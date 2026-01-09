@@ -8,7 +8,7 @@ export default function Hero() {
             {/* Content */}
             <div className="container mx-auto px-6 relative z-10 text-center">
                 <div className="inline-block mb-4 px-4 py-1.5 border border-neon/50 rounded-full bg-neon/5 text-neon text-xs font-heading tracking-[0.2em] uppercase backdrop-blur-md">
-                    Next Gen Simulation
+                    Racing Simulation
                 </div>
 
                 <h1 className="text-5xl md:text-8xl font-black font-heading italic uppercase tracking-tighter mb-8 leading-none">

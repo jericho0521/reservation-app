@@ -5,7 +5,7 @@ export default function Header() {
         <header className="fixed top-0 left-0 right-0 z-50 glass-panel border-b border-white/10">
             <div className="container mx-auto px-6 h-20 flex items-center justify-between">
                 <Link href="/" className="text-2xl font-bold font-heading tracking-tighter uppercase italic">
-                    Apex<span className="text-neon drop-shadow-[0_0_10px_rgba(185,217,207,0.5)]">Sim</span>
+                    PROJECT PLAY<span className="text-neon drop-shadow-[0_0_10px_rgba(185,217,207,0.5)]"> by CW</span>
                 </Link>
 
                 <nav className="hidden md:flex items-center gap-8 text-sm tracking-wider uppercase">
@@ -18,7 +18,6 @@ export default function Header() {
                     Book Session
                 </button>
 
-                {/* Mobile Menu Button - simplified for high-fidelity specific view */}
                 <button className="md:hidden text-white">
                     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                         <line x1="3" y1="12" x2="21" y2="12"></line>

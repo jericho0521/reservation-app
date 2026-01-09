@@ -14,7 +14,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: 'Apex Racing Simulators',
+  title: 'Project Play By CW',
   description: 'Experience the ultimate racing simulation.',
 };
 

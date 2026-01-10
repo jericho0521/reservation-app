@@ -10,7 +10,7 @@ export async function GET(
 
         const { data, error } = await supabase
             .from('bookings')
-            .select('*, venues(name, location)')
+            .select('*, services(name)')
             .eq('id', id)
             .single();
 
@@ -63,7 +63,6 @@ export async function DELETE(
     try {
         const { id } = await params;
 
-        // Soft delete - update status to cancelled
         const { data, error } = await supabase
             .from('bookings')
             .update({

@@ -3,31 +3,42 @@ import { supabase } from '@/lib/supabase';
 
 export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
-    const venueId = searchParams.get('venue_id');
+    const serviceId = searchParams.get('service_id');
     const date = searchParams.get('date');
 
-    if (!venueId || !date) {
+    if (!serviceId || !date) {
         return NextResponse.json(
-            { error: 'venue_id and date are required' },
+            { error: 'service_id and date are required' },
             { status: 400 }
         );
     }
 
     try {
-        // Check existing bookings for this venue and date
+        // Get service to know total seats
+        const { data: service, error: serviceError } = await supabase
+            .from('services')
+            .select('total_seats')
+            .eq('id', serviceId)
+            .single();
+
+        if (serviceError) throw serviceError;
+
+        const totalSeats = service.total_seats;
+
+        // Get existing bookings for this service and date
         const { data: bookings, error: bookingsError } = await supabase
             .from('bookings')
-            .select('start_time, end_time')
-            .eq('venue_id', venueId)
+            .select('start_time, end_time, seats_booked')
+            .eq('service_id', serviceId)
             .eq('booking_date', date)
             .eq('status', 'confirmed');
 
         if (bookingsError) throw bookingsError;
 
-        // Generate available time slots (9 AM - 5 PM, 1-hour slots)
-        const timeSlots = generateTimeSlots(bookings || []);
+        // Generate time slots (12 PM - 1 AM, 1-hour intervals)
+        const timeSlots = generateTimeSlots(totalSeats, bookings || []);
 
-        return NextResponse.json({ timeSlots });
+        return NextResponse.json({ timeSlots, totalSeats });
     } catch (error) {
         console.error('Failed to check availability:', error);
         return NextResponse.json(
@@ -37,29 +48,42 @@ export async function GET(request: Request) {
     }
 }
 
-function generateTimeSlots(bookings: { start_time: string; end_time: string }[]) {
+function generateTimeSlots(
+    totalSeats: number,
+    bookings: { start_time: string; end_time: string; seats_booked: number }[]
+) {
     const slots = [];
-    const startHour = 9;  // 9 AM
-    const endHour = 17;   // 5 PM
 
-    for (let hour = startHour; hour < endHour; hour++) {
+    // Hours: 12 PM (12) to 1 AM (25, representing next day's 1:00)
+    // 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 0 (midnight), 1 AM end
+    const hours = [12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 0];
+
+    for (const hour of hours) {
         const startTime = `${hour.toString().padStart(2, '0')}:00`;
-        const endTime = `${(hour + 1).toString().padStart(2, '0')}:00`;
+        const endHour = hour === 0 ? 1 : hour + 1;
+        const endTime = `${endHour.toString().padStart(2, '0')}:00`;
 
-        // Check if slot conflicts with existing bookings
-        const isAvailable = !bookings.some(booking => {
-            const bookingStart = booking.start_time.slice(0, 5);
-            const bookingEnd = booking.end_time.slice(0, 5);
-            return (
-                (startTime >= bookingStart && startTime < bookingEnd) ||
-                (endTime > bookingStart && endTime <= bookingEnd)
-            );
-        });
+        // Calculate booked seats for this time slot
+        const bookedSeats = bookings
+            .filter(booking => {
+                const bookingStart = booking.start_time.slice(0, 5);
+                const bookingEnd = booking.end_time.slice(0, 5);
+                // Check for overlap
+                return (
+                    (startTime >= bookingStart && startTime < bookingEnd) ||
+                    (endTime > bookingStart && endTime <= bookingEnd) ||
+                    (startTime <= bookingStart && endTime >= bookingEnd)
+                );
+            })
+            .reduce((sum, booking) => sum + booking.seats_booked, 0);
+
+        const availableSeats = totalSeats - bookedSeats;
 
         slots.push({
             start_time: startTime,
             end_time: endTime,
-            is_available: isAvailable
+            available_seats: Math.max(0, availableSeats),
+            is_available: availableSeats > 0
         });
     }
 

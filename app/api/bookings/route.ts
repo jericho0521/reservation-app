@@ -3,14 +3,13 @@ import { supabase } from '@/lib/supabase';
 import { z } from 'zod';
 
 const bookingSchema = z.object({
-    venue_id: z.string().uuid(),
+    service_id: z.string().uuid(),
     user_name: z.string().min(1),
     user_email: z.string().email(),
     booking_date: z.string(),
     start_time: z.string(),
     end_time: z.string(),
-    capacity_needed: z.number().positive(),
-    equipment_needed: z.array(z.string()).optional(),
+    seats_booked: z.number().positive(),
     interface_type: z.enum(['form', 'chat'])
 });
 
@@ -18,7 +17,7 @@ export async function GET() {
     try {
         const { data, error } = await supabase
             .from('bookings')
-            .select('*, venues(name)')
+            .select('*, services(name)')
             .order('booking_date', { ascending: false });
 
         if (error) throw error;
@@ -38,19 +37,39 @@ export async function POST(request: Request) {
         const body = await request.json();
         const validatedData = bookingSchema.parse(body);
 
-        // Check for conflicts
-        const { data: conflicts } = await supabase
+        // Get service to check total seats
+        const { data: service, error: serviceError } = await supabase
+            .from('services')
+            .select('total_seats')
+            .eq('id', validatedData.service_id)
+            .single();
+
+        if (serviceError) throw serviceError;
+
+        // Check current bookings for this time slot
+        const { data: existingBookings, error: bookingsError } = await supabase
             .from('bookings')
-            .select('id')
-            .eq('venue_id', validatedData.venue_id)
+            .select('seats_booked')
+            .eq('service_id', validatedData.service_id)
             .eq('booking_date', validatedData.booking_date)
             .eq('status', 'confirmed')
             .gte('end_time', validatedData.start_time)
             .lte('start_time', validatedData.end_time);
 
-        if (conflicts && conflicts.length > 0) {
+        if (bookingsError) throw bookingsError;
+
+        const bookedSeats = (existingBookings || []).reduce(
+            (sum, b) => sum + b.seats_booked,
+            0
+        );
+        const availableSeats = service.total_seats - bookedSeats;
+
+        if (validatedData.seats_booked > availableSeats) {
             return NextResponse.json(
-                { error: 'Time slot not available' },
+                {
+                    error: 'Not enough seats available',
+                    available_seats: availableSeats
+                },
                 { status: 409 }
             );
         }
@@ -60,8 +79,7 @@ export async function POST(request: Request) {
             .from('bookings')
             .insert([{
                 ...validatedData,
-                status: 'confirmed',
-                equipment_needed: validatedData.equipment_needed || []
+                status: 'confirmed'
             }])
             .select()
             .single();

@@ -1,29 +1,20 @@
-export interface Venue {
+export interface Service {
     id: string;
     name: string;
     description?: string;
-    capacity: number;
-    location?: string;
+    total_seats: number;
     created_at: string;
-}
-
-export interface Equipment {
-    id: string;
-    name: string;
-    quantity: number;
-    venue_id: string;
 }
 
 export interface Booking {
     id?: string;
-    venue_id: string;
+    service_id: string;
     user_name: string;
     user_email: string;
     booking_date: string;
     start_time: string;
     end_time: string;
-    capacity_needed: number;
-    equipment_needed?: string[];
+    seats_booked: number;
     status?: string;
     interface_type: 'form' | 'chat';
 }
@@ -31,6 +22,7 @@ export interface Booking {
 export interface TimeSlot {
     start_time: string;
     end_time: string;
+    available_seats: number;
     is_available: boolean;
 }
 

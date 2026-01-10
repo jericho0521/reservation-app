@@ -1,3 +1,5 @@
+import Link from 'next/link';
+
 export default function Hero() {
     return (
         <section className="relative min-h-screen flex items-center justify-center overflow-hidden pt-20">
@@ -25,12 +27,18 @@ export default function Hero() {
                 </p>
 
                 <div className="flex flex-col md:flex-row items-center justify-center gap-6">
-                    <button className="relative z-20 px-8 py-4 bg-neon text-racing-dark font-sans font-black text-lg uppercase tracking-wider hover:bg-white hover:shadow-[0_0_20px_rgba(185,217,207,0.5)] transition-all duration-300 w-full md:w-auto">
-                        Book Your Ride
-                    </button>
-                    <button className="relative z-20 px-8 py-4 border border-white/20 hover:border-neon text-white font-sans font-bold uppercase tracking-wider hover:text-neon hover:bg-neon/5 transition-all duration-300 w-full md:w-auto">
+                    <Link
+                        href="/form-booking"
+                        className="relative z-20 px-8 py-4 bg-neon text-racing-dark font-sans font-black text-lg uppercase tracking-wider hover:bg-white hover:shadow-[0_0_20px_rgba(185,217,207,0.5)] transition-all duration-300 w-full md:w-auto text-center"
+                    >
+                        Book Now
+                    </Link>
+                    <Link
+                        href="#pricing"
+                        className="relative z-20 px-8 py-4 border border-white/20 hover:border-neon text-white font-sans font-bold uppercase tracking-wider hover:text-neon hover:bg-neon/5 transition-all duration-300 w-full md:w-auto text-center"
+                    >
                         View Pricing
-                    </button>
+                    </Link>
                 </div>
             </div>
 

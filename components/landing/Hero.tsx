@@ -26,12 +26,18 @@ export default function Hero() {
                     Precision engineering meets immersive virtual reality.
                 </p>
 
-                <div className="flex flex-col md:flex-row items-center justify-center gap-6">
+                <div className="flex flex-col md:flex-row items-center justify-center gap-4">
                     <Link
                         href="/form-booking"
                         className="relative z-20 px-8 py-4 bg-neon text-racing-dark font-sans font-black text-lg uppercase tracking-wider hover:bg-white hover:shadow-[0_0_20px_rgba(185,217,207,0.5)] transition-all duration-300 w-full md:w-auto text-center"
                     >
                         Book Now
+                    </Link>
+                    <Link
+                        href="/chat-booking"
+                        className="relative z-20 px-8 py-4 bg-white/5 border border-neon text-neon font-sans font-bold uppercase tracking-wider hover:bg-neon hover:text-racing-dark transition-all duration-300 w-full md:w-auto text-center"
+                    >
+                        Chat Booking
                     </Link>
                     <Link
                         href="#pricing"

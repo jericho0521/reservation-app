@@ -22,11 +22,11 @@ body {
     .text-neon {
         color: var(--color-neon);
         text-shadow: 0 0 10px rgba(185, 217, 207, 0.5);
-    }
+}
 
     .border-neon {
         border-color: var(--color-neon);
-    }
+}
 
     .bg-neon-10 {
         background-color: rgba(185, 217, 207, 0.1);
@@ -36,5 +36,5 @@ body {
         background: rgba(23, 29, 48, 0.8);
         backdrop-filter: blur(12px);
         border: 1px solid rgba(185, 217, 207, 0.2);
-    }
+}
 }

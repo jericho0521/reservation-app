@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { MessageCircle } from 'lucide-react';
 import MessageBubble from './MessageBubble';
 
 interface Message {
@@ -112,7 +113,9 @@ export default function ChatInterface() {
             <div className="flex-1 overflow-y-auto p-4">
                 {messages.length === 0 && (
                     <div className="text-center text-gray-400 mt-8">
-                        <div className="text-4xl mb-4">👋</div>
+                        <div className="mb-4 flex justify-center">
+                            <MessageCircle className="w-12 h-12 text-neon" />
+                        </div>
                         <p className="text-lg mb-2">Hi! I&apos;m your booking assistant.</p>
                         <p className="text-sm">Tell me what you&apos;d like to book and I&apos;ll help you out!</p>
                         <p className="text-sm mt-2">Type a message below or ask me about Racing Simulators or PS5!</p>

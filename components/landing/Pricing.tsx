@@ -7,7 +7,7 @@ export default function Pricing() {
             <div className="container mx-auto px-6 relative z-10">
                 <h2 className="text-4xl md:text-5xl font-bold font-heading uppercase italic tracking-tighter text-center mb-16">
                     Race <span className="text-neon">Passes</span>
-                </h2>
+                    </h2>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto">
                     {/* Starter */}
@@ -22,13 +22,13 @@ export default function Pricing() {
                         <button className="w-full py-3 border border-white/20 hover:border-neon hover:text-neon hover:bg-neon/5 transition-all text-sm uppercase tracking-wider font-bold">
                             Select
                         </button>
-                    </div>
+                </div>
 
                     {/* Pro (Highlighted) */}
                     <div className="p-8 border-2 border-neon bg-neon/5 backdrop-blur-sm flex flex-col relative transform md:-translate-y-4">
                         <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 px-4 py-1 bg-neon text-racing-dark text-xs font-bold uppercase tracking-wider">
-                            Most Popular
-                        </div>
+                                    Most Popular
+                                </div>
                         <h3 className="text-xl font-bold font-heading uppercase tracking-wider text-neon mb-2">Pro Driver</h3>
                         <div className="text-4xl font-bold font-heading mb-6">$45<span className="text-sm font-normal font-sans text-gray-400">/session</span></div>
                         <ul className="space-y-4 mb-8 flex-grow text-sm text-gray-300">
@@ -39,7 +39,7 @@ export default function Pricing() {
                         <button className="w-full py-3 bg-neon text-racing-dark hover:bg-white transition-all text-sm uppercase tracking-wider font-bold">
                             Select
                         </button>
-                    </div>
+                            </div>
 
                     {/* Team */}
                     <div className="p-8 border border-white/10 bg-black/20 backdrop-blur-sm flex flex-col">
@@ -49,11 +49,11 @@ export default function Pricing() {
                             <li className="flex gap-3"><span className="text-neon">✓</span> Up to 4 Simulators</li>
                             <li className="flex gap-3"><span className="text-neon">✓</span> Private Race Lobby</li>
                             <li className="flex gap-3"><span className="text-neon">✓</span> Instructor Included</li>
-                        </ul>
+                            </ul>
                         <button className="w-full py-3 border border-white/20 hover:border-neon hover:text-neon hover:bg-neon/5 transition-all text-sm uppercase tracking-wider font-bold">
                             Select
                         </button>
-                    </div>
+                        </div>
                 </div>
             </div>
         </section>

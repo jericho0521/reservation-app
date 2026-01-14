@@ -1,9 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase-browser';
-import { Check, X, RotateCcw, LogOut } from 'lucide-react';
+import { Check, X, RotateCcw, LogOut, RefreshCw } from 'lucide-react';
 
 interface Booking {
     id: string;
@@ -29,6 +29,30 @@ export default function AdminDashboard({ bookings: initialBookings, todayCount, 
     const [isUpdating, setIsUpdating] = useState<string | null>(null);
     const router = useRouter();
     const supabase = createClient();
+    const [lastRefresh, setLastRefresh] = useState(new Date());
+    const [isRefreshing, setIsRefreshing] = useState(false);
+
+    const refreshBookings = useCallback(async () => {
+        setIsRefreshing(true);
+        const { data } = await supabase
+            .from('bookings')
+            .select('*, services (name)')
+            .order('booking_date', { ascending: false })
+            .order('start_time', { ascending: false })
+            .limit(50);
+
+        if (data) {
+            setBookings(data);
+            setLastRefresh(new Date());
+        }
+        setIsRefreshing(false);
+    }, [supabase]);
+
+    // Auto-refresh every 30 seconds
+    useEffect(() => {
+        const interval = setInterval(refreshBookings, 30000);
+        return () => clearInterval(interval);
+    }, [refreshBookings]);
 
     const handleLogout = async () => {
         await supabase.auth.signOut();
@@ -86,13 +110,28 @@ export default function AdminDashboard({ bookings: initialBookings, todayCount, 
                         <h1 className="text-2xl font-bold font-heading">Admin Dashboard</h1>
                         <p className="text-sm text-gray-400">Logged in as {userEmail}</p>
                     </div>
-                    <button
-                        onClick={handleLogout}
-                        className="flex items-center gap-2 px-4 py-2 text-sm border border-white/20 rounded-lg hover:bg-white/10 transition-colors"
-                    >
-                        <LogOut className="w-4 h-4" />
-                        Sign Out
-                    </button>
+                    <div className="flex items-center gap-4">
+                        <div className="flex items-center gap-2 text-sm text-gray-400">
+                            <button
+                                onClick={refreshBookings}
+                                disabled={isRefreshing}
+                                className="flex items-center gap-1 px-3 py-1.5 border border-white/20 rounded-lg hover:bg-white/10 transition-colors disabled:opacity-50"
+                            >
+                                <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+                                {isRefreshing ? 'Refreshing...' : 'Refresh'}
+                            </button>
+                            <span className="text-xs">
+                                Updated {lastRefresh.toLocaleTimeString()}
+                            </span>
+                        </div>
+                        <button
+                            onClick={handleLogout}
+                            className="flex items-center gap-2 px-4 py-2 text-sm border border-white/20 rounded-lg hover:bg-white/10 transition-colors"
+                        >
+                            <LogOut className="w-4 h-4" />
+                            Sign Out
+                        </button>
+                    </div>
                 </div>
             </header>
 

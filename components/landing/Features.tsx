@@ -1,27 +1,27 @@
 export default function Features() {
-    const features = [
-        {
+const features = [
+    {
             title: "Motion Simulation",
             description: "Full-motion feedback systems that replicate G-forces and track surface details.",
             icon: (
                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" /><path d="M19 10v2a7 7 0 0 1-14 0v-2" /><line x1="12" y1="19" x2="12" y2="22" /><line x1="8" y1="22" x2="16" y2="22" /></svg>
             )
-        },
-        {
+    },
+    {
             title: "VR Immersion",
             description: "Cutting-edge VR headsets providing 360-degree vision and depth perception.",
             icon: (
                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 12h5" /><path d="M17 12h5" /><path d="M7 12a5 5 0 0 1 5-5 5 5 0 0 1 5 5" /><path d="M7 12a5 5 0 0 0 5 5 5 5 0 0 0 5-5" /></svg>
             )
-        },
-        {
+    },
+    {
             title: "Pro Hardware",
             description: "Direct-drive steering wheels and hydraulic load-cell pedals for realistic control.",
             icon: (
                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><circle cx="12" cy="12" r="2" /><path d="m16.24 7.76-1.41 1.41" /><path d="m7.76 16.24 1.41-1.41" /><path d="m16.24 16.24-1.41-1.41" /><path d="m7.76 7.76 1.41 1.41" /><path d="M12 2v4" /><path d="M12 18v4" /><path d="M22 12h-4" /><path d="M6 12H2" /></svg>
             )
-        },
-        {
+    },
+    {
             title: "Global Multiplayer",
             description: "Compete against racers worldwide in sanctioned leagues and daily events.",
             icon: (

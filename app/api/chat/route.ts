@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
+import { getRelevantContext } from '@/lib/knowledge';
 
 const SYSTEM_PROMPT = `You are a friendly booking assistant for PROJECT PLAY by CW.
 
@@ -191,9 +192,20 @@ async function executeTool(name: string, args: Record<string, unknown>) {
 export async function POST(req: Request) {
     const { messages } = await req.json();
 
+    // Get the latest user message for context retrieval
+    const latestUserMessage = [...messages].reverse().find((m: { role: string }) => m.role === 'user')?.content || '';
+
+    // Retrieve relevant context from knowledge base
+    const context = await getRelevantContext(latestUserMessage);
+
+    // Build enhanced system prompt with context
+    const enhancedSystemPrompt = context
+        ? `${SYSTEM_PROMPT}${context}`
+        : SYSTEM_PROMPT;
+
     // Prepare messages for OpenRouter
     const apiMessages = [
-        { role: 'system', content: SYSTEM_PROMPT },
+        { role: 'system', content: enhancedSystemPrompt },
         ...messages.map((m: { role: string; content: string }) => ({
             role: m.role,
             content: m.content,

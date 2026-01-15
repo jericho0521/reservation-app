@@ -6,10 +6,9 @@ interface Props {
 }
 
 export default function DatePicker({ selected, onSelect }: Props) {
-    // Get tomorrow as minimum date
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    const minDate = tomorrow.toISOString().split('T')[0];
+    // Get today as minimum date (allow same-day bookings)
+    const today = new Date();
+    const minDate = today.toISOString().split('T')[0];
 
     // Get 30 days from now as maximum
     const maxDate = new Date();

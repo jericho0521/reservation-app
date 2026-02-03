@@ -3,7 +3,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase-browser';
-import { Check, X, RotateCcw, LogOut, RefreshCw, BarChart3, TrendingUp, Users, Building2, Clock, Download, Settings } from 'lucide-react';
+import { Check, X, RotateCcw, LogOut, RefreshCw } from 'lucide-react';
+import { Sidebar } from '@/components/admin/Sidebar';
 
 interface Booking {
     id: string;
@@ -103,73 +104,46 @@ export default function AdminDashboard({ bookings: initialBookings, todayCount, 
     };
 
     return (
-        <div className="min-h-screen bg-racing-dark flex flex-col">
-            {/* Header */}
-            <header className="border-b border-white/10 bg-white/5 sticky top-0 z-10 backdrop-blur-md">
-                <div className="container mx-auto px-6 py-4 flex justify-between items-center">
-                    <div>
-                        <h1 className="text-2xl font-bold font-heading">Admin Dashboard</h1>
-                        <p className="text-sm text-gray-400">Logged in as {userEmail}</p>
-                    </div>
-                    <div className="flex items-center gap-4">
-                        <div className="flex items-center gap-2 text-sm text-gray-400">
+        <div className="min-h-screen bg-racing-dark">
+            {/* New Expandable Sidebar */}
+            <Sidebar title="Admin Panel" subtitle={userEmail} />
+
+            {/* Main Layout with margin for sidebar */}
+            <div className="ml-[76px] transition-all duration-300">
+                {/* Header */}
+                <header className="border-b border-white/10 bg-white/5 sticky top-0 z-10 backdrop-blur-md">
+                    <div className="container mx-auto px-6 py-4 flex justify-between items-center">
+                        <div>
+                            <h1 className="text-2xl font-bold font-heading">Bookings Management</h1>
+                            <p className="text-sm text-gray-400">Manage all your reservations</p>
+                        </div>
+                        <div className="flex items-center gap-4">
+                            <div className="flex items-center gap-2 text-sm text-gray-400">
+                                <button
+                                    onClick={refreshBookings}
+                                    disabled={isRefreshing}
+                                    className="flex items-center gap-1 px-3 py-1.5 border border-white/20 rounded-lg hover:bg-white/10 transition-colors disabled:opacity-50"
+                                >
+                                    <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+                                    {isRefreshing ? 'Refreshing...' : 'Refresh'}
+                                </button>
+                                <span className="text-xs">
+                                    Updated {lastRefresh.toLocaleTimeString()}
+                                </span>
+                            </div>
                             <button
-                                onClick={refreshBookings}
-                                disabled={isRefreshing}
-                                className="flex items-center gap-1 px-3 py-1.5 border border-white/20 rounded-lg hover:bg-white/10 transition-colors disabled:opacity-50"
+                                onClick={handleLogout}
+                                className="flex items-center gap-2 px-4 py-2 text-sm border border-white/20 rounded-lg hover:bg-white/10 transition-colors"
                             >
-                                <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-                                {isRefreshing ? 'Refreshing...' : 'Refresh'}
+                                <LogOut className="w-4 h-4" />
+                                Sign Out
                             </button>
-                            <span className="text-xs">
-                                Updated {lastRefresh.toLocaleTimeString()}
-                            </span>
-                        </div>
-                        <button
-                            onClick={handleLogout}
-                            className="flex items-center gap-2 px-4 py-2 text-sm border border-white/20 rounded-lg hover:bg-white/10 transition-colors"
-                        >
-                            <LogOut className="w-4 h-4" />
-                            Sign Out
-                        </button>
-                    </div>
-                </div>
-            </header>
-
-            <div className="flex flex-1 container mx-auto px-6 py-8 gap-8">
-                {/* Sidebar (25% - Left Side) */}
-                <aside className="w-full lg:w-64 flex-shrink-0">
-                    <div className="sticky top-24">
-                        <div className="bg-white/5 border border-white/10 rounded-xl overflow-hidden backdrop-blur-sm">
-                            <div className="p-4 border-b border-white/10">
-                                <h2 className="text-lg font-bold font-heading text-neon">Analytics & Tools</h2>
-                            </div>
-                            <div className="p-2">
-                                {[
-                                    { label: 'Revenue Analytics', icon: BarChart3, path: '/admin/analytics' },
-                                    { label: 'Booking Trends', icon: TrendingUp, path: '/admin/analytics' },
-                                    { label: 'Customer Insights', icon: Users, path: '#' },
-                                    { label: 'Occupancy Rates', icon: Building2, path: '#' },
-                                    { label: 'Peak Hours', icon: Clock, path: '#' },
-                                    { label: 'Export Reports', icon: Download, path: '#' },
-                                    { label: 'Settings', icon: Settings, path: '#' },
-                                ].map((item, index) => (
-                                    <button
-                                        key={index}
-                                        onClick={() => item.path !== '#' && router.push(item.path)}
-                                        className="w-full flex items-center gap-3 px-4 py-3 text-left rounded-lg text-gray-400 hover:text-white hover:bg-white/10 transition-all duration-200 group"
-                                    >
-                                        <item.icon className="w-5 h-5 group-hover:text-neon transition-colors" />
-                                        <span className="text-sm font-medium">{item.label}</span>
-                                    </button>
-                                ))}
-                            </div>
                         </div>
                     </div>
-                </aside>
+                </header>
 
-                {/* Main Content Area (75% - Right Side) */}
-                <main className="flex-1 min-w-0 space-y-8">
+                {/* Main Content Area */}
+                <main className="container mx-auto px-6 py-8 space-y-8">
                     {/* Stats */}
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                         <div className="glass-panel p-4 rounded-xl border border-white/10">

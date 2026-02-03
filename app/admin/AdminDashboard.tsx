@@ -13,6 +13,7 @@ interface Booking {
     start_time: string;
     end_time: string;
     seats_booked: number;
+    seat_labels?: string[];
     status: string;
     services: { name: string } | null;
 }
@@ -220,8 +221,13 @@ export default function AdminDashboard({ bookings: initialBookings, todayCount, 
                                             <td className="px-4 py-3 text-sm">
                                                 {booking.start_time} - {booking.end_time}
                                             </td>
-                                            <td className="px-4 py-3 text-sm">
-                                                {booking.seats_booked}
+                                            <td className="px-4 py-3">
+                                                <div className="text-sm font-medium">{booking.seats_booked}</div>
+                                                {booking.seat_labels && booking.seat_labels.length > 0 && (
+                                                    <div className="text-xs text-neon mt-0.5">
+                                                        {booking.seat_labels.join(', ')}
+                                                    </div>
+                                                )}
                                             </td>
                                             <td className="px-4 py-3">
                                                 <span className={`px-2 py-1 text-xs rounded-full border ${getStatusColor(booking.status)}`}>

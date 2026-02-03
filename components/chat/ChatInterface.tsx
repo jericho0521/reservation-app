@@ -3,11 +3,28 @@
 import { useEffect, useRef, useState } from 'react';
 import { MessageCircle } from 'lucide-react';
 import MessageBubble from './MessageBubble';
+import BookingCard from './BookingCard';
+
+interface BookingData {
+    service: string;
+    date: string;
+    time: string;
+    seats: number;
+    name: string;
+    email: string;
+}
+
+interface MessageAction {
+    type: 'booking_confirmation' | 'booking_success';
+    data: BookingData;
+}
 
 interface Message {
     id: string;
     role: 'user' | 'assistant';
     content: string;
+    action?: MessageAction;
+    actionStatus?: 'pending' | 'confirmed' | 'cancelled' | 'loading';
 }
 
 export default function ChatInterface() {
@@ -16,6 +33,7 @@ export default function ChatInterface() {
     const [isLoading, setIsLoading] = useState(false);
 
     const messagesEndRef = useRef<HTMLDivElement>(null);
+    const inputRef = useRef<HTMLInputElement>(null);
 
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -24,6 +42,69 @@ export default function ChatInterface() {
     useEffect(() => {
         scrollToBottom();
     }, [messages]);
+
+    // Auto-focus input when loading finishes or on mount
+    useEffect(() => {
+        if (!isLoading) {
+            inputRef.current?.focus();
+        }
+    }, [isLoading, messages]);
+
+    const handleConfirmBooking = async (messageId: string, data: BookingData) => {
+        // Update message status to loading
+        setMessages(prev => prev.map(m =>
+            m.id === messageId ? { ...m, actionStatus: 'loading' as const } : m
+        ));
+
+        try {
+            const response = await fetch('/api/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    messages: [],
+                    confirmBooking: data
+                }),
+            });
+
+            const result = await response.json();
+
+            // Update to confirmed and add success message
+            setMessages(prev => {
+                const updated = prev.map(m =>
+                    m.id === messageId ? { ...m, actionStatus: 'confirmed' as const } : m
+                );
+                return [
+                    ...updated,
+                    {
+                        id: Date.now().toString(),
+                        role: 'assistant' as const,
+                        content: result.content
+                    }
+                ];
+            });
+        } catch (error) {
+            console.error('Booking confirmation error:', error);
+            setMessages(prev => prev.map(m =>
+                m.id === messageId ? { ...m, actionStatus: 'pending' as const } : m
+            ));
+        }
+    };
+
+    const handleCancelBooking = (messageId: string) => {
+        setMessages(prev => {
+            const updated = prev.map(m =>
+                m.id === messageId ? { ...m, actionStatus: 'cancelled' as const } : m
+            );
+            return [
+                ...updated,
+                {
+                    id: Date.now().toString(),
+                    role: 'assistant' as const,
+                    content: "No problem! Let me know if you'd like to make changes or start a new booking."
+                }
+            ];
+        });
+    };
 
     const onSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -56,36 +137,17 @@ export default function ChatInterface() {
                 throw new Error('Failed to get response');
             }
 
-            // Read the stream
-            const reader = response.body?.getReader();
-            const decoder = new TextDecoder();
-            let assistantContent = '';
+            const result = await response.json();
 
-            if (reader) {
-                const assistantMessage: Message = {
-                    id: (Date.now() + 1).toString(),
-                    role: 'assistant',
-                    content: '',
-                };
-                setMessages([...newMessages, assistantMessage]);
+            const assistantMessage: Message = {
+                id: (Date.now() + 1).toString(),
+                role: 'assistant',
+                content: result.content,
+                action: result.action,
+                actionStatus: result.action ? 'pending' : undefined
+            };
 
-                while (true) {
-                    const { done, value } = await reader.read();
-                    if (done) break;
-
-                    const chunk = decoder.decode(value, { stream: true });
-                    assistantContent += chunk;
-
-                    setMessages(prev => {
-                        const updated = [...prev];
-                        const lastMsg = updated[updated.length - 1];
-                        if (lastMsg?.role === 'assistant') {
-                            lastMsg.content = assistantContent;
-                        }
-                        return updated;
-                    });
-                }
-            }
+            setMessages([...newMessages, assistantMessage]);
         } catch (error) {
             console.error('Chat error:', error);
             setMessages(prev => [
@@ -123,11 +185,28 @@ export default function ChatInterface() {
                 )}
 
                 {messages.map((message) => (
-                    <MessageBubble
-                        key={message.id}
-                        role={message.role}
-                        content={message.content}
-                    />
+                    <div key={message.id}>
+                        {/* Hide text message when showing booking card (card shows the same info) */}
+                        {!(message.action && message.action.type === 'booking_confirmation') && (
+                            <MessageBubble
+                                role={message.role}
+                                content={message.content}
+                            />
+                        )}
+                        {message.action && message.action.type === 'booking_confirmation' && (
+                            <BookingCard
+                                service={message.action.data.service}
+                                date={message.action.data.date}
+                                time={message.action.data.time}
+                                seats={message.action.data.seats}
+                                name={message.action.data.name}
+                                email={message.action.data.email}
+                                status={message.actionStatus}
+                                onConfirm={() => handleConfirmBooking(message.id, message.action!.data)}
+                                onCancel={() => handleCancelBooking(message.id)}
+                            />
+                        )}
+                    </div>
                 ))}
 
                 {isLoading && messages[messages.length - 1]?.role !== 'assistant' && (
@@ -152,6 +231,7 @@ export default function ChatInterface() {
             >
                 <div className="flex gap-3">
                     <input
+                        ref={inputRef}
                         type="text"
                         value={inputValue}
                         onChange={(e) => setInputValue(e.target.value)}

@@ -10,6 +10,7 @@ const bookingSchema = z.object({
     start_time: z.string(),
     end_time: z.string(),
     seats_booked: z.number().positive(),
+    seat_labels: z.array(z.string()).optional(),
     interface_type: z.enum(['form', 'chat'])
 });
 

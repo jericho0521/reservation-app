@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import useSWR from 'swr';
 import { Service } from '@/types';
 
 interface Props {
@@ -8,25 +8,24 @@ interface Props {
     onSelect: (serviceId: string, serviceName: string, totalSeats: number) => void;
 }
 
+const fetcher = (url: string) => fetch(url).then(res => res.json());
+
+// Hoisted static SVG icons - avoid re-creation on each render
+const RacingIcon = (
+    <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 10V3L4 14h7v7l9-11h-7z" />
+    </svg>
+);
+
+const PlayIcon = (
+    <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+    </svg>
+);
+
 export default function ServiceSelector({ selected, onSelect }: Props) {
-    const [services, setServices] = useState<Service[]>([]);
-    const [loading, setLoading] = useState(true);
-
-    useEffect(() => {
-        fetchServices();
-    }, []);
-
-    const fetchServices = async () => {
-        try {
-            const response = await fetch('/api/services');
-            const data = await response.json();
-            setServices(data);
-        } catch (error) {
-            console.error('Failed to fetch services:', error);
-        } finally {
-            setLoading(false);
-        }
-    };
+    const { data: services = [], isLoading: loading } = useSWR<Service[]>('/api/services', fetcher);
 
     if (loading) {
         return (
@@ -37,19 +36,7 @@ export default function ServiceSelector({ selected, onSelect }: Props) {
     }
 
     const getServiceIcon = (name: string) => {
-        if (name.toLowerCase().includes('racing')) {
-            return (
-                <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                </svg>
-            );
-        }
-        return (
-            <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-        );
+        return name.toLowerCase().includes('racing') ? RacingIcon : PlayIcon;
     };
 
     return (

@@ -10,9 +10,13 @@ Available services:
 
 Operating Hours: 12 PM - 2 AM (1-hour time slots)
 
+TODAY'S DATE: ${new Date().toISOString().split('T')[0]}
+
+When users say dates like "tomorrow", "next Monday", "this Friday", etc., convert them to YYYY-MM-DD format using today's date as reference.
+
 Help users book sessions by:
 1. Asking which service they want
-2. Checking availability for their preferred date
+2. Checking availability for their preferred date (convert natural language dates)
 3. Getting number of seats, name, and email
 4. Creating the booking
 
@@ -150,8 +154,8 @@ const tools = [
     {
         type: 'function',
         function: {
-            name: 'create_booking',
-            description: 'Create a booking after confirming all details',
+            name: 'prepare_booking',
+            description: 'Prepare a booking for user confirmation. Call this when you have ALL details: service, date, time, seats, name, email. This does NOT create the booking yet - it shows a confirmation card to the user.',
             parameters: {
                 type: 'object',
                 properties: {
@@ -175,22 +179,72 @@ async function executeTool(name: string, args: Record<string, unknown>) {
             return await getServices();
         case 'check_availability':
             return await checkAvailability(args.service_name as string, args.date as string);
-        case 'create_booking':
-            return await createBooking(
-                args.service_name as string,
-                args.date as string,
-                args.start_time as string,
-                args.seats as number,
-                args.user_name as string,
-                args.user_email as string
-            );
+        case 'prepare_booking':
+            // Just return the booking data - actual creation happens when user clicks Confirm
+            return {
+                ready_for_confirmation: true,
+                service_name: args.service_name,
+                date: args.date,
+                start_time: args.start_time,
+                seats: args.seats,
+                user_name: args.user_name,
+                user_email: args.user_email
+            };
         default:
             return { error: 'Unknown function' };
     }
 }
 
+// Check if assistant message contains booking confirmation request
+function extractBookingAction(content: string, toolCalls: unknown[]): { type: string; data: unknown } | null {
+    // Look for the prepare_booking tool call to extract data
+    if (toolCalls && Array.isArray(toolCalls)) {
+        for (const call of toolCalls) {
+            const tc = call as { function?: { name?: string; arguments?: string } };
+            if (tc.function?.name === 'prepare_booking') {
+                try {
+                    const args = JSON.parse(tc.function.arguments || '{}');
+                    return {
+                        type: 'booking_confirmation',
+                        data: {
+                            service: args.service_name,
+                            date: args.date,
+                            time: args.start_time,
+                            seats: args.seats,
+                            name: args.user_name,
+                            email: args.user_email
+                        }
+                    };
+                } catch {
+                    return null;
+                }
+            }
+        }
+    }
+    return null;
+}
+
 export async function POST(req: Request) {
-    const { messages } = await req.json();
+    const body = await req.json();
+    const { messages, confirmBooking } = body;
+
+    // If this is a booking confirmation request
+    if (confirmBooking) {
+        const result = await createBooking(
+            confirmBooking.service,
+            confirmBooking.date,
+            confirmBooking.time,
+            confirmBooking.seats,
+            confirmBooking.name,
+            confirmBooking.email
+        );
+        return Response.json({
+            content: result.success
+                ? `Great! Your booking is confirmed! 🎉 You've booked ${confirmBooking.seats} seat(s) for ${confirmBooking.service} on ${confirmBooking.date} at ${confirmBooking.time}. A confirmation will be sent to ${confirmBooking.email}.`
+                : `Sorry, there was an issue: ${result.error}`,
+            action: result.success ? { type: 'booking_success', data: confirmBooking } : null
+        });
+    }
 
     // Get the latest user message for context retrieval
     const latestUserMessage = [...messages].reverse().find((m: { role: string }) => m.role === 'user')?.content || '';
@@ -200,8 +254,14 @@ export async function POST(req: Request) {
 
     // Build enhanced system prompt with context
     const enhancedSystemPrompt = context
-        ? `${SYSTEM_PROMPT}${context}`
-        : SYSTEM_PROMPT;
+        ? `${SYSTEM_PROMPT}
+
+IMPORTANT: When you have collected ALL booking details (service, date, time, seats, name, email), respond with a summary asking the user to confirm. Format the details clearly.
+
+${context}`
+        : `${SYSTEM_PROMPT}
+
+IMPORTANT: When you have collected ALL booking details (service, date, time, seats, name, email), DO NOT call create_booking yet. Instead, respond with a summary of the details and ask the user to confirm. Only call create_booking after they explicitly confirm.`;
 
     // Prepare messages for OpenRouter
     const apiMessages = [
@@ -237,9 +297,11 @@ export async function POST(req: Request) {
 
     let result = await response.json();
     let assistantMessage = result.choices?.[0]?.message;
+    let lastToolCalls: unknown[] = [];
 
     // Process tool calls if any
     while (assistantMessage?.tool_calls && assistantMessage.tool_calls.length > 0) {
+        lastToolCalls = assistantMessage.tool_calls;
         const toolResults = [];
 
         for (const toolCall of assistantMessage.tool_calls) {
@@ -280,10 +342,15 @@ export async function POST(req: Request) {
         assistantMessage = result.choices?.[0]?.message;
     }
 
-    // Return final text response
+    // Check if this was a booking creation
+    const action = extractBookingAction(assistantMessage?.content || '', lastToolCalls);
+
+    // Return JSON response with potential action
     const content = assistantMessage?.content || 'Sorry, I encountered an error.';
 
-    return new Response(content, {
-        headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+    return Response.json({
+        content,
+        action
     });
 }
+

@@ -15,6 +15,7 @@ export interface Booking {
     start_time: string;
     end_time: string;
     seats_booked: number;
+    seat_labels?: string[];
     status?: string;
     interface_type: 'form' | 'chat';
 }

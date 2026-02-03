@@ -4,13 +4,16 @@ import { useState } from 'react';
 import ServiceSelector from './ServiceSelector';
 import DatePicker from './DatePicker';
 import TimeSlotSelector from './TimeSlotSelector';
-import SeatSelector from './SeatSelector';
+import SeatMap from './SeatMap';
 import BookingSummary from './BookingSummary';
+import ConfettiExplosion from '../ui/ConfettiExplosion';
+import BookingTicket from '../ui/BookingTicket';
 import { Booking } from '@/types';
 
 interface FormData extends Partial<Booking> {
     service_name?: string;
     max_seats?: number;
+    selected_seat_labels?: string[];
 }
 
 export default function MultiStepForm() {
@@ -18,10 +21,10 @@ export default function MultiStepForm() {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isSuccess, setIsSuccess] = useState(false);
     const [availableSeats, setAvailableSeats] = useState(0);
-    const [formData, setFormData] = useState<FormData>({
+    const [formData, setFormData] = useState<FormData>(() => ({
         interface_type: 'form',
         seats_booked: 1
-    });
+    }));
 
     const updateFormData = (data: Partial<FormData>) => {
         setFormData({ ...formData, ...data });
@@ -44,6 +47,7 @@ export default function MultiStepForm() {
                     start_time: formData.start_time,
                     end_time: formData.end_time,
                     seats_booked: formData.seats_booked,
+                    seat_labels: formData.selected_seat_labels || [],
                     interface_type: formData.interface_type
                 })
             });
@@ -64,19 +68,28 @@ export default function MultiStepForm() {
 
     if (isSuccess) {
         return (
-            <div className="max-w-2xl mx-auto p-8 text-center">
-                <div className="text-6xl mb-6">Thank You!</div>
-                <h2 className="text-3xl font-bold font-heading text-neon mb-4">Your booking has been confirmed!</h2>
-                <p className="text-gray-400 mb-8">
-                    A confirmation email has been sent to {formData.user_email}
-                </p>
+            <div className="relative min-h-[80vh] flex flex-col items-center justify-center p-8">
+                {/* Confetti Animation */}
+                <ConfettiExplosion />
+
+                {/* Animated Booking Ticket */}
+                <BookingTicket
+                    service={formData.service_name || 'Racing Simulator'}
+                    date={formData.booking_date || ''}
+                    time={formData.start_time || ''}
+                    seats={formData.seats_booked || 1}
+                    name={formData.user_name || ''}
+                    email={formData.user_email || ''}
+                />
+
+                {/* Make Another Booking Button */}
                 <button
                     onClick={() => {
                         setIsSuccess(false);
                         setCurrentStep(1);
                         setFormData({ interface_type: 'form', seats_booked: 1 });
                     }}
-                    className="px-6 py-3 bg-neon text-racing-dark font-bold rounded-lg hover:bg-white transition-colors"
+                    className="mt-8 px-6 py-3 bg-white/10 border border-white/20 text-white font-bold rounded-lg hover:bg-white/20 hover:border-neon transition-all"
                 >
                     Make Another Booking
                 </button>
@@ -146,12 +159,42 @@ export default function MultiStepForm() {
 
                 {currentStep === 3 && (
                     <div className="space-y-8">
-                        <SeatSelector
-                            value={formData.seats_booked}
-                            maxSeats={availableSeats}
-                            serviceName={formData.service_name || 'this service'}
-                            onChange={(seats) => updateFormData({ seats_booked: seats })}
-                        />
+                        {/* Only show SeatMap for Racing Simulator (16 seats) */}
+                        {formData.max_seats === 16 ? (
+                            <SeatMap
+                                totalSeats={16}
+                                maxAvailable={availableSeats}
+                                onSelectionChange={(seats, labels) => updateFormData({
+                                    seats_booked: seats.length,
+                                    selected_seat_labels: labels
+                                })}
+                            />
+                        ) : (
+                            /* Simple seat count for PS5 (2 seats) */
+                            <div className="space-y-4">
+                                <h3 className="text-xl font-bold font-heading">Number of Seats</h3>
+                                <p className="text-sm text-gray-400">
+                                    How many seats would you like to book for {formData.service_name}?
+                                </p>
+                                <div className="max-w-xs">
+                                    <input
+                                        type="number"
+                                        min={1}
+                                        max={availableSeats}
+                                        value={formData.seats_booked || ''}
+                                        onChange={(e) => {
+                                            const val = parseInt(e.target.value) || 0;
+                                            updateFormData({ seats_booked: Math.min(val, availableSeats) });
+                                        }}
+                                        placeholder="Enter number of seats"
+                                        className="w-full px-4 py-3 bg-white/5 border border-white/20 rounded-lg text-white focus:border-neon focus:outline-none focus:ring-1 focus:ring-neon transition-colors text-lg"
+                                    />
+                                    <p className="text-sm text-neon mt-2">
+                                        Maximum available: {availableSeats} seats
+                                    </p>
+                                </div>
+                            </div>
+                        )}
 
                         <div className="space-y-4">
                             <h3 className="text-xl font-bold font-heading">Your Information</h3>

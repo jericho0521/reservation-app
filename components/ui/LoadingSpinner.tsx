@@ -7,9 +7,11 @@ export default function LoadingSpinner({ size = 'md' }: { size?: 'sm' | 'md' | '
 
     return (
         <div
-            className={`${sizeClasses[size]} border-neon/30 border-t-neon rounded-full animate-spin`}
+            className={`${sizeClasses[size]} animate-spin`}
             role="status"
             aria-label="Loading"
-        />
+        >
+            <div className="w-full h-full border-neon/30 border-t-neon rounded-full" style={{ borderWidth: 'inherit' }} />
+        </div>
     );
 }

@@ -3,6 +3,38 @@
 import { useEffect, useState, useMemo } from 'react';
 import { Calendar, Clock, Users, User, Mail, Trophy } from 'lucide-react';
 
+function hashSeed(seed: string) {
+    let hash = 0;
+
+    for (const character of seed) {
+        hash = (hash * 31 + character.charCodeAt(0)) >>> 0;
+    }
+
+    return hash;
+}
+
+function buildQrPattern(seed: string) {
+    const pattern = [];
+    let value = hashSeed(seed) || 1;
+
+    for (let i = 0; i < 49; i++) {
+        const isCorner = (i < 7 && (i % 7 < 3 || i < 3)) ||
+            (i >= 42 && i % 7 < 3) ||
+            (i < 7 && i >= 4) ||
+            (i % 7 === 0 && i < 21) ||
+            (i % 7 === 6 && i < 21);
+
+        value = (value * 1664525 + 1013904223) >>> 0;
+        pattern.push(isCorner || (value & 1) === 0);
+    }
+
+    return pattern;
+}
+
+function buildReference(seed: string) {
+    return `PP${hashSeed(seed).toString().padStart(8, '0').slice(-8)}`;
+}
+
 interface Props {
     service: string;
     date: string;
@@ -23,21 +55,10 @@ export default function BookingTicket({
     bookingId
 }: Props) {
     const [isVisible, setIsVisible] = useState(false);
+    const seed = `${service}|${date}|${time}|${seats}|${name}|${email}|${bookingId || ''}`;
 
-    // Generate stable QR code pattern
-    const qrPattern = useMemo(() => {
-        const pattern = [];
-        for (let i = 0; i < 49; i++) {
-            // Create a more realistic QR-like pattern
-            const isCorner = (i < 7 && (i % 7 < 3 || i < 3)) ||
-                (i >= 42 && i % 7 < 3) ||
-                (i < 7 && i >= 4) ||
-                (i % 7 === 0 && i < 21) ||
-                (i % 7 === 6 && i < 21);
-            pattern.push(isCorner || Math.random() > 0.5);
-        }
-        return pattern;
-    }, []);
+    const qrPattern = useMemo(() => buildQrPattern(seed), [seed]);
+    const reference = useMemo(() => bookingId || buildReference(seed), [bookingId, seed]);
 
     useEffect(() => {
         const timer = setTimeout(() => setIsVisible(true), 100);
@@ -144,7 +165,7 @@ export default function BookingTicket({
 
                         {/* Booking Reference */}
                         <p className="text-center text-xs text-gray-500 pt-1">
-                            Reference: {bookingId || `PP${Date.now().toString().slice(-8)}`}
+                            Reference: {reference}
                         </p>
                     </div>
                 </div>

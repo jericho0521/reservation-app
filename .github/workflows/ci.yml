@@ -45,16 +45,12 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-        working-directory: reservation-app
 
       - name: Run tests
         run: pnpm test
-        working-directory: reservation-app
 
       - name: Run linter
         run: pnpm lint
-        working-directory: reservation-app
 
       - name: Build application
         run: pnpm build
-        working-directory: reservation-app

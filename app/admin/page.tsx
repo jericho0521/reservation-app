@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase-server';
+import { ADMIN_BOOKINGS_SELECT, type AdminBooking } from './dashboard-data';
 import AdminDashboard from './AdminDashboard';
 
 export default async function AdminPage() {
@@ -11,29 +12,25 @@ export default async function AdminPage() {
         redirect('/admin/login');
     }
 
-    // Fetch bookings
-    const { data: bookings } = await supabase
-        .from('bookings')
-        .select(`
-            *,
-            services (name)
-        `)
-        .order('booking_date', { ascending: false })
-        .order('start_time', { ascending: false })
-        .limit(50);
-
-    // Fetch today's stats
     const today = new Date().toISOString().split('T')[0];
-    const { count: todayCount } = await supabase
-        .from('bookings')
-        .select('*', { count: 'exact', head: true })
-        .eq('booking_date', today)
-        .eq('status', 'confirmed');
+    const [bookingsResult, todayCountResult] = await Promise.all([
+        supabase
+            .from('bookings')
+            .select(ADMIN_BOOKINGS_SELECT)
+            .order('booking_date', { ascending: false })
+            .order('start_time', { ascending: false })
+            .limit(50),
+        supabase
+            .from('bookings')
+            .select('*', { count: 'exact', head: true })
+            .eq('booking_date', today)
+            .eq('status', 'confirmed'),
+    ]);
 
     return (
         <AdminDashboard
-            bookings={bookings || []}
-            todayCount={todayCount || 0}
+            bookings={(bookingsResult.data || []) as AdminBooking[]}
+            todayCount={todayCountResult.count || 0}
             userEmail={user.email || ''}
         />
     );

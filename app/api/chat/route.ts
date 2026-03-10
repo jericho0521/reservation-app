@@ -1,8 +1,43 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
+import { getEndTime, generateTimeSlots } from '@/lib/availability';
 import { getRelevantContext } from '@/lib/knowledge';
+import { extractPreparedBookingAction, resolveToolCalls, type ToolCall } from './tool-loop';
 
-const SYSTEM_PROMPT = `You are a friendly booking assistant for PROJECT PLAY by CW.
+interface ServiceRecord {
+    id: string;
+    name: string;
+    total_seats: number;
+}
+
+interface ChatMessage {
+    role: 'user' | 'assistant';
+    content: string;
+}
+
+interface ConfirmBookingPayload {
+    service: string;
+    date: string;
+    time: string;
+    seats: number;
+    name: string;
+    email: string;
+}
+
+interface OpenRouterMessage {
+    role: 'system' | 'user' | 'assistant' | 'tool';
+    content: string;
+    tool_call_id?: string;
+    tool_calls?: ToolCall[];
+}
+
+interface OpenRouterAssistantMessage extends OpenRouterMessage {
+    role: 'assistant';
+    tool_calls?: ToolCall[];
+}
+
+function buildSystemPrompt(today: string) {
+    return `You are a friendly booking assistant for PROJECT PLAY by CW.
 
 Available services:
 - Racing Simulator (16 seats) - High-fidelity motion racing simulators
@@ -10,7 +45,7 @@ Available services:
 
 Operating Hours: 12 PM - 2 AM (1-hour time slots)
 
-TODAY'S DATE: ${new Date().toISOString().split('T')[0]}
+TODAY'S DATE: ${today}
 
 When users say dates like "tomorrow", "next Monday", "this Friday", etc., convert them to YYYY-MM-DD format using today's date as reference.
 
@@ -21,7 +56,8 @@ Help users book sessions by:
 4. Creating the booking
 
 Use the provided functions to check availability and create bookings.
-Always confirm all details before creating a booking.`;
+Always confirm all details before creating the booking.`;
+}
 
 // Tool functions
 async function getServices() {
@@ -32,13 +68,22 @@ async function getServices() {
     return { services: data };
 }
 
-async function checkAvailability(serviceName: string, date: string) {
-    const { data: service } = await supabase
+async function getServiceByName(serviceName: string): Promise<ServiceRecord | null> {
+    const { data, error } = await supabase
         .from('services')
         .select('id, name, total_seats')
         .ilike('name', `%${serviceName}%`)
         .single();
 
+    if (error || !data) {
+        return null;
+    }
+
+    return data;
+}
+
+async function checkAvailability(serviceName: string, date: string) {
+    const service = await getServiceByName(serviceName);
     if (!service) return { error: 'Service not found' };
 
     const { data: bookings } = await supabase
@@ -48,16 +93,12 @@ async function checkAvailability(serviceName: string, date: string) {
         .eq('booking_date', date)
         .eq('status', 'confirmed');
 
-    const hours = [12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 0, 1];
-    const slots = hours.map(hour => {
-        const startTime = `${hour.toString().padStart(2, '0')}:00`;
-        const bookedSeats = (bookings || [])
-            .filter(b => b.start_time.startsWith(startTime))
-            .reduce((sum, b) => sum + b.seats_booked, 0);
-        const availableSeats = service.total_seats - bookedSeats;
-
-        return { time: startTime, available_seats: availableSeats };
-    }).filter(s => s.available_seats > 0);
+    const slots = generateTimeSlots(service.total_seats, bookings || [])
+        .filter(slot => slot.is_available)
+        .map(slot => ({
+            time: slot.start_time,
+            available_seats: slot.available_seats,
+        }));
 
     return {
         service_name: service.name,
@@ -76,13 +117,7 @@ async function createBooking(
     userName: string,
     userEmail: string
 ) {
-    // Look up service by name
-    const { data: service } = await supabase
-        .from('services')
-        .select('id, total_seats')
-        .ilike('name', `%${serviceName}%`)
-        .single();
-
+    const service = await getServiceByName(serviceName);
     if (!service) return { success: false, error: 'Service not found' };
 
     const { data: existing } = await supabase
@@ -98,9 +133,7 @@ async function createBooking(
         return { success: false, error: `Only ${service.total_seats - bookedSeats} seats available` };
     }
 
-    const startHour = parseInt(startTime.split(':')[0]);
-    const endHour = startHour === 0 ? 1 : startHour === 1 ? 2 : startHour + 1;
-    const endTime = `${endHour.toString().padStart(2, '0')}:00`;
+    const endTime = getEndTime(startTime);
 
     const { data: booking, error } = await supabase
         .from('bookings')
@@ -195,85 +228,8 @@ async function executeTool(name: string, args: Record<string, unknown>) {
     }
 }
 
-// Check if assistant message contains booking confirmation request
-function extractBookingAction(content: string, toolCalls: unknown[]): { type: string; data: unknown } | null {
-    // Look for the prepare_booking tool call to extract data
-    if (toolCalls && Array.isArray(toolCalls)) {
-        for (const call of toolCalls) {
-            const tc = call as { function?: { name?: string; arguments?: string } };
-            if (tc.function?.name === 'prepare_booking') {
-                try {
-                    const args = JSON.parse(tc.function.arguments || '{}');
-                    return {
-                        type: 'booking_confirmation',
-                        data: {
-                            service: args.service_name,
-                            date: args.date,
-                            time: args.start_time,
-                            seats: args.seats,
-                            name: args.user_name,
-                            email: args.user_email
-                        }
-                    };
-                } catch {
-                    return null;
-                }
-            }
-        }
-    }
-    return null;
-}
-
-export async function POST(req: Request) {
-    const body = await req.json();
-    const { messages, confirmBooking } = body;
-
-    // If this is a booking confirmation request
-    if (confirmBooking) {
-        const result = await createBooking(
-            confirmBooking.service,
-            confirmBooking.date,
-            confirmBooking.time,
-            confirmBooking.seats,
-            confirmBooking.name,
-            confirmBooking.email
-        );
-        return Response.json({
-            content: result.success
-                ? `Great! Your booking is confirmed! 🎉 You've booked ${confirmBooking.seats} seat(s) for ${confirmBooking.service} on ${confirmBooking.date} at ${confirmBooking.time}. A confirmation will be sent to ${confirmBooking.email}.`
-                : `Sorry, there was an issue: ${result.error}`,
-            action: result.success ? { type: 'booking_success', data: confirmBooking } : null
-        });
-    }
-
-    // Get the latest user message for context retrieval
-    const latestUserMessage = [...messages].reverse().find((m: { role: string }) => m.role === 'user')?.content || '';
-
-    // Retrieve relevant context from knowledge base
-    const context = await getRelevantContext(latestUserMessage);
-
-    // Build enhanced system prompt with context
-    const enhancedSystemPrompt = context
-        ? `${SYSTEM_PROMPT}
-
-IMPORTANT: When you have collected ALL booking details (service, date, time, seats, name, email), respond with a summary asking the user to confirm. Format the details clearly.
-
-${context}`
-        : `${SYSTEM_PROMPT}
-
-IMPORTANT: When you have collected ALL booking details (service, date, time, seats, name, email), DO NOT call create_booking yet. Instead, respond with a summary of the details and ask the user to confirm. Only call create_booking after they explicitly confirm.`;
-
-    // Prepare messages for OpenRouter
-    const apiMessages = [
-        { role: 'system', content: enhancedSystemPrompt },
-        ...messages.map((m: { role: string; content: string }) => ({
-            role: m.role,
-            content: m.content,
-        })),
-    ];
-
-    // Make initial request to OpenRouter with BYOK Gemini
-    let response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+async function requestOpenRouterCompletion(messages: OpenRouterMessage[]): Promise<OpenRouterAssistantMessage> {
+    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
         method: 'POST',
         headers: {
             'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`,
@@ -282,7 +238,7 @@ IMPORTANT: When you have collected ALL booking details (service, date, time, sea
         },
         body: JSON.stringify({
             model: 'google/gemini-2.5-flash',
-            messages: apiMessages,
+            messages,
             tools,
             tool_choice: 'auto',
             max_tokens: 1024,
@@ -291,66 +247,83 @@ IMPORTANT: When you have collected ALL booking details (service, date, time, sea
 
     if (!response.ok) {
         const error = await response.text();
-        console.error('OpenRouter error:', error);
-        return NextResponse.json({ error: 'Failed to get AI response' }, { status: 500 });
+        throw new Error(error || 'Failed to get AI response');
     }
 
-    let result = await response.json();
-    let assistantMessage = result.choices?.[0]?.message;
-    let lastToolCalls: unknown[] = [];
+    const result = await response.json();
+    const message = result.choices?.[0]?.message;
 
-    // Process tool calls if any
-    while (assistantMessage?.tool_calls && assistantMessage.tool_calls.length > 0) {
-        lastToolCalls = assistantMessage.tool_calls;
-        const toolResults = [];
+    return {
+        role: 'assistant',
+        content: message?.content || '',
+        tool_calls: Array.isArray(message?.tool_calls) ? message.tool_calls : undefined,
+    };
+}
 
-        for (const toolCall of assistantMessage.tool_calls) {
-            const funcName = toolCall.function.name;
-            const funcArgs = JSON.parse(toolCall.function.arguments || '{}');
-            const toolResult = await executeTool(funcName, funcArgs);
+export async function POST(req: Request) {
+    try {
+        const body = await req.json();
+        const messages = (Array.isArray(body.messages) ? body.messages : []) as ChatMessage[];
+        const confirmBooking = body.confirmBooking as ConfirmBookingPayload | undefined;
 
-            toolResults.push({
-                role: 'tool',
-                tool_call_id: toolCall.id,
-                content: JSON.stringify(toolResult),
+        if (confirmBooking) {
+            const result = await createBooking(
+                confirmBooking.service,
+                confirmBooking.date,
+                confirmBooking.time,
+                confirmBooking.seats,
+                confirmBooking.name,
+                confirmBooking.email,
+            );
+
+            return Response.json({
+                content: result.success
+                    ? `Great! Your booking is confirmed! 🎉 You've booked ${confirmBooking.seats} seat(s) for ${confirmBooking.service} on ${confirmBooking.date} at ${confirmBooking.time}. A confirmation will be sent to ${confirmBooking.email}.`
+                    : `Sorry, there was an issue: ${result.error}`,
+                action: result.success ? { type: 'booking_success', data: confirmBooking } : null,
             });
         }
 
-        // Add assistant message and tool results to conversation
-        apiMessages.push(assistantMessage);
-        apiMessages.push(...toolResults);
+        const latestUserMessage = [...messages].reverse().find(message => message.role === 'user')?.content || '';
+        const context = latestUserMessage ? await getRelevantContext(latestUserMessage) : '';
+        const systemPrompt = buildSystemPrompt(new Date().toISOString().split('T')[0]);
+        const enhancedSystemPrompt = context
+            ? `${systemPrompt}
 
-        // Get next response
-        response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`,
-                'Content-Type': 'application/json',
-                'HTTP-Referer': 'http://localhost:3000',
-            },
-            body: JSON.stringify({
-                model: 'google/gemini-2.5-flash',
-                messages: apiMessages,
-                tools,
-                tool_choice: 'auto',
-                max_tokens: 1024,
-            }),
+IMPORTANT: When you have collected ALL booking details (service, date, time, seats, name, email), respond with a summary asking the user to confirm. Format the details clearly.
+
+${context}`
+            : `${systemPrompt}
+
+IMPORTANT: When you have collected ALL booking details (service, date, time, seats, name, email), DO NOT create the booking yet. Instead, respond with a summary of the details and ask the user to confirm. Only create the booking after they explicitly confirm.`;
+
+        const apiMessages: OpenRouterMessage[] = [
+            { role: 'system', content: enhancedSystemPrompt },
+            ...messages.map(message => ({
+                role: message.role,
+                content: message.content,
+            })),
+        ];
+
+        let assistantMessage = await requestOpenRouterCompletion(apiMessages);
+        let lastToolCalls: ToolCall[] = [];
+
+        while (assistantMessage.tool_calls?.length) {
+            lastToolCalls = assistantMessage.tool_calls;
+            apiMessages.push(assistantMessage);
+
+            const toolResults = await resolveToolCalls(assistantMessage.tool_calls, executeTool);
+            apiMessages.push(...toolResults);
+
+            assistantMessage = await requestOpenRouterCompletion(apiMessages);
+        }
+
+        return Response.json({
+            content: assistantMessage.content || 'Sorry, I encountered an error.',
+            action: extractPreparedBookingAction(lastToolCalls),
         });
-
-        if (!response.ok) break;
-        result = await response.json();
-        assistantMessage = result.choices?.[0]?.message;
+    } catch (error) {
+        console.error('Chat route error:', error);
+        return NextResponse.json({ error: 'Failed to get AI response' }, { status: 500 });
     }
-
-    // Check if this was a booking creation
-    const action = extractBookingAction(assistantMessage?.content || '', lastToolCalls);
-
-    // Return JSON response with potential action
-    const content = assistantMessage?.content || 'Sorry, I encountered an error.';
-
-    return Response.json({
-        content,
-        action
-    });
 }
-

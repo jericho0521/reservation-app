@@ -1,14 +1,19 @@
 'use client';
 
 import { useState } from 'react';
+import dynamic from 'next/dynamic';
 import ServiceSelector from './ServiceSelector';
 import DatePicker from './DatePicker';
 import TimeSlotSelector from './TimeSlotSelector';
 import SeatMap from './SeatMap';
 import BookingSummary from './BookingSummary';
-import ConfettiExplosion from '../ui/ConfettiExplosion';
-import BookingTicket from '../ui/BookingTicket';
 import { Booking } from '@/types';
+
+const ConfettiExplosion = dynamic(() => import('../ui/ConfettiExplosion'), {
+    ssr: false,
+});
+
+const BookingTicket = dynamic(() => import('../ui/BookingTicket'));
 
 interface FormData extends Partial<Booking> {
     service_name?: string;
@@ -27,7 +32,7 @@ export default function MultiStepForm() {
     }));
 
     const updateFormData = (data: Partial<FormData>) => {
-        setFormData({ ...formData, ...data });
+        setFormData(prev => ({ ...prev, ...data }));
     };
 
     const nextStep = () => setCurrentStep(prev => prev + 1);
@@ -87,6 +92,7 @@ export default function MultiStepForm() {
                     onClick={() => {
                         setIsSuccess(false);
                         setCurrentStep(1);
+                        setAvailableSeats(0);
                         setFormData({ interface_type: 'form', seats_booked: 1 });
                     }}
                     className="mt-8 px-6 py-3 bg-white/10 border border-white/20 text-white font-bold rounded-lg hover:bg-white/20 hover:border-neon transition-all"

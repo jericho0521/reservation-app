@@ -35,16 +35,8 @@ interface NavItemProps {
 }
 
 const NavItem = ({ item, onHover, onLeave }: NavItemProps) => {
-    const ItemWrapper = item.href ? Link : 'span';
-    const itemProps = item.href ? { href: item.href } : {};
-
-    return (
-        <ItemWrapper
-            {...itemProps}
-            className="nav-item"
-            onMouseEnter={onHover}
-            onMouseLeave={onLeave}
-        >
+    const content = (
+        <>
             {item.name}
             {item.items && (
                 <div className="nav-dropdown">
@@ -61,7 +53,30 @@ const NavItem = ({ item, onHover, onLeave }: NavItemProps) => {
                     </div>
                 </div>
             )}
-        </ItemWrapper>
+        </>
+    );
+
+    if (item.href) {
+        return (
+            <Link
+                href={item.href}
+                className="nav-item"
+                onMouseEnter={onHover}
+                onMouseLeave={onLeave}
+            >
+                {content}
+            </Link>
+        );
+    }
+
+    return (
+        <span
+            className="nav-item"
+            onMouseEnter={onHover}
+            onMouseLeave={onLeave}
+        >
+            {content}
+        </span>
     );
 };
 

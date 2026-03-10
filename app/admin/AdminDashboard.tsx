@@ -1,44 +1,49 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase-browser';
 import { Check, X, RotateCcw, LogOut, RefreshCw } from 'lucide-react';
 import { Sidebar } from '@/components/admin/Sidebar';
-
-interface Booking {
-    id: string;
-    user_name: string;
-    user_email: string;
-    booking_date: string;
-    start_time: string;
-    end_time: string;
-    seats_booked: number;
-    seat_labels?: string[];
-    status: string;
-    services: { name: string } | null;
-}
+import { ADMIN_BOOKINGS_SELECT, filterBookings, getBookingSummary, getServiceName, type AdminBooking, type AdminFilter } from './dashboard-data';
 
 interface AdminDashboardProps {
-    bookings: Booking[];
+    bookings: AdminBooking[];
     todayCount: number;
     userEmail: string;
 }
 
+const STATUS_COLOR_MAP: Record<string, string> = {
+    confirmed: 'bg-green-500/20 text-green-400 border-green-500/30',
+    cancelled: 'bg-red-500/20 text-red-400 border-red-500/30',
+    completed: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
+    pending: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
+};
+
+const FILTER_OPTIONS: AdminFilter[] = ['all', 'today', 'upcoming', 'completed', 'cancelled'];
+
 export default function AdminDashboard({ bookings: initialBookings, todayCount, userEmail }: AdminDashboardProps) {
     const [bookings, setBookings] = useState(initialBookings);
-    const [filter, setFilter] = useState<'all' | 'today' | 'upcoming' | 'completed' | 'cancelled'>('all');
+    const [filter, setFilter] = useState<AdminFilter>('all');
     const [isUpdating, setIsUpdating] = useState<string | null>(null);
     const router = useRouter();
-    const supabase = createClient();
+    const supabase = useMemo(() => createClient(), []);
     const [lastRefresh, setLastRefresh] = useState(new Date());
     const [isRefreshing, setIsRefreshing] = useState(false);
+    const today = new Date().toISOString().split('T')[0];
+    const summary = useMemo(() => getBookingSummary(bookings), [bookings]);
+    const filteredBookings = useMemo(() => filterBookings(bookings, filter, today), [bookings, filter, today]);
+    const dateFormatter = useMemo(() => new Intl.DateTimeFormat('en-MY', {
+        weekday: 'short',
+        month: 'short',
+        day: 'numeric',
+    }), []);
 
     const refreshBookings = useCallback(async () => {
         setIsRefreshing(true);
         const { data } = await supabase
             .from('bookings')
-            .select('*, services (name)')
+            .select(ADMIN_BOOKINGS_SELECT)
             .order('booking_date', { ascending: false })
             .order('start_time', { ascending: false })
             .limit(50);
@@ -83,24 +88,8 @@ export default function AdminDashboard({ bookings: initialBookings, todayCount, 
         }
     };
 
-    const today = new Date().toISOString().split('T')[0];
-
-    const filteredBookings = bookings.filter(booking => {
-        if (filter === 'today') return booking.booking_date === today && booking.status === 'confirmed';
-        if (filter === 'upcoming') return booking.booking_date >= today && booking.status === 'confirmed';
-        if (filter === 'completed') return booking.status === 'completed';
-        if (filter === 'cancelled') return booking.status === 'cancelled';
-        return booking.status === 'confirmed' || booking.status === 'pending';
-    });
-
     const getStatusColor = (status: string) => {
-        switch (status) {
-            case 'confirmed': return 'bg-green-500/20 text-green-400 border-green-500/30';
-            case 'cancelled': return 'bg-red-500/20 text-red-400 border-red-500/30';
-            case 'completed': return 'bg-blue-500/20 text-blue-400 border-blue-500/30';
-            case 'pending': return 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30';
-            default: return 'bg-gray-500/20 text-gray-400 border-gray-500/30';
-        }
+        return STATUS_COLOR_MAP[status] ?? 'bg-gray-500/20 text-gray-400 border-gray-500/30';
     };
 
     return (
@@ -153,26 +142,26 @@ export default function AdminDashboard({ bookings: initialBookings, todayCount, 
                         <div className="glass-panel p-4 rounded-xl border border-white/10">
                             <p className="text-xs text-gray-400 mb-1">Confirmed</p>
                             <p className="text-2xl font-bold text-green-400">
-                                {bookings.filter(b => b.status === 'confirmed').length}
+                                {summary.confirmed}
                             </p>
                         </div>
                         <div className="glass-panel p-4 rounded-xl border border-white/10">
                             <p className="text-xs text-gray-400 mb-1">Completed</p>
                             <p className="text-2xl font-bold text-blue-400">
-                                {bookings.filter(b => b.status === 'completed').length}
+                                {summary.completed}
                             </p>
                         </div>
                         <div className="glass-panel p-4 rounded-xl border border-white/10">
                             <p className="text-xs text-gray-400 mb-1">Cancelled</p>
                             <p className="text-2xl font-bold text-red-400">
-                                {bookings.filter(b => b.status === 'cancelled').length}
+                                {summary.cancelled}
                             </p>
                         </div>
                     </div>
 
                     {/* Filter */}
                     <div className="flex flex-wrap gap-2">
-                        {(['all', 'today', 'upcoming', 'completed', 'cancelled'] as const).map(f => (
+                        {FILTER_OPTIONS.map(f => (
                             <button
                                 key={f}
                                 onClick={() => setFilter(f)}
@@ -216,14 +205,10 @@ export default function AdminDashboard({ bookings: initialBookings, todayCount, 
                                                     <div className="text-xs text-gray-400">{booking.user_email}</div>
                                                 </td>
                                                 <td className="px-4 py-3 text-sm">
-                                                    {booking.services?.name || 'Unknown'}
+                                                    {getServiceName(booking.services)}
                                                 </td>
                                                 <td className="px-4 py-3 text-sm">
-                                                    {new Date(booking.booking_date).toLocaleDateString('en-MY', {
-                                                        weekday: 'short',
-                                                        month: 'short',
-                                                        day: 'numeric'
-                                                    })}
+                                                    {dateFormatter.format(new Date(booking.booking_date))}
                                                 </td>
                                                 <td className="px-4 py-3 text-sm">
                                                     {booking.start_time} - {booking.end_time}

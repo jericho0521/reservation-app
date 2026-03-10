@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
+import { buildAnalyticsCatalogPrompt } from '@/components/analytics/renderer/catalog';
+import { extractSpecAndFallback } from '@/components/analytics/spec-adapter';
 
 // Hardcoded pricing (RM per hour per seat)
 const PRICING: Record<string, number> = {
@@ -7,26 +9,35 @@ const PRICING: Record<string, number> = {
     'Playstation 5': 30,
 };
 
-// Dashboard component schema for AI to generate
-const DASHBOARD_SCHEMA = `
-You are an analytics dashboard generator. Based on the booking data and user query, generate a JSON dashboard.
+const DASHBOARD_SCHEMA = `${buildAnalyticsCatalogPrompt()}
 
-IMPORTANT: You MUST respond with valid JSON only. No markdown, no explanations.
+Additional analytics guidelines:
+- Build for booking/revenue analytics use-cases.
+- Generate 2-4 metric cards, 1-2 charts, and 3-5 insights when data supports it.
+- Use RM for currency values.
+- Keep text concise and data-driven.
+- Always return valid JSON with a single root and valid element references.
+- Do not exceed 40 total elements.
+- Prefer concise output over exhaustive output.`;
 
-JSON Schema:
+const FALLBACK_DASHBOARD_SCHEMA = `
+You are an analytics dashboard generator.
+Respond with valid JSON only.
+
+Schema:
 {
   "cards": [
     {
-      "label": "string (e.g., 'Total Revenue')",
-      "value": "string (e.g., 'RM 1,250')",
-      "trend": "string (e.g., '+12.5%')",
+      "label": "string",
+      "value": "string",
+      "trend": "string (optional)",
       "trendDirection": "up" | "down" | "neutral",
       "color": "neon" | "blue" | "green" | "purple" | "orange" | "red"
     }
   ],
   "insights": {
-    "title": "string (e.g., 'Key Insights')",
-    "items": ["string array of bullet points"]
+    "title": "string",
+    "items": ["string"]
   },
   "charts": [
     {
@@ -37,18 +48,19 @@ JSON Schema:
   ]
 }
 
-Guidelines:
-- Generate 2-4 metric cards based on the query
-- Include 3-5 actionable insights
-- Include 1-2 relevant charts if data supports it
-- Use RM for currency (Malaysian Ringgit)
-- Format numbers nicely (e.g., "1,250" not "1250")
-- Be specific and data-driven in insights
+Rules:
+- 2-4 cards maximum
+- 1-2 charts maximum
+- 3-5 insights maximum
+- Keep JSON short and complete
 `;
 
+interface AICompletionResult {
+    content: unknown;
+    finishReason?: string;
+}
+
 interface BookingData {
-    id: string;
-    service_id: string;
     booking_date: string;
     start_time: string;
     seats_booked: number;
@@ -56,12 +68,126 @@ interface BookingData {
     services: { name: string } | { name: string }[] | null;
 }
 
-// Fetch and aggregate booking statistics
-async function getBookingStats(startDate?: string, endDate?: string) {
-    // Fetch ALL bookings (confirmed, completed, cancelled) for comprehensive analytics
+interface AnalyticsSnapshot {
+    period: {
+        start?: string;
+        end?: string;
+    };
+    totals: {
+        bookings: number;
+        confirmed: number;
+        completed: number;
+        cancelled: number;
+        seats: number;
+    };
+    revenue: {
+        total: number;
+        earned: number;
+        pending: number;
+        lost: number;
+    };
+    services: Array<{
+        name: string;
+        bookings: number;
+        seats: number;
+        revenue: number;
+        completed: number;
+        confirmed: number;
+        cancelled: number;
+    }>;
+    bookingsByDay: Array<{ label: string; value: number }>;
+    bookingsByHour: Array<{ label: string; value: number }>;
+    statusCounts: Array<{ label: string; value: number }>;
+}
+
+const DAY_ORDER = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+async function requestAICompletion({
+    systemPrompt,
+    userPrompt,
+    maxTokens,
+}: {
+    systemPrompt: string;
+    userPrompt: string;
+    maxTokens: number;
+}): Promise<AICompletionResult> {
+    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+            'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`,
+            'Content-Type': 'application/json',
+            'HTTP-Referer': 'http://localhost:3000',
+        },
+        body: JSON.stringify({
+            model: 'google/gemini-2.5-flash',
+            messages: [
+                { role: 'system', content: systemPrompt },
+                { role: 'user', content: userPrompt },
+            ],
+            response_format: { type: 'json_object' },
+            max_tokens: maxTokens,
+        }),
+    });
+
+    if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`OpenRouter API error: ${errorText}`);
+    }
+
+    const result = await response.json();
+    return {
+        content: result.choices?.[0]?.message?.content,
+        finishReason: result.choices?.[0]?.finish_reason,
+    };
+}
+
+function parseModelJson(content: unknown): unknown | null {
+    if (!content) {
+        return null;
+    }
+
+    if (typeof content === 'object') {
+        return content;
+    }
+
+    if (typeof content !== 'string') {
+        return null;
+    }
+
+    const trimmed = content.trim();
+    const withoutFences = trimmed.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '');
+
+    try {
+        return JSON.parse(withoutFences);
+    } catch {
+        // Try to recover when model adds text before/after the JSON object.
+    }
+
+    const start = withoutFences.indexOf('{');
+    const end = withoutFences.lastIndexOf('}');
+    if (start >= 0 && end > start) {
+        try {
+            return JSON.parse(withoutFences.slice(start, end + 1));
+        } catch {
+            return null;
+        }
+    }
+
+    return null;
+}
+
+function getServiceName(services: BookingData['services']): string {
+    if (Array.isArray(services)) {
+        return services[0]?.name || 'Unknown';
+    }
+
+    return services?.name || 'Unknown';
+}
+
+async function getBookingSnapshot(startDate?: string, endDate?: string): Promise<AnalyticsSnapshot | null> {
     let query = supabase
         .from('bookings')
-        .select('id, service_id, booking_date, start_time, seats_booked, status, services(name)');
+        .select('booking_date, start_time, seats_booked, status, services(name)');
 
     if (startDate) {
         query = query.gte('booking_date', startDate);
@@ -77,73 +203,113 @@ async function getBookingStats(startDate?: string, endDate?: string) {
         return null;
     }
 
-    const typedBookings = bookings as BookingData[];
-
-    // Calculate statistics
-    const stats = {
-        totalBookings: typedBookings.length,
-        confirmedBookings: typedBookings.filter(b => b.status === 'confirmed').length,
-        completedBookings: typedBookings.filter(b => b.status === 'completed').length,
-        cancelledBookings: typedBookings.filter(b => b.status === 'cancelled').length,
-        totalSeats: typedBookings.reduce((sum, b) => sum + b.seats_booked, 0),
-        totalRevenue: 0,         // All revenue (completed + confirmed)
-        earnedRevenue: 0,        // Actual earned (completed bookings only)
-        pendingRevenue: 0,       // Expected (confirmed but not yet completed)
-        lostRevenue: 0,          // Lost due to cancellations
-        byService: {} as Record<string, { bookings: number; seats: number; revenue: number; completed: number; cancelled: number }>,
-        byDay: {} as Record<string, number>,
-        byHour: {} as Record<string, number>,
-        byStatus: {} as Record<string, number>,
+    const typedBookings = (bookings ?? []) as BookingData[];
+    const serviceMap = new Map<string, AnalyticsSnapshot['services'][number]>();
+    const dayMap = new Map<string, number>();
+    const hourMap = new Map<string, number>();
+    const statusMap = new Map<string, number>();
+    const snapshot: AnalyticsSnapshot = {
+        period: { start: startDate, end: endDate },
+        totals: {
+            bookings: typedBookings.length,
+            confirmed: 0,
+            completed: 0,
+            cancelled: 0,
+            seats: 0,
+        },
+        revenue: {
+            total: 0,
+            earned: 0,
+            pending: 0,
+            lost: 0,
+        },
+        services: [],
+        bookingsByDay: [],
+        bookingsByHour: [],
+        statusCounts: [],
     };
 
     for (const booking of typedBookings) {
-        // Handle both array and object format from Supabase
-        const services = booking.services;
-        const serviceName = Array.isArray(services)
-            ? services[0]?.name
-            : services?.name || 'Unknown';
+        const serviceName = getServiceName(booking.services);
         const price = PRICING[serviceName] || 0;
         const bookingRevenue = booking.seats_booked * price;
 
-        // By service
-        if (!stats.byService[serviceName]) {
-            stats.byService[serviceName] = { bookings: 0, seats: 0, revenue: 0, completed: 0, cancelled: 0 };
-        }
-        stats.byService[serviceName].bookings++;
-        stats.byService[serviceName].seats += booking.seats_booked;
+        snapshot.totals.seats += booking.seats_booked;
 
-        // Track revenue by booking status
+        if (booking.status === 'confirmed') {
+            snapshot.totals.confirmed += 1;
+            snapshot.revenue.pending += bookingRevenue;
+            snapshot.revenue.total += bookingRevenue;
+        }
+
         if (booking.status === 'completed') {
-            stats.earnedRevenue += bookingRevenue;
-            stats.totalRevenue += bookingRevenue;
-            stats.byService[serviceName].revenue += bookingRevenue;
-            stats.byService[serviceName].completed++;
-        } else if (booking.status === 'confirmed') {
-            stats.pendingRevenue += bookingRevenue;
-            stats.totalRevenue += bookingRevenue;
-            stats.byService[serviceName].revenue += bookingRevenue;
-        } else if (booking.status === 'cancelled') {
-            stats.lostRevenue += bookingRevenue;
-            stats.byService[serviceName].cancelled++;
+            snapshot.totals.completed += 1;
+            snapshot.revenue.earned += bookingRevenue;
+            snapshot.revenue.total += bookingRevenue;
         }
 
-        // By status
-        stats.byStatus[booking.status] = (stats.byStatus[booking.status] || 0) + 1;
+        if (booking.status === 'cancelled') {
+            snapshot.totals.cancelled += 1;
+            snapshot.revenue.lost += bookingRevenue;
+        }
 
-        // By day of week
+        const serviceStats = serviceMap.get(serviceName) ?? {
+            name: serviceName,
+            bookings: 0,
+            seats: 0,
+            revenue: 0,
+            completed: 0,
+            confirmed: 0,
+            cancelled: 0,
+        };
+
+        serviceStats.bookings += 1;
+        serviceStats.seats += booking.seats_booked;
+
+        if (booking.status === 'completed') {
+            serviceStats.completed += 1;
+            serviceStats.revenue += bookingRevenue;
+        }
+
+        if (booking.status === 'confirmed') {
+            serviceStats.confirmed += 1;
+            serviceStats.revenue += bookingRevenue;
+        }
+
+        if (booking.status === 'cancelled') {
+            serviceStats.cancelled += 1;
+        }
+
+        serviceMap.set(serviceName, serviceStats);
+
+        statusMap.set(booking.status, (statusMap.get(booking.status) ?? 0) + 1);
+
         const dayOfWeek = new Date(booking.booking_date).toLocaleDateString('en-US', { weekday: 'long' });
-        stats.byDay[dayOfWeek] = (stats.byDay[dayOfWeek] || 0) + 1;
+        dayMap.set(dayOfWeek, (dayMap.get(dayOfWeek) ?? 0) + 1);
 
-        // By hour
-        const hour = booking.start_time.split(':')[0];
-        stats.byHour[hour] = (stats.byHour[hour] || 0) + 1;
+        const hour = booking.start_time.slice(0, 5);
+        hourMap.set(hour, (hourMap.get(hour) ?? 0) + 1);
     }
 
-    return {
-        ...stats,
-        dateRange: { start: startDate, end: endDate },
-        generatedAt: new Date().toISOString(),
-    };
+    snapshot.services = [...serviceMap.values()].sort((left, right) => right.bookings - left.bookings);
+    snapshot.bookingsByDay = DAY_ORDER
+        .filter(day => dayMap.has(day))
+        .map(day => ({ label: day, value: dayMap.get(day) ?? 0 }));
+    snapshot.bookingsByHour = [...hourMap.entries()]
+        .sort(([left], [right]) => left.localeCompare(right))
+        .map(([label, value]) => ({ label, value }));
+    snapshot.statusCounts = [...statusMap.entries()].map(([label, value]) => ({ label, value }));
+
+    return snapshot;
+}
+
+function buildAnalyticsPrompt(prompt: string, snapshot: AnalyticsSnapshot): string {
+    return `User Query: "${prompt}"
+
+Analytics Snapshot JSON:
+${JSON.stringify(snapshot)}
+
+Generate an analytics UI spec JSON response using the allowed component catalog.`;
 }
 
 // Parse natural language date references
@@ -223,62 +389,67 @@ export async function POST(req: Request) {
         // Parse date range from prompt
         const { startDate, endDate } = parseDateRange(prompt);
 
-        // Fetch booking statistics
-        const stats = await getBookingStats(startDate, endDate);
+        const snapshot = await getBookingSnapshot(startDate, endDate);
 
-        if (!stats) {
+        if (!snapshot) {
             return NextResponse.json({ error: 'Failed to fetch booking data' }, { status: 500 });
         }
 
-        // Call OpenRouter API with JSON mode
-        const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`,
-                'Content-Type': 'application/json',
-                'HTTP-Referer': 'http://localhost:3000',
-            },
-            body: JSON.stringify({
-                model: 'google/gemini-2.5-flash',
-                messages: [
-                    { role: 'system', content: DASHBOARD_SCHEMA },
-                    {
-                        role: 'user',
-                        content: `Booking Statistics:\n${JSON.stringify(stats, null, 2)}\n\nUser Query: "${prompt}"\n\nGenerate a dashboard JSON response.`
-                    }
-                ],
-                response_format: { type: 'json_object' },
-                max_tokens: 2048,
-            }),
-        });
-
-        if (!response.ok) {
-            const errorText = await response.text();
-            console.error('OpenRouter API error:', errorText);
+        const primaryUserPrompt = buildAnalyticsPrompt(prompt, snapshot);
+        let aiResult: AICompletionResult;
+        try {
+            aiResult = await requestAICompletion({
+                systemPrompt: DASHBOARD_SCHEMA,
+                userPrompt: primaryUserPrompt,
+                maxTokens: 2400,
+            });
+        } catch (aiError) {
+            console.error('OpenRouter request failed:', aiError);
             return NextResponse.json({ error: 'AI service error' }, { status: 500 });
         }
 
-        const result = await response.json();
-        const content = result.choices?.[0]?.message?.content;
+        let parsedPayload = parseModelJson(aiResult.content);
 
-        if (!content) {
-            return NextResponse.json({ error: 'No response from AI' }, { status: 500 });
+        if (!parsedPayload) {
+            console.warn('Primary analytics spec parse failed; retrying with compact fallback schema.', {
+                finishReason: aiResult.finishReason,
+            });
+
+            const fallbackUserPrompt = `User Query: "${prompt}"
+
+Analytics Snapshot JSON:
+${JSON.stringify(snapshot)}
+
+Return a compact dashboard JSON now.`;
+            try {
+                aiResult = await requestAICompletion({
+                    systemPrompt: FALLBACK_DASHBOARD_SCHEMA,
+                    userPrompt: fallbackUserPrompt,
+                    maxTokens: 1200,
+                });
+            } catch (aiError) {
+                console.error('Fallback OpenRouter request failed:', aiError);
+                return NextResponse.json({ error: 'AI service error' }, { status: 500 });
+            }
+
+            parsedPayload = parseModelJson(aiResult.content);
         }
 
-        // Parse and validate JSON response
-        let dashboard;
-        try {
-            dashboard = JSON.parse(content);
-        } catch {
-            console.error('Failed to parse AI response:', content);
+        if (!parsedPayload) {
+            console.error('Failed to parse AI response after fallback attempt:', aiResult.content);
             return NextResponse.json({ error: 'Invalid AI response format' }, { status: 500 });
         }
 
+        const { spec, fallbackDashboard, error } = extractSpecAndFallback(parsedPayload);
+
+        if (!spec) {
+            console.error('AI response failed spec validation:', error, parsedPayload);
+            return NextResponse.json({ error: 'Invalid AI response schema' }, { status: 500 });
+        }
+
         return NextResponse.json({
-            dashboard,
-            stats,
-            query: prompt,
-            dateRange: { startDate, endDate },
+            spec,
+            fallbackDashboard,
         });
 
     } catch (error) {

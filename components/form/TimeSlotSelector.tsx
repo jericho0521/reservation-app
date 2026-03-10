@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import useSWR from 'swr';
 import { TimeSlot } from '@/types';
 
 interface Props {
@@ -10,35 +10,39 @@ interface Props {
     selectedStart?: string;
 }
 
+async function availabilityFetcher([url, serviceId, date]: readonly [string, string, string]) {
+    const response = await fetch(`${url}?service_id=${serviceId}&date=${date}`);
+
+    if (!response.ok) {
+        throw new Error('Failed to fetch time slots');
+    }
+
+    return response.json() as Promise<{ timeSlots?: TimeSlot[] }>;
+}
+
 export default function TimeSlotSelector({ serviceId, date, onSelect, selectedStart }: Props) {
-    const [slots, setSlots] = useState<TimeSlot[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [totalSeats, setTotalSeats] = useState(0);
+    const shouldFetch = Boolean(serviceId && date);
+    const { data, error, isLoading } = useSWR(
+        shouldFetch ? ['/api/availability', serviceId, date] as const : null,
+        availabilityFetcher,
+        {
+            revalidateOnFocus: false,
+        },
+    );
+    const slots = data?.timeSlots ?? [];
 
-    useEffect(() => {
-        if (serviceId && date) {
-            fetchSlots();
-        }
-    }, [serviceId, date]);
-
-    const fetchSlots = async () => {
-        setLoading(true);
-        try {
-            const response = await fetch(`/api/availability?service_id=${serviceId}&date=${date}`);
-            const data = await response.json();
-            setSlots(data.timeSlots || []);
-            setTotalSeats(data.totalSeats || 0);
-        } catch (error) {
-            console.error('Failed to fetch time slots:', error);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    if (loading) {
+    if (isLoading) {
         return (
             <div className="flex items-center justify-center py-8">
                 <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-neon"></div>
+            </div>
+        );
+    }
+
+    if (error) {
+        return (
+            <div className="mt-6 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-400">
+                Failed to load time slots. Please try another date.
             </div>
         );
     }

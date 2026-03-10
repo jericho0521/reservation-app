@@ -3,32 +3,9 @@
 import { MetricCard } from './MetricCard';
 import { InsightsList } from './InsightsList';
 import { ChartPlaceholder } from './ChartPlaceholder';
+import type { DashboardResponse } from './dashboard-types';
 
-// Dashboard response types from AI
-export interface DashboardCard {
-    label: string;
-    value: string;
-    trend?: string;
-    trendDirection?: 'up' | 'down' | 'neutral';
-    color?: 'neon' | 'blue' | 'green' | 'purple' | 'orange' | 'red';
-}
-
-export interface DashboardInsights {
-    title?: string;
-    items: string[];
-}
-
-export interface DashboardChart {
-    type: 'bar' | 'line' | 'pie';
-    title: string;
-    data: { label: string; value: number }[];
-}
-
-export interface DashboardResponse {
-    cards?: DashboardCard[];
-    insights?: DashboardInsights;
-    charts?: DashboardChart[];
-}
+export type { DashboardCard, DashboardChart, DashboardInsights, DashboardResponse } from './dashboard-types';
 
 interface DynamicDashboardProps {
     data: DashboardResponse | null;

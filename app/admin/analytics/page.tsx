@@ -4,20 +4,42 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, Sparkles } from 'lucide-react';
 import { AnalyticsChatInput } from '@/components/analytics/AnalyticsChatInput';
-import { DynamicDashboard, DashboardResponse } from '@/components/analytics/DynamicDashboard';
+import { DynamicDashboard } from '@/components/analytics/DynamicDashboard';
+import type { DashboardResponse } from '@/components/analytics/dashboard-types';
+import { dashboardToSpec } from '@/components/analytics/dashboard-to-spec';
+import { AnalyticsRenderer, applyAnalyticsAction } from '@/components/analytics/renderer/AnalyticsRenderer';
+import type { AnalyticsAction, AnalyticsSpec } from '@/components/analytics/renderer/spec-types';
 import { Sidebar } from '@/components/admin/Sidebar';
+
+interface AnalyticsApiResponse {
+    spec?: AnalyticsSpec | null;
+    fallbackDashboard?: DashboardResponse | null;
+}
 
 export default function AnalyticsPage() {
     const router = useRouter();
     const [isLoading, setIsLoading] = useState(false);
     const [dashboard, setDashboard] = useState<DashboardResponse | null>(null);
+    const [spec, setSpec] = useState<AnalyticsSpec | null>(null);
+    const [uiState, setUiState] = useState<Record<string, unknown>>({
+        filters: {},
+        sections: {
+            insightsOpen: true,
+        },
+    });
     const [lastQuery, setLastQuery] = useState<string>('');
     const [error, setError] = useState<string | null>(null);
+
+    const handleRendererAction = (action: AnalyticsAction) => {
+        setUiState(prev => applyAnalyticsAction(prev, action));
+    };
 
     const handleSubmit = async (prompt: string) => {
         setIsLoading(true);
         setError(null);
         setLastQuery(prompt);
+        setSpec(null);
+        setDashboard(null);
 
         try {
             const response = await fetch('/api/analytics-chat', {
@@ -30,8 +52,17 @@ export default function AnalyticsPage() {
                 throw new Error('Failed to generate dashboard');
             }
 
-            const data = await response.json();
-            setDashboard(data.dashboard);
+            const data = (await response.json()) as AnalyticsApiResponse;
+            const fallbackDashboard = data.fallbackDashboard ?? null;
+            const nextSpec = data.spec ?? (fallbackDashboard ? dashboardToSpec(fallbackDashboard) : null);
+
+            setSpec(nextSpec);
+            setDashboard(fallbackDashboard);
+            setUiState(prev => ({
+                ...prev,
+                filters: {},
+                lastQuery: prompt,
+            }));
         } catch (err) {
             console.error('Analytics chat error:', err);
             setError('Failed to generate dashboard. Please try again.');
@@ -87,10 +118,20 @@ export default function AnalyticsPage() {
                     )}
 
                     {/* Dynamic Dashboard */}
-                    <DynamicDashboard data={dashboard} isLoading={isLoading} />
+                    {spec ? (
+                        <AnalyticsRenderer
+                            spec={spec}
+                            uiState={uiState}
+                            setUiState={setUiState}
+                            onAction={handleRendererAction}
+                            isLoading={isLoading}
+                        />
+                    ) : (
+                        <DynamicDashboard data={dashboard} isLoading={isLoading} />
+                    )}
 
                     {/* Empty State */}
-                    {!dashboard && !isLoading && !error && (
+                    {!spec && !dashboard && !isLoading && !error && (
                         <div className="glass-panel p-12 rounded-xl border border-white/10 text-center">
                             <Sparkles className="w-12 h-12 text-neon/50 mx-auto mb-4" />
                             <h3 className="text-lg font-bold font-heading mb-2">Ask a Question</h3>

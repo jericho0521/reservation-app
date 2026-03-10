@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { MessageCircle } from 'lucide-react';
 import MessageBubble from './MessageBubble';
 import BookingCard from './BookingCard';
@@ -27,6 +27,41 @@ interface Message {
     actionStatus?: 'pending' | 'confirmed' | 'cancelled' | 'loading';
 }
 
+const ChatMessageItem = memo(function ChatMessageItem({
+    message,
+    onConfirm,
+    onCancel,
+}: {
+    message: Message;
+    onConfirm: (messageId: string, data: BookingData) => void;
+    onCancel: (messageId: string) => void;
+}) {
+    if (message.action?.type === 'booking_confirmation') {
+        const action = message.action;
+
+        return (
+            <BookingCard
+                service={action.data.service}
+                date={action.data.date}
+                time={action.data.time}
+                seats={action.data.seats}
+                name={action.data.name}
+                email={action.data.email}
+                status={message.actionStatus}
+                onConfirm={() => onConfirm(message.id, action.data)}
+                onCancel={() => onCancel(message.id)}
+            />
+        );
+    }
+
+    return (
+        <MessageBubble
+            role={message.role}
+            content={message.content}
+        />
+    );
+});
+
 export default function ChatInterface() {
     const [messages, setMessages] = useState<Message[]>([]);
     const [inputValue, setInputValue] = useState('');
@@ -48,9 +83,9 @@ export default function ChatInterface() {
         if (!isLoading) {
             inputRef.current?.focus();
         }
-    }, [isLoading, messages]);
+    }, [isLoading]);
 
-    const handleConfirmBooking = async (messageId: string, data: BookingData) => {
+    const handleConfirmBooking = useCallback(async (messageId: string, data: BookingData) => {
         // Update message status to loading
         setMessages(prev => prev.map(m =>
             m.id === messageId ? { ...m, actionStatus: 'loading' as const } : m
@@ -88,9 +123,9 @@ export default function ChatInterface() {
                 m.id === messageId ? { ...m, actionStatus: 'pending' as const } : m
             ));
         }
-    };
+    }, []);
 
-    const handleCancelBooking = (messageId: string) => {
+    const handleCancelBooking = useCallback((messageId: string) => {
         setMessages(prev => {
             const updated = prev.map(m =>
                 m.id === messageId ? { ...m, actionStatus: 'cancelled' as const } : m
@@ -104,7 +139,7 @@ export default function ChatInterface() {
                 }
             ];
         });
-    };
+    }, []);
 
     const onSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -185,28 +220,12 @@ export default function ChatInterface() {
                 )}
 
                 {messages.map((message) => (
-                    <div key={message.id}>
-                        {/* Hide text message when showing booking card (card shows the same info) */}
-                        {!(message.action && message.action.type === 'booking_confirmation') && (
-                            <MessageBubble
-                                role={message.role}
-                                content={message.content}
-                            />
-                        )}
-                        {message.action && message.action.type === 'booking_confirmation' && (
-                            <BookingCard
-                                service={message.action.data.service}
-                                date={message.action.data.date}
-                                time={message.action.data.time}
-                                seats={message.action.data.seats}
-                                name={message.action.data.name}
-                                email={message.action.data.email}
-                                status={message.actionStatus}
-                                onConfirm={() => handleConfirmBooking(message.id, message.action!.data)}
-                                onCancel={() => handleCancelBooking(message.id)}
-                            />
-                        )}
-                    </div>
+                    <ChatMessageItem
+                        key={message.id}
+                        message={message}
+                        onConfirm={handleConfirmBooking}
+                        onCancel={handleCancelBooking}
+                    />
                 ))}
 
                 {isLoading && messages[messages.length - 1]?.role !== 'assistant' && (

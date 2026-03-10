@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useMemo, useState } from 'react';
 
 interface Props {
     totalSeats: number;
@@ -14,22 +14,10 @@ export default function SeatMap({
     onSelectionChange 
 }: Props) {
     const [selectedSeats, setSelectedSeats] = useState<number[]>([]);
-    const [bookedSeats, setBookedSeats] = useState<number[]>([]);
+    const bookedSeats = useMemo(() => {
+        const unavailable = Math.max(0, totalSeats - maxAvailable);
 
-    // Simulate some booked seats based on availability
-    useEffect(() => {
-        const unavailable = totalSeats - maxAvailable;
-        const booked: number[] = [];
-        const usedSeats = new Set<number>();
-        
-        while (booked.length < unavailable && booked.length < totalSeats) {
-            const seat = Math.floor(Math.random() * totalSeats) + 1;
-            if (!usedSeats.has(seat)) {
-                usedSeats.add(seat);
-                booked.push(seat);
-            }
-        }
-        setBookedSeats(booked);
+        return Array.from({ length: unavailable }, (_, index) => totalSeats - index);
     }, [totalSeats, maxAvailable]);
 
     const getSeatLabel = (seatNumber: number) => {
@@ -178,7 +166,7 @@ export default function SeatMap({
                 <div className="p-3 bg-neon/10 border border-neon/30 rounded-lg text-center">
                     <p className="text-sm text-neon font-medium">
                         {selectedSeats.length} seat{selectedSeats.length > 1 ? 's' : ''}: {' '}
-                        {selectedSeats.sort((a, b) => a - b).map(s => getSeatLabel(s)).join(', ')}
+                        {[...selectedSeats].sort((a, b) => a - b).map(s => getSeatLabel(s)).join(', ')}
                     </p>
                 </div>
             )}

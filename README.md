@@ -53,3 +53,34 @@ For the most reliable CI builds, configure these GitHub repository variables or 
 - `OPENROUTER_API_KEY`
 
 The workflow includes placeholder fallbacks so verification can still run before real secrets are configured, but production-like builds should use real values.
+
+## Branch-Based Delivery Flow
+
+The repository now supports a simple branch pipeline:
+
+- feature branches: run CI on push and pull request
+- `staging`: run CI plus the staging deploy skeleton in `.github/workflows/deploy.yml`
+- `master`: run CI plus the production deploy skeleton in `.github/workflows/deploy.yml`
+
+The deploy workflow currently verifies the app and then runs placeholder deploy jobs for the `staging` and `production` GitHub environments. This gives you the branch automation structure now without locking you into a deployment provider yet.
+
+Recommended next setup in GitHub:
+
+- create GitHub environments named `staging` and `production`
+- add environment-specific secrets there if your deploy target needs them
+- optionally require manual approval for the `production` environment
+
+When you are ready to deploy for real, replace the placeholder deploy step in `.github/workflows/deploy.yml` with your provider-specific command.
+
+## Fast PR Command
+
+Use this command to push your current branch and create a pull request if one does not already exist:
+
+```bash
+pnpm pr
+```
+
+Useful options:
+
+- `pnpm pr -- --base master`
+- `pnpm pr -- --dry-run`

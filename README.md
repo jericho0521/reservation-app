@@ -34,3 +34,22 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+
+## Continuous Integration
+
+GitHub Actions CI is configured in `.github/workflows/ci.yml`.
+
+The workflow runs on pushes, pull requests, and manual dispatches, and executes:
+
+- `pnpm test`
+- `pnpm lint`
+- `pnpm build`
+
+For the most reliable CI builds, configure these GitHub repository variables or secrets:
+
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `GOOGLE_GENERATIVE_AI_API_KEY`
+- `OPENROUTER_API_KEY`
+
+The workflow includes placeholder fallbacks so verification can still run before real secrets are configured, but production-like builds should use real values.

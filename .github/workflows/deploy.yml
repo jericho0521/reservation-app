@@ -1,0 +1,92 @@
+name: Deploy
+
+on:
+  push:
+    branches:
+      - staging
+      - master
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Deployment target
+        required: true
+        type: choice
+        options:
+          - staging
+          - production
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      CI: true
+      NEXT_PUBLIC_SUPABASE_URL: ${{ vars.NEXT_PUBLIC_SUPABASE_URL || 'https://example.supabase.co' }}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'ci-placeholder-anon-key' }}
+      GOOGLE_GENERATIVE_AI_API_KEY: ${{ secrets.GOOGLE_GENERATIVE_AI_API_KEY || 'ci-placeholder-google-key' }}
+      OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY || 'ci-placeholder-openrouter-key' }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run tests
+        run: pnpm test
+
+      - name: Run linter
+        run: pnpm lint
+
+      - name: Build application
+        run: pnpm build
+
+  deploy-staging:
+    if: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/staging') || (github.event_name == 'workflow_dispatch' && inputs.environment == 'staging') }}
+    needs: verify
+    runs-on: ubuntu-latest
+    environment:
+      name: staging
+
+    steps:
+      - name: Deployment placeholder
+        run: |
+          echo "Staging deployment skeleton is active."
+          echo "Add your staging deploy command here, for example a Vercel, Docker, or SSH deploy step."
+
+  deploy-production:
+    if: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/master') || (github.event_name == 'workflow_dispatch' && inputs.environment == 'production') }}
+    needs: verify
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+
+    steps:
+      - name: Deployment placeholder
+        run: |
+          echo "Production deployment skeleton is active."
+          echo "Add your production deploy command here after you decide on the deployment provider."

@@ -19,6 +19,22 @@ function printHelp() {
   console.log('  --base <branch>  Override the PR base branch');
   console.log('  --dry-run        Show what would run without pushing or creating a PR');
   console.log('  --help           Show this help message');
+  console.log('');
+  console.log('Default branch flow:');
+  console.log('  feature/* -> staging');
+  console.log('  staging -> master');
+}
+
+function getDefaultBaseBranch(currentBranch) {
+  if (currentBranch === 'staging') {
+    return 'master';
+  }
+
+  if (currentBranch === 'master') {
+    return '';
+  }
+
+  return 'staging';
 }
 
 const args = process.argv.slice(2);
@@ -49,7 +65,12 @@ if (currentBranch === 'HEAD') {
 }
 
 if (!baseBranch) {
-  baseBranch = run('gh', ['repo', 'view', '--json', 'defaultBranchRef', '--jq', '.defaultBranchRef.name']);
+  baseBranch = getDefaultBaseBranch(currentBranch);
+}
+
+if (currentBranch === 'master') {
+  console.error('Refusing to open a PR from master. Create release PRs from staging to master instead.');
+  process.exit(1);
 }
 
 if (dryRun) {

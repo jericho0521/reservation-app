@@ -80,7 +80,13 @@ Use this command to push your current branch and create a pull request if one do
 pnpm pr
 ```
 
+Default branch flow:
+
+- feature branches -> `staging`
+- `staging` -> `master`
+
 Useful options:
 
+- `pnpm pr -- --base staging`
 - `pnpm pr -- --base master`
 - `pnpm pr -- --dry-run`

@@ -1,3 +1,5 @@
+import type { ChartProps } from '@/components/analytics/renderer/spec-types';
+
 export type DashboardColor = 'neon' | 'blue' | 'green' | 'purple' | 'orange' | 'red';
 
 export interface DashboardCard {
@@ -13,11 +15,7 @@ export interface DashboardInsights {
     items: string[];
 }
 
-export interface DashboardChart {
-    type: 'bar' | 'line' | 'pie';
-    title: string;
-    data: { label: string; value: number }[];
-}
+export type DashboardChart = ChartProps;
 
 export interface DashboardResponse {
     cards?: DashboardCard[];

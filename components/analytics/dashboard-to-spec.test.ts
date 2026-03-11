@@ -33,6 +33,41 @@ test('dashboardToSpec creates metric, chart, and insights sections', () => {
     assert.equal(spec.elements['insights-list'].type, 'Insights');
 });
 
+test('dashboardToSpec preserves richer fallback chart metadata', () => {
+    const spec = dashboardToSpec({
+        charts: [
+            {
+                type: 'line',
+                title: 'Revenue Over Time',
+                subtitle: 'Daily revenue for the selected period',
+                xKey: 'date',
+                yKey: 'revenue',
+                format: 'currency',
+                legend: true,
+                emptyMessage: 'No revenue data for this period.',
+                data: [{ date: '2026-01-01', revenue: 30 }],
+                series: [{ key: 'revenue', name: 'Revenue', color: '#39FF14' }],
+            },
+        ],
+    });
+
+    assert.deepEqual(spec.elements['chart-1'], {
+        type: 'Chart',
+        props: {
+            type: 'line',
+            title: 'Revenue Over Time',
+            subtitle: 'Daily revenue for the selected period',
+            xKey: 'date',
+            yKey: 'revenue',
+            format: 'currency',
+            legend: true,
+            emptyMessage: 'No revenue data for this period.',
+            data: [{ date: '2026-01-01', revenue: 30 }],
+            series: [{ key: 'revenue', name: 'Revenue', color: '#39FF14' }],
+        },
+    });
+});
+
 test('dashboardToSpec adds an empty state when no dashboard widgets exist', () => {
     const spec = dashboardToSpec({});
 

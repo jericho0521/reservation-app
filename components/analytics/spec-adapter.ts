@@ -14,12 +14,19 @@ const dashboardCardSchema = z.object({
 const dashboardChartSchema = z.object({
     type: z.enum(['bar', 'line', 'pie']),
     title: z.string(),
-    data: z.array(
-        z.object({
-            label: z.string(),
-            value: z.number(),
-        }),
-    ),
+    subtitle: z.string().optional(),
+    xKey: z.string().optional(),
+    yKey: z.string().optional(),
+    format: z.enum(['currency', 'number', 'percent']).optional(),
+    legend: z.boolean().optional(),
+    stacked: z.boolean().optional(),
+    emptyMessage: z.string().optional(),
+    series: z.array(z.object({
+        key: z.string(),
+        name: z.string(),
+        color: z.string().optional(),
+    })).optional(),
+    data: z.array(z.record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()]))),
 });
 
 const dashboardInsightsSchema = z.object({

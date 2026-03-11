@@ -1,9 +1,15 @@
 import { z } from 'zod';
 import type { AnalyticsAction, AnalyticsElement, AnalyticsSpec, VisibilityCondition } from './spec-types';
 
-const chartDataItemSchema = z.object({
-    label: z.string(),
-    value: z.number(),
+const chartDataItemSchema = z.record(
+    z.string(),
+    z.union([z.string(), z.number(), z.boolean(), z.null()]),
+);
+
+const chartSeriesSchema = z.object({
+    key: z.string(),
+    name: z.string(),
+    color: z.string().optional(),
 });
 
 const metricCardColorSchema = z.enum(['neon', 'blue', 'green', 'purple', 'orange', 'red']);
@@ -20,6 +26,14 @@ const chartPropsSchema = z.object({
     type: z.enum(['bar', 'line', 'pie']),
     title: z.string(),
     data: z.array(chartDataItemSchema),
+    subtitle: z.string().optional(),
+    xKey: z.string().optional(),
+    yKey: z.string().optional(),
+    format: z.enum(['currency', 'number', 'percent']).optional(),
+    legend: z.boolean().optional(),
+    stacked: z.boolean().optional(),
+    emptyMessage: z.string().optional(),
+    series: z.array(chartSeriesSchema).optional(),
 });
 
 const insightsPropsSchema = z.object({

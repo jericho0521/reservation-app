@@ -2,20 +2,21 @@ import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { buildAnalyticsCatalogPrompt } from '@/components/analytics/renderer/catalog';
 import { extractSpecAndFallback } from '@/components/analytics/spec-adapter';
-
-// Hardcoded pricing (RM per hour per seat)
-const PRICING: Record<string, number> = {
-    'Racing Simulator': 15,
-    'Playstation 5': 30,
-};
+import { buildAnalyticsSnapshot, type AnalyticsSnapshot } from './snapshot';
 
 const DASHBOARD_SCHEMA = `${buildAnalyticsCatalogPrompt()}
 
 Additional analytics guidelines:
 - Build for booking/revenue analytics use-cases.
-- Generate 2-4 metric cards, 1-2 charts, and 3-5 insights when data supports it.
+- Generate 2-4 metric cards, 3-5 charts, and 3-5 insights when data supports it.
 - Use RM for currency values.
 - Keep text concise and data-driven.
+- For revenue prompts, include at least one trend chart and one composition or comparison chart.
+- Use line charts for trends over dates, pie charts for revenue share, and bar charts for service or period comparisons.
+- When enough data exists, also include demand timing charts like bookings by weekday or hour.
+- Reuse the prebuilt chart suggestions in topLevelCharts when they fit the question.
+- Prefer chart titles that clearly answer the user's question.
+- When filters are provided, honor them in titles, subtitles, and insights.
 - Always return valid JSON with a single root and valid element references.
 - Do not exceed 40 total elements.
 - Prefer concise output over exhaustive output.`;
@@ -43,6 +44,11 @@ Schema:
     {
       "type": "bar" | "line" | "pie",
       "title": "string",
+      "subtitle": "string (optional)",
+      "xKey": "string (optional)",
+      "yKey": "string (optional)",
+      "format": "currency" | "number" | "percent",
+      "legend": true,
       "data": [{ "label": "string", "value": number }]
     }
   ]
@@ -50,7 +56,7 @@ Schema:
 
 Rules:
 - 2-4 cards maximum
-- 1-2 charts maximum
+- 2-4 charts maximum
 - 3-5 insights maximum
 - Keep JSON short and complete
 `;
@@ -59,48 +65,6 @@ interface AICompletionResult {
     content: unknown;
     finishReason?: string;
 }
-
-interface BookingData {
-    booking_date: string;
-    start_time: string;
-    seats_booked: number;
-    status: string;
-    services: { name: string } | { name: string }[] | null;
-}
-
-interface AnalyticsSnapshot {
-    period: {
-        start?: string;
-        end?: string;
-    };
-    totals: {
-        bookings: number;
-        confirmed: number;
-        completed: number;
-        cancelled: number;
-        seats: number;
-    };
-    revenue: {
-        total: number;
-        earned: number;
-        pending: number;
-        lost: number;
-    };
-    services: Array<{
-        name: string;
-        bookings: number;
-        seats: number;
-        revenue: number;
-        completed: number;
-        confirmed: number;
-        cancelled: number;
-    }>;
-    bookingsByDay: Array<{ label: string; value: number }>;
-    bookingsByHour: Array<{ label: string; value: number }>;
-    statusCounts: Array<{ label: string; value: number }>;
-}
-
-const DAY_ORDER = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
 async function requestAICompletion({
     systemPrompt,
@@ -176,14 +140,6 @@ function parseModelJson(content: unknown): unknown | null {
     return null;
 }
 
-function getServiceName(services: BookingData['services']): string {
-    if (Array.isArray(services)) {
-        return services[0]?.name || 'Unknown';
-    }
-
-    return services?.name || 'Unknown';
-}
-
 async function getBookingSnapshot(startDate?: string, endDate?: string): Promise<AnalyticsSnapshot | null> {
     let query = supabase
         .from('bookings')
@@ -203,113 +159,35 @@ async function getBookingSnapshot(startDate?: string, endDate?: string): Promise
         return null;
     }
 
-    const typedBookings = (bookings ?? []) as BookingData[];
-    const serviceMap = new Map<string, AnalyticsSnapshot['services'][number]>();
-    const dayMap = new Map<string, number>();
-    const hourMap = new Map<string, number>();
-    const statusMap = new Map<string, number>();
-    const snapshot: AnalyticsSnapshot = {
-        period: { start: startDate, end: endDate },
-        totals: {
-            bookings: typedBookings.length,
-            confirmed: 0,
-            completed: 0,
-            cancelled: 0,
-            seats: 0,
-        },
-        revenue: {
-            total: 0,
-            earned: 0,
-            pending: 0,
-            lost: 0,
-        },
-        services: [],
-        bookingsByDay: [],
-        bookingsByHour: [],
-        statusCounts: [],
-    };
-
-    for (const booking of typedBookings) {
-        const serviceName = getServiceName(booking.services);
-        const price = PRICING[serviceName] || 0;
-        const bookingRevenue = booking.seats_booked * price;
-
-        snapshot.totals.seats += booking.seats_booked;
-
-        if (booking.status === 'confirmed') {
-            snapshot.totals.confirmed += 1;
-            snapshot.revenue.pending += bookingRevenue;
-            snapshot.revenue.total += bookingRevenue;
-        }
-
-        if (booking.status === 'completed') {
-            snapshot.totals.completed += 1;
-            snapshot.revenue.earned += bookingRevenue;
-            snapshot.revenue.total += bookingRevenue;
-        }
-
-        if (booking.status === 'cancelled') {
-            snapshot.totals.cancelled += 1;
-            snapshot.revenue.lost += bookingRevenue;
-        }
-
-        const serviceStats = serviceMap.get(serviceName) ?? {
-            name: serviceName,
-            bookings: 0,
-            seats: 0,
-            revenue: 0,
-            completed: 0,
-            confirmed: 0,
-            cancelled: 0,
-        };
-
-        serviceStats.bookings += 1;
-        serviceStats.seats += booking.seats_booked;
-
-        if (booking.status === 'completed') {
-            serviceStats.completed += 1;
-            serviceStats.revenue += bookingRevenue;
-        }
-
-        if (booking.status === 'confirmed') {
-            serviceStats.confirmed += 1;
-            serviceStats.revenue += bookingRevenue;
-        }
-
-        if (booking.status === 'cancelled') {
-            serviceStats.cancelled += 1;
-        }
-
-        serviceMap.set(serviceName, serviceStats);
-
-        statusMap.set(booking.status, (statusMap.get(booking.status) ?? 0) + 1);
-
-        const dayOfWeek = new Date(booking.booking_date).toLocaleDateString('en-US', { weekday: 'long' });
-        dayMap.set(dayOfWeek, (dayMap.get(dayOfWeek) ?? 0) + 1);
-
-        const hour = booking.start_time.slice(0, 5);
-        hourMap.set(hour, (hourMap.get(hour) ?? 0) + 1);
-    }
-
-    snapshot.services = [...serviceMap.values()].sort((left, right) => right.bookings - left.bookings);
-    snapshot.bookingsByDay = DAY_ORDER
-        .filter(day => dayMap.has(day))
-        .map(day => ({ label: day, value: dayMap.get(day) ?? 0 }));
-    snapshot.bookingsByHour = [...hourMap.entries()]
-        .sort(([left], [right]) => left.localeCompare(right))
-        .map(([label, value]) => ({ label, value }));
-    snapshot.statusCounts = [...statusMap.entries()].map(([label, value]) => ({ label, value }));
-
-    return snapshot;
+    return buildAnalyticsSnapshot(bookings ?? [], startDate, endDate);
 }
 
-function buildAnalyticsPrompt(prompt: string, snapshot: AnalyticsSnapshot): string {
+function buildAnalyticsPrompt(
+    prompt: string,
+    snapshot: AnalyticsSnapshot,
+    previousQuery?: string,
+    filters?: Record<string, unknown>,
+): string {
+    const hasFilters = filters && Object.keys(filters).length > 0;
+
     return `User Query: "${prompt}"
+
+Previous Query Context: ${previousQuery ? `"${previousQuery}"` : 'None'}
+
+Active Filters: ${hasFilters ? JSON.stringify(filters) : 'None'}
 
 Analytics Snapshot JSON:
 ${JSON.stringify(snapshot)}
 
-Generate an analytics UI spec JSON response using the allowed component catalog.`;
+Generate an analytics UI spec JSON response using the allowed component catalog.
+
+Dashboard generation goals:
+- Answer the latest user query directly.
+- Prefer visually clear analytics with charts over walls of text.
+- For revenue questions, highlight trend + mix + key KPIs.
+- Prefer 3-5 graphs when the question is broad enough to support them.
+- If active filters exist, reflect them in chart subtitles and insight wording.
+- Use concise, business-friendly titles and subtitles.`;
 }
 
 // Parse natural language date references
@@ -380,7 +258,7 @@ function parseDateRange(query: string): { startDate?: string; endDate?: string }
 
 export async function POST(req: Request) {
     try {
-        const { prompt } = await req.json();
+        const { prompt, previousQuery, filters } = await req.json();
 
         if (!prompt || typeof prompt !== 'string') {
             return NextResponse.json({ error: 'Prompt is required' }, { status: 400 });
@@ -395,7 +273,12 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: 'Failed to fetch booking data' }, { status: 500 });
         }
 
-        const primaryUserPrompt = buildAnalyticsPrompt(prompt, snapshot);
+        const primaryUserPrompt = buildAnalyticsPrompt(
+            prompt,
+            snapshot,
+            typeof previousQuery === 'string' ? previousQuery : undefined,
+            filters && typeof filters === 'object' ? filters as Record<string, unknown> : undefined,
+        );
         let aiResult: AICompletionResult;
         try {
             aiResult = await requestAICompletion({

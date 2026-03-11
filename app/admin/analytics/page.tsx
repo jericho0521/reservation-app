@@ -1,13 +1,18 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Sparkles } from 'lucide-react';
+import { ArrowLeft, GripVertical, Sparkles, X } from 'lucide-react';
 import { AnalyticsChatInput } from '@/components/analytics/AnalyticsChatInput';
 import { DynamicDashboard } from '@/components/analytics/DynamicDashboard';
 import type { DashboardResponse } from '@/components/analytics/dashboard-types';
 import { dashboardToSpec } from '@/components/analytics/dashboard-to-spec';
-import { AnalyticsRenderer, applyAnalyticsAction } from '@/components/analytics/renderer/AnalyticsRenderer';
+import {
+    AnalyticsRenderer,
+    applyAnalyticsAction,
+    getDefaultLayoutState,
+    sanitizeLayoutState,
+} from '@/components/analytics/renderer/AnalyticsRenderer';
 import type { AnalyticsAction, AnalyticsSpec } from '@/components/analytics/renderer/spec-types';
 import { Sidebar } from '@/components/admin/Sidebar';
 
@@ -21,6 +26,7 @@ export default function AnalyticsPage() {
     const [isLoading, setIsLoading] = useState(false);
     const [dashboard, setDashboard] = useState<DashboardResponse | null>(null);
     const [spec, setSpec] = useState<AnalyticsSpec | null>(null);
+    const [layoutState, setLayoutState] = useState<Record<string, string[]>>({});
     const [uiState, setUiState] = useState<Record<string, unknown>>({
         filters: {},
         sections: {
@@ -29,9 +35,59 @@ export default function AnalyticsPage() {
     });
     const [lastQuery, setLastQuery] = useState<string>('');
     const [error, setError] = useState<string | null>(null);
+    const activeFilters = useMemo(
+        () => Object.entries((uiState.filters as Record<string, unknown>) ?? {}).filter(([, value]) => Boolean(value)),
+        [uiState],
+    );
+    const layoutStorageKey = useMemo(() => {
+        if (!spec) {
+            return '';
+        }
+
+        return `analytics-layout:${spec.root}:${Object.keys(spec.elements).sort().join('|')}`;
+    }, [spec]);
+
+    useEffect(() => {
+        if (!spec || !layoutStorageKey) {
+            setLayoutState({});
+            return;
+        }
+
+        const defaultLayout = getDefaultLayoutState(spec);
+
+        try {
+            const savedLayout = window.localStorage.getItem(layoutStorageKey);
+
+            if (!savedLayout) {
+                setLayoutState(defaultLayout);
+                return;
+            }
+
+            const parsedLayout = JSON.parse(savedLayout) as Record<string, string[]>;
+            setLayoutState(sanitizeLayoutState(spec, parsedLayout));
+        } catch {
+            setLayoutState(defaultLayout);
+        }
+    }, [spec, layoutStorageKey]);
+
+    useEffect(() => {
+        if (!spec || !layoutStorageKey || Object.keys(layoutState).length === 0) {
+            return;
+        }
+
+        window.localStorage.setItem(layoutStorageKey, JSON.stringify(layoutState));
+    }, [layoutState, layoutStorageKey, spec]);
 
     const handleRendererAction = (action: AnalyticsAction) => {
         setUiState(prev => applyAnalyticsAction(prev, action));
+    };
+
+    const clearFilters = () => {
+        setUiState(prev => ({
+            ...prev,
+            filters: {},
+            drilldown: null,
+        }));
     };
 
     const handleSubmit = async (prompt: string) => {
@@ -40,12 +96,17 @@ export default function AnalyticsPage() {
         setLastQuery(prompt);
         setSpec(null);
         setDashboard(null);
+        setLayoutState({});
 
         try {
             const response = await fetch('/api/analytics-chat', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ prompt }),
+                body: JSON.stringify({
+                    prompt,
+                    previousQuery: lastQuery || undefined,
+                    filters: activeFilters.length > 0 ? Object.fromEntries(activeFilters) : undefined,
+                }),
             });
 
             if (!response.ok) {
@@ -104,9 +165,39 @@ export default function AnalyticsPage() {
 
                     {/* Query Display */}
                     {lastQuery && (
-                        <div className="flex items-center gap-2 text-sm text-gray-400">
-                            <span>Showing results for:</span>
-                            <span className="text-neon font-medium">&quot;{lastQuery}&quot;</span>
+                        <div className="glass-panel rounded-2xl border border-white/10 p-4">
+                            <div className="flex flex-wrap items-center gap-2 text-sm text-gray-400">
+                                <span>Showing results for:</span>
+                                <span className="font-medium text-neon">&quot;{lastQuery}&quot;</span>
+                            </div>
+
+                            {spec && Object.values(layoutState).some(order => order.length > 1) && (
+                                <div className="mt-3 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.02] px-3 py-1 text-xs text-gray-400">
+                                    <GripVertical className="h-3.5 w-3.5 text-neon" />
+                                    Drag any dashboard block by its handle to rearrange the layout
+                                </div>
+                            )}
+
+                            {activeFilters.length > 0 && (
+                                <div className="mt-3 flex flex-wrap items-center gap-2">
+                                    <span className="text-xs uppercase tracking-[0.2em] text-gray-500">Active Filters</span>
+                                    {activeFilters.map(([key, value]) => (
+                                        <span
+                                            key={key}
+                                            className="rounded-full border border-neon/20 bg-neon/10 px-3 py-1 text-xs text-neon"
+                                        >
+                                            {key}: {String(value)}
+                                        </span>
+                                    ))}
+                                    <button
+                                        onClick={clearFilters}
+                                        className="inline-flex items-center gap-1 rounded-full border border-white/10 px-3 py-1 text-xs text-gray-300 transition-colors hover:border-white/20 hover:text-white"
+                                    >
+                                        <X className="h-3 w-3" />
+                                        Clear filters
+                                    </button>
+                                </div>
+                            )}
                         </div>
                     )}
 
@@ -125,6 +216,8 @@ export default function AnalyticsPage() {
                             setUiState={setUiState}
                             onAction={handleRendererAction}
                             isLoading={isLoading}
+                            layoutState={layoutState}
+                            onLayoutStateChange={setLayoutState}
                         />
                     ) : (
                         <DynamicDashboard data={dashboard} isLoading={isLoading} />
@@ -137,7 +230,9 @@ export default function AnalyticsPage() {
                             <h3 className="text-lg font-bold font-heading mb-2">Ask a Question</h3>
                             <p className="text-gray-400 max-w-md mx-auto">
                                 Type a question above or click one of the example prompts to generate
-                                an AI-powered analytics dashboard from your booking data.
+                                an AI-powered analytics dashboard from your booking data. Ask follow-up
+                                questions like &quot;break it down by service&quot; or &quot;focus on January only&quot;
+                                to keep refining the view.
                             </p>
                         </div>
                     )}

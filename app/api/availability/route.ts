@@ -16,7 +16,7 @@ export async function GET(request: Request) {
 
     try {
         // Get service to know total seats
-        const { data: service, error: serviceError } = await supabase
+        const { data: service, error: serviceError } = await supabase()
             .from('services')
             .select('total_seats')
             .eq('id', serviceId)
@@ -27,7 +27,7 @@ export async function GET(request: Request) {
         const totalSeats = service.total_seats;
 
         // Get existing bookings for this service and date
-        const { data: bookings, error: bookingsError } = await supabase
+        const { data: bookings, error: bookingsError } = await supabase()
             .from('bookings')
             .select('start_time, end_time, seats_booked')
             .eq('service_id', serviceId)

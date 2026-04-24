@@ -7,9 +7,7 @@ export default function ChatBookingPage() {
         <>
             <Header />
             <main className="min-h-screen bg-racing-dark text-white pt-20">
-                <div className="container mx-auto px-6">
-                    <ChatInterface />
-                </div>
+                <ChatInterface />
             </main>
         </>
     );

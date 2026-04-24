@@ -89,6 +89,18 @@ To test a stronger chat model without code changes, set:
 OPENROUTER_CHAT_MODEL=google/gemini-2.5-pro
 ```
 
+## AI Sales Report Processing
+
+The AI Analytics reports panel needs two Supabase tables plus a private Storage bucket before uploads will work.
+
+### First-time Setup
+
+1. Run `supabase/sales-reports.sql` in the Supabase SQL editor.
+2. Refresh `/admin/analytics`.
+3. Upload a PDF, JPG, PNG, or WebP daily sales report from the Daily Sales Reports panel.
+
+If the panel says sales report storage is not set up, Supabase has not applied `supabase/sales-reports.sql` yet or the PostgREST schema cache has not refreshed.
+
 ## Branch-Based Delivery Flow
 
 The repository now supports a simple branch pipeline:

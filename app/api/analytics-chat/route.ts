@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { buildAnalyticsCatalogPrompt } from '@/components/analytics/renderer/catalog';
 import { extractSpecAndFallback } from '@/components/analytics/spec-adapter';
-import { buildAnalyticsSnapshot, type AnalyticsSnapshot } from './snapshot';
+import { buildAnalyticsSnapshot, type AnalyticsSalesReportRecord, type AnalyticsSnapshot } from './snapshot';
 
 const DASHBOARD_SCHEMA = `${buildAnalyticsCatalogPrompt()}
 
@@ -12,6 +12,7 @@ Additional analytics guidelines:
 - Use RM for currency values.
 - Keep text concise and data-driven.
 - For revenue prompts, include at least one trend chart and one composition or comparison chart.
+- Prefer actual daily sales report data when revenue.source is actual_sales_reports or mixed; call out booking-estimated days when source coverage is mixed.
 - Use line charts for trends over dates, pie charts for revenue share, and bar charts for service or period comparisons.
 - When enough data exists, also include demand timing charts like bookings by weekday or hour.
 - Reuse the prebuilt chart suggestions in topLevelCharts when they fit the question.
@@ -140,26 +141,57 @@ function parseModelJson(content: unknown): unknown | null {
     return null;
 }
 
+function isMissingSalesReportsTable(error: unknown) {
+    if (!error || typeof error !== 'object') {
+        return false;
+    }
+
+    const maybeError = error as { code?: string; message?: string };
+    return maybeError.code === 'PGRST205' || Boolean(maybeError.message?.includes('daily_sales_reports'));
+}
+
 async function getBookingSnapshot(startDate?: string, endDate?: string): Promise<AnalyticsSnapshot | null> {
     let query = supabase()
         .from('bookings')
         .select('booking_date, start_time, seats_booked, status, services(name)');
+    let salesReportsQuery = supabase()
+        .from('daily_sales_reports')
+        .select('report_date, shift_income, gross_sales, net_sales, discounts, tax, refunds, transaction_count, payment_breakdown')
+        .eq('is_published', true);
 
     if (startDate) {
         query = query.gte('booking_date', startDate);
+        salesReportsQuery = salesReportsQuery.gte('report_date', startDate);
     }
     if (endDate) {
         query = query.lte('booking_date', endDate);
+        salesReportsQuery = salesReportsQuery.lte('report_date', endDate);
     }
 
-    const { data: bookings, error } = await query;
+    const [
+        { data: bookings, error },
+        salesReportsResult,
+    ] = await Promise.all([
+        query,
+        salesReportsQuery.order('report_date', { ascending: true }),
+    ]);
 
     if (error) {
         console.error('Error fetching bookings:', error);
         return null;
     }
 
-    return buildAnalyticsSnapshot(bookings ?? [], startDate, endDate);
+    if (salesReportsResult.error && !isMissingSalesReportsTable(salesReportsResult.error)) {
+        console.error('Error fetching sales reports:', salesReportsResult.error);
+        return null;
+    }
+
+    return buildAnalyticsSnapshot(
+        bookings ?? [],
+        startDate,
+        endDate,
+        (salesReportsResult.data ?? []) as AnalyticsSalesReportRecord[],
+    );
 }
 
 function buildAnalyticsPrompt(
@@ -184,7 +216,7 @@ Generate an analytics UI spec JSON response using the allowed component catalog.
 Dashboard generation goals:
 - Answer the latest user query directly.
 - Prefer visually clear analytics with charts over walls of text.
-- For revenue questions, highlight trend + mix + key KPIs.
+- For revenue questions, highlight trend + mix + key KPIs. Use actual sales report data when available and identify booking-estimated fallback days when coverage is mixed.
 - Prefer 3-5 graphs when the question is broad enough to support them.
 - If active filters exist, reflect them in chart subtitles and insight wording.
 - Use concise, business-friendly titles and subtitles.`;

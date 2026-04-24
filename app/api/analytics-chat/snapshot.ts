@@ -15,6 +15,18 @@ export interface AnalyticsBookingRecord {
     services: { name: string } | { name: string }[] | null;
 }
 
+export interface AnalyticsSalesReportRecord {
+    report_date: string;
+    shift_income: number | null;
+    gross_sales: number | null;
+    net_sales: number | null;
+    discounts: number | null;
+    tax: number | null;
+    refunds: number | null;
+    transaction_count: number | null;
+    payment_breakdown: Record<string, number> | null;
+}
+
 interface ServiceSnapshot {
     name: string;
     bookings: number;
@@ -43,13 +55,34 @@ export interface AnalyticsSnapshot {
         earned: number;
         pending: number;
         lost: number;
+        actual: number;
+        estimated: number;
+        source: 'booking_estimate' | 'actual_sales_reports' | 'mixed';
     };
     services: ServiceSnapshot[];
     bookingsByDay: Array<{ label: string; value: number }>;
     bookingsByHour: Array<{ label: string; value: number }>;
     statusCounts: Array<{ label: string; value: number }>;
-    revenueByDay: Array<{ date: string; revenue: number }>;
+    revenueByDay: Array<{ date: string; revenue: number; source: 'booking_estimate' | 'actual_sales_report' }>;
     revenueByService: Array<{ label: string; revenue: number; bookings: number }>;
+    dailySalesReports: Array<{
+        date: string;
+        grossSales: number;
+        netSales: number;
+        transactionCount: number;
+    }>;
+    paymentBreakdown: Array<{ label: string; value: number }>;
+    salesReportCoverage: {
+        actualDays: number;
+        estimatedDays: number;
+        totalDays: number;
+        missingReportDates: string[];
+        label: string;
+    };
+    salesMetrics: {
+        transactionCount: number;
+        averageTicket: number;
+    };
     topLevelCharts: {
         revenueTrend: ChartProps;
         revenueShare: ChartProps;
@@ -57,6 +90,7 @@ export interface AnalyticsSnapshot {
         weekdayDemand: ChartProps;
         hourlyDemand: ChartProps;
         statusBreakdown: ChartProps;
+        paymentMix: ChartProps;
     };
 }
 
@@ -88,12 +122,15 @@ export function buildAnalyticsSnapshot(
     bookings: AnalyticsBookingRecord[],
     startDate?: string,
     endDate?: string,
+    salesReports: AnalyticsSalesReportRecord[] = [],
 ): AnalyticsSnapshot {
     const serviceMap = new Map<string, ServiceSnapshot>();
     const dayMap = new Map<string, number>();
     const hourMap = new Map<string, number>();
     const statusMap = new Map<string, number>();
     const revenueByDate = new Map<string, number>();
+    const paymentMap = new Map<string, number>();
+    const salesReportByDate = new Map<string, AnalyticsSalesReportRecord>();
 
     const snapshot: AnalyticsSnapshot = {
         period: {
@@ -113,6 +150,9 @@ export function buildAnalyticsSnapshot(
             earned: 0,
             pending: 0,
             lost: 0,
+            actual: 0,
+            estimated: 0,
+            source: 'booking_estimate',
         },
         services: [],
         bookingsByDay: [],
@@ -120,6 +160,19 @@ export function buildAnalyticsSnapshot(
         statusCounts: [],
         revenueByDay: [],
         revenueByService: [],
+        dailySalesReports: [],
+        paymentBreakdown: [],
+        salesReportCoverage: {
+            actualDays: 0,
+            estimatedDays: 0,
+            totalDays: 0,
+            missingReportDates: [],
+            label: 'Booking-estimated revenue only',
+        },
+        salesMetrics: {
+            transactionCount: 0,
+            averageTicket: 0,
+        },
         topLevelCharts: {
             revenueTrend: {
                 type: 'line',
@@ -193,6 +246,18 @@ export function buildAnalyticsSnapshot(
                 series: [{ key: 'value', name: 'Bookings', color: '#A855F7' }],
                 emptyMessage: 'No booking status data available.',
             },
+            paymentMix: {
+                type: 'pie',
+                title: 'Payment Mix',
+                subtitle: 'Payment breakdown from published sales reports',
+                xKey: 'label',
+                yKey: 'value',
+                format: 'currency',
+                legend: true,
+                data: [],
+                series: [{ key: 'value', name: 'Sales', color: '#38BDF8' }],
+                emptyMessage: 'No payment mix data from sales reports yet.',
+            },
         },
     };
 
@@ -261,6 +326,14 @@ export function buildAnalyticsSnapshot(
         hourMap.set(hour, (hourMap.get(hour) ?? 0) + 1);
     }
 
+    for (const report of salesReports) {
+        salesReportByDate.set(report.report_date, report);
+
+        for (const [label, value] of Object.entries(report.payment_breakdown ?? {})) {
+            paymentMap.set(label, (paymentMap.get(label) ?? 0) + Number(value));
+        }
+    }
+
     snapshot.services = [...serviceMap.values()].sort((left, right) => right.bookings - left.bookings);
     snapshot.bookingsByDay = DAY_ORDER
         .filter(day => dayMap.has(day))
@@ -269,9 +342,19 @@ export function buildAnalyticsSnapshot(
         .sort(([left], [right]) => left.localeCompare(right))
         .map(([label, value]) => ({ label, value }));
     snapshot.statusCounts = [...statusMap.entries()].map(([label, value]) => ({ label, value }));
-    snapshot.revenueByDay = [...revenueByDate.entries()]
-        .sort(([left], [right]) => left.localeCompare(right))
-        .map(([date, revenue]) => ({ date, revenue }));
+    const revenueDates = new Set([...revenueByDate.keys(), ...salesReportByDate.keys()]);
+    snapshot.revenueByDay = [...revenueDates]
+        .sort((left, right) => left.localeCompare(right))
+        .map(date => {
+            const report = salesReportByDate.get(date);
+            const actualRevenue = report ? getReportRevenue(report) : null;
+
+            return {
+                date,
+                revenue: actualRevenue ?? revenueByDate.get(date) ?? 0,
+                source: report ? 'actual_sales_report' as const : 'booking_estimate' as const,
+            };
+        });
     snapshot.revenueByService = snapshot.services
         .filter(service => service.revenue > 0)
         .map(service => ({
@@ -279,8 +362,40 @@ export function buildAnalyticsSnapshot(
             revenue: service.revenue,
             bookings: service.bookings,
         }));
+    snapshot.dailySalesReports = [...salesReportByDate.entries()]
+        .sort(([left], [right]) => left.localeCompare(right))
+        .map(([date, report]) => ({
+            date,
+            grossSales: Number(report.gross_sales ?? 0),
+            netSales: Number(report.net_sales ?? report.gross_sales ?? 0),
+            transactionCount: Number(report.transaction_count ?? 0),
+        }));
+    snapshot.paymentBreakdown = [...paymentMap.entries()]
+        .sort(([, left], [, right]) => right - left)
+        .map(([label, value]) => ({ label, value }));
+    snapshot.revenue.actual = snapshot.revenueByDay
+        .filter(day => day.source === 'actual_sales_report')
+        .reduce((sum, day) => sum + day.revenue, 0);
+    snapshot.revenue.estimated = snapshot.revenueByDay
+        .filter(day => day.source === 'booking_estimate')
+        .reduce((sum, day) => sum + day.revenue, 0);
+    snapshot.revenue.total = snapshot.revenue.actual + snapshot.revenue.estimated;
+    snapshot.revenue.source = snapshot.revenue.actual > 0 && snapshot.revenue.estimated > 0
+        ? 'mixed'
+        : snapshot.revenue.actual > 0
+            ? 'actual_sales_reports'
+            : 'booking_estimate';
+    snapshot.salesMetrics.transactionCount = snapshot.dailySalesReports.reduce(
+        (sum, report) => sum + report.transactionCount,
+        0,
+    );
+    snapshot.salesMetrics.averageTicket = snapshot.salesMetrics.transactionCount > 0
+        ? Math.round((snapshot.revenue.actual / snapshot.salesMetrics.transactionCount) * 100) / 100
+        : 0;
+    snapshot.salesReportCoverage = buildSalesReportCoverage(snapshot.revenueByDay);
 
     snapshot.topLevelCharts.revenueTrend.data = snapshot.revenueByDay;
+    snapshot.topLevelCharts.revenueTrend.subtitle = `Daily revenue (${snapshot.salesReportCoverage.label})`;
     snapshot.topLevelCharts.revenueShare.data = snapshot.revenueByService;
     snapshot.topLevelCharts.bookingsByService.data = snapshot.revenueByService.map(service => ({
         label: service.label,
@@ -290,6 +405,35 @@ export function buildAnalyticsSnapshot(
     snapshot.topLevelCharts.weekdayDemand.data = snapshot.bookingsByDay;
     snapshot.topLevelCharts.hourlyDemand.data = snapshot.bookingsByHour;
     snapshot.topLevelCharts.statusBreakdown.data = snapshot.statusCounts;
+    snapshot.topLevelCharts.paymentMix.data = snapshot.paymentBreakdown;
 
     return snapshot;
+}
+
+function getReportRevenue(report: AnalyticsSalesReportRecord) {
+    return Number(report.shift_income ?? report.net_sales ?? report.gross_sales ?? 0);
+}
+
+function buildSalesReportCoverage(
+    revenueByDay: AnalyticsSnapshot['revenueByDay'],
+): AnalyticsSnapshot['salesReportCoverage'] {
+    const actualDays = revenueByDay.filter(day => day.source === 'actual_sales_report').length;
+    const estimatedDays = revenueByDay.filter(day => day.source === 'booking_estimate').length;
+    const totalDays = revenueByDay.length;
+    const missingReportDates = revenueByDay
+        .filter(day => day.source === 'booking_estimate' && day.revenue > 0)
+        .map(day => day.date);
+    const label = actualDays > 0 && estimatedDays > 0
+        ? `${actualDays} actual day(s), ${estimatedDays} booking-estimated day(s)`
+        : actualDays > 0
+            ? 'Actual sales report revenue'
+            : 'Booking-estimated revenue only';
+
+    return {
+        actualDays,
+        estimatedDays,
+        totalDays,
+        missingReportDates,
+        label,
+    };
 }

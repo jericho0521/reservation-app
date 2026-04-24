@@ -106,7 +106,15 @@ export const analyticsRegistry: AnalyticsRegistry = {
         <ChartPlaceholder
             type={props.type}
             title={props.title}
+            subtitle={props.subtitle}
             data={props.data}
+            xKey={props.xKey}
+            yKey={props.yKey}
+            format={props.format}
+            legend={props.legend}
+            stacked={props.stacked}
+            emptyMessage={props.emptyMessage}
+            series={props.series}
         />
     ),
     Insights: ({ props }) => (

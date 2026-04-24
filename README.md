@@ -5,16 +5,10 @@ This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-
 First, run the development server:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
 pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:4000](http://localhost:4000) with your browser to see the result.
 
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
@@ -51,8 +45,49 @@ For the most reliable CI builds, configure these GitHub repository variables or 
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 - `GOOGLE_GENERATIVE_AI_API_KEY`
 - `OPENROUTER_API_KEY`
+- `OPENROUTER_CHAT_MODEL` (optional, defaults to `google/gemini-2.5-flash`)
 
 The workflow includes placeholder fallbacks so verification can still run before real secrets are configured, but production-like builds should use real values.
+
+## Booking Assistant RAG
+
+The chat assistant retrieves business information from `data/knowledge.md` through Supabase pgvector.
+
+### First-time Setup
+
+1. Run `supabase/knowledge.sql` in the Supabase SQL editor.
+2. Add these local environment values to `.env`:
+   - `NEXT_PUBLIC_SUPABASE_URL`
+   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+   - `SUPABASE_SERVICE_ROLE_KEY`
+   - `GOOGLE_GENERATIVE_AI_API_KEY`
+   - `OPENROUTER_API_KEY`
+   - `GOOGLE_EMBEDDING_MODEL` (optional, defaults to `gemini-embedding-001`)
+3. Seed the knowledge chunks:
+
+```bash
+pnpm seed:knowledge
+```
+
+### Updating Knowledge Base
+
+Whenever you edit `data/knowledge.md`, re-run the seed command to regenerate embeddings and push the updated content to Supabase:
+
+```bash
+pnpm seed:knowledge
+```
+
+That's it. The script clears old chunks, re-splits the markdown by headings, generates new 768-dimension embeddings via Gemini, and inserts them into the `knowledge_chunks` table. No manual SQL needed.
+
+### Details
+
+The knowledge setup assumes 768-dimensional embeddings so it matches `supabase/knowledge.sql`.
+
+To test a stronger chat model without code changes, set:
+
+```bash
+OPENROUTER_CHAT_MODEL=google/gemini-2.5-pro
+```
 
 ## Branch-Based Delivery Flow
 

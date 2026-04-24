@@ -1,8 +1,15 @@
 export type MetricCardColor = 'neon' | 'blue' | 'green' | 'purple' | 'orange' | 'red';
 
+export type ChartValue = string | number | boolean | null;
+
 export interface ChartDataItem {
-    label: string;
-    value: number;
+    [key: string]: ChartValue;
+}
+
+export interface ChartSeries {
+    key: string;
+    name: string;
+    color?: string;
 }
 
 export interface MetricCardProps {
@@ -17,6 +24,14 @@ export interface ChartProps {
     type: 'bar' | 'line' | 'pie';
     title: string;
     data: ChartDataItem[];
+    subtitle?: string;
+    xKey?: string;
+    yKey?: string;
+    format?: 'currency' | 'number' | 'percent';
+    legend?: boolean;
+    stacked?: boolean;
+    emptyMessage?: string;
+    series?: ChartSeries[];
 }
 
 export interface InsightsProps {

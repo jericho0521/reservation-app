@@ -4,6 +4,7 @@ import Hero from '@/components/landing/Hero';
 import Features from '@/components/landing/Features';
 import Pricing from '@/components/landing/Pricing';
 import CTABanner from '@/components/landing/CTABanner';
+import FloatingChat from '@/components/chat/FloatingChat';
 
 export default function Home() {
     return (
@@ -16,6 +17,7 @@ export default function Home() {
                 <CTABanner />
             </main>
             <Footer />
+            <FloatingChat />
         </>
     );
 }

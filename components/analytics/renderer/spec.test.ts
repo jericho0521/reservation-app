@@ -76,3 +76,46 @@ test('parseAnalyticsSpec rejects unknown component types', () => {
 
     assert.equal(result.success, false);
 });
+
+test('parseAnalyticsSpec accepts rich chart props for interactive analytics dashboards', () => {
+    const result = parseAnalyticsSpec({
+        root: 'root',
+        elements: {
+            root: {
+                type: 'Chart',
+                props: {
+                    type: 'line',
+                    title: 'January Revenue Trend',
+                    subtitle: 'Daily revenue across the selected month',
+                    xKey: 'date',
+                    yKey: 'revenue',
+                    format: 'currency',
+                    legend: true,
+                    data: [
+                        { date: '2026-01-01', revenue: 1200 },
+                        { date: '2026-01-02', revenue: 1500 },
+                    ],
+                    series: [
+                        {
+                            key: 'revenue',
+                            name: 'Revenue',
+                            color: '#10B981',
+                        },
+                    ],
+                    emptyMessage: 'No revenue data for this period.',
+                },
+                on: {
+                    press: {
+                        action: 'applyFilter',
+                        params: {
+                            field: 'month',
+                            value: '2026-01',
+                        },
+                    },
+                },
+            },
+        },
+    });
+
+    assert.equal(result.success, true);
+});

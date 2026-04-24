@@ -1,6 +1,5 @@
 'use client';
 
-import { useState } from 'react';
 import { Check, X, Calendar, Clock, Users, User, Mail } from 'lucide-react';
 
 interface BookingCardProps {
@@ -26,10 +25,7 @@ export default function BookingCard({
     onCancel,
     status = 'pending'
 }: BookingCardProps) {
-    const [isAnimating, setIsAnimating] = useState(false);
-
     const handleConfirm = () => {
-        setIsAnimating(true);
         onConfirm();
     };
 

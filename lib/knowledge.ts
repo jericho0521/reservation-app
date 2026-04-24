@@ -1,32 +1,16 @@
 import { supabase } from './supabase';
+import { generateGeminiEmbedding } from './gemini-embeddings';
 
-// Generate embedding using Google Gemini
-async function generateEmbedding(text: string): Promise<number[]> {
-    const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key=${process.env.GOOGLE_GENERATIVE_AI_API_KEY}`,
-        {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                model: 'models/text-embedding-004',
-                content: { parts: [{ text }] },
-            }),
-        }
-    );
-
-    if (!response.ok) {
-        throw new Error(`Embedding failed: ${await response.text()}`);
-    }
-
-    const data = await response.json();
-    return data.embedding.values;
+interface KnowledgeMatch {
+    content: string;
+    similarity?: number;
 }
 
 // Search knowledge base for relevant chunks
 export async function searchKnowledge(query: string, matchCount: number = 3): Promise<string[]> {
     try {
         // Generate embedding for the query
-        const queryEmbedding = await generateEmbedding(query);
+        const queryEmbedding = await generateGeminiEmbedding(query);
 
         // Search for similar chunks
         const { data, error } = await supabase.rpc('match_knowledge', {
@@ -40,7 +24,9 @@ export async function searchKnowledge(query: string, matchCount: number = 3): Pr
             return [];
         }
 
-        return data?.map((chunk: { content: string }) => chunk.content) || [];
+        const matches = (data || []) as KnowledgeMatch[];
+
+        return matches.map(chunk => chunk.content);
     } catch (error) {
         console.error('Knowledge search failed:', error);
         return [];

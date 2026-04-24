@@ -10,9 +10,11 @@ interface AnalyticsChatInputProps {
 
 const EXAMPLE_PROMPTS = [
     'Show me January revenue',
+    'Show me January revenue by day and service',
     'Compare Racing Simulator vs PS5',
     'Busiest days this week',
     'Revenue last month',
+    'Which service made the most revenue this month?',
 ];
 
 export function AnalyticsChatInput({ onSubmit, isLoading }: AnalyticsChatInputProps) {

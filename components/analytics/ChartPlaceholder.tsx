@@ -1,17 +1,24 @@
 'use client';
 
+import {
+    Bar,
+    BarChart,
+    CartesianGrid,
+    Cell,
+    Legend,
+    Line,
+    LineChart,
+    Pie,
+    PieChart,
+    ResponsiveContainer,
+    Tooltip,
+    XAxis,
+    YAxis,
+} from 'recharts';
 import { BarChart3, LineChart as LineChartIcon, PieChart as PieChartIcon } from 'lucide-react';
+import type { ChartProps, ChartValue } from '@/components/analytics/renderer/spec-types';
 
-interface ChartData {
-    label: string;
-    value: number;
-}
-
-interface ChartPlaceholderProps {
-    type: 'bar' | 'line' | 'pie';
-    title: string;
-    data: ChartData[];
-}
+type ChartComponentProps = ChartProps;
 
 const iconMap = {
     bar: BarChart3,
@@ -19,183 +26,200 @@ const iconMap = {
     pie: PieChartIcon,
 };
 
-const COLORS = [
-    'bg-neon',
-    'bg-blue-400',
-    'bg-purple-400',
-    'bg-orange-400',
-    'bg-green-400',
-    'bg-pink-400',
-    'bg-cyan-400',
-];
+const CHART_COLORS = ['#39FF14', '#60A5FA', '#C084FC', '#FB923C', '#4ADE80', '#F472B6', '#22D3EE'];
 
-export function ChartPlaceholder({ type, title, data }: ChartPlaceholderProps) {
-    const Icon = iconMap[type] || BarChart3;
-    const maxValue = Math.max(...data.map(d => d.value), 1);
-    const total = data.reduce((sum, d) => sum + d.value, 0);
+function formatChartValue(value: ChartValue, format?: ChartProps['format']) {
+    if (typeof value !== 'number') {
+        return String(value ?? '');
+    }
 
-    if (!data || data.length === 0) {
-        return (
-            <div className="glass-panel p-6 rounded-xl border border-white/10 h-64 flex items-center justify-center">
-                <p className="text-gray-500">No data available</p>
-            </div>
-        );
+    if (format === 'currency') {
+        return `RM${value.toLocaleString('en-MY')}`;
+    }
+
+    if (format === 'percent') {
+        return `${value.toFixed(1)}%`;
+    }
+
+    return value.toLocaleString('en-MY');
+}
+
+function getCategoryValue(item: Record<string, ChartValue>, key?: string) {
+    if (key && item[key] !== undefined) {
+        return String(item[key] ?? '');
+    }
+
+    if (item.label !== undefined) {
+        return String(item.label ?? '');
+    }
+
+    const firstStringEntry = Object.values(item).find(value => typeof value === 'string');
+    return String(firstStringEntry ?? '');
+}
+
+function getNumericValue(item: Record<string, ChartValue>, key?: string) {
+    if (key && typeof item[key] === 'number') {
+        return item[key] as number;
+    }
+
+    if (typeof item.value === 'number') {
+        return item.value;
+    }
+
+    const firstNumberEntry = Object.values(item).find(value => typeof value === 'number');
+    return typeof firstNumberEntry === 'number' ? firstNumberEntry : 0;
+}
+
+function CustomTooltip({
+    active,
+    payload,
+    label,
+    format,
+}: {
+    active?: boolean;
+    payload?: Array<{ value?: ChartValue; name?: string; color?: string }>;
+    label?: string;
+    format?: ChartProps['format'];
+}) {
+    if (!active || !payload?.length) {
+        return null;
     }
 
     return (
-        <div className="glass-panel p-6 rounded-xl border border-white/10">
-            <div className="flex items-center gap-2 mb-6">
-                <Icon className="w-5 h-5 text-neon" />
-                <h3 className="text-lg font-bold font-heading">{title}</h3>
+        <div className="rounded-xl border border-white/10 bg-racing-dark/95 px-3 py-2 shadow-lg shadow-black/30">
+            {label ? <p className="mb-2 text-xs font-medium uppercase tracking-[0.2em] text-gray-500">{label}</p> : null}
+            <div className="space-y-1">
+                {payload.map((entry, index) => (
+                    <div key={index} className="flex items-center justify-between gap-4 text-sm">
+                        <span className="text-gray-300" style={{ color: entry.color }}>{entry.name}</span>
+                        <span className="font-semibold text-white">{formatChartValue(entry.value ?? '', format)}</span>
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+}
+
+export function ChartPlaceholder({
+    type,
+    title,
+    subtitle,
+    data,
+    xKey,
+    yKey,
+    format,
+    legend,
+    series,
+    emptyMessage,
+}: ChartComponentProps) {
+    const Icon = iconMap[type] || BarChart3;
+    const resolvedSeries = series?.length
+        ? series
+        : [{ key: yKey ?? 'value', name: title, color: CHART_COLORS[0] }];
+    const resolvedXKey = xKey ?? 'label';
+    const resolvedYKey = yKey ?? resolvedSeries[0]?.key ?? 'value';
+
+    const normalizedData = data.map(item => {
+        const chartItem = item as Record<string, ChartValue>;
+        return {
+            ...chartItem,
+            [resolvedXKey]: getCategoryValue(chartItem, resolvedXKey),
+            [resolvedYKey]: getNumericValue(chartItem, resolvedYKey),
+        };
+    });
+
+    const renderEmptyState = () => (
+        <div className="flex h-[320px] items-center justify-center rounded-xl border border-dashed border-white/10 bg-white/[0.02] text-center">
+            <div className="space-y-2 px-6">
+                <p className="text-sm font-medium text-white">{title}</p>
+                <p className="text-sm text-gray-400">{emptyMessage ?? 'No data available for this chart.'}</p>
+            </div>
+        </div>
+    );
+
+    return (
+        <div className="glass-panel rounded-2xl border border-white/10 p-6">
+            <div className="mb-5 flex items-start gap-3">
+                <div className="mt-1 rounded-lg border border-neon/20 bg-neon/10 p-2">
+                    <Icon className="h-4 w-4 text-neon" />
+                </div>
+                <div className="space-y-1">
+                    <h3 className="font-heading text-lg font-bold text-white">{title}</h3>
+                    {subtitle ? <p className="text-sm text-gray-400">{subtitle}</p> : null}
+                </div>
             </div>
 
-            {/* Bar Chart - Horizontal bars with values */}
-            {type === 'bar' && (
-                <div className="space-y-4">
-                    {data.map((item, index) => (
-                        <div key={index} className="group">
-                            <div className="flex justify-between items-center mb-1">
-                                <span className="text-sm text-gray-400 group-hover:text-white transition-colors">
-                                    {item.label}
-                                </span>
-                                <span className="text-sm font-bold text-white">
-                                    {typeof item.value === 'number' && item.value >= 1000
-                                        ? `${(item.value / 1000).toFixed(1)}k`
-                                        : item.value}
-                                </span>
-                            </div>
-                            <div className="h-3 bg-white/5 rounded-full overflow-hidden">
-                                <div
-                                    className={`h-full ${COLORS[index % COLORS.length]} rounded-full transition-all duration-700 ease-out group-hover:opacity-80`}
-                                    style={{
-                                        width: `${Math.max((item.value / maxValue) * 100, 2)}%`,
-                                    }}
+            {normalizedData.length === 0 ? renderEmptyState() : (
+                <div className="h-[320px] w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                        {type === 'pie' ? (
+                            <PieChart>
+                                <Tooltip content={<CustomTooltip format={format} />} />
+                                {legend ? <Legend /> : null}
+                                <Pie
+                                    data={normalizedData}
+                                    dataKey={resolvedYKey}
+                                    nameKey={resolvedXKey}
+                                    cx="50%"
+                                    cy="50%"
+                                    innerRadius={55}
+                                    outerRadius={100}
+                                    paddingAngle={3}
+                                >
+                                    {normalizedData.map((_, index) => (
+                                        <Cell key={index} fill={resolvedSeries[index]?.color ?? CHART_COLORS[index % CHART_COLORS.length]} />
+                                    ))}
+                                </Pie>
+                            </PieChart>
+                        ) : type === 'line' ? (
+                            <LineChart data={normalizedData} margin={{ top: 12, right: 16, bottom: 0, left: 4 }}>
+                                <CartesianGrid stroke="rgba(255,255,255,0.08)" strokeDasharray="3 3" />
+                                <XAxis dataKey={resolvedXKey} stroke="#94A3B8" tickLine={false} axisLine={false} />
+                                <YAxis
+                                    stroke="#94A3B8"
+                                    tickLine={false}
+                                    axisLine={false}
+                                    tickFormatter={value => formatChartValue(value, format)}
                                 />
-                            </div>
-                        </div>
-                    ))}
-                </div>
-            )}
-
-            {/* Pie Chart - Visual segments with legend */}
-            {type === 'pie' && (
-                <div className="flex flex-col md:flex-row items-center gap-8">
-                    {/* Pie visualization */}
-                    <div className="relative w-40 h-40 flex-shrink-0">
-                        <svg viewBox="0 0 100 100" className="transform -rotate-90 w-full h-full">
-                            {(() => {
-                                let currentAngle = 0;
-                                return data.map((item, index) => {
-                                    const percentage = (item.value / total) * 100;
-                                    const angle = (percentage / 100) * 360;
-                                    const startAngle = currentAngle;
-                                    currentAngle += angle;
-
-                                    // Calculate SVG arc path
-                                    const x1 = 50 + 40 * Math.cos((startAngle * Math.PI) / 180);
-                                    const y1 = 50 + 40 * Math.sin((startAngle * Math.PI) / 180);
-                                    const x2 = 50 + 40 * Math.cos(((startAngle + angle) * Math.PI) / 180);
-                                    const y2 = 50 + 40 * Math.sin(((startAngle + angle) * Math.PI) / 180);
-                                    const largeArcFlag = angle > 180 ? 1 : 0;
-
-                                    const colorClasses: Record<string, string> = {
-                                        'bg-neon': '#39FF14',
-                                        'bg-blue-400': '#60A5FA',
-                                        'bg-purple-400': '#C084FC',
-                                        'bg-orange-400': '#FB923C',
-                                        'bg-green-400': '#4ADE80',
-                                        'bg-pink-400': '#F472B6',
-                                        'bg-cyan-400': '#22D3EE',
-                                    };
-
-                                    const fill = colorClasses[COLORS[index % COLORS.length]] || '#39FF14';
-
-                                    return (
-                                        <path
-                                            key={index}
-                                            d={`M 50 50 L ${x1} ${y1} A 40 40 0 ${largeArcFlag} 1 ${x2} ${y2} Z`}
-                                            fill={fill}
-                                            className="hover:opacity-80 transition-opacity cursor-pointer"
-                                            style={{ filter: 'drop-shadow(0 0 4px rgba(0,0,0,0.3))' }}
-                                        />
-                                    );
-                                });
-                            })()}
-                        </svg>
-                        <div className="absolute inset-0 flex items-center justify-center">
-                            <div className="text-center">
-                                <p className="text-2xl font-bold text-white">{total}</p>
-                                <p className="text-xs text-gray-500">Total</p>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Legend */}
-                    <div className="flex-1 space-y-2">
-                        {data.map((item, index) => {
-                            const percentage = ((item.value / total) * 100).toFixed(1);
-                            return (
-                                <div key={index} className="flex items-center gap-3 group cursor-pointer">
-                                    <span className={`w-3 h-3 rounded-full ${COLORS[index % COLORS.length]} group-hover:scale-125 transition-transform`} />
-                                    <span className="text-sm text-gray-400 group-hover:text-white transition-colors flex-1">
-                                        {item.label}
-                                    </span>
-                                    <span className="text-sm font-medium text-white">
-                                        {item.value}
-                                    </span>
-                                    <span className="text-xs text-gray-500">
-                                        ({percentage}%)
-                                    </span>
-                                </div>
-                            );
-                        })}
-                    </div>
-                </div>
-            )}
-
-            {/* Line Chart - Vertical bars simulating a trend */}
-            {type === 'line' && (
-                <div className="h-48">
-                    <div className="flex items-end justify-between gap-2 h-full pb-6 relative">
-                        {/* Y-axis labels */}
-                        <div className="absolute left-0 top-0 bottom-6 flex flex-col justify-between text-xs text-gray-500 w-8">
-                            <span>{maxValue}</span>
-                            <span>{Math.round(maxValue / 2)}</span>
-                            <span>0</span>
-                        </div>
-
-                        {/* Bars */}
-                        <div className="flex items-end justify-between gap-2 h-full flex-1 ml-10">
-                            {data.map((item, index) => {
-                                const height = Math.max((item.value / maxValue) * 100, 5);
-                                return (
-                                    <div key={index} className="flex-1 flex flex-col items-center gap-2 group">
-                                        <div className="relative w-full flex justify-center">
-                                            <div
-                                                className="w-full max-w-12 bg-gradient-to-t from-neon/80 to-neon rounded-t transition-all duration-500 group-hover:from-neon group-hover:to-neon/60"
-                                                style={{ height: `${height}%`, minHeight: '8px' }}
-                                            >
-                                                <div className="absolute -top-6 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity bg-racing-dark border border-white/20 px-2 py-1 rounded text-xs whitespace-nowrap">
-                                                    {item.value}
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    </div>
-
-                    {/* X-axis labels */}
-                    <div className="flex justify-between ml-10 gap-2">
-                        {data.map((item, index) => (
-                            <div key={index} className="flex-1 text-center">
-                                <span className="text-xs text-gray-500 truncate block">
-                                    {item.label.length > 8 ? item.label.slice(0, 8) + '...' : item.label}
-                                </span>
-                            </div>
-                        ))}
-                    </div>
+                                <Tooltip content={<CustomTooltip format={format} />} />
+                                {legend ? <Legend /> : null}
+                                {resolvedSeries.map((entry, index) => (
+                                    <Line
+                                        key={entry.key}
+                                        type="monotone"
+                                        dataKey={entry.key}
+                                        name={entry.name}
+                                        stroke={entry.color ?? CHART_COLORS[index % CHART_COLORS.length]}
+                                        strokeWidth={3}
+                                        dot={{ r: 4 }}
+                                        activeDot={{ r: 6 }}
+                                    />
+                                ))}
+                            </LineChart>
+                        ) : (
+                            <BarChart data={normalizedData} margin={{ top: 12, right: 16, bottom: 0, left: 4 }}>
+                                <CartesianGrid stroke="rgba(255,255,255,0.08)" strokeDasharray="3 3" />
+                                <XAxis dataKey={resolvedXKey} stroke="#94A3B8" tickLine={false} axisLine={false} />
+                                <YAxis
+                                    stroke="#94A3B8"
+                                    tickLine={false}
+                                    axisLine={false}
+                                    tickFormatter={value => formatChartValue(value, format)}
+                                />
+                                <Tooltip content={<CustomTooltip format={format} />} />
+                                {legend ? <Legend /> : null}
+                                {resolvedSeries.map((entry, index) => (
+                                    <Bar
+                                        key={entry.key}
+                                        dataKey={entry.key}
+                                        name={entry.name}
+                                        radius={[8, 8, 0, 0]}
+                                        fill={entry.color ?? CHART_COLORS[index % CHART_COLORS.length]}
+                                    />
+                                ))}
+                            </BarChart>
+                        )}
+                    </ResponsiveContainer>
                 </div>
             )}
         </div>

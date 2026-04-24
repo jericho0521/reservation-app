@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { CheckCircle, XCircle, Info, X } from 'lucide-react';
 
 interface ToastProps {
     message: string;

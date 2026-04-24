@@ -8,7 +8,7 @@ export async function GET(
     try {
         const { id } = await params;
 
-        const { data, error } = await supabase
+        const { data, error } = await supabase()
             .from('bookings')
             .select('*, services(name)')
             .eq('id', id)
@@ -34,7 +34,7 @@ export async function PUT(
         const { id } = await params;
         const body = await request.json();
 
-        const { data, error } = await supabase
+        const { data, error } = await supabase()
             .from('bookings')
             .update({
                 ...body,
@@ -63,7 +63,7 @@ export async function DELETE(
     try {
         const { id } = await params;
 
-        const { data, error } = await supabase
+        const { data, error } = await supabase()
             .from('bookings')
             .update({
                 status: 'cancelled',

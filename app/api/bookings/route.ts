@@ -16,7 +16,7 @@ const bookingSchema = z.object({
 
 export async function GET() {
     try {
-        const { data, error } = await supabase
+        const { data, error } = await supabase()
             .from('bookings')
             .select('*, services(name)')
             .order('booking_date', { ascending: false });
@@ -39,7 +39,7 @@ export async function POST(request: Request) {
         const validatedData = bookingSchema.parse(body);
 
         // Get service to check total seats
-        const { data: service, error: serviceError } = await supabase
+        const { data: service, error: serviceError } = await supabase()
             .from('services')
             .select('total_seats')
             .eq('id', validatedData.service_id)
@@ -48,7 +48,7 @@ export async function POST(request: Request) {
         if (serviceError) throw serviceError;
 
         // Check current bookings for this time slot
-        const { data: existingBookings, error: bookingsError } = await supabase
+        const { data: existingBookings, error: bookingsError } = await supabase()
             .from('bookings')
             .select('seats_booked')
             .eq('service_id', validatedData.service_id)
@@ -76,7 +76,7 @@ export async function POST(request: Request) {
         }
 
         // Create booking
-        const { data, error } = await supabase
+        const { data, error } = await supabase()
             .from('bookings')
             .insert([{
                 ...validatedData,

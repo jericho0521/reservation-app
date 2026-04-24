@@ -39,7 +39,7 @@ interface OpenRouterAssistantMessage extends OpenRouterMessage {
 
 // Tool functions
 async function getServices() {
-    const { data, error } = await supabase
+    const { data, error } = await supabase()
         .from('services')
         .select('id, name, description, total_seats');
     if (error) return { error: error.message };
@@ -47,7 +47,7 @@ async function getServices() {
 }
 
 async function getServiceByName(serviceName: string): Promise<ServiceRecord | null> {
-    const { data, error } = await supabase
+    const { data, error } = await supabase()
         .from('services')
         .select('id, name, total_seats')
         .ilike('name', `%${serviceName}%`)
@@ -64,7 +64,7 @@ async function checkAvailability(serviceName: string, date: string) {
     const service = await getServiceByName(serviceName);
     if (!service) return { error: 'Service not found' };
 
-    const { data: bookings } = await supabase
+    const { data: bookings } = await supabase()
         .from('bookings')
         .select('start_time, seats_booked')
         .eq('service_id', service.id)
@@ -98,7 +98,7 @@ async function createBooking(
     const service = await getServiceByName(serviceName);
     if (!service) return { success: false, error: 'Service not found' };
 
-    const { data: existing } = await supabase
+    const { data: existing } = await supabase()
         .from('bookings')
         .select('seats_booked')
         .eq('service_id', service.id)
@@ -113,7 +113,7 @@ async function createBooking(
 
     const endTime = getEndTime(startTime);
 
-    const { data: booking, error } = await supabase
+    const { data: booking, error } = await supabase()
         .from('bookings')
         .insert({
             service_id: service.id,

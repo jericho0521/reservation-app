@@ -141,7 +141,7 @@ function parseModelJson(content: unknown): unknown | null {
 }
 
 async function getBookingSnapshot(startDate?: string, endDate?: string): Promise<AnalyticsSnapshot | null> {
-    let query = supabase
+    let query = supabase()
         .from('bookings')
         .select('booking_date, start_time, seats_booked, status, services(name)');
 

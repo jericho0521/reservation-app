@@ -13,7 +13,7 @@ export async function searchKnowledge(query: string, matchCount: number = 3): Pr
         const queryEmbedding = await generateGeminiEmbedding(query);
 
         // Search for similar chunks
-        const { data, error } = await supabase.rpc('match_knowledge', {
+        const { data, error } = await supabase().rpc('match_knowledge', {
             query_embedding: queryEmbedding,
             match_threshold: 0.3,
             match_count: matchCount,

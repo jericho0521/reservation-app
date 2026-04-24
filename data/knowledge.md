@@ -23,13 +23,13 @@ Project Play By CW is Bandar Sunway's sim racing and gaming hub. We offer Racing
 - **Description:** Professional racing simulator experience.
 - **Capacity:** 16 seats.
 - **Equipment:** Logitech G29 racing wheel and pedal set.
-- **Games:** F1, Gran Turismo 7, Assetto Corsa, and other racing titles available on site.
+- **Games:** Only F1 and Gran Turismo 7
 - **Best for:** Sim racing practice, friendly races, group sessions, and racing game fans.
 
 ### Playstation 5
 - **Description:** Premium Playstation 5 gaming stations.
 - **Capacity:** 2 seats.
-- **Games:** Mainstream multiplayer games and latest releases available on site.
+- **Games:** Mainstream multiplayer games and latest releases available on site. FC25, UF5, Overcooked, NBA 2k24, Tekken 8 and Mortal Kombat.
 - **Bring your own games:** Customers may bring their own PS5 games.
 - **Best for:** Casual gaming, co-op sessions, and small groups.
 
@@ -54,10 +54,10 @@ You can book Racing Simulator sessions or Playstation 5 sessions.
 We use Logitech G29 racing wheels and pedal sets.
 
 ### What games are available?
-Racing Simulator sessions include games such as F1, Gran Turismo 7, and Assetto Corsa. Playstation 5 sessions include mainstream multiplayer games and latest releases available on site.
+Racing Simulator have only F1 and Gran Turismo 7. Playstation 5 sessions include mainstream multiplayer games.
 
 ### Can I bring my own games?
-Customers may bring their own PS5 games. Racing Simulator sessions use the games installed on our setup.
+No you may not. Only on PC where you can install a game that you like that is not available in our PC.
 
 ### Is there an age restriction?
 All ages are welcome. Children under 12 should be accompanied by an adult.

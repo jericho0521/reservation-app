@@ -53,10 +53,10 @@ The workflow includes placeholder fallbacks so verification can still run before
 
 The chat assistant retrieves business information from `data/knowledge.md` through Supabase pgvector.
 
-Setup:
+### First-time Setup
 
 1. Run `supabase/knowledge.sql` in the Supabase SQL editor.
-2. Add these local environment values:
+2. Add these local environment values to `.env`:
    - `NEXT_PUBLIC_SUPABASE_URL`
    - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
    - `SUPABASE_SERVICE_ROLE_KEY`
@@ -68,6 +68,18 @@ Setup:
 ```bash
 pnpm seed:knowledge
 ```
+
+### Updating Knowledge Base
+
+Whenever you edit `data/knowledge.md`, re-run the seed command to regenerate embeddings and push the updated content to Supabase:
+
+```bash
+pnpm seed:knowledge
+```
+
+That's it. The script clears old chunks, re-splits the markdown by headings, generates new 768-dimension embeddings via Gemini, and inserts them into the `knowledge_chunks` table. No manual SQL needed.
+
+### Details
 
 The knowledge setup assumes 768-dimensional embeddings so it matches `supabase/knowledge.sql`.
 

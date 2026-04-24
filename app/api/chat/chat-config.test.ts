@@ -8,6 +8,12 @@ test('getMalaysiaDateString returns the Malaysia local date', () => {
   assert.equal(getMalaysiaDateString(date), '2026-04-23');
 });
 
+test('buildSystemPrompt instructs the AI to answer business questions freely', () => {
+  const prompt = buildSystemPrompt('2026-04-23');
+
+  assert.match(prompt, /Answer questions about games, equipment, location, pricing/);
+});
+
 test('buildSystemPrompt requires confirmation-only booking creation', () => {
   const prompt = buildSystemPrompt('2026-04-23');
 

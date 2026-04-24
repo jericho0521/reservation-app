@@ -25,10 +25,6 @@ export async function searchKnowledge(query: string, matchCount: number = 3): Pr
         }
 
         const matches = (data || []) as KnowledgeMatch[];
-        console.info('Knowledge search completed', {
-            matchCount: matches.length,
-            requestedCount: matchCount,
-        });
 
         return matches.map(chunk => chunk.content);
     } catch (error) {

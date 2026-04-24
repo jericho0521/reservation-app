@@ -13,7 +13,7 @@ test('buildSystemPrompt requires confirmation-only booking creation', () => {
 
   assert.match(prompt, /Ask for only one missing booking detail at a time/);
   assert.match(prompt, /Use check_availability before offering or confirming any time slot/);
-  assert.match(prompt, /Call prepare_booking only after all required booking details are known/);
+  assert.match(prompt, /NEVER call prepare_booking until you have collected ALL required details/);
   assert.match(prompt, /final booking is created only after the user presses the confirmation button/);
 });
 

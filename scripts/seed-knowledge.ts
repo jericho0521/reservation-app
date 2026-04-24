@@ -4,41 +4,25 @@ import { createClient } from '@supabase/supabase-js';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as dotenv from 'dotenv';
+import { generateGeminiEmbedding, getGeminiEmbeddingDimension, getGeminiEmbeddingModel } from '@/lib/gemini-embeddings';
 
 dotenv.config({ path: path.join(process.cwd(), '.env') });
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 const googleApiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY!;
 
 if (!supabaseUrl || !supabaseKey || !googleApiKey) {
     console.error('Missing environment variables!');
-    console.log('Required: NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY, GOOGLE_GENERATIVE_AI_API_KEY');
+    console.log('Required: NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, GOOGLE_GENERATIVE_AI_API_KEY');
     process.exit(1);
 }
 
-const supabase = createClient(supabaseUrl, supabaseKey);
-
-async function generateEmbedding(text: string): Promise<number[]> {
-    const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key=${googleApiKey}`,
-        {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                model: 'models/text-embedding-004',
-                content: { parts: [{ text }] },
-            }),
-        }
-    );
-
-    if (!response.ok) {
-        throw new Error(`Embedding failed: ${await response.text()}`);
-    }
-
-    const data = await response.json() as { embedding: { values: number[] } };
-    return data.embedding.values;
+if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    console.warn('SUPABASE_SERVICE_ROLE_KEY is not set. Seeding may fail if knowledge_chunks has RLS enabled.');
 }
+
+const supabase = createClient(supabaseUrl, supabaseKey);
 
 function splitIntoChunks(markdown: string): string[] {
     const chunks: string[] = [];
@@ -72,6 +56,7 @@ function splitIntoChunks(markdown: string): string[] {
 
 async function seedKnowledge() {
     console.log('Starting knowledge base seeding...\n');
+    console.log(`Embedding model: ${getGeminiEmbeddingModel()} (${getGeminiEmbeddingDimension()} dimensions)\n`);
 
     const knowledgePath = path.join(process.cwd(), 'data', 'knowledge.md');
     const knowledgeContent = fs.readFileSync(knowledgePath, 'utf-8');
@@ -88,7 +73,7 @@ async function seedKnowledge() {
         console.log(`   Preview: ${chunk.substring(0, 50).replace(/\n/g, ' ')}...`);
 
         try {
-            const embedding = await generateEmbedding(chunk);
+            const embedding = await generateGeminiEmbedding(chunk, googleApiKey);
             console.log(`   Generated embedding (${embedding.length} dimensions)`);
 
             const { error } = await supabase.from('knowledge_chunks').insert({

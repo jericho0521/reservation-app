@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase';
 import { getEndTime, generateTimeSlots } from '@/lib/availability';
 import { getRelevantContext } from '@/lib/knowledge';
 import { extractPreparedBookingAction, resolveToolCalls, type ToolCall } from './tool-loop';
+import { buildSystemPrompt, getMalaysiaDateString, getOpenRouterChatModel } from './chat-config';
 
 interface ServiceRecord {
     id: string;
@@ -34,29 +35,6 @@ interface OpenRouterMessage {
 interface OpenRouterAssistantMessage extends OpenRouterMessage {
     role: 'assistant';
     tool_calls?: ToolCall[];
-}
-
-function buildSystemPrompt(today: string) {
-    return `You are a friendly booking assistant for PROJECT PLAY by CW.
-
-Available services:
-- Racing Simulator (16 seats) - High-fidelity motion racing simulators
-- Playstation 5 (2 seats) - Premium PS5 gaming stations
-
-Operating Hours: 12 PM - 2 AM (1-hour time slots)
-
-TODAY'S DATE: ${today}
-
-When users say dates like "tomorrow", "next Monday", "this Friday", etc., convert them to YYYY-MM-DD format using today's date as reference.
-
-Help users book sessions by:
-1. Asking which service they want
-2. Checking availability for their preferred date (convert natural language dates)
-3. Getting number of seats, name, and email
-4. Creating the booking
-
-Use the provided functions to check availability and create bookings.
-Always confirm all details before creating the booking.`;
 }
 
 // Tool functions
@@ -228,7 +206,8 @@ async function executeTool(name: string, args: Record<string, unknown>) {
     }
 }
 
-async function requestOpenRouterCompletion(messages: OpenRouterMessage[]): Promise<OpenRouterAssistantMessage> {
+async function requestOpenRouterCompletion(messages: OpenRouterMessage[], attempt = 0): Promise<OpenRouterAssistantMessage> {
+    const maxRetries = 3;
     const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
         method: 'POST',
         headers: {
@@ -237,13 +216,21 @@ async function requestOpenRouterCompletion(messages: OpenRouterMessage[]): Promi
             'HTTP-Referer': 'http://localhost:3000',
         },
         body: JSON.stringify({
-            model: 'google/gemini-2.5-flash',
+            model: getOpenRouterChatModel(),
             messages,
             tools,
             tool_choice: 'auto',
+            temperature: 0.2,
             max_tokens: 1024,
         }),
     });
+
+    if (response.status === 429 && attempt < maxRetries) {
+        const delay = Math.pow(2, attempt) * 1000;
+        console.warn(`Rate limited, retrying in ${delay}ms (attempt ${attempt + 1}/${maxRetries})`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+        return requestOpenRouterCompletion(messages, attempt + 1);
+    }
 
     if (!response.ok) {
         const error = await response.text();
@@ -286,16 +273,12 @@ export async function POST(req: Request) {
 
         const latestUserMessage = [...messages].reverse().find(message => message.role === 'user')?.content || '';
         const context = latestUserMessage ? await getRelevantContext(latestUserMessage) : '';
-        const systemPrompt = buildSystemPrompt(new Date().toISOString().split('T')[0]);
+        const systemPrompt = buildSystemPrompt(getMalaysiaDateString());
         const enhancedSystemPrompt = context
             ? `${systemPrompt}
 
-IMPORTANT: When you have collected ALL booking details (service, date, time, seats, name, email), respond with a summary asking the user to confirm. Format the details clearly.
-
 ${context}`
-            : `${systemPrompt}
-
-IMPORTANT: When you have collected ALL booking details (service, date, time, seats, name, email), DO NOT create the booking yet. Instead, respond with a summary of the details and ask the user to confirm. Only create the booking after they explicitly confirm.`;
+            : systemPrompt;
 
         const apiMessages: OpenRouterMessage[] = [
             { role: 'system', content: enhancedSystemPrompt },
@@ -324,6 +307,11 @@ IMPORTANT: When you have collected ALL booking details (service, date, time, sea
         });
     } catch (error) {
         console.error('Chat route error:', error);
-        return NextResponse.json({ error: 'Failed to get AI response' }, { status: 500 });
+        const errorText = error instanceof Error ? error.message : String(error);
+        const isRateLimit = errorText.includes('429') || errorText.includes('quota') || errorText.includes('RESOURCE_EXHAUSTED');
+        const userMessage = isRateLimit
+            ? "I'm receiving too many requests right now. Please wait a moment and try again."
+            : 'Something went wrong. Please try again.';
+        return NextResponse.json({ content: userMessage }, { status: 200 });
     }
 }

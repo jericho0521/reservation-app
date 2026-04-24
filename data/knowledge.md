@@ -1,7 +1,7 @@
 # Project Play By CW - Knowledge Base
 
 ## About Us
-Project Play By CW is Bandar Sunway's premier sim racing and gaming hub! We offer professional racing simulators, high-performance gaming PCs, and PS5 gaming stations. Your ultimate destination for competitive gaming and simulation racing.
+Project Play By CW is Bandar Sunway's sim racing and gaming hub. We offer Racing Simulator sessions and Playstation 5 gaming stations for casual play, group hangouts, and competitive racing sessions.
 
 ## Location
 - **Address:** Sunway, Subang Jaya, Selangor 47500, Malaysia
@@ -14,80 +14,84 @@ Project Play By CW is Bandar Sunway's premier sim racing and gaming hub! We offe
 - **Instagram:** @projectplaybycw
 
 ## Operating Hours
-- **Daily:** 12:00 PM - 2:00 AM (All days of the week)
+- **Daily:** 12:00 PM - 2:00 AM Malaysia time
+- Sessions are booked in 1-hour time slots.
 
-## Services
+## Bookable Services
 
 ### Racing Simulator
-- **Description:** Professional racing simulator experience
-- **Equipment:** Logitech G29 racing wheel and pedal set
-- **Features:**
-  - Immersive racing experience
-  - Professional-grade racing wheels
-  - Realistic pedal sets
-  - Popular racing games including F1, Gran Turismo 7
+- **Description:** Professional racing simulator experience.
+- **Capacity:** 16 seats.
+- **Equipment:** Logitech G29 racing wheel and pedal set.
+- **Games:** Only F1 and Gran Turismo 7
+- **Best for:** Sim racing practice, friendly races, group sessions, and racing game fans.
 
-### PC Gaming
-- **Description:** High-performance gaming PCs with the latest titles
-- **Features:**
-  - High-performance gaming computers
-  - Latest games available
-  - Competitive gaming setup
-
-### PlayStation 5 Gaming
-- **Description:** Premium PS5 gaming stations
-- **Features:**
-  - Latest PS5 console
-  - Latest PS5 games and accessories
-  - Mainstream multiplayer games
+### Playstation 5
+- **Description:** Premium Playstation 5 gaming stations.
+- **Capacity:** 2 seats.
+- **Games:** Mainstream multiplayer games and latest releases available on site. FC25, UF5, Overcooked, NBA 2k24, Tekken 8 and Mortal Kombat.
+- **Bring your own games:** Customers may bring their own PS5 games.
+- **Best for:** Casual gaming, co-op sessions, and small groups.
 
 ## Booking Information
-- Sessions are available in 1-hour time slots
-- Advance booking is recommended, especially on weekends
-- You can book through our website or chat with our AI assistant
-- Walk-ins are welcome based on availability
+- Advance booking is recommended, especially on weekends.
+- Walk-ins are welcome based on live availability.
+- Customers can book through the website or chat with the AI booking assistant.
+- Live availability, seat counts, and booking confirmation must always be checked through the booking system, not this knowledge base.
 
 ## Frequently Asked Questions
 
-### What racing simulator equipment do you have?
-We feature the Logitech G29 racing wheel and pedal set for an immersive racing experience.
-
 ### Where is Project Play By CW located?
-We are located in Bandar Sunway, Subang Jaya, Malaysia.
+We are located in Bandar Sunway, Subang Jaya, Selangor, Malaysia.
 
-### What gaming services do you offer?
-We offer Racing Simulators, High-Performance PC Gaming, and PlayStation 5 gaming services.
+### What time are you open?
+We are open daily from 12:00 PM to 2:00 AM Malaysia time.
 
-### Is there an age restriction?
-All ages are welcome. However, children under 12 must be accompanied by an adult.
+### What services can I book?
+You can book Racing Simulator sessions or Playstation 5 sessions.
 
-### Do you offer group packages?
-Yes! Contact us for group bookings and special rates for parties or corporate events.
+### What racing simulator equipment do you have?
+We use Logitech G29 racing wheels and pedal sets.
 
 ### What games are available?
-- Racing simulators: F1, Gran Turismo 7, Assetto Corsa
-- PS5: Mainstream multiplayer games and latest releases
+Racing Simulator have only F1 and Gran Turismo 7. Playstation 5 sessions include mainstream multiplayer games.
 
 ### Can I bring my own games?
-PS5 stations can use your own games. Racing simulators use our pre-installed game library.
+No you may not. Only on PC where you can install a game that you like that is not available in our PC.
+
+### Is there an age restriction?
+All ages are welcome. Children under 12 should be accompanied by an adult.
+
+### Do you offer group packages?
+Yes. Customers can contact us for group bookings, parties, tournaments, or corporate events.
 
 ### Is food and drinks allowed?
-Light snacks and drinks are welcome. Please be careful around the equipment. Strictly no eating on the gaming area.
+Light snacks and drinks are welcome, but customers should be careful around the equipment. Food is not allowed in the gaming area.
+
+### Is smoking or vaping allowed?
+Vaping is permitted. Cigarettes are not allowed.
+
+### How do I check availability?
+Availability changes constantly. Use the booking assistant or website booking flow to check available time slots for a specific service and date.
+
+### How much does it cost?
+Pricing can change and should be confirmed through the website, booking flow, or by contacting Project Play By CW directly.
 
 ## Policies
 
 ### Equipment Care
-- Please handle all equipment with care
-- Report any issues immediately to staff
-- Damage due to misuse may result in charges
+- Handle all equipment carefully.
+- Report any issues to staff immediately.
+- Damage caused by misuse may result in charges.
 
 ### House Rules
-- Be respectful to other players and staff
-- Keep noise at reasonable levels
-- Food and drinks allowed but no food on the gaming area
-- Vaping is permitted but ciggarates are not allowed
+- Be respectful to other players and staff.
+- Keep noise at reasonable levels.
+- Keep the gaming area clean.
+- No food in the gaming area.
+- Vaping is permitted; cigarettes are not allowed.
 
 ## Community & Events
-- We host gaming events and tournaments
-- Join our community for updates on upcoming events
-- Follow us on social media for the latest news
+- We host gaming events and tournaments.
+- Join our community for updates on upcoming events.
+- Follow us on Instagram for the latest news.

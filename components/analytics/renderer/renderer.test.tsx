@@ -93,3 +93,127 @@ test('renderer gracefully renders fallback for unknown element type', () => {
 
     assert.match(html, /Unknown analytics element type/);
 });
+
+test('renderer passes rich chart props through to analytics charts', () => {
+    const chartSpec: AnalyticsSpec = {
+        root: 'root',
+        elements: {
+            root: {
+                type: 'Chart',
+                props: {
+                    type: 'line',
+                    title: 'Revenue Over Time',
+                    subtitle: 'Daily revenue across the selected period',
+                    xKey: 'date',
+                    yKey: 'revenue',
+                    format: 'currency',
+                    emptyMessage: 'No revenue data for this period.',
+                    data: [],
+                    series: [{ key: 'revenue', name: 'Revenue', color: '#39FF14' }],
+                },
+            },
+        },
+    };
+
+    const noopSetState = (() => undefined) as unknown as Dispatch<SetStateAction<Record<string, unknown>>>;
+
+    const html = renderToStaticMarkup(
+        <AnalyticsRenderer
+            spec={chartSpec}
+            uiState={{}}
+            setUiState={noopSetState}
+        />,
+    );
+
+    assert.match(html, /Revenue Over Time/);
+    assert.match(html, /Daily revenue across the selected period/);
+    assert.match(html, /No revenue data for this period./);
+});
+
+test('renderer respects explicit top-level section order', () => {
+    const spec: AnalyticsSpec = {
+        root: 'root',
+        elements: {
+            root: {
+                type: 'Stack',
+                children: ['metrics', 'charts', 'insights'],
+            },
+            metrics: {
+                type: 'Text',
+                props: { content: 'Metrics Section' },
+            },
+            charts: {
+                type: 'Text',
+                props: { content: 'Charts Section' },
+            },
+            insights: {
+                type: 'Text',
+                props: { content: 'Insights Section' },
+            },
+        },
+    };
+
+    const noopSetState = (() => undefined) as unknown as Dispatch<SetStateAction<Record<string, unknown>>>;
+
+    const html = renderToStaticMarkup(
+        <AnalyticsRenderer
+            spec={spec}
+            uiState={{}}
+            setUiState={noopSetState}
+            layoutState={{ root: ['charts', 'insights', 'metrics'] }}
+        />,
+    );
+
+    assert.ok(html.indexOf('Charts Section') < html.indexOf('Insights Section'));
+    assert.ok(html.indexOf('Insights Section') < html.indexOf('Metrics Section'));
+});
+
+test('renderer respects nested grid ordering as well as root ordering', () => {
+    const spec: AnalyticsSpec = {
+        root: 'root',
+        elements: {
+            root: {
+                type: 'Stack',
+                children: ['metrics-grid', 'insights'],
+            },
+            'metrics-grid': {
+                type: 'Grid',
+                children: ['card-a', 'card-b', 'card-c'],
+            },
+            insights: {
+                type: 'Text',
+                props: { content: 'Insights Section' },
+            },
+            'card-a': {
+                type: 'Text',
+                props: { content: 'Metric A' },
+            },
+            'card-b': {
+                type: 'Text',
+                props: { content: 'Metric B' },
+            },
+            'card-c': {
+                type: 'Text',
+                props: { content: 'Metric C' },
+            },
+        },
+    };
+
+    const noopSetState = (() => undefined) as unknown as Dispatch<SetStateAction<Record<string, unknown>>>;
+
+    const html = renderToStaticMarkup(
+        <AnalyticsRenderer
+            spec={spec}
+            uiState={{}}
+            setUiState={noopSetState}
+            layoutState={{
+                root: ['insights', 'metrics-grid'],
+                'metrics-grid': ['card-c', 'card-a', 'card-b'],
+            }}
+        />,
+    );
+
+    assert.ok(html.indexOf('Insights Section') < html.indexOf('Metric C'));
+    assert.ok(html.indexOf('Metric C') < html.indexOf('Metric A'));
+    assert.ok(html.indexOf('Metric A') < html.indexOf('Metric B'));
+});

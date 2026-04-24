@@ -32,7 +32,18 @@ export const analyticsCatalog = {
         },
         Chart: {
             description: 'Chart card for booking/revenue visualizations',
-            props: ['type: bar|line|pie', 'title: string', 'data: [{ label: string, value: number }]'],
+            props: [
+                'type: bar|line|pie',
+                'title: string',
+                'subtitle?: string',
+                'data: [{ ...record }] with numeric series fields',
+                'xKey?: string',
+                'yKey?: string',
+                'series?: [{ key: string, name: string, color?: string }]',
+                'format?: currency|number|percent',
+                'legend?: boolean',
+                'emptyMessage?: string',
+            ],
         },
         Insights: {
             description: 'Bullet insight list for narrative findings',
@@ -102,6 +113,11 @@ Rules:
 - Prefer 1 root layout element (Stack or Grid).
 - Keep child references valid (no missing keys).
 - For cards/charts/insights, map directly to provided analytics data.
+- For time-based trends, prefer line charts.
+- For composition/share, prefer pie charts.
+- For comparisons across services or periods, prefer bar charts.
+- For chart-heavy queries like revenue, include 3-5 complementary charts when the data supports it.
+- Prefer using multiple chart views together: trend + share + comparison + demand timing.
 - Keep total elements under 40.
 - Limit sections to at most 6.
 - Grid columns may be "1"-"4" or numeric 1-4.

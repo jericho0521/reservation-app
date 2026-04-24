@@ -68,7 +68,15 @@ export function DynamicDashboard({ data, isLoading }: DynamicDashboardProps) {
                             key={index}
                             type={chart.type}
                             title={chart.title}
+                            subtitle={chart.subtitle}
                             data={chart.data}
+                            xKey={chart.xKey}
+                            yKey={chart.yKey}
+                            format={chart.format}
+                            legend={chart.legend}
+                            stacked={chart.stacked}
+                            emptyMessage={chart.emptyMessage}
+                            series={chart.series}
                         />
                     ))}
                 </div>

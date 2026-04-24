@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase-browser';
 import { Check, X, RotateCcw, LogOut, RefreshCw } from 'lucide-react';
@@ -27,7 +27,7 @@ export default function AdminDashboard({ bookings: initialBookings, todayCount, 
     const [filter, setFilter] = useState<AdminFilter>('all');
     const [isUpdating, setIsUpdating] = useState<string | null>(null);
     const router = useRouter();
-    const supabase = useMemo(() => createClient(), []);
+    const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null);
     const [lastRefresh, setLastRefresh] = useState(new Date());
     const [isRefreshing, setIsRefreshing] = useState(false);
     const today = new Date().toISOString().split('T')[0];
@@ -39,8 +39,18 @@ export default function AdminDashboard({ bookings: initialBookings, todayCount, 
         day: 'numeric',
     }), []);
 
+    const getSupabase = useCallback(() => {
+        if (!supabaseRef.current) {
+            supabaseRef.current = createClient();
+        }
+
+        return supabaseRef.current;
+    }, []);
+
     const refreshBookings = useCallback(async () => {
         setIsRefreshing(true);
+        const supabase = getSupabase();
+
         const { data } = await supabase
             .from('bookings')
             .select(ADMIN_BOOKINGS_SELECT)
@@ -53,7 +63,7 @@ export default function AdminDashboard({ bookings: initialBookings, todayCount, 
             setLastRefresh(new Date());
         }
         setIsRefreshing(false);
-    }, [supabase]);
+    }, [getSupabase]);
 
     // Auto-refresh every 30 seconds
     useEffect(() => {
@@ -62,6 +72,8 @@ export default function AdminDashboard({ bookings: initialBookings, todayCount, 
     }, [refreshBookings]);
 
     const handleLogout = async () => {
+        const supabase = getSupabase();
+
         await supabase.auth.signOut();
         router.push('/admin/login');
         router.refresh();
@@ -70,6 +82,8 @@ export default function AdminDashboard({ bookings: initialBookings, todayCount, 
     const updateBookingStatus = async (bookingId: string, newStatus: string) => {
         setIsUpdating(bookingId);
         try {
+            const supabase = getSupabase();
+
             const { error } = await supabase
                 .from('bookings')
                 .update({ status: newStatus })

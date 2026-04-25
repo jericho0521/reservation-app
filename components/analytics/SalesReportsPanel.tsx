@@ -9,6 +9,7 @@ import {
     RefreshCw,
     Save,
     Upload,
+    X,
 } from 'lucide-react';
 
 type ReportStatus = 'pending' | 'processing' | 'auto_published' | 'needs_review' | 'published' | 'failed';
@@ -154,16 +155,47 @@ const statusStyles: Record<ReportStatus, string> = {
     failed: 'border-red-400/30 text-red-300 bg-red-500/10',
 };
 
+interface QueuedFile {
+    file: File;
+    status: 'queued' | 'uploading' | 'uploaded' | 'error';
+    error?: string;
+    documentId?: string;
+}
+
+interface SalesReportSummary {
+    period: string;
+    publishedCount: number;
+    totalDocuments: number;
+    grossSalesTotal: number;
+    netSalesTotal: number;
+    shiftIncomeTotal: number;
+    transactionCount: number;
+    averageTicket: number;
+    paymentBreakdown: Record<string, number>;
+    reportDates: string[];
+}
+
+function currentMonthKey() {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+}
+
 export function SalesReportsPanel() {
     const [reports, setReports] = useState<SalesReportItem[]>([]);
     const [selectedId, setSelectedId] = useState<string | null>(null);
     const [editState, setEditState] = useState<EditState>(emptyEditState);
-    const [file, setFile] = useState<File | null>(null);
+    const [fileQueue, setFileQueue] = useState<QueuedFile[]>([]);
+    const [batchUploading, setBatchUploading] = useState(false);
+    const [batchProcessing, setBatchProcessing] = useState(false);
+    const [batchProgress, setBatchProgress] = useState({ current: 0, total: 0, message: '' });
     const [isLoading, setIsLoading] = useState(false);
     const [busyId, setBusyId] = useState<string | null>(null);
     const [message, setMessage] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [setupRequired, setSetupRequired] = useState(false);
+    const [selectedMonth, setSelectedMonth] = useState(currentMonthKey);
+    const [summary, setSummary] = useState<SalesReportSummary | null>(null);
+    const [summaryLoading, setSummaryLoading] = useState(false);
 
     const selectedReport = useMemo(
         () => reports.find(report => report.id === selectedId) ?? null,
@@ -173,6 +205,10 @@ export function SalesReportsPanel() {
     useEffect(() => {
         void refreshReports();
     }, []);
+
+    useEffect(() => {
+        void loadSummary();
+    }, [selectedMonth]);
 
     useEffect(() => {
         if (!selectedId && reports[0]) {
@@ -220,8 +256,153 @@ export function SalesReportsPanel() {
         }
     };
 
+    const loadSummary = async () => {
+        setSummaryLoading(true);
+
+        try {
+            const [y, m] = selectedMonth.split('-');
+            const response = await fetch(`/api/analytics-reports/summary?year=${y}&month=${m}`);
+
+            if (response.ok) {
+                const data = await response.json() as SalesReportSummary;
+                setSummary(data);
+            } else {
+                setSummary(null);
+            }
+        } catch {
+            setSummary(null);
+        } finally {
+            setSummaryLoading(false);
+        }
+    };
+
+    const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const selected = event.target.files;
+
+        if (!selected || selected.length === 0) {
+            setFileQueue([]);
+            return;
+        }
+
+        const queued: QueuedFile[] = Array.from(selected).map(file => ({
+            file,
+            status: 'queued' as const,
+        }));
+
+        setFileQueue(queued);
+        event.target.value = '';
+    };
+
+    const removeFileFromQueue = (index: number) => {
+        setFileQueue(prev => prev.filter((_, i) => i !== index));
+    };
+
+    const batchUploadAndProcess = async () => {
+        if (fileQueue.length === 0 || batchUploading || batchProcessing) {
+            return;
+        }
+
+        setBatchUploading(true);
+        setError(null);
+        setMessage(null);
+
+        try {
+            const formData = new FormData();
+
+            for (const qf of fileQueue) {
+                formData.append('files', qf.file);
+            }
+
+            const uploadResponse = await fetch('/api/analytics-reports/batch', {
+                method: 'POST',
+                body: formData,
+            });
+
+            if (!uploadResponse.ok) {
+                const payload = await uploadResponse.json().catch(() => ({})) as SalesReportsApiError;
+                throw new Error(payload.error || 'Batch upload failed');
+            }
+
+            const uploadPayload = await uploadResponse.json() as {
+                results: Array<{ id: string; fileName: string; status: string; error?: string }>;
+                summary: { total: number; succeeded: number; failed: number };
+            };
+
+            const updatedQueue = fileQueue.map((qf) => {
+                const result = uploadPayload.results.find(r => r.fileName === qf.file.name);
+
+                if (!result) {
+                    return { ...qf, status: 'error' as const, error: 'Unknown result' };
+                }
+
+                if (result.status === 'created') {
+                    return { ...qf, status: 'uploaded' as const, documentId: result.id };
+                }
+
+                return { ...qf, status: 'error' as const, error: result.error };
+            });
+
+            setFileQueue(updatedQueue);
+
+            const uploadedIds = updatedQueue
+                .filter(qf => qf.status === 'uploaded' && qf.documentId)
+                .map(qf => qf.documentId!);
+
+            if (uploadedIds.length === 0) {
+                throw new Error('No files were uploaded successfully');
+            }
+
+            setBatchUploading(false);
+            setBatchProcessing(true);
+            setBatchProgress({ current: 0, total: uploadedIds.length, message: 'Starting batch processing...' });
+
+            const CHUNK_SIZE = 10;
+
+            for (let i = 0; i < uploadedIds.length; i += CHUNK_SIZE) {
+                const chunk = uploadedIds.slice(i, i + CHUNK_SIZE);
+
+                const processResponse = await fetch('/api/analytics-reports/batch-process', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ documentIds: chunk }),
+                });
+
+                if (!processResponse.ok) {
+                    throw new Error('Batch processing failed');
+                }
+
+                const processPayload = await processResponse.json() as {
+                    results: Array<{ id: string; status: string; error?: string }>;
+                    summary: { total: number; succeeded: number; needsReview: number; failed: number };
+                };
+
+                const processed = i + chunk.length;
+
+                setBatchProgress({
+                    current: Math.min(processed, uploadedIds.length),
+                    total: uploadedIds.length,
+                    message: `Processed ${Math.min(processed, uploadedIds.length)} of ${uploadedIds.length} (${processPayload.summary.succeeded} ok, ${processPayload.summary.failed} failed)`,
+                });
+            }
+
+            await refreshReports();
+            await loadSummary();
+            setBatchProgress({ current: uploadedIds.length, total: uploadedIds.length, message: 'Batch processing complete.' });
+            setMessage('Batch processing complete.');
+        } catch (err) {
+            console.error('Batch operation failed:', err);
+            setError(err instanceof Error ? err.message : 'Batch operation failed');
+            await refreshReports();
+        } finally {
+            setBatchUploading(false);
+            setBatchProcessing(false);
+        }
+    };
+
     const uploadAndProcess = async () => {
-        if (!file) {
+        const singleFile = fileQueue.find(qf => qf.status === 'queued');
+
+        if (!singleFile) {
             return;
         }
 
@@ -231,7 +412,7 @@ export function SalesReportsPanel() {
 
         try {
             const formData = new FormData();
-            formData.append('file', file);
+            formData.append('file', singleFile.file);
 
             const uploadResponse = await fetch('/api/analytics-reports', {
                 method: 'POST',
@@ -250,10 +431,11 @@ export function SalesReportsPanel() {
 
             const uploadPayload = await uploadResponse.json() as { document: SalesReportItem };
             setSelectedId(uploadPayload.document.id);
-            setFile(null);
+            setFileQueue([]);
 
             await processReport(uploadPayload.document.id, false);
             setMessage('Sales report uploaded and processed.');
+            await loadSummary();
         } catch (err) {
             console.error('Failed to upload sales report:', err);
             setError(err instanceof Error ? err.message : 'Failed to upload sales report.');
@@ -377,22 +559,71 @@ export function SalesReportsPanel() {
                     </p>
                 </div>
 
-                <div className="flex w-full flex-col gap-2 sm:w-auto sm:min-w-[320px]">
+                <div className="flex w-full flex-col gap-2 sm:w-auto sm:min-w-[340px]">
                     <input
                         type="file"
+                        multiple
                         accept="application/pdf,image/jpeg,image/png,image/webp"
-                        onChange={(event) => setFile(event.target.files?.[0] ?? null)}
+                        onChange={handleFileSelect}
                         className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-gray-300 file:mr-3 file:rounded-md file:border-0 file:bg-neon file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-racing-dark"
                     />
+                    {fileQueue.length > 0 && (
+                        <div className="max-h-[200px] overflow-auto rounded-lg border border-white/10 bg-white/[0.03]">
+                            {fileQueue.map((qf, index) => (
+                                <div key={`${qf.file.name}-${index}`} className="flex items-center justify-between border-b border-white/5 px-3 py-1.5 text-xs last:border-b-0">
+                                    <span className="min-w-0 flex-1 truncate text-gray-300">{qf.file.name}</span>
+                                    <span className="ml-2 shrink-0 whitespace-nowrap text-gray-500">
+                                        {qf.status === 'queued' && 'Queued'}
+                                        {qf.status === 'uploading' && '...'}
+                                        {qf.status === 'uploaded' && 'Done'}
+                                        {qf.status === 'error' && <span className="text-red-400">{qf.error ?? 'Failed'}</span>}
+                                    </span>
+                                    {(qf.status === 'queued') && (
+                                        <button
+                                            onClick={() => removeFileFromQueue(index)}
+                                            className="ml-2 shrink-0 text-gray-500 hover:text-red-400"
+                                        >
+                                            <X className="h-3 w-3" />
+                                        </button>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                    {batchProcessing && (
+                        <div className="rounded-lg border border-blue-400/30 bg-blue-500/10 px-3 py-2 text-xs text-blue-200">
+                            <div className="flex items-center gap-2">
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                                {batchProgress.message}
+                            </div>
+                            <div className="mt-1 h-1 w-full overflow-hidden rounded-full bg-white/10">
+                                <div
+                                    className="h-full rounded-full bg-neon transition-all"
+                                    style={{ width: batchProgress.total > 0 ? `${(batchProgress.current / batchProgress.total) * 100}%` : '0%' }}
+                                />
+                            </div>
+                        </div>
+                    )}
                     <div className="flex gap-2">
-                        <button
-                            onClick={uploadAndProcess}
-                            disabled={!file || busyId === 'upload' || setupRequired}
-                            className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg bg-neon px-4 py-2 text-sm font-medium text-racing-dark transition-colors hover:bg-neon/90 disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                            {busyId === 'upload' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
-                            Upload & process
-                        </button>
+                        {fileQueue.length > 1 ? (
+                            <button
+                                onClick={batchUploadAndProcess}
+                                disabled={fileQueue.length === 0 || batchUploading || batchProcessing || setupRequired}
+                                className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg bg-neon px-4 py-2 text-sm font-medium text-racing-dark transition-colors hover:bg-neon/90 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                                {(batchUploading || batchProcessing) ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+                                {batchProcessing ? 'Processing...' : `Upload All (${fileQueue.length})`}
+                            </button>
+                        ) : (
+                            <button
+                                onClick={uploadAndProcess}
+                                disabled={fileQueue.length === 0 || busyId === 'upload' || setupRequired}
+                                className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg bg-neon px-4 py-2 text-sm font-medium text-racing-dark transition-colors hover:bg-neon/90 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                                {busyId === 'upload' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+                                Upload & process
+                            </button>
+                        )}
                         <button
                             onClick={refreshReports}
                             disabled={isLoading}
@@ -402,6 +633,14 @@ export function SalesReportsPanel() {
                             <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
                         </button>
                     </div>
+                    {fileQueue.length > 0 && (
+                        <button
+                            onClick={() => setFileQueue([])}
+                            className="text-xs text-gray-500 hover:text-gray-300"
+                        >
+                            Clear queue
+                        </button>
+                    )}
                 </div>
             </div>
 
@@ -416,6 +655,46 @@ export function SalesReportsPanel() {
                     Run <span className="font-mono text-yellow-50">supabase/sales-reports.sql</span> in your Supabase SQL editor, then refresh this page.
                 </div>
             )}
+
+            <div className="mt-4 flex flex-wrap items-end gap-3">
+                <div className="flex items-end gap-2">
+                    <label className="block">
+                        <span className="text-xs uppercase tracking-[0.2em] text-gray-500">Month</span>
+                        <input
+                            type="month"
+                            value={selectedMonth}
+                            onChange={(e) => setSelectedMonth(e.target.value)}
+                            className="mt-0.5 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none transition-colors focus:border-neon/50"
+                        />
+                    </label>
+                    {summaryLoading && <Loader2 className="mb-1.5 h-4 w-4 animate-spin text-gray-400" />}
+                </div>
+                {summary && (
+                    <div className="flex flex-wrap gap-x-5 gap-y-1.5 text-sm">
+                        <span className="text-gray-400">
+                            <span className="text-white font-medium">{summary.publishedCount}</span> published
+                            {summary.totalDocuments > 0 && <> / {summary.totalDocuments} uploaded</>}
+                        </span>
+                        <span className="text-gray-400">
+                            Gross: <span className="text-green-300 font-medium">RM {summary.grossSalesTotal.toLocaleString('en-MY', { minimumFractionDigits: 2 })}</span>
+                        </span>
+                        <span className="text-gray-400">
+                            Net: <span className="text-green-300 font-medium">RM {summary.netSalesTotal.toLocaleString('en-MY', { minimumFractionDigits: 2 })}</span>
+                        </span>
+                        {summary.shiftIncomeTotal > 0 && (
+                            <span className="text-gray-400">
+                                Shift income: <span className="text-green-300 font-medium">RM {summary.shiftIncomeTotal.toLocaleString('en-MY', { minimumFractionDigits: 2 })}</span>
+                            </span>
+                        )}
+                        <span className="text-gray-400">
+                            {summary.transactionCount} txn
+                        </span>
+                        <span className="text-gray-400">
+                            Avg <span className="text-white font-medium">RM {summary.averageTicket.toLocaleString('en-MY', { minimumFractionDigits: 2 })}</span>/txn
+                        </span>
+                    </div>
+                )}
+            </div>
 
             <div className="mt-5 grid gap-5 xl:grid-cols-[minmax(0,0.9fr)_minmax(420px,1.1fr)]">
                 <div className="overflow-hidden rounded-xl border border-white/10">

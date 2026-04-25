@@ -328,6 +328,9 @@ export function normalizePaymentBreakdown(
 }
 
 export function normalizeExtractedSalesReport(input: unknown): NormalizedSalesReport {
+  if (input && typeof input === "object" && "paymentBreakdown" in input && (input as Record<string, unknown>).paymentBreakdown === null) {
+    (input as Record<string, unknown>).paymentBreakdown = {};
+  }
   const extracted = extractedSalesReportSchema.parse(input);
   const topupRegisterAmount = parseCurrencyValue(extracted.topupRegisterAmount);
   const freebies = parseCurrencyValue(extracted.freebies);

@@ -82,6 +82,8 @@ export interface AnalyticsSnapshot {
     salesMetrics: {
         transactionCount: number;
         averageTicket: number;
+        grossSalesTotal: number;
+        netSalesTotal: number;
     };
     topLevelCharts: {
         revenueTrend: ChartProps;
@@ -172,6 +174,8 @@ export function buildAnalyticsSnapshot(
         salesMetrics: {
             transactionCount: 0,
             averageTicket: 0,
+            grossSalesTotal: 0,
+            netSalesTotal: 0,
         },
         topLevelCharts: {
             revenueTrend: {
@@ -392,6 +396,14 @@ export function buildAnalyticsSnapshot(
     snapshot.salesMetrics.averageTicket = snapshot.salesMetrics.transactionCount > 0
         ? Math.round((snapshot.revenue.actual / snapshot.salesMetrics.transactionCount) * 100) / 100
         : 0;
+    snapshot.salesMetrics.grossSalesTotal = snapshot.dailySalesReports.reduce(
+        (sum, report) => sum + (report.grossSales || 0),
+        0,
+    );
+    snapshot.salesMetrics.netSalesTotal = snapshot.dailySalesReports.reduce(
+        (sum, report) => sum + (report.netSales || 0),
+        0,
+    );
     snapshot.salesReportCoverage = buildSalesReportCoverage(snapshot.revenueByDay);
 
     snapshot.topLevelCharts.revenueTrend.data = snapshot.revenueByDay;

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { ArrowLeft, GripVertical, Sparkles, X } from 'lucide-react';
 import { AnalyticsChatInput } from '@/components/analytics/AnalyticsChatInput';
 import { DynamicDashboard } from '@/components/analytics/DynamicDashboard';
+import { SalesReportsPanel } from '@/components/analytics/SalesReportsPanel';
 import type { DashboardResponse } from '@/components/analytics/dashboard-types';
 import { dashboardToSpec } from '@/components/analytics/dashboard-to-spec';
 import {
@@ -160,6 +161,8 @@ export default function AnalyticsPage() {
                 </header>
 
                 <main className="container mx-auto px-6 py-8 space-y-8">
+                    <SalesReportsPanel />
+
                     {/* Chat Input */}
                     <AnalyticsChatInput onSubmit={handleSubmit} isLoading={isLoading} />
 

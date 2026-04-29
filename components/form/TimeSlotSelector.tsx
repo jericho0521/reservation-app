@@ -6,7 +6,12 @@ import { TimeSlot } from '@/types';
 interface Props {
     serviceId: string;
     date: string;
-    onSelect: (startTime: string, endTime: string, availableSeats: number) => void;
+    onSelect: (
+        startTime: string,
+        endTime: string,
+        availableSeats: number,
+        takenSeatLabels: string[],
+    ) => void;
     selectedStart?: string;
 }
 
@@ -55,7 +60,12 @@ export default function TimeSlotSelector({ serviceId, date, onSelect, selectedSt
                 {slots.map(slot => (
                     <button
                         key={slot.start_time}
-                        onClick={() => slot.is_available && onSelect(slot.start_time, slot.end_time, slot.available_seats)}
+                        onClick={() => slot.is_available && onSelect(
+                            slot.start_time,
+                            slot.end_time,
+                            slot.available_seats,
+                            slot.taken_seat_labels,
+                        )}
                         disabled={!slot.is_available}
                         className={`px-4 py-4 rounded-lg text-sm font-medium transition-all duration-300 ${selectedStart === slot.start_time
                                 ? 'bg-neon text-racing-dark shadow-[0_0_15px_rgba(185,217,207,0.5)]'

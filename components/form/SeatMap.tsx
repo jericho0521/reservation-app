@@ -5,20 +5,33 @@ import { useMemo, useState } from 'react';
 interface Props {
     totalSeats: number;
     maxAvailable: number;
+    takenSeatLabels?: string[];
     onSelectionChange: (selectedSeats: number[], seatLabels: string[]) => void;
 }
 
 export default function SeatMap({ 
     totalSeats, 
     maxAvailable,
+    takenSeatLabels = [],
     onSelectionChange 
 }: Props) {
     const [selectedSeats, setSelectedSeats] = useState<number[]>([]);
     const bookedSeats = useMemo(() => {
-        const unavailable = Math.max(0, totalSeats - maxAvailable);
+        const takenSeatNumbers = takenSeatLabels
+            .map(label => Number.parseInt(label.replace(/\D/g, ''), 10))
+            .filter(seatNumber => (
+                Number.isInteger(seatNumber) &&
+                seatNumber >= 1 &&
+                seatNumber <= totalSeats
+            ));
 
+        if (takenSeatNumbers.length > 0) {
+            return takenSeatNumbers;
+        }
+
+        const unavailable = Math.max(0, totalSeats - maxAvailable);
         return Array.from({ length: unavailable }, (_, index) => totalSeats - index);
-    }, [totalSeats, maxAvailable]);
+    }, [totalSeats, maxAvailable, takenSeatLabels]);
 
     const getSeatLabel = (seatNumber: number) => {
         return `RS${seatNumber}`;

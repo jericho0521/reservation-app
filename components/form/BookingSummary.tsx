@@ -42,6 +42,15 @@ export default function BookingSummary({ booking }: Props) {
                     <span className="font-medium text-neon">{booking.seats_booked} {booking.seats_booked === 1 ? 'seat' : 'seats'}</span>
                 </div>
 
+                {booking.seat_labels && booking.seat_labels.length > 0 && (
+                    <div className="flex justify-between border-b border-white/10 pb-4 gap-6">
+                        <span className="text-gray-400">Seat Labels</span>
+                        <span className="font-medium text-neon text-right">
+                            {booking.seat_labels.join(', ')}
+                        </span>
+                    </div>
+                )}
+
                 <div className="flex justify-between border-b border-white/10 pb-4">
                     <span className="text-gray-400">Name</span>
                     <span className="font-medium">{booking.user_name}</span>

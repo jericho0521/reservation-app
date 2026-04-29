@@ -3,7 +3,7 @@ import test from 'node:test';
 import type { Dispatch, SetStateAction } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { AnalyticsRenderer, applyAnalyticsAction, evaluateVisibilityCondition, isElementVisible } from './AnalyticsRenderer';
-import type { AnalyticsSpec } from './spec';
+import type { AnalyticsElement, AnalyticsSpec } from './spec';
 
 test('applyAnalyticsAction handles setState and toggleSection', () => {
     const afterSet = applyAnalyticsAction(
@@ -58,7 +58,7 @@ test('visibility conditions support eq and not', () => {
 test('isElementVisible evaluates all conditions in arrays', () => {
     const state = { flags: { show: true }, filters: { service: 'PS5' } };
 
-    const element = {
+    const element: AnalyticsElement = {
         type: 'Text',
         props: { content: 'visible text' },
         visible: [

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
+import { jsonError, supabaseErrorStatus } from '@/app/api/api-utils';
 
 export async function GET(
     request: Request,
@@ -14,14 +15,16 @@ export async function GET(
             .eq('id', id)
             .single();
 
-        if (error) throw error;
+        if (error) {
+            return jsonError(
+                supabaseErrorStatus(error) === 404 ? 'Venue not found' : 'Failed to fetch venue',
+                supabaseErrorStatus(error)
+            );
+        }
 
         return NextResponse.json(data);
     } catch (error) {
         console.error('Failed to fetch venue:', error);
-        return NextResponse.json(
-            { error: 'Failed to fetch venue' },
-            { status: 500 }
-        );
+        return jsonError('Failed to fetch venue', 500);
     }
 }

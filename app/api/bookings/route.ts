@@ -1,5 +1,12 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
+import { supabaseAdmin } from '@/lib/supabase-admin';
+import {
+    getAvailableSeats,
+    getBookingsForSlot,
+    getConflictingSeatLabels,
+} from '@/lib/reservation-capacity';
+import { jsonError, requireAuthenticatedSupabase, supabaseErrorStatus } from '@/app/api/api-utils';
 import { z } from 'zod';
 
 const bookingSchema = z.object({
@@ -16,7 +23,13 @@ const bookingSchema = z.object({
 
 export async function GET() {
     try {
-        const { data, error } = await supabase()
+        const auth = await requireAuthenticatedSupabase();
+
+        if (auth.response) {
+            return auth.response;
+        }
+
+        const { data, error } = await auth.supabase
             .from('bookings')
             .select('*, services(name)')
             .order('booking_date', { ascending: false });
@@ -26,10 +39,7 @@ export async function GET() {
         return NextResponse.json(data);
     } catch (error) {
         console.error('Failed to fetch bookings:', error);
-        return NextResponse.json(
-            { error: 'Failed to fetch bookings' },
-            { status: 500 }
-        );
+        return jsonError('Failed to fetch bookings', 500);
     }
 }
 
@@ -45,38 +55,58 @@ export async function POST(request: Request) {
             .eq('id', validatedData.service_id)
             .single();
 
-        if (serviceError) throw serviceError;
-
-        // Check current bookings for this time slot
-        const { data: existingBookings, error: bookingsError } = await supabase()
-            .from('bookings')
-            .select('seats_booked')
-            .eq('service_id', validatedData.service_id)
-            .eq('booking_date', validatedData.booking_date)
-            .eq('status', 'confirmed')
-            .gte('end_time', validatedData.start_time)
-            .lte('start_time', validatedData.end_time);
-
-        if (bookingsError) throw bookingsError;
-
-        const bookedSeats = (existingBookings || []).reduce(
-            (sum, b) => sum + b.seats_booked,
-            0
-        );
-        const availableSeats = service.total_seats - bookedSeats;
-
-        if (validatedData.seats_booked > availableSeats) {
-            return NextResponse.json(
-                {
-                    error: 'Not enough seats available',
-                    available_seats: availableSeats
-                },
-                { status: 409 }
+        if (serviceError) {
+            return jsonError(
+                serviceError.code === 'PGRST116' ? 'Service not found' : 'Failed to load service',
+                supabaseErrorStatus(serviceError)
             );
         }
 
+        // Check current bookings for this time slot
+        const bookingClient = supabaseAdmin();
+
+        const { data: existingBookings, error: bookingsError } = await bookingClient
+            .from('bookings')
+            .select('start_time, seats_booked, seat_labels')
+            .eq('service_id', validatedData.service_id)
+            .eq('booking_date', validatedData.booking_date)
+            .eq('status', 'confirmed');
+
+        if (bookingsError) throw bookingsError;
+
+        const sameSlotBookings = getBookingsForSlot(
+            existingBookings || [],
+            validatedData.start_time,
+        );
+        const availableSeats = getAvailableSeats(service.total_seats, sameSlotBookings);
+        const requestedSeatLabels = validatedData.seat_labels ?? [];
+
+        if (
+            service.total_seats === 16 &&
+            requestedSeatLabels.length !== validatedData.seats_booked
+        ) {
+            return jsonError('Selected seat labels must match booked seats', 400);
+        }
+
+        if (validatedData.seats_booked > availableSeats) {
+            return jsonError('Not enough seats available', 409, {
+                available_seats: availableSeats
+            });
+        }
+
+        const conflictingSeatLabels = getConflictingSeatLabels(
+            sameSlotBookings,
+            requestedSeatLabels,
+        );
+
+        if (conflictingSeatLabels.length > 0) {
+            return jsonError('Some selected seats are no longer available', 409, {
+                seat_labels: conflictingSeatLabels,
+            });
+        }
+
         // Create booking
-        const { data, error } = await supabase()
+        const { data, error } = await bookingClient
             .from('bookings')
             .insert([{
                 ...validatedData,
@@ -90,15 +120,14 @@ export async function POST(request: Request) {
         return NextResponse.json(data, { status: 201 });
     } catch (error) {
         if (error instanceof z.ZodError) {
-            return NextResponse.json(
-                { error: 'Invalid booking data', details: error.issues },
-                { status: 400 }
-            );
+            return jsonError('Invalid booking data', 400, { details: error.issues });
         }
+
+        if (error instanceof SyntaxError) {
+            return jsonError('Invalid JSON body', 400);
+        }
+
         console.error('Failed to create booking:', error);
-        return NextResponse.json(
-            { error: 'Failed to create booking' },
-            { status: 500 }
-        );
+        return jsonError('Failed to create booking', 500);
     }
 }

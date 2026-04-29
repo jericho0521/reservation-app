@@ -7,6 +7,7 @@ export function useChat() {
     const [messages, setMessages] = useState<Message[]>([]);
     const [inputValue, setInputValue] = useState('');
     const [isLoading, setIsLoading] = useState(false);
+    const threadIdRef = useRef<string>("");
 
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
@@ -36,7 +37,8 @@ export function useChat() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     messages: [],
-                    confirmBooking: data
+                    confirmBooking: data,
+                    threadId: threadIdRef.current || undefined,
                 }),
             });
 
@@ -103,6 +105,7 @@ export function useChat() {
                         role: m.role,
                         content: m.content,
                     })),
+                    threadId: threadIdRef.current || undefined,
                 }),
             });
 
@@ -111,6 +114,10 @@ export function useChat() {
             }
 
             const result = await response.json();
+
+            if (result.threadId) {
+                threadIdRef.current = result.threadId;
+            }
 
             const assistantMessage: Message = {
                 id: (Date.now() + 1).toString(),

@@ -74,13 +74,13 @@ const visibilityConditionSchema: z.ZodType<VisibilityCondition> = z.object({
     not: z.boolean().optional(),
 });
 
-const setStateActionSchema: z.ZodType<Extract<AnalyticsAction, { action: 'setState' }>> = z.object({
+const setStateActionSchema = z.object({
     action: z.literal('setState'),
     params: z.object({
         path: z.string(),
         value: z.unknown(),
     }),
-});
+}) as unknown as z.ZodType<Extract<AnalyticsAction, { action: 'setState' }>>;
 
 const toggleSectionActionSchema: z.ZodType<Extract<AnalyticsAction, { action: 'toggleSection' }>> = z.object({
     action: z.literal('toggleSection'),
@@ -164,7 +164,7 @@ const buttonElementSchema = baseElementSchema.extend({
     props: buttonPropsSchema,
 });
 
-export const analyticsElementSchema: z.ZodType<AnalyticsElement> = z.discriminatedUnion('type', [
+export const analyticsElementSchema = z.discriminatedUnion('type', [
     metricCardElementSchema,
     chartElementSchema,
     insightsElementSchema,
@@ -173,7 +173,7 @@ export const analyticsElementSchema: z.ZodType<AnalyticsElement> = z.discriminat
     gridElementSchema,
     sectionElementSchema,
     buttonElementSchema,
-]);
+]) as unknown as z.ZodType<AnalyticsElement>;
 
 export const analyticsSpecSchema: z.ZodType<AnalyticsSpec> = z.object({
     root: z.string(),

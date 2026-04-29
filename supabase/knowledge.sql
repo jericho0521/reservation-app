@@ -19,6 +19,7 @@ create index if not exists knowledge_chunks_embedding_idx
 
 create or replace function public.match_knowledge(
   query_embedding vector(768),
+  filter jsonb default '{}'::jsonb,
   match_threshold float default 0.3,
   match_count int default 3
 )
@@ -37,7 +38,8 @@ as $$
     knowledge_chunks.metadata,
     1 - (knowledge_chunks.embedding <=> query_embedding) as similarity
   from public.knowledge_chunks
-  where 1 - (knowledge_chunks.embedding <=> query_embedding) > match_threshold
+  where knowledge_chunks.metadata @> filter
+    and 1 - (knowledge_chunks.embedding <=> query_embedding) > match_threshold
   order by knowledge_chunks.embedding <=> query_embedding
   limit match_count;
 $$;

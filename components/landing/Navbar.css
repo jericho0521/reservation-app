@@ -93,8 +93,10 @@
     width: 100%;
     min-width: 180px;
     left: 0;
-    top: 62px;
+    top: 60px;
     border-radius: 0 0 8px 8px;
+    pointer-events: none;
+    visibility: hidden;
 }
 
 .landing-navbar .nav-dropdown-inner {
@@ -142,6 +144,11 @@
 }
 
 /* Show Dropdown on Hover */
+.landing-navbar .nav-item:hover>.nav-dropdown {
+    pointer-events: auto;
+    visibility: visible;
+}
+
 .landing-navbar .nav-item:hover>.nav-dropdown>.nav-dropdown-inner {
     transform: translateY(0);
 }

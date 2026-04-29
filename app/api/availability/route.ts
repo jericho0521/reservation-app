@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
+import { supabaseAdmin } from '@/lib/supabase-admin';
 import { generateTimeSlots } from '@/lib/availability';
+import { jsonError, supabaseErrorStatus } from '@/app/api/api-utils';
 
 export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
@@ -8,10 +10,7 @@ export async function GET(request: Request) {
     const date = searchParams.get('date');
 
     if (!serviceId || !date) {
-        return NextResponse.json(
-            { error: 'service_id and date are required' },
-            { status: 400 }
-        );
+        return jsonError('service_id and date are required', 400);
     }
 
     try {
@@ -22,14 +21,19 @@ export async function GET(request: Request) {
             .eq('id', serviceId)
             .single();
 
-        if (serviceError) throw serviceError;
+        if (serviceError) {
+            return jsonError(
+                supabaseErrorStatus(serviceError) === 404 ? 'Service not found' : 'Failed to load service',
+                supabaseErrorStatus(serviceError)
+            );
+        }
 
         const totalSeats = service.total_seats;
 
         // Get existing bookings for this service and date
-        const { data: bookings, error: bookingsError } = await supabase()
+        const { data: bookings, error: bookingsError } = await supabaseAdmin()
             .from('bookings')
-            .select('start_time, end_time, seats_booked')
+            .select('start_time, end_time, seats_booked, seat_labels')
             .eq('service_id', serviceId)
             .eq('booking_date', date)
             .eq('status', 'confirmed');
@@ -41,9 +45,6 @@ export async function GET(request: Request) {
         return NextResponse.json({ timeSlots, totalSeats });
     } catch (error) {
         console.error('Failed to check availability:', error);
-        return NextResponse.json(
-            { error: 'Failed to check availability' },
-            { status: 500 }
-        );
+        return jsonError('Failed to check availability', 500);
     }
 }

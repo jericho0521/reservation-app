@@ -1,5 +1,6 @@
 'use client';
 
+import type { ReactNode } from 'react';
 import { Check, X, Calendar, Clock, Users, User, Mail } from 'lucide-react';
 
 interface BookingCardProps {
@@ -12,6 +13,28 @@ interface BookingCardProps {
     onConfirm: () => void;
     onCancel: () => void;
     status?: 'pending' | 'confirmed' | 'cancelled' | 'loading';
+}
+
+function BookingDetail({
+    icon,
+    label,
+    value,
+    className = '',
+}: {
+    icon: ReactNode;
+    label: string;
+    value: string | number;
+    className?: string;
+}) {
+    return (
+        <div className={`flex min-w-0 items-center gap-3 p-3 rounded-lg bg-white/5 ${className}`}>
+            <div className="shrink-0">{icon}</div>
+            <div className="min-w-0">
+                <p className="text-xs text-gray-400">{label}</p>
+                <p className="text-sm font-medium text-white truncate">{value}</p>
+            </div>
+        </div>
+    );
 }
 
 export default function BookingCard({
@@ -29,6 +52,37 @@ export default function BookingCard({
         onConfirm();
     };
 
+    const details = (
+        <>
+            <BookingDetail
+                icon={<Calendar className="w-5 h-5 text-neon" />}
+                label="Date"
+                value={date}
+            />
+            <BookingDetail
+                icon={<Clock className="w-5 h-5 text-neon" />}
+                label="Time"
+                value={time}
+            />
+            <BookingDetail
+                icon={<Users className="w-5 h-5 text-neon" />}
+                label="Seats"
+                value={seats}
+            />
+            <BookingDetail
+                icon={<User className="w-5 h-5 text-neon" />}
+                label="Name"
+                value={name}
+            />
+            <BookingDetail
+                icon={<Mail className="w-5 h-5 text-neon" />}
+                label="Email"
+                value={email}
+                className="sm:col-span-2"
+            />
+        </>
+    );
+
     if (status === 'confirmed') {
         return (
             <div className="my-4 p-6 rounded-2xl bg-gradient-to-br from-neon/20 to-neon/5 border border-neon/50 backdrop-blur-sm">
@@ -41,15 +95,13 @@ export default function BookingCard({
                         <p className="text-sm text-gray-400">Your session is all set</p>
                     </div>
                 </div>
-                <div className="grid grid-cols-2 gap-3 text-sm">
-                    <div className="flex items-center gap-2 text-gray-300">
-                        <Calendar className="w-4 h-4 text-neon" />
-                        <span>{date}</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-gray-300">
-                        <Clock className="w-4 h-4 text-neon" />
-                        <span>{time}</span>
-                    </div>
+
+                <div className="inline-block px-3 py-1 mb-4 rounded-full bg-neon/10 border border-neon/30 text-neon text-sm font-medium">
+                    {service}
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {details}
                 </div>
             </div>
         );
@@ -80,44 +132,8 @@ export default function BookingCard({
             </div>
 
             {/* Details Grid */}
-            <div className="grid grid-cols-2 gap-4 mb-6">
-                <div className="flex items-center gap-3 p-3 rounded-lg bg-white/5">
-                    <Calendar className="w-5 h-5 text-neon" />
-                    <div>
-                        <p className="text-xs text-gray-400">Date</p>
-                        <p className="text-sm font-medium text-white">{date}</p>
-                    </div>
-                </div>
-                <div className="flex items-center gap-3 p-3 rounded-lg bg-white/5">
-                    <Clock className="w-5 h-5 text-neon" />
-                    <div>
-                        <p className="text-xs text-gray-400">Time</p>
-                        <p className="text-sm font-medium text-white">{time}</p>
-                    </div>
-                </div>
-                <div className="flex items-center gap-3 p-3 rounded-lg bg-white/5">
-                    <Users className="w-5 h-5 text-neon" />
-                    <div>
-                        <p className="text-xs text-gray-400">Seats</p>
-                        <p className="text-sm font-medium text-white">{seats}</p>
-                    </div>
-                </div>
-                <div className="flex items-center gap-3 p-3 rounded-lg bg-white/5">
-                    <User className="w-5 h-5 text-neon" />
-                    <div>
-                        <p className="text-xs text-gray-400">Name</p>
-                        <p className="text-sm font-medium text-white truncate">{name}</p>
-                    </div>
-                </div>
-            </div>
-
-            {/* Email */}
-            <div className="flex items-center gap-3 p-3 mb-6 rounded-lg bg-white/5">
-                <Mail className="w-5 h-5 text-neon" />
-                <div>
-                    <p className="text-xs text-gray-400">Email</p>
-                    <p className="text-sm font-medium text-white">{email}</p>
-                </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+                {details}
             </div>
 
             {/* Action Buttons */}

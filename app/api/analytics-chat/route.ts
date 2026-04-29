@@ -1,8 +1,16 @@
 import { NextResponse } from "next/server";
+import { createClient } from "@/lib/supabase-server";
 import { runAnalyticsAgent } from "@/lib/langchain/analytics-agent";
 
 export async function POST(req: Request) {
   try {
+    const supabase = await createClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return NextResponse.json({ error: "Admin authentication required" }, { status: 401 });
+    }
+
     const { prompt, previousQuery, filters, threadId } = await req.json();
 
     if (!prompt || typeof prompt !== "string") {
@@ -17,7 +25,8 @@ export async function POST(req: Request) {
       typeof previousQuery === "string" ? previousQuery : undefined,
       filters && typeof filters === "object"
         ? (filters as Record<string, unknown>)
-        : undefined
+        : undefined,
+      supabase
     );
 
     return NextResponse.json({

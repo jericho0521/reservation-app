@@ -1,4 +1,4 @@
-import { supabase } from "@/lib/supabase";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   buildAnalyticsSnapshot,
   type AnalyticsSalesReportRecord,
@@ -151,14 +151,15 @@ function isMissingSalesReportsTable(error: unknown) {
 }
 
 async function getAnalyticsSnapshot(
+  supabase: SupabaseClient,
   startDate?: string,
   endDate?: string
 ): Promise<AnalyticsSnapshot | null> {
-  let query = supabase()
+  let query = supabase
     .from("bookings")
     .select("booking_date, start_time, seats_booked, status, services(name)");
 
-  let salesReportsQuery = supabase()
+  let salesReportsQuery = supabase
     .from("daily_sales_reports")
     .select(
       "report_date, shift_income, gross_sales, net_sales, discounts, tax, refunds, transaction_count, payment_breakdown"
@@ -311,12 +312,17 @@ export async function runAnalyticsAgent(
   prompt: string,
   threadId: string,
   previousQuery?: string,
-  filters?: Record<string, unknown>
+  filters?: Record<string, unknown>,
+  supabase?: SupabaseClient
 ): Promise<AnalyticsAgentResult> {
   const { startDate, endDate } = parseDateRange(prompt);
 
   try {
-    const snapshot = await getAnalyticsSnapshot(startDate, endDate);
+    if (!supabase) {
+      throw new Error("Authenticated Supabase client is required");
+    }
+
+    const snapshot = await getAnalyticsSnapshot(supabase, startDate, endDate);
 
     if (!snapshot) {
       throw new Error("Failed to fetch booking data");

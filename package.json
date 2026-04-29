@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "node --import tsx --test app/api/chat/chat-config.test.ts app/api/chat/tool-loop.test.ts app/api/analytics-chat/snapshot.test.ts lib/langchain/chat-agent.test.ts lib/sales-reports.test.ts lib/gemini-embeddings.test.ts lib/availability.test.ts components/analytics/dashboard-to-spec.test.ts app/admin/dashboard-data.test.ts components/analytics/renderer/spec.test.ts components/analytics/renderer/renderer.test.tsx",
+    "test": "node --import tsx --test app/api/api-utils.test.ts app/api/availability/route.test.ts app/api/bookings/route.test.ts app/api/chat/chat-config.test.ts app/api/chat/tool-loop.test.ts app/api/analytics-chat/snapshot.test.ts lib/langchain/chat-agent.test.ts lib/sales-reports.test.ts lib/gemini-embeddings.test.ts lib/reservation-capacity.test.ts lib/supabase-admin.test.ts lib/availability.test.ts components/analytics/dashboard-to-spec.test.ts app/admin/dashboard-data.test.ts components/analytics/renderer/spec.test.ts components/analytics/renderer/renderer.test.tsx",
     "seed:knowledge": "tsx scripts/seed-knowledge.ts",
     "pr": "node scripts/pr.mjs"
   },

@@ -10,7 +10,9 @@ import {
   ToolMessage,
 } from "@langchain/core/messages";
 import { supabase } from "@/lib/supabase";
+import { supabaseAdmin } from "@/lib/supabase-admin";
 import { getEndTime, generateTimeSlots } from "@/lib/availability";
+import { getAvailableSeats } from "@/lib/reservation-capacity";
 import { createOpenRouterChat } from "./models";
 import { buildBookingSystemPromptWithContext } from "./prompts";
 
@@ -73,30 +75,35 @@ const getServicesTool = tool(
 
 const checkAvailabilityTool = tool(
   async ({ service_name, date }) => {
-    const service = await getServiceByName(service_name);
-    if (!service) return { error: "Service not found" };
+    try {
+      const service = await getServiceByName(service_name);
+      if (!service) return { error: "Service not found" };
 
-    const { data: bookings } = await supabase()
-      .from("bookings")
-      .select("start_time, seats_booked")
-      .eq("service_id", service.id)
-      .eq("booking_date", date)
-      .eq("status", "confirmed");
+      const { data: bookings } = await supabaseAdmin()
+        .from("bookings")
+        .select("start_time, seats_booked")
+        .eq("service_id", service.id)
+        .eq("booking_date", date)
+        .eq("status", "confirmed");
 
-    const slots = generateTimeSlots(service.total_seats, bookings || [])
-      .filter((slot) => slot.is_available)
-      .map((slot) => ({
-        time: slot.start_time,
-        available_seats: slot.available_seats,
-      }));
+      const slots = generateTimeSlots(service.total_seats, bookings || [])
+        .filter((slot) => slot.is_available)
+        .map((slot) => ({
+          time: slot.start_time,
+          available_seats: slot.available_seats,
+        }));
 
-    return {
-      service_name: service.name,
-      service_id: service.id,
-      date,
-      total_seats: service.total_seats,
-      available_slots: slots,
-    };
+      return {
+        service_name: service.name,
+        service_id: service.id,
+        date,
+        total_seats: service.total_seats,
+        available_slots: slots,
+      };
+    } catch (error) {
+      console.error("Failed to check chat booking availability:", error);
+      return { error: "Booking availability is temporarily unavailable" };
+    }
   },
   {
     name: "check_availability",
@@ -247,43 +254,49 @@ export async function createBooking(
   const service = await getServiceByName(serviceName);
   if (!service) return { success: false, error: "Service not found" };
 
-  const { data: existing } = await supabase()
-    .from("bookings")
-    .select("seats_booked")
-    .eq("service_id", service.id)
-    .eq("booking_date", date)
-    .eq("start_time", startTime)
-    .eq("status", "confirmed");
+  try {
+    const bookingClient = supabaseAdmin();
+    const { data: existing } = await bookingClient
+      .from("bookings")
+      .select("seats_booked")
+      .eq("service_id", service.id)
+      .eq("booking_date", date)
+      .eq("start_time", startTime)
+      .eq("status", "confirmed");
 
-  const bookedSeats = (existing || []).reduce((sum, b) => sum + b.seats_booked, 0);
-  if (seats > service.total_seats - bookedSeats) {
-    return { success: false, error: `Only ${service.total_seats - bookedSeats} seats available` };
+    const availableSeats = getAvailableSeats(service.total_seats, existing || []);
+    if (seats > availableSeats) {
+      return { success: false, error: `Only ${availableSeats} seats available` };
+    }
+
+    const endTime = getEndTime(startTime);
+
+    const { data: booking, error } = await bookingClient
+      .from("bookings")
+      .insert({
+        service_id: service.id,
+        user_name: userName,
+        user_email: userEmail,
+        booking_date: date,
+        start_time: startTime,
+        end_time: endTime,
+        seats_booked: seats,
+        status: "confirmed",
+        interface_type: "chat",
+      })
+      .select()
+      .single();
+
+    if (error) return { success: false, error: error.message };
+    return {
+      success: true,
+      booking_id: booking.id,
+      message: `Booking confirmed! ${seats} seat(s) on ${date} at ${startTime}.`,
+    };
+  } catch (error) {
+    console.error("Failed to create chat booking:", error);
+    return { success: false, error: "Booking service is temporarily unavailable" };
   }
-
-  const endTime = getEndTime(startTime);
-
-  const { data: booking, error } = await supabase()
-    .from("bookings")
-    .insert({
-      service_id: service.id,
-      user_name: userName,
-      user_email: userEmail,
-      booking_date: date,
-      start_time: startTime,
-      end_time: endTime,
-      seats_booked: seats,
-      status: "confirmed",
-      interface_type: "chat",
-    })
-    .select()
-    .single();
-
-  if (error) return { success: false, error: error.message };
-  return {
-    success: true,
-    booking_id: booking.id,
-    message: `Booking confirmed! ${seats} seat(s) on ${date} at ${startTime}.`,
-  };
 }
 
 function createChatAgent() {

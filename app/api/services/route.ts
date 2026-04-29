@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
+import { jsonError } from '@/app/api/api-utils';
 
 export async function GET() {
     try {
@@ -13,9 +14,6 @@ export async function GET() {
         return NextResponse.json(data);
     } catch (error) {
         console.error('Failed to fetch services:', error);
-        return NextResponse.json(
-            { error: 'Failed to fetch services' },
-            { status: 500 }
-        );
+        return jsonError('Failed to fetch services', 500);
     }
 }

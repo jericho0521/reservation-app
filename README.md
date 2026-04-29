@@ -43,11 +43,14 @@ For the most reliable CI builds, configure these GitHub repository variables or 
 
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `SUPABASE_SERVICE_ROLE_KEY`
 - `GOOGLE_GENERATIVE_AI_API_KEY`
 - `OPENROUTER_API_KEY`
 - `OPENROUTER_CHAT_MODEL` (optional, defaults to `google/gemini-2.5-flash`)
 
 The workflow includes placeholder fallbacks so verification can still run before real secrets are configured, but production-like builds should use real values.
+
+`SUPABASE_SERVICE_ROLE_KEY` is server-only. Never prefix it with `NEXT_PUBLIC_`, and do not expose it to client components.
 
 ## Booking Assistant RAG
 

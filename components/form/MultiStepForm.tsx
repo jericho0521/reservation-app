@@ -26,6 +26,7 @@ export default function MultiStepForm() {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isSuccess, setIsSuccess] = useState(false);
     const [availableSeats, setAvailableSeats] = useState(0);
+    const [takenSeatLabels, setTakenSeatLabels] = useState<string[]>([]);
     const [formData, setFormData] = useState<FormData>(() => ({
         interface_type: 'form',
         seats_booked: 1
@@ -129,13 +130,19 @@ export default function MultiStepForm() {
                 {currentStep === 1 && (
                     <ServiceSelector
                         selected={formData.service_id}
-                        onSelect={(serviceId, serviceName, totalSeats) =>
+                        onSelect={(serviceId, serviceName, totalSeats) => {
+                            setAvailableSeats(0);
+                            setTakenSeatLabels([]);
                             updateFormData({
                                 service_id: serviceId,
                                 service_name: serviceName,
-                                max_seats: totalSeats
-                            })
-                        }
+                                max_seats: totalSeats,
+                                start_time: undefined,
+                                end_time: undefined,
+                                selected_seat_labels: undefined,
+                                seats_booked: totalSeats === 16 ? 0 : 1,
+                            });
+                        }}
                     />
                 )}
 
@@ -143,20 +150,32 @@ export default function MultiStepForm() {
                     <div>
                         <DatePicker
                             selected={formData.booking_date}
-                            onSelect={(date) => updateFormData({
-                                booking_date: date,
-                                start_time: undefined,
-                                end_time: undefined
-                            })}
+                            onSelect={(date) => {
+                                setAvailableSeats(0);
+                                setTakenSeatLabels([]);
+                                updateFormData({
+                                    booking_date: date,
+                                    start_time: undefined,
+                                    end_time: undefined,
+                                    selected_seat_labels: undefined,
+                                    seats_booked: formData.max_seats === 16 ? 0 : 1,
+                                });
+                            }}
                         />
                         {formData.booking_date && formData.service_id && (
                             <TimeSlotSelector
                                 serviceId={formData.service_id}
                                 date={formData.booking_date}
                                 selectedStart={formData.start_time}
-                                onSelect={(start, end, seats) => {
-                                    updateFormData({ start_time: start, end_time: end });
+                                onSelect={(start, end, seats, labels) => {
+                                    updateFormData({
+                                        start_time: start,
+                                        end_time: end,
+                                        selected_seat_labels: undefined,
+                                        seats_booked: formData.max_seats === 16 ? 0 : 1,
+                                    });
                                     setAvailableSeats(seats);
+                                    setTakenSeatLabels(labels);
                                 }}
                             />
                         )}
@@ -168,8 +187,10 @@ export default function MultiStepForm() {
                         {/* Only show SeatMap for Racing Simulator (16 seats) */}
                         {formData.max_seats === 16 ? (
                             <SeatMap
+                                key={`${formData.service_id}-${formData.booking_date}-${formData.start_time}`}
                                 totalSeats={16}
                                 maxAvailable={availableSeats}
+                                takenSeatLabels={takenSeatLabels}
                                 onSelectionChange={(seats, labels) => updateFormData({
                                     seats_booked: seats.length,
                                     selected_seat_labels: labels
@@ -273,6 +294,17 @@ function isStepValid(step: number, data: Partial<FormData>): boolean {
         case 2:
             return !!data.booking_date && !!data.start_time && !!data.end_time;
         case 3:
+            if (data.max_seats === 16) {
+                const selectedLabels = data.selected_seat_labels ?? [];
+
+                return (
+                    selectedLabels.length > 0 &&
+                    data.seats_booked === selectedLabels.length &&
+                    !!data.user_name &&
+                    !!data.user_email
+                );
+            }
+
             return !!data.seats_booked && data.seats_booked > 0 && !!data.user_name && !!data.user_email;
         default:
             return true;

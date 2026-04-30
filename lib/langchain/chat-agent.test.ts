@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { AIMessage, HumanMessage, ToolMessage } from "@langchain/core/messages";
-import { extractPreparedBookingAction } from "./chat-agent";
+import { extractPreparedBookingAction, getChatDomainGuardResponse } from "./chat-agent";
 
 const preparedBookingPayload = {
   ready_for_confirmation: true,
@@ -67,4 +67,16 @@ test("extractPreparedBookingAction ignores prepared bookings from previous turns
   ]);
 
   assert.equal(action, null);
+});
+
+test("getChatDomainGuardResponse blocks model identity questions", () => {
+  assert.equal(
+    getChatDomainGuardResponse("what model are you"),
+    "I can help with Project Play bookings, services, availability, pricing, policies, and venue information. What would you like to book or ask about Project Play?"
+  );
+});
+
+test("getChatDomainGuardResponse allows booking and business questions", () => {
+  assert.equal(getChatDomainGuardResponse("Can I book racing simulator tomorrow?"), null);
+  assert.equal(getChatDomainGuardResponse("What are your prices?"), null);
 });

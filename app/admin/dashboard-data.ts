@@ -89,3 +89,20 @@ export function getServiceName(services: AdminServiceRelation): string {
 
     return services?.name || 'Unknown';
 }
+
+export function formatRefreshTime(
+    value: Date | null,
+    locale = 'en-MY',
+    timeZone?: string,
+) {
+    if (!value) {
+        return 'Updated just now';
+    }
+
+    return `Updated ${new Intl.DateTimeFormat(locale, {
+        hour: 'numeric',
+        minute: '2-digit',
+        second: '2-digit',
+        timeZone,
+    }).format(value)}`;
+}

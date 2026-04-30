@@ -1,6 +1,12 @@
 import { NextResponse } from "next/server";
 import { getRelevantContext } from "@/lib/knowledge";
-import { runChatAgent, createBooking, type ChatMessage, type BookingAction } from "@/lib/langchain/chat-agent";
+import {
+  getChatDomainGuardResponse,
+  runChatAgent,
+  createBooking,
+  type ChatMessage,
+  type BookingAction,
+} from "@/lib/langchain/chat-agent";
 
 interface ConfirmBookingPayload {
   service: string;
@@ -39,6 +45,15 @@ export async function POST(req: Request) {
 
     const latestUserMessage =
       [...messages].reverse().find((m) => m.role === "user")?.content || "";
+    const guardResponse = getChatDomainGuardResponse(latestUserMessage);
+    if (guardResponse) {
+      return Response.json({
+        content: guardResponse,
+        action: null,
+        threadId: body.threadId || crypto.randomUUID(),
+      });
+    }
+
     const context = latestUserMessage ? await getRelevantContext(latestUserMessage) : "";
 
     const threadId = body.threadId || crypto.randomUUID();

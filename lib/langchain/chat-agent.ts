@@ -44,6 +44,40 @@ export interface ChatAgentResult {
   action: BookingAction | null;
 }
 
+export const CHAT_DOMAIN_GUARD_RESPONSE =
+  "I can help with Project Play bookings, services, availability, pricing, policies, and venue information. What would you like to book or ask about Project Play?";
+
+const blockedChatTopics = [
+  /\bwhat\s+(model|llm)\b/i,
+  /\bwhich\s+(model|llm)\b/i,
+  /\bwho\s+(made|built|created)\s+you\b/i,
+  /\bare\s+you\s+(chatgpt|gemini|claude|an?\s+ai)\b/i,
+  /\b(prompt|system\s+prompt|instructions?)\b/i,
+  /\bignore\s+(previous|all)\s+instructions?\b/i,
+];
+
+const allowedChatTopics = [
+  /\b(book|booking|reserve|reservation|slot|availability|available|time|date|seat|session)\b/i,
+  /\b(service|racing|simulator|playstation|ps5|game|games|equipment|price|pricing|cost|policy|policies|rule|rules|faq|location|open|hours|contact|project\s+play)\b/i,
+];
+
+export function getChatDomainGuardResponse(message: string): string | null {
+  const normalizedMessage = message.trim();
+
+  if (!normalizedMessage) {
+    return null;
+  }
+
+  const isAllowedTopic = allowedChatTopics.some((pattern) => pattern.test(normalizedMessage));
+  if (isAllowedTopic) {
+    return null;
+  }
+
+  return blockedChatTopics.some((pattern) => pattern.test(normalizedMessage))
+    ? CHAT_DOMAIN_GUARD_RESPONSE
+    : null;
+}
+
 async function getServiceByName(serviceName: string): Promise<ServiceRecord | null> {
   const { data, error } = await supabase()
     .from("services")

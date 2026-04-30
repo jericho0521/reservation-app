@@ -24,7 +24,7 @@ export function PublicContentDetail({ section, post }: PublicContentDetailProps)
   return (
     <main className="min-h-screen bg-racing-dark text-white selection:bg-neon selection:text-racing-dark">
       <article>
-        <header className="border-b border-white/10 px-6 py-16">
+        <header className="border-b border-white/10 px-6 pb-16 pt-28 md:pt-32">
           <div className="container mx-auto max-w-4xl">
             <Link href={labels.publicPath} className="mb-8 inline-flex items-center gap-2 text-sm text-gray-400 hover:text-neon">
               <ArrowLeft className="h-4 w-4" /> Back to {labels.plural}

@@ -4,6 +4,18 @@ export default function Hero() {
     return (
         <section className="relative min-h-screen flex items-center justify-center overflow-hidden pt-20">
             {/* Background Elements */}
+            <video
+                className="absolute inset-0 h-full w-full object-cover opacity-45"
+                autoPlay
+                muted
+                loop
+                playsInline
+                preload="metadata"
+                aria-hidden="true"
+            >
+                <source src="/dreamina-hero.mp4" type="video/mp4" />
+            </video>
+            <div className="absolute inset-0 bg-racing-dark/55 pointer-events-none" />
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-blue-900/20 via-racing-dark to-racing-dark pointer-events-none" />
             <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px] pointer-events-none" />
 

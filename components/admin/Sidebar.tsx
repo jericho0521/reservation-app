@@ -11,6 +11,8 @@ import {
     HelpCircle,
     ChevronDown,
     Plus,
+    FileText,
+    Newspaper,
     type LucideIcon
 } from 'lucide-react';
 import './Sidebar.css';
@@ -33,6 +35,7 @@ const leftTopItems: { icon: LucideIcon; label: string }[] = [
     { icon: LayoutDashboard, label: 'Dashboard' },
     { icon: Calendar, label: 'Calendar' },
     { icon: BarChart3, label: 'Analytics' },
+    { icon: FileText, label: 'Blogs' },
     { icon: Users, label: 'Users' },
 ];
 
@@ -66,6 +69,24 @@ const navItems: NavItem[] = [
             { label: 'Revenue', path: '/admin/analytics' },
             { label: 'Trends', path: '/admin/analytics' },
             { label: 'Reports', path: '/admin/analytics' },
+        ],
+    },
+    {
+        icon: FileText,
+        label: 'Blog CMS',
+        path: '/admin/blogs',
+        submenu: [
+            { label: 'All Blog Posts', path: '/admin/blogs' },
+            { label: 'New Blog Post', path: '/admin/blogs/new' },
+        ],
+    },
+    {
+        icon: Newspaper,
+        label: 'Updates CMS',
+        path: '/admin/updates',
+        submenu: [
+            { label: 'All Updates', path: '/admin/updates' },
+            { label: 'New Update', path: '/admin/updates/new' },
         ],
     },
     {

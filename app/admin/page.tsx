@@ -34,6 +34,7 @@ export default async function AdminPage() {
             bookings={(bookingsResult.data || []) as AdminBooking[]}
             todayCount={todayCountResult.count || 0}
             userEmail={user.email || ''}
+            today={today}
         />
     );
 }

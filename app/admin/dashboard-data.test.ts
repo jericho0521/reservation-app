@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { filterBookings, getBookingSummary, type AdminBooking } from './dashboard-data';
+import { filterBookings, formatRefreshTime, getBookingSummary, type AdminBooking } from './dashboard-data';
 
 const bookings: AdminBooking[] = [
     {
@@ -81,5 +81,16 @@ test('filterBookings applies admin filters deterministically', () => {
     assert.deepEqual(
         filterBookings(bookings, 'cancelled', '2026-03-11').map(booking => booking.id),
         ['3'],
+    );
+});
+
+test('formatRefreshTime renders a stable placeholder before client hydration', () => {
+    assert.equal(formatRefreshTime(null), 'Updated just now');
+});
+
+test('formatRefreshTime formats the client refresh timestamp after hydration', () => {
+    assert.equal(
+        formatRefreshTime(new Date('2026-03-11T05:12:43.000Z'), 'en-MY', 'UTC'),
+        'Updated 5:12:43 am',
     );
 });

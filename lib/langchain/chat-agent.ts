@@ -39,9 +39,94 @@ export interface BookingAction {
   };
 }
 
+export interface LocationDirectionsAction {
+  type: "location_directions";
+  data: {
+    name: string;
+    address: string;
+    area: string;
+    coordinates: {
+      lat: number;
+      lng: number;
+    };
+    mapEmbedUrl: string;
+    wazeUrl: string;
+    googleMapsUrl: string;
+  };
+}
+
+export type ChatAction = BookingAction | LocationDirectionsAction;
+
 export interface ChatAgentResult {
   content: string;
-  action: BookingAction | null;
+  action: ChatAction | null;
+}
+
+const PROJECT_PLAY_LOCATION: LocationDirectionsAction["data"] = {
+  name: "Project Play by CW",
+  address: "Project Play By CW, 70, Jalan PJS 11/7, Bandar Sunway, 47500 Subang Jaya, Selangor",
+  area: "Bandar Sunway, Subang Jaya",
+  coordinates: {
+    lat: 3.0660998,
+    lng: 101.6026114,
+  },
+  mapEmbedUrl:
+    "https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3984.0!2d101.6026114!3d3.0660998!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x31cc4d50f390a0ad%3A0x3a6370b811df68b!2sProject%20Play%20By%20CW!5e0!3m2!1sen!2smy!4v1234567890",
+  wazeUrl:
+    "https://waze.com/ul?q=Project%20Play%20By%20CW%2C%2070%2C%20Jalan%20PJS%2011%2F7%2C%20Bandar%20Sunway%2C%2047500%20Subang%20Jaya%2C%20Selangor&ll=3.0660998%2C101.6026114&navigate=yes",
+  googleMapsUrl:
+    "https://www.google.com/maps/search/?api=1&query=Project%20Play%20By%20CW%2C%2070%2C%20Jalan%20PJS%2011%2F7%2C%20Bandar%20Sunway%2C%2047500%20Subang%20Jaya%2C%20Selangor",
+};
+
+export const CHAT_DOMAIN_GUARD_RESPONSE =
+  "I can help with Project Play bookings, services, availability, pricing, policies, and venue information. What would you like to book or ask about Project Play?";
+
+const blockedChatTopics = [
+  /\bwhat\s+(model|llm)\b/i,
+  /\bwhich\s+(model|llm)\b/i,
+  /\bwho\s+(made|built|created)\s+you\b/i,
+  /\bare\s+you\s+(chatgpt|gemini|claude|an?\s+ai)\b/i,
+  /\b(prompt|system\s+prompt|instructions?)\b/i,
+  /\bignore\s+(previous|all)\s+instructions?\b/i,
+];
+
+const allowedChatTopics = [
+  /\b(book|booking|reserve|reservation|slot|availability|available|time|date|seat|session)\b/i,
+  /\b(service|racing|simulator|playstation|ps5|game|games|equipment|price|pricing|cost|policy|policies|rule|rules|faq|location|open|hours|contact|project\s+play)\b/i,
+];
+
+export function getChatDomainGuardResponse(message: string): string | null {
+  const normalizedMessage = message.trim();
+
+  if (!normalizedMessage) {
+    return null;
+  }
+
+  const isAllowedTopic = allowedChatTopics.some((pattern) => pattern.test(normalizedMessage));
+  if (isAllowedTopic) {
+    return null;
+  }
+
+  return blockedChatTopics.some((pattern) => pattern.test(normalizedMessage))
+    ? CHAT_DOMAIN_GUARD_RESPONSE
+    : null;
+}
+
+export function getLocationDirectionsAction(message: string): LocationDirectionsAction | null {
+  const normalizedMessage = message.trim();
+
+  if (!normalizedMessage) {
+    return null;
+  }
+
+  const isLocationRequest = /\b(location|located|address|where\s+are\s+you|directions?|direction|map|maps|waze|navigate|navigation|how\s+to\s+go|how\s+do\s+i\s+get\s+there)\b/i.test(normalizedMessage);
+
+  return isLocationRequest
+    ? {
+        type: "location_directions",
+        data: PROJECT_PLAY_LOCATION,
+      }
+    : null;
 }
 
 async function getServiceByName(serviceName: string): Promise<ServiceRecord | null> {

@@ -4,9 +4,9 @@
 Project Play By CW is Bandar Sunway's sim racing and gaming hub. We offer Racing Simulator sessions and Playstation 5 gaming stations for casual play, group hangouts, and competitive racing sessions.
 
 ## Location
-- **Address:** Sunway, Subang Jaya, Selangor 47500, Malaysia
+- **Address:** Project Play By CW, 70, Jalan PJS 11/7, Bandar Sunway, 47500 Subang Jaya, Selangor
 - **Area:** Bandar Sunway
-- **Coordinates:** 3.0738, 101.5183
+- **Coordinates:** 3.0660998, 101.6026114
 
 ## Contact Information
 - **Phone:** +60 11-1628 1524

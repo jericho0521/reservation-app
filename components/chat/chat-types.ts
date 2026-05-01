@@ -7,10 +7,29 @@ export interface BookingData {
     email: string;
 }
 
-export interface MessageAction {
-    type: 'booking_confirmation' | 'booking_success';
-    data: BookingData;
+export interface LocationDirectionsData {
+    name: string;
+    address: string;
+    area: string;
+    coordinates: {
+        lat: number;
+        lng: number;
+    };
+    mapEmbedUrl: string;
+    wazeUrl: string;
+    googleMapsUrl: string;
 }
+
+export type MessageAction =
+    | {
+        type: 'booking_confirmation' | 'booking_success';
+        data: BookingData;
+    }
+    | {
+        type: 'location_directions';
+        data: LocationDirectionsData;
+    };
+
 
 export interface Message {
     id: string;

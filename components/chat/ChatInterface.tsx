@@ -5,6 +5,7 @@ import { MessageCircle } from 'lucide-react';
 import { useChat } from './useChat';
 import MessageBubble from './MessageBubble';
 import BookingCard from './BookingCard';
+import LocationDirectionsCard from './LocationDirectionsCard';
 import type { BookingData, Message } from './chat-types';
 
 const ChatMessageItem = memo(function ChatMessageItem({
@@ -32,6 +33,10 @@ const ChatMessageItem = memo(function ChatMessageItem({
                 onCancel={() => onCancel(message.id)}
             />
         );
+    }
+
+    if (message.action?.type === 'location_directions') {
+        return <LocationDirectionsCard data={message.action.data} />;
     }
 
     return (

@@ -2,10 +2,11 @@ import { NextResponse } from "next/server";
 import { getRelevantContext } from "@/lib/knowledge";
 import {
   getChatDomainGuardResponse,
+  getLocationDirectionsAction,
   runChatAgent,
   createBooking,
   type ChatMessage,
-  type BookingAction,
+  type ChatAction,
 } from "@/lib/langchain/chat-agent";
 
 interface ConfirmBookingPayload {
@@ -38,7 +39,7 @@ export async function POST(req: Request) {
           ? `Great! Your booking is confirmed! 🎉 You've booked ${confirmBooking.seats} seat(s) for ${confirmBooking.service} on ${confirmBooking.date} at ${confirmBooking.time}. A confirmation will be sent to ${confirmBooking.email}.`
           : `Sorry, there was an issue: ${result.error}`,
         action: result.success
-          ? ({ type: "booking_success", data: confirmBooking } as BookingAction)
+          ? ({ type: "booking_success", data: confirmBooking } as ChatAction)
           : null,
       });
     }
@@ -50,6 +51,15 @@ export async function POST(req: Request) {
       return Response.json({
         content: guardResponse,
         action: null,
+        threadId: body.threadId || crypto.randomUUID(),
+      });
+    }
+
+    const locationAction = getLocationDirectionsAction(latestUserMessage);
+    if (locationAction) {
+      return Response.json({
+        content: `We are located at ${locationAction.data.area}. You can open the directions card below for Waze or Google Maps navigation.`,
+        action: locationAction,
         threadId: body.threadId || crypto.randomUUID(),
       });
     }

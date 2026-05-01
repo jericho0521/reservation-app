@@ -22,6 +22,8 @@ export default function Footer() {
                             <li><Link href="/form-booking" className="hover:text-neon transition-colors">Book Now</Link></li>
                             <li><Link href="/chat-booking" className="hover:text-neon transition-colors">AI Chat Booking</Link></li>
                             <li><Link href="/#services" className="hover:text-neon transition-colors">Services</Link></li>
+                            <li><Link href="/blog" className="hover:text-neon transition-colors">Blog</Link></li>
+                            <li><Link href="/updates" className="hover:text-neon transition-colors">Updates</Link></li>
                         </ul>
                     </div>
 

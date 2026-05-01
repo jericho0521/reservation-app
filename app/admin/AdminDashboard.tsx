@@ -5,12 +5,13 @@ import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase-browser';
 import { Check, X, RotateCcw, LogOut, RefreshCw } from 'lucide-react';
 import { Sidebar } from '@/components/admin/Sidebar';
-import { ADMIN_BOOKINGS_SELECT, filterBookings, getBookingSummary, getServiceName, type AdminBooking, type AdminFilter } from './dashboard-data';
+import { ADMIN_BOOKINGS_SELECT, filterBookings, formatRefreshTime, getBookingSummary, getServiceName, type AdminBooking, type AdminFilter } from './dashboard-data';
 
 interface AdminDashboardProps {
     bookings: AdminBooking[];
     todayCount: number;
     userEmail: string;
+    today: string;
 }
 
 const STATUS_COLOR_MAP: Record<string, string> = {
@@ -22,15 +23,14 @@ const STATUS_COLOR_MAP: Record<string, string> = {
 
 const FILTER_OPTIONS: AdminFilter[] = ['all', 'today', 'upcoming', 'completed', 'cancelled'];
 
-export default function AdminDashboard({ bookings: initialBookings, todayCount, userEmail }: AdminDashboardProps) {
+export default function AdminDashboard({ bookings: initialBookings, todayCount, userEmail, today }: AdminDashboardProps) {
     const [bookings, setBookings] = useState(initialBookings);
     const [filter, setFilter] = useState<AdminFilter>('all');
     const [isUpdating, setIsUpdating] = useState<string | null>(null);
     const router = useRouter();
     const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null);
-    const [lastRefresh, setLastRefresh] = useState(new Date());
+    const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
     const [isRefreshing, setIsRefreshing] = useState(false);
-    const today = new Date().toISOString().split('T')[0];
     const summary = useMemo(() => getBookingSummary(bookings), [bookings]);
     const filteredBookings = useMemo(() => filterBookings(bookings, filter, today), [bookings, filter, today]);
     const dateFormatter = useMemo(() => new Intl.DateTimeFormat('en-MY', {
@@ -67,6 +67,7 @@ export default function AdminDashboard({ bookings: initialBookings, todayCount, 
 
     // Auto-refresh every 30 seconds
     useEffect(() => {
+        setLastRefresh(new Date());
         const interval = setInterval(refreshBookings, 30000);
         return () => clearInterval(interval);
     }, [refreshBookings]);
@@ -131,7 +132,7 @@ export default function AdminDashboard({ bookings: initialBookings, todayCount, 
                                     {isRefreshing ? 'Refreshing...' : 'Refresh'}
                                 </button>
                                 <span className="text-xs">
-                                    Updated {lastRefresh.toLocaleTimeString()}
+                                    {formatRefreshTime(lastRefresh)}
                                 </span>
                             </div>
                             <button

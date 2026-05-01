@@ -1,6 +1,13 @@
 import { NextResponse } from "next/server";
 import { getRelevantContext } from "@/lib/knowledge";
-import { runChatAgent, createBooking, type ChatMessage, type BookingAction } from "@/lib/langchain/chat-agent";
+import {
+  getChatDomainGuardResponse,
+  getLocationDirectionsAction,
+  runChatAgent,
+  createBooking,
+  type ChatMessage,
+  type ChatAction,
+} from "@/lib/langchain/chat-agent";
 
 interface ConfirmBookingPayload {
   service: string;
@@ -32,13 +39,31 @@ export async function POST(req: Request) {
           ? `Great! Your booking is confirmed! 🎉 You've booked ${confirmBooking.seats} seat(s) for ${confirmBooking.service} on ${confirmBooking.date} at ${confirmBooking.time}. A confirmation will be sent to ${confirmBooking.email}.`
           : `Sorry, there was an issue: ${result.error}`,
         action: result.success
-          ? ({ type: "booking_success", data: confirmBooking } as BookingAction)
+          ? ({ type: "booking_success", data: confirmBooking } as ChatAction)
           : null,
       });
     }
 
     const latestUserMessage =
       [...messages].reverse().find((m) => m.role === "user")?.content || "";
+    const guardResponse = getChatDomainGuardResponse(latestUserMessage);
+    if (guardResponse) {
+      return Response.json({
+        content: guardResponse,
+        action: null,
+        threadId: body.threadId || crypto.randomUUID(),
+      });
+    }
+
+    const locationAction = getLocationDirectionsAction(latestUserMessage);
+    if (locationAction) {
+      return Response.json({
+        content: `We are located at ${locationAction.data.area}. You can open the directions card below for Waze or Google Maps navigation.`,
+        action: locationAction,
+        threadId: body.threadId || crypto.randomUUID(),
+      });
+    }
+
     const context = latestUserMessage ? await getRelevantContext(latestUserMessage) : "";
 
     const threadId = body.threadId || crypto.randomUUID();

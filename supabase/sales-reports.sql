@@ -107,21 +107,21 @@ create policy "Authenticated admins can manage sales report documents"
 on public.sales_report_documents
 for all
 to authenticated
-using (true)
-with check (true);
+using (public.is_admin())
+with check (public.is_admin());
 
 drop policy if exists "Authenticated admins can manage daily sales reports" on public.daily_sales_reports;
 create policy "Authenticated admins can manage daily sales reports"
 on public.daily_sales_reports
 for all
 to authenticated
-using (true)
-with check (true);
+using (public.is_admin())
+with check (public.is_admin());
 
 drop policy if exists "Authenticated admins can manage sales report files" on storage.objects;
 create policy "Authenticated admins can manage sales report files"
 on storage.objects
 for all
 to authenticated
-using (bucket_id = 'sales-report-documents')
-with check (bucket_id = 'sales-report-documents');
+using (bucket_id = 'sales-report-documents' and public.is_admin())
+with check (bucket_id = 'sales-report-documents' and public.is_admin());

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import dynamic from 'next/dynamic';
 import ServiceSelector from './ServiceSelector';
 import DatePicker from './DatePicker';
@@ -35,6 +35,14 @@ export default function MultiStepForm() {
     const updateFormData = (data: Partial<FormData>) => {
         setFormData(prev => ({ ...prev, ...data }));
     };
+
+    const handleSeatSelectionChange = useCallback((seats: number[], labels: string[]) => {
+        setFormData(prev => ({
+            ...prev,
+            seats_booked: seats.length,
+            selected_seat_labels: labels,
+        }));
+    }, []);
 
     const nextStep = () => setCurrentStep(prev => prev + 1);
     const prevStep = () => setCurrentStep(prev => prev - 1);
@@ -191,10 +199,7 @@ export default function MultiStepForm() {
                                 totalSeats={16}
                                 maxAvailable={availableSeats}
                                 takenSeatLabels={takenSeatLabels}
-                                onSelectionChange={(seats, labels) => updateFormData({
-                                    seats_booked: seats.length,
-                                    selected_seat_labels: labels
-                                })}
+                                onSelectionChange={handleSeatSelectionChange}
                             />
                         ) : (
                             /* Simple seat count for PS5 (2 seats) */

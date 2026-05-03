@@ -12,6 +12,7 @@ interface AdminDashboardProps {
     todayCount: number;
     userEmail: string;
     today: string;
+    loadError: string | null;
 }
 
 const STATUS_COLOR_MAP: Record<string, string> = {
@@ -23,7 +24,7 @@ const STATUS_COLOR_MAP: Record<string, string> = {
 
 const FILTER_OPTIONS: AdminFilter[] = ['all', 'today', 'upcoming', 'completed', 'cancelled'];
 
-export default function AdminDashboard({ bookings: initialBookings, todayCount, userEmail, today }: AdminDashboardProps) {
+export default function AdminDashboard({ bookings: initialBookings, todayCount, userEmail, today, loadError }: AdminDashboardProps) {
     const [bookings, setBookings] = useState(initialBookings);
     const [filter, setFilter] = useState<AdminFilter>('all');
     const [isUpdating, setIsUpdating] = useState<string | null>(null);
@@ -51,12 +52,19 @@ export default function AdminDashboard({ bookings: initialBookings, todayCount, 
         setIsRefreshing(true);
         const supabase = getSupabase();
 
-        const { data } = await supabase
+        const { data, error } = await supabase
             .from('bookings')
             .select(ADMIN_BOOKINGS_SELECT)
             .order('booking_date', { ascending: false })
             .order('start_time', { ascending: false })
             .limit(50);
+
+        if (error) {
+            console.error('Failed to refresh bookings:', error);
+            alert(`Failed to refresh bookings: ${error.message}`);
+            setIsRefreshing(false);
+            return;
+        }
 
         if (data) {
             setBookings(data);
@@ -148,6 +156,13 @@ export default function AdminDashboard({ bookings: initialBookings, todayCount, 
 
                 {/* Main Content Area */}
                 <main className="container mx-auto px-6 py-8 space-y-8">
+                    {loadError && (
+                        <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">
+                            <p className="font-semibold text-red-100">Failed to load bookings</p>
+                            <p className="mt-1">{loadError}</p>
+                        </div>
+                    )}
+
                     {/* Stats */}
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                         <div className="glass-panel p-4 rounded-xl border border-white/10">

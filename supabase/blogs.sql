@@ -25,6 +25,7 @@ create index if not exists content_posts_slug_idx
 create or replace function public.set_content_posts_updated_at()
 returns trigger
 language plpgsql
+set search_path = public
 as $$
 begin
   new.updated_at = now();
@@ -51,23 +52,19 @@ create policy "Authenticated users can manage content"
   on public.content_posts
   for all
   to authenticated
-  using (true)
-  with check (true);
+  using (public.is_admin())
+  with check (public.is_admin());
 
 insert into storage.buckets (id, name, public)
 values ('blog-assets', 'blog-assets', true)
 on conflict (id) do nothing;
 
 drop policy if exists "Blog assets are publicly readable" on storage.objects;
-create policy "Blog assets are publicly readable"
-  on storage.objects
-  for select
-  using (bucket_id = 'blog-assets');
 
 drop policy if exists "Authenticated users can manage blog assets" on storage.objects;
 create policy "Authenticated users can manage blog assets"
   on storage.objects
   for all
   to authenticated
-  using (bucket_id = 'blog-assets')
-  with check (bucket_id = 'blog-assets');
+  using (bucket_id = 'blog-assets' and public.is_admin())
+  with check (bucket_id = 'blog-assets' and public.is_admin());

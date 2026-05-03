@@ -35,8 +35,8 @@ create policy "Authenticated admins can manage services"
 on public.services
 for all
 to authenticated
-using (true)
-with check (true);
+using (public.is_admin())
+with check (public.is_admin());
 
 drop policy if exists "Public can read venues" on public.venues;
 create policy "Public can read venues"
@@ -50,8 +50,8 @@ create policy "Authenticated admins can manage venues"
 on public.venues
 for all
 to authenticated
-using (true)
-with check (true);
+using (public.is_admin())
+with check (public.is_admin());
 
 do $$
 begin
@@ -59,7 +59,7 @@ begin
     execute 'drop policy if exists "Public can read equipment" on public.equipment';
     execute 'create policy "Public can read equipment" on public.equipment for select to anon, authenticated using (true)';
     execute 'drop policy if exists "Authenticated admins can manage equipment" on public.equipment';
-    execute 'create policy "Authenticated admins can manage equipment" on public.equipment for all to authenticated using (true) with check (true)';
+    execute 'create policy "Authenticated admins can manage equipment" on public.equipment for all to authenticated using (public.is_admin()) with check (public.is_admin())';
   end if;
 end $$;
 
@@ -78,5 +78,5 @@ create policy "Authenticated admins can manage bookings"
 on public.bookings
 for all
 to authenticated
-using (true)
-with check (true);
+using (public.is_admin())
+with check (public.is_admin());

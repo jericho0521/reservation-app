@@ -31,6 +31,7 @@ returns table (
 )
 language sql
 stable
+set search_path = public, extensions
 as $$
   select
     knowledge_chunks.id,

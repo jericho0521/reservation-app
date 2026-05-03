@@ -3,6 +3,35 @@
 
 create extension if not exists pgcrypto;
 
+create table if not exists public.admin_users (
+  user_id uuid primary key references auth.users(id) on delete cascade,
+  created_at timestamptz not null default now()
+);
+
+alter table public.admin_users enable row level security;
+
+revoke select on public.admin_users from anon;
+
+drop policy if exists "Admin users can read their own admin row" on public.admin_users;
+create policy "Admin users can read their own admin row"
+on public.admin_users
+for select
+to authenticated
+using (user_id = auth.uid());
+
+create or replace function public.is_admin()
+returns boolean
+language sql
+stable
+set search_path = public, auth
+as $$
+  select exists (
+    select 1
+    from public.admin_users
+    where user_id = auth.uid()
+  );
+$$;
+
 create table if not exists public.services (
   id uuid primary key default gen_random_uuid(),
   name text not null,
@@ -65,6 +94,7 @@ on public.bookings (booking_date desc);
 create or replace function public.set_updated_at()
 returns trigger
 language plpgsql
+set search_path = public
 as $$
 begin
   new.updated_at = now();

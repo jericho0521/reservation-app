@@ -1,12 +1,22 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 interface Props {
     totalSeats: number;
     maxAvailable: number;
     takenSeatLabels?: string[];
     onSelectionChange: (selectedSeats: number[], seatLabels: string[]) => void;
+}
+
+export function computeNextSeatSelection(selectedSeats: number[], seatNumber: number) {
+    return selectedSeats.includes(seatNumber)
+        ? selectedSeats.filter(seat => seat !== seatNumber)
+        : [...selectedSeats, seatNumber];
+}
+
+function getSeatLabel(seatNumber: number) {
+    return `RS${seatNumber}`;
 }
 
 export default function SeatMap({ 
@@ -33,22 +43,14 @@ export default function SeatMap({
         return Array.from({ length: unavailable }, (_, index) => totalSeats - index);
     }, [totalSeats, maxAvailable, takenSeatLabels]);
 
-    const getSeatLabel = (seatNumber: number) => {
-        return `RS${seatNumber}`;
-    };
+    useEffect(() => {
+        onSelectionChange(selectedSeats, selectedSeats.map(getSeatLabel));
+    }, [selectedSeats, onSelectionChange]);
 
     const toggleSeat = (seatNumber: number) => {
         if (bookedSeats.includes(seatNumber)) return;
-        
-        setSelectedSeats(prev => {
-            const newSelection = prev.includes(seatNumber)
-                ? prev.filter(s => s !== seatNumber)
-                : [...prev, seatNumber];
-            
-            const labels = newSelection.map(s => getSeatLabel(s));
-            onSelectionChange(newSelection, labels);
-            return newSelection;
-        });
+
+        setSelectedSeats(prev => computeNextSeatSelection(prev, seatNumber));
     };
 
     const getSeatStatus = (seatNumber: number) => {

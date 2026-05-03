@@ -42,19 +42,19 @@ create policy "Auth users can manage checkpoints"
   on public.checkpoints
   for all
   to authenticated
-  using (true)
-  with check (true);
+  using (public.is_admin())
+  with check (public.is_admin());
 
 create policy "Auth users can manage checkpoint writes"
   on public.checkpoint_writes
   for all
   to authenticated
-  using (true)
-  with check (true);
+  using (public.is_admin())
+  with check (public.is_admin());
 
 create policy "Auth users can manage checkpoint blobs"
   on public.checkpoint_blobs
   for all
   to authenticated
-  using (true)
-  with check (true);
+  using (public.is_admin())
+  with check (public.is_admin());

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { filterBookings, formatRefreshTime, getBookingSummary, type AdminBooking } from './dashboard-data';
+import { filterBookings, formatRefreshTime, getAdminBookingsLoadError, getBookingSummary, type AdminBooking } from './dashboard-data';
 
 const bookings: AdminBooking[] = [
     {
@@ -92,5 +92,22 @@ test('formatRefreshTime formats the client refresh timestamp after hydration', (
     assert.equal(
         formatRefreshTime(new Date('2026-03-11T05:12:43.000Z'), 'en-MY', 'UTC'),
         'Updated 5:12:43 am',
+    );
+});
+
+test('getAdminBookingsLoadError surfaces booking query failures first', () => {
+    assert.equal(
+        getAdminBookingsLoadError(
+            { message: 'Could not find a relationship between bookings and services' },
+            { message: 'permission denied' },
+        ),
+        'Could not find a relationship between bookings and services',
+    );
+});
+
+test('getAdminBookingsLoadError falls back to today count failures', () => {
+    assert.equal(
+        getAdminBookingsLoadError(null, { message: 'permission denied for table bookings' }),
+        'permission denied for table bookings',
     );
 });

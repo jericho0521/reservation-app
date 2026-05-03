@@ -34,6 +34,17 @@ export interface BookingSummary {
     cancelled: number;
 }
 
+interface QueryErrorLike {
+    message?: string;
+}
+
+export function getAdminBookingsLoadError(
+    bookingsError: QueryErrorLike | null | undefined,
+    todayCountError: QueryErrorLike | null | undefined,
+) {
+    return bookingsError?.message || todayCountError?.message || null;
+}
+
 export function getBookingSummary(bookings: AdminBooking[]): BookingSummary {
     return bookings.reduce<BookingSummary>((summary, booking) => {
         if (booking.status === 'confirmed') {

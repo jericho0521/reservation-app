@@ -85,6 +85,24 @@ create table if not exists public.bookings (
   updated_at timestamptz not null default now()
 );
 
+create table if not exists public.service_seat_maintenance (
+  id uuid primary key default gen_random_uuid(),
+  service_id uuid not null references public.services(id) on delete cascade,
+  seat_label text not null,
+  reason text,
+  is_active boolean not null default true,
+  created_by uuid references auth.users(id) on delete set null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  constraint service_seat_maintenance_label_check check (seat_label ~ '^RS([1-9]|1[0-6])$')
+);
+
+create unique index if not exists service_seat_maintenance_service_label_key
+on public.service_seat_maintenance (service_id, seat_label);
+
+create index if not exists service_seat_maintenance_active_idx
+on public.service_seat_maintenance (service_id, is_active);
+
 create index if not exists bookings_service_date_status_idx
 on public.bookings (service_id, booking_date, status);
 
@@ -120,6 +138,11 @@ for each row execute function public.set_updated_at();
 drop trigger if exists set_bookings_updated_at on public.bookings;
 create trigger set_bookings_updated_at
 before update on public.bookings
+for each row execute function public.set_updated_at();
+
+drop trigger if exists set_service_seat_maintenance_updated_at on public.service_seat_maintenance;
+create trigger set_service_seat_maintenance_updated_at
+before update on public.service_seat_maintenance
 for each row execute function public.set_updated_at();
 
 insert into public.services (name, description, total_seats)

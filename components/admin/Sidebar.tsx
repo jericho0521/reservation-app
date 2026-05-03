@@ -13,6 +13,7 @@ import {
     Plus,
     FileText,
     Newspaper,
+    Wrench,
     type LucideIcon
 } from 'lucide-react';
 import './Sidebar.css';
@@ -59,7 +60,13 @@ const navItems: NavItem[] = [
             { label: 'Today', count: 10, path: '/admin' },
             { label: 'Upcoming', count: 25, path: '/admin' },
             { label: 'Completed', count: 15, path: '/admin' },
+            { label: 'Seat Maintenance', path: '/admin/seat-maintenance' },
         ],
+    },
+    {
+        icon: Wrench,
+        label: 'Seat Maintenance',
+        path: '/admin/seat-maintenance',
     },
     {
         icon: BarChart3,

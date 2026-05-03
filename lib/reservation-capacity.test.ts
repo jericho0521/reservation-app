@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   getAvailableSeats,
+  getAvailableSeatsWithMaintenance,
   getBookedSeatLabels,
   getBookedSeats,
   getBookingsForSlot,
@@ -16,6 +17,10 @@ test("getBookedSeats sums booked seat counts", () => {
 
 test("getAvailableSeats subtracts existing bookings from capacity", () => {
   assert.equal(getAvailableSeats(8, [{ seats_booked: 2 }, { seats_booked: 3 }]), 3);
+});
+
+test("getAvailableSeatsWithMaintenance subtracts blocked seats from capacity", () => {
+  assert.equal(getAvailableSeatsWithMaintenance(8, [{ seats_booked: 2 }], ["RS1", "RS2"]), 4);
 });
 
 test("isOverCapacity detects over-capacity booking requests", () => {

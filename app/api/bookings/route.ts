@@ -2,10 +2,11 @@ import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import {
-    getAvailableSeats,
+    getAvailableSeatsWithMaintenance,
     getBookingsForSlot,
     getConflictingSeatLabels,
 } from '@/lib/reservation-capacity';
+import { getMaintenanceSeatConflicts } from '@/lib/seat-maintenance';
 import { jsonError, requireAuthenticatedSupabase, supabaseErrorStatus } from '@/app/api/api-utils';
 import { z } from 'zod';
 
@@ -74,11 +75,26 @@ export async function POST(request: Request) {
 
         if (bookingsError) throw bookingsError;
 
+        const { data: maintenanceSeats, error: maintenanceError } = await bookingClient
+            .from('service_seat_maintenance')
+            .select('seat_label')
+            .eq('service_id', validatedData.service_id)
+            .eq('is_active', true);
+
+        if (maintenanceError) throw maintenanceError;
+
         const sameSlotBookings = getBookingsForSlot(
             existingBookings || [],
             validatedData.start_time,
         );
-        const availableSeats = getAvailableSeats(service.total_seats, sameSlotBookings);
+        const maintenanceSeatLabels = (maintenanceSeats || [])
+            .map(seat => seat.seat_label)
+            .filter((label): label is string => typeof label === 'string');
+        const availableSeats = getAvailableSeatsWithMaintenance(
+            service.total_seats,
+            sameSlotBookings,
+            maintenanceSeatLabels,
+        );
         const requestedSeatLabels = validatedData.seat_labels ?? [];
 
         if (
@@ -91,6 +107,17 @@ export async function POST(request: Request) {
         if (validatedData.seats_booked > availableSeats) {
             return jsonError('Not enough seats available', 409, {
                 available_seats: availableSeats
+            });
+        }
+
+        const maintenanceConflicts = getMaintenanceSeatConflicts(
+            requestedSeatLabels,
+            maintenanceSeatLabels,
+        );
+
+        if (maintenanceConflicts.length > 0) {
+            return jsonError('Some selected seats are under maintenance', 409, {
+                seat_labels: maintenanceConflicts,
             });
         }
 

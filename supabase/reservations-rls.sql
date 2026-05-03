@@ -18,6 +18,13 @@ alter table public.bookings enable row level security;
 
 do $$
 begin
+  if to_regclass('public.service_seat_maintenance') is not null then
+    execute 'alter table public.service_seat_maintenance enable row level security';
+  end if;
+end $$;
+
+do $$
+begin
   if to_regclass('public.equipment') is not null then
     execute 'alter table public.equipment enable row level security';
   end if;
@@ -80,3 +87,11 @@ for all
 to authenticated
 using (public.is_admin())
 with check (public.is_admin());
+
+do $$
+begin
+  if to_regclass('public.service_seat_maintenance') is not null then
+    execute 'drop policy if exists "Authenticated admins can manage seat maintenance" on public.service_seat_maintenance';
+    execute 'create policy "Authenticated admins can manage seat maintenance" on public.service_seat_maintenance for all to authenticated using (public.is_admin()) with check (public.is_admin())';
+  end if;
+end $$;

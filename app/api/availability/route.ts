@@ -40,7 +40,18 @@ export async function GET(request: Request) {
 
         if (bookingsError) throw bookingsError;
 
-        const timeSlots = generateTimeSlots(totalSeats, bookings || []);
+        const { data: maintenanceSeats, error: maintenanceError } = await supabaseAdmin()
+            .from('service_seat_maintenance')
+            .select('seat_label')
+            .eq('service_id', serviceId)
+            .eq('is_active', true);
+
+        if (maintenanceError) throw maintenanceError;
+
+        const maintenanceSeatLabels = (maintenanceSeats || [])
+            .map(seat => seat.seat_label)
+            .filter((label): label is string => typeof label === 'string');
+        const timeSlots = generateTimeSlots(totalSeats, bookings || [], maintenanceSeatLabels);
 
         return NextResponse.json({ timeSlots, totalSeats });
     } catch (error) {

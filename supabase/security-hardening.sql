@@ -31,8 +31,33 @@ as $$
   );
 $$;
 
+create table if not exists public.service_seat_maintenance (
+  id uuid primary key default gen_random_uuid(),
+  service_id uuid not null references public.services(id) on delete cascade,
+  seat_label text not null,
+  reason text,
+  is_active boolean not null default true,
+  created_by uuid references auth.users(id) on delete set null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  constraint service_seat_maintenance_label_check check (seat_label ~ '^RS([1-9]|1[0-6])$')
+);
+
+create unique index if not exists service_seat_maintenance_service_label_key
+on public.service_seat_maintenance (service_id, seat_label);
+
+create index if not exists service_seat_maintenance_active_idx
+on public.service_seat_maintenance (service_id, is_active);
+
+alter table public.service_seat_maintenance enable row level security;
+
 alter function public.set_updated_at()
 set search_path = public;
+
+drop trigger if exists set_service_seat_maintenance_updated_at on public.service_seat_maintenance;
+create trigger set_service_seat_maintenance_updated_at
+before update on public.service_seat_maintenance
+for each row execute function public.set_updated_at();
 
 alter function public.set_content_posts_updated_at()
 set search_path = public;
@@ -67,6 +92,14 @@ end $$;
 drop policy if exists "Authenticated admins can manage bookings" on public.bookings;
 create policy "Authenticated admins can manage bookings"
 on public.bookings
+for all
+to authenticated
+using (public.is_admin())
+with check (public.is_admin());
+
+drop policy if exists "Authenticated admins can manage seat maintenance" on public.service_seat_maintenance;
+create policy "Authenticated admins can manage seat maintenance"
+on public.service_seat_maintenance
 for all
 to authenticated
 using (public.is_admin())

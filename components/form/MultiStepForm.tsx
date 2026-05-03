@@ -27,6 +27,7 @@ export default function MultiStepForm() {
     const [isSuccess, setIsSuccess] = useState(false);
     const [availableSeats, setAvailableSeats] = useState(0);
     const [takenSeatLabels, setTakenSeatLabels] = useState<string[]>([]);
+    const [maintenanceSeatLabels, setMaintenanceSeatLabels] = useState<string[]>([]);
     const [formData, setFormData] = useState<FormData>(() => ({
         interface_type: 'form',
         seats_booked: 1
@@ -102,6 +103,7 @@ export default function MultiStepForm() {
                         setIsSuccess(false);
                         setCurrentStep(1);
                         setAvailableSeats(0);
+                        setMaintenanceSeatLabels([]);
                         setFormData({ interface_type: 'form', seats_booked: 1 });
                     }}
                     className="mt-8 px-6 py-3 bg-white/10 border border-white/20 text-white font-bold rounded-lg hover:bg-white/20 hover:border-neon transition-all"
@@ -141,6 +143,7 @@ export default function MultiStepForm() {
                         onSelect={(serviceId, serviceName, totalSeats) => {
                             setAvailableSeats(0);
                             setTakenSeatLabels([]);
+                            setMaintenanceSeatLabels([]);
                             updateFormData({
                                 service_id: serviceId,
                                 service_name: serviceName,
@@ -161,6 +164,7 @@ export default function MultiStepForm() {
                             onSelect={(date) => {
                                 setAvailableSeats(0);
                                 setTakenSeatLabels([]);
+                                setMaintenanceSeatLabels([]);
                                 updateFormData({
                                     booking_date: date,
                                     start_time: undefined,
@@ -175,7 +179,7 @@ export default function MultiStepForm() {
                                 serviceId={formData.service_id}
                                 date={formData.booking_date}
                                 selectedStart={formData.start_time}
-                                onSelect={(start, end, seats, labels) => {
+                                onSelect={(start, end, seats, labels, maintenanceLabels) => {
                                     updateFormData({
                                         start_time: start,
                                         end_time: end,
@@ -184,6 +188,7 @@ export default function MultiStepForm() {
                                     });
                                     setAvailableSeats(seats);
                                     setTakenSeatLabels(labels);
+                                    setMaintenanceSeatLabels(maintenanceLabels);
                                 }}
                             />
                         )}
@@ -199,6 +204,7 @@ export default function MultiStepForm() {
                                 totalSeats={16}
                                 maxAvailable={availableSeats}
                                 takenSeatLabels={takenSeatLabels}
+                                maintenanceSeatLabels={maintenanceSeatLabels}
                                 onSelectionChange={handleSeatSelectionChange}
                             />
                         ) : (

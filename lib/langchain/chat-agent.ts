@@ -12,7 +12,7 @@ import {
 import { supabase } from "@/lib/supabase";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { getEndTime, generateTimeSlots } from "@/lib/availability";
-import { getAvailableSeats } from "@/lib/reservation-capacity";
+import { getAvailableSeatsWithMaintenance } from "@/lib/reservation-capacity";
 import { createOpenRouterChat } from "./models";
 import { buildBookingSystemPromptWithContext } from "./prompts";
 
@@ -164,14 +164,24 @@ const checkAvailabilityTool = tool(
       const service = await getServiceByName(service_name);
       if (!service) return { error: "Service not found" };
 
-      const { data: bookings } = await supabaseAdmin()
+      const bookingClient = supabaseAdmin();
+      const { data: bookings } = await bookingClient
         .from("bookings")
-        .select("start_time, seats_booked")
+        .select("start_time, seats_booked, seat_labels")
         .eq("service_id", service.id)
         .eq("booking_date", date)
         .eq("status", "confirmed");
 
-      const slots = generateTimeSlots(service.total_seats, bookings || [])
+      const { data: maintenanceSeats } = await bookingClient
+        .from("service_seat_maintenance")
+        .select("seat_label")
+        .eq("service_id", service.id)
+        .eq("is_active", true);
+      const maintenanceSeatLabels = (maintenanceSeats || [])
+        .map((seat) => seat.seat_label)
+        .filter((label): label is string => typeof label === "string");
+
+      const slots = generateTimeSlots(service.total_seats, bookings || [], maintenanceSeatLabels)
         .filter((slot) => slot.is_available)
         .map((slot) => ({
           time: slot.start_time,
@@ -349,7 +359,19 @@ export async function createBooking(
       .eq("start_time", startTime)
       .eq("status", "confirmed");
 
-    const availableSeats = getAvailableSeats(service.total_seats, existing || []);
+    const { data: maintenanceSeats } = await bookingClient
+      .from("service_seat_maintenance")
+      .select("seat_label")
+      .eq("service_id", service.id)
+      .eq("is_active", true);
+    const maintenanceSeatLabels = (maintenanceSeats || [])
+      .map((seat) => seat.seat_label)
+      .filter((label): label is string => typeof label === "string");
+    const availableSeats = getAvailableSeatsWithMaintenance(
+      service.total_seats,
+      existing || [],
+      maintenanceSeatLabels,
+    );
     if (seats > availableSeats) {
       return { success: false, error: `Only ${availableSeats} seats available` };
     }

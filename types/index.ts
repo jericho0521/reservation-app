@@ -26,6 +26,7 @@ export interface TimeSlot {
     available_seats: number;
     is_available: boolean;
     taken_seat_labels: string[];
+    maintenance_seat_labels?: string[];
 }
 
 export interface Message {

@@ -49,6 +49,14 @@ export function getAvailableSeats(totalSeats: number, bookings: SeatBooking[]) {
   return totalSeats - getBookedSeats(bookings);
 }
 
+export function getAvailableSeatsWithMaintenance(
+  totalSeats: number,
+  bookings: SeatBooking[],
+  maintenanceSeatLabels: string[],
+) {
+  return Math.max(0, totalSeats - getBookedSeats(bookings) - maintenanceSeatLabels.length);
+}
+
 export function isOverCapacity(totalSeats: number, bookings: SeatBooking[], requestedSeats: number) {
   return requestedSeats > getAvailableSeats(totalSeats, bookings);
 }

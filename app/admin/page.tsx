@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase-server';
-import { ADMIN_BOOKINGS_SELECT, type AdminBooking } from './dashboard-data';
+import { ADMIN_BOOKINGS_SELECT, getAdminBookingsLoadError, type AdminBooking } from './dashboard-data';
 import AdminDashboard from './AdminDashboard';
 
 export const dynamic = 'force-dynamic';
@@ -35,6 +35,7 @@ export default async function AdminPage() {
             todayCount={todayCountResult.count || 0}
             userEmail={user.email || ''}
             today={today}
+            loadError={getAdminBookingsLoadError(bookingsResult.error, todayCountResult.error)}
         />
     );
 }

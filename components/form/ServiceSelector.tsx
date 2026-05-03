@@ -2,13 +2,22 @@
 
 import useSWR from 'swr';
 import { Service } from '@/types';
+import { BOOKING_WHATSAPP_URL, shouldShowBookingMaintenanceFallback } from './booking-maintenance';
 
 interface Props {
     selected?: string;
     onSelect: (serviceId: string, serviceName: string, totalSeats: number) => void;
 }
 
-const fetcher = (url: string) => fetch(url).then(res => res.json());
+const fetcher = async (url: string) => {
+    const response = await fetch(url);
+
+    if (!response.ok) {
+        throw new Error('Failed to load services');
+    }
+
+    return response.json();
+};
 
 // Hoisted static SVG icons - avoid re-creation on each render
 const RacingIcon = (
@@ -25,7 +34,7 @@ const PlayIcon = (
 );
 
 export default function ServiceSelector({ selected, onSelect }: Props) {
-    const { data: services = [], isLoading: loading } = useSWR<Service[]>('/api/services', fetcher);
+    const { data: services = [], error, isLoading: loading } = useSWR<Service[]>('/api/services', fetcher);
 
     if (loading) {
         return (
@@ -38,6 +47,28 @@ export default function ServiceSelector({ selected, onSelect }: Props) {
     const getServiceIcon = (name: string) => {
         return name.toLowerCase().includes('racing') ? RacingIcon : PlayIcon;
     };
+
+    if (shouldShowBookingMaintenanceFallback(services, error, loading)) {
+        return (
+            <div className="rounded-2xl border border-neon/30 bg-white/[0.04] p-8 text-center shadow-[0_0_30px_rgba(185,217,207,0.08)]">
+                <p className="mb-3 text-sm font-semibold uppercase tracking-[0.35em] text-neon">Booking unavailable</p>
+                <h2 className="text-3xl font-black uppercase italic tracking-tighter font-heading">
+                    Under Maintenance
+                </h2>
+                <p className="mx-auto mt-4 max-w-md text-gray-300">
+                    Under Maintenance, proceed to WhatsApp for booking.
+                </p>
+                <a
+                    href={BOOKING_WHATSAPP_URL}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-6 inline-flex items-center justify-center rounded-lg bg-neon px-6 py-3 font-bold text-racing-dark transition-colors hover:bg-white"
+                >
+                    Book on WhatsApp
+                </a>
+            </div>
+        );
+    }
 
     return (
         <div className="space-y-4">

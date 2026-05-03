@@ -11,6 +11,7 @@ export interface Booking {
     service_id: string;
     user_name: string;
     user_email: string;
+    user_phone?: string;
     booking_date: string;
     start_time: string;
     end_time: string;

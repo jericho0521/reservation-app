@@ -16,6 +16,7 @@ interface ConfirmBookingPayload {
   seats: number;
   name: string;
   email: string;
+  phone: string;
 }
 
 export async function POST(req: Request) {
@@ -31,7 +32,8 @@ export async function POST(req: Request) {
         confirmBooking.time,
         confirmBooking.seats,
         confirmBooking.name,
-        confirmBooking.email
+        confirmBooking.email,
+        confirmBooking.phone
       );
 
       return Response.json({

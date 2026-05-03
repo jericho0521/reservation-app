@@ -28,6 +28,7 @@ const ChatMessageItem = memo(function ChatMessageItem({
                 seats={action.data.seats}
                 name={action.data.name}
                 email={action.data.email}
+                phone={action.data.phone}
                 status={message.actionStatus}
                 onConfirm={() => onConfirm(message.id, action.data)}
                 onCancel={() => onCancel(message.id)}

@@ -14,6 +14,7 @@ const bookingSchema = z.object({
     service_id: z.string().uuid(),
     user_name: z.string().min(1),
     user_email: z.string().email(),
+    user_phone: z.string().min(1),
     booking_date: z.string(),
     start_time: z.string(),
     end_time: z.string(),

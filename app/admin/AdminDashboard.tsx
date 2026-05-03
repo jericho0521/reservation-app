@@ -233,6 +233,9 @@ export default function AdminDashboard({ bookings: initialBookings, todayCount, 
                                                 <td className="px-4 py-3">
                                                     <div className="font-medium text-sm">{booking.user_name}</div>
                                                     <div className="text-xs text-gray-400">{booking.user_email}</div>
+                                                    {booking.user_phone && (
+                                                        <div className="text-xs text-gray-500">{booking.user_phone}</div>
+                                                    )}
                                                 </td>
                                                 <td className="px-4 py-3 text-sm">
                                                     {getServiceName(booking.services)}

@@ -36,6 +36,7 @@ export interface BookingAction {
     seats: number;
     name: string;
     email: string;
+    phone: string;
   };
 }
 
@@ -233,6 +234,7 @@ const prepareBookingTool = tool(
       seats: z.number().describe("Number of seats"),
       user_name: z.string().describe("Customer name"),
       user_email: z.string().describe("Customer email"),
+      user_phone: z.string().describe("Customer phone number"),
     }),
   }
 );
@@ -281,6 +283,7 @@ function bookingActionFromArgs(args: Record<string, unknown>): BookingAction | n
   const seats = args.seats;
   const name = args.user_name;
   const email = args.user_email;
+  const phone = args.user_phone;
 
   if (
     typeof service !== "string" ||
@@ -288,7 +291,8 @@ function bookingActionFromArgs(args: Record<string, unknown>): BookingAction | n
     typeof time !== "string" ||
     typeof seats !== "number" ||
     typeof name !== "string" ||
-    typeof email !== "string"
+    typeof email !== "string" ||
+    typeof phone !== "string"
   ) {
     return null;
   }
@@ -302,6 +306,7 @@ function bookingActionFromArgs(args: Record<string, unknown>): BookingAction | n
       seats,
       name,
       email,
+      phone,
     },
   };
 }
@@ -344,7 +349,8 @@ export async function createBooking(
   startTime: string,
   seats: number,
   userName: string,
-  userEmail: string
+  userEmail: string,
+  userPhone: string
 ) {
   const service = await getServiceByName(serviceName);
   if (!service) return { success: false, error: "Service not found" };
@@ -384,6 +390,7 @@ export async function createBooking(
         service_id: service.id,
         user_name: userName,
         user_email: userEmail,
+        user_phone: userPhone,
         booking_date: date,
         start_time: startTime,
         end_time: endTime,

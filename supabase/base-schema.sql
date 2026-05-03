@@ -74,6 +74,7 @@ create table if not exists public.bookings (
   service_id uuid not null references public.services(id) on delete restrict,
   user_name text not null,
   user_email text not null,
+  user_phone text,
   booking_date date not null,
   start_time time not null,
   end_time time not null,

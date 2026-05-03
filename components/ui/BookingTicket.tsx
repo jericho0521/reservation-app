@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
-import { Calendar, Clock, Users, User, Mail, Trophy } from 'lucide-react';
+import { Calendar, Clock, Users, User, Mail, Phone, Trophy } from 'lucide-react';
 
 function hashSeed(seed: string) {
     let hash = 0;
@@ -42,6 +42,7 @@ interface Props {
     seats: number;
     name: string;
     email: string;
+    phone?: string;
     bookingId?: string;
 }
 
@@ -52,10 +53,11 @@ export default function BookingTicket({
     seats,
     name,
     email,
+    phone,
     bookingId
 }: Props) {
     const [isVisible, setIsVisible] = useState(false);
-    const seed = `${service}|${date}|${time}|${seats}|${name}|${email}|${bookingId || ''}`;
+    const seed = `${service}|${date}|${time}|${seats}|${name}|${email}|${phone || ''}|${bookingId || ''}`;
 
     const qrPattern = useMemo(() => buildQrPattern(seed), [seed]);
     const reference = useMemo(() => bookingId || buildReference(seed), [bookingId, seed]);
@@ -148,6 +150,17 @@ export default function BookingTicket({
                                 <p className="text-sm font-medium text-white truncate">{email}</p>
                             </div>
                         </div>
+
+                        {/* Phone */}
+                        {phone && (
+                            <div className="flex items-center gap-3 p-3 bg-white/5 rounded-lg border border-white/5">
+                                <Phone className="w-4 h-4 text-neon flex-shrink-0" />
+                                <div className="min-w-0">
+                                    <p className="text-[10px] text-gray-500 uppercase tracking-wide">Phone</p>
+                                    <p className="text-sm font-medium text-white truncate">{phone}</p>
+                                </div>
+                            </div>
+                        )}
 
                         {/* QR Code */}
                         <div className="flex justify-center pt-2">

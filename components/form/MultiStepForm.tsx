@@ -54,11 +54,12 @@ export default function MultiStepForm() {
             const response = await fetch('/api/bookings', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    service_id: formData.service_id,
-                    user_name: formData.user_name,
-                    user_email: formData.user_email,
-                    booking_date: formData.booking_date,
+                    body: JSON.stringify({
+                        service_id: formData.service_id,
+                        user_name: formData.user_name,
+                        user_email: formData.user_email,
+                        user_phone: formData.user_phone,
+                        booking_date: formData.booking_date,
                     start_time: formData.start_time,
                     end_time: formData.end_time,
                     seats_booked: formData.seats_booked,
@@ -95,6 +96,7 @@ export default function MultiStepForm() {
                     seats={formData.seats_booked || 1}
                     name={formData.user_name || ''}
                     email={formData.user_email || ''}
+                    phone={formData.user_phone || ''}
                 />
 
                 {/* Make Another Booking Button */}
@@ -256,6 +258,16 @@ export default function MultiStepForm() {
                                     className="w-full px-4 py-3 bg-white/5 border border-white/20 rounded-lg text-white focus:border-neon focus:outline-none focus:ring-1 focus:ring-neon transition-colors"
                                 />
                             </div>
+                            <div>
+                                <label className="block text-sm text-gray-400 mb-2">Phone Number</label>
+                                <input
+                                    type="tel"
+                                    value={formData.user_phone || ''}
+                                    onChange={(e) => updateFormData({ user_phone: e.target.value })}
+                                    placeholder="+60 12-345 6789"
+                                    className="w-full px-4 py-3 bg-white/5 border border-white/20 rounded-lg text-white focus:border-neon focus:outline-none focus:ring-1 focus:ring-neon transition-colors"
+                                />
+                            </div>
                         </div>
                     </div>
                 )}
@@ -312,11 +324,12 @@ function isStepValid(step: number, data: Partial<FormData>): boolean {
                     selectedLabels.length > 0 &&
                     data.seats_booked === selectedLabels.length &&
                     !!data.user_name &&
-                    !!data.user_email
+                    !!data.user_email &&
+                    !!data.user_phone
                 );
             }
 
-            return !!data.seats_booked && data.seats_booked > 0 && !!data.user_name && !!data.user_email;
+            return !!data.seats_booked && data.seats_booked > 0 && !!data.user_name && !!data.user_email && !!data.user_phone;
         default:
             return true;
     }

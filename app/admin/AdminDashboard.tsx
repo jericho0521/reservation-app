@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase-browser';
-import { Check, X, RotateCcw, LogOut, RefreshCw } from 'lucide-react';
+import { Check, X, RotateCcw, LogOut, RefreshCw, Search, XCircle } from 'lucide-react';
 import { Sidebar } from '@/components/admin/Sidebar';
 import { ADMIN_BOOKINGS_SELECT, filterBookings, formatRefreshTime, getBookingSummary, getServiceName, type AdminBooking, type AdminFilter } from './dashboard-data';
 
@@ -32,8 +32,22 @@ export default function AdminDashboard({ bookings: initialBookings, todayCount, 
     const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null);
     const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
     const [isRefreshing, setIsRefreshing] = useState(false);
+    const [searchTerm, setSearchTerm] = useState('');
+    const [isSearching, setIsSearching] = useState(false);
+    const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const summary = useMemo(() => getBookingSummary(bookings), [bookings]);
-    const filteredBookings = useMemo(() => filterBookings(bookings, filter, today), [bookings, filter, today]);
+    const filteredBookings = useMemo(() => {
+        let results = bookings;
+        if (searchTerm.trim()) {
+            const term = searchTerm.toLowerCase();
+            results = results.filter(b =>
+                b.user_name.toLowerCase().includes(term) ||
+                b.user_email.toLowerCase().includes(term) ||
+                (b.user_phone && b.user_phone.toLowerCase().includes(term))
+            );
+        }
+        return filterBookings(results, filter, today);
+    }, [bookings, filter, today, searchTerm]);
     const dateFormatter = useMemo(() => new Intl.DateTimeFormat('en-MY', {
         weekday: 'short',
         month: 'short',
@@ -73,12 +87,48 @@ export default function AdminDashboard({ bookings: initialBookings, todayCount, 
         setIsRefreshing(false);
     }, [getSupabase]);
 
-    // Auto-refresh every 30 seconds
+    const performSearch = useCallback(async (term: string) => {
+        if (!term.trim()) {
+            await refreshBookings();
+            return;
+        }
+        setIsSearching(true);
+        try {
+            const response = await fetch(`/api/bookings?search=${encodeURIComponent(term.trim())}`);
+            if (response.ok) {
+                const data = await response.json();
+                setBookings(data);
+                setLastRefresh(new Date());
+            }
+        } catch (error) {
+            console.error('Search failed:', error);
+        } finally {
+            setIsSearching(false);
+        }
+    }, [refreshBookings]);
+
+    // Auto-refresh every 30 seconds (disabled while searching)
     useEffect(() => {
+        if (searchTerm.trim()) return;
         setLastRefresh(new Date());
         const interval = setInterval(refreshBookings, 30000);
         return () => clearInterval(interval);
-    }, [refreshBookings]);
+    }, [refreshBookings, searchTerm]);
+
+    // Debounced search
+    useEffect(() => {
+        if (searchTimerRef.current) {
+            clearTimeout(searchTimerRef.current);
+        }
+        searchTimerRef.current = setTimeout(() => {
+            performSearch(searchTerm);
+        }, 300);
+        return () => {
+            if (searchTimerRef.current) {
+                clearTimeout(searchTimerRef.current);
+            }
+        };
+    }, [searchTerm, performSearch]);
 
     const handleLogout = async () => {
         const supabase = getSupabase();
@@ -189,6 +239,32 @@ export default function AdminDashboard({ bookings: initialBookings, todayCount, 
                         </div>
                     </div>
 
+                    {/* Search */}
+                    <div className="relative">
+                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <Search className="w-5 h-5 text-gray-400" />
+                        </div>
+                        <input
+                            type="text"
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            placeholder="Search by name, email, or phone..."
+                            className="w-full pl-10 pr-10 py-3 bg-white/5 border border-white/20 rounded-lg text-white placeholder-gray-500 focus:border-neon focus:outline-none focus:ring-1 focus:ring-neon transition-colors"
+                        />
+                        {searchTerm && (
+                            <button
+                                onClick={() => setSearchTerm('')}
+                                className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-white transition-colors"
+                            >
+                                {isSearching ? (
+                                    <span className="w-4 h-4 border-2 border-gray-400 border-t-neon rounded-full animate-spin" />
+                                ) : (
+                                    <XCircle className="w-5 h-5" />
+                                )}
+                            </button>
+                        )}
+                    </div>
+
                     {/* Filter */}
                     <div className="flex flex-wrap gap-2">
                         {FILTER_OPTIONS.map(f => (
@@ -224,7 +300,7 @@ export default function AdminDashboard({ bookings: initialBookings, todayCount, 
                                     {filteredBookings.length === 0 ? (
                                         <tr>
                                             <td colSpan={7} className="px-4 py-8 text-center text-gray-400">
-                                                No bookings found
+                                                {searchTerm ? 'No bookings match your search' : 'No bookings found'}
                                             </td>
                                         </tr>
                                     ) : (

@@ -110,6 +110,11 @@ on public.bookings (service_id, booking_date, status);
 create index if not exists bookings_date_idx
 on public.bookings (booking_date desc);
 
+create extension if not exists pg_trgm with schema extensions;
+
+create index if not exists bookings_customer_search_idx
+on public.bookings using gin (user_name gin_trgm_ops, user_email gin_trgm_ops, user_phone gin_trgm_ops);
+
 create or replace function public.set_updated_at()
 returns trigger
 language plpgsql

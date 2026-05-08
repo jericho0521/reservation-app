@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import { NextResponse, NextRequest } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import {
@@ -23,7 +23,7 @@ const bookingSchema = z.object({
     interface_type: z.enum(['form', 'chat'])
 });
 
-export async function GET() {
+export async function GET(request: NextRequest) {
     try {
         const auth = await requireAuthenticatedSupabase();
 
@@ -31,10 +31,21 @@ export async function GET() {
             return auth.response;
         }
 
-        const { data, error } = await auth.supabase
+        const search = request.nextUrl.searchParams.get('search') || null;
+
+        let query = auth.supabase
             .from('bookings')
             .select('*, services(name)')
             .order('booking_date', { ascending: false });
+
+        if (search) {
+            const term = `%${search}%`;
+            query = query
+                .or(`user_name.ilike.${term},user_email.ilike.${term},user_phone.ilike.${term}`)
+                .limit(100);
+        }
+
+        const { data, error } = await query;
 
         if (error) throw error;
 

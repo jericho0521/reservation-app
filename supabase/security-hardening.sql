@@ -31,6 +31,14 @@ as $$
   );
 $$;
 
+alter table public.bookings
+add column if not exists user_phone text;
+
+create extension if not exists pg_trgm with schema extensions;
+
+create index if not exists bookings_customer_search_idx
+on public.bookings using gin (user_name gin_trgm_ops, user_email gin_trgm_ops, user_phone gin_trgm_ops);
+
 create table if not exists public.service_seat_maintenance (
   id uuid primary key default gen_random_uuid(),
   service_id uuid not null references public.services(id) on delete cascade,

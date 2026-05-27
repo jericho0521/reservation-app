@@ -45,8 +45,9 @@ export function SeatMaintenanceManager({ userEmail }: SeatMaintenanceManagerProp
 
         if (!isMounted) return;
 
-        setServices(data);
-        const racingService = data.find((service) => service.total_seats === 16) ?? data[0];
+        const maintenanceServices = data.filter((service) => service.total_seats === 16);
+        setServices(maintenanceServices);
+        const racingService = maintenanceServices[0];
         setSelectedServiceId(racingService?.id ?? "");
       } catch (loadError) {
         console.error("Failed to load services:", loadError);

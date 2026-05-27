@@ -212,7 +212,7 @@ const checkAvailabilityTool = tool(
 );
 
 const prepareBookingTool = tool(
-  async ({ service_name, date, start_time, seats, user_name, user_email }) => {
+  async ({ service_name, date, start_time, seats, user_name, user_email, user_phone }) => {
     return {
       ready_for_confirmation: true,
       service_name,
@@ -221,12 +221,13 @@ const prepareBookingTool = tool(
       seats,
       user_name,
       user_email,
+      user_phone,
     };
   },
   {
     name: "prepare_booking",
     description:
-      "Prepare a booking for user confirmation. Call this when you have ALL details: service, date, time, seats, name, email. This does NOT create the booking yet - it shows a confirmation card to the user.",
+      "Prepare a booking for user confirmation. Call this when you have ALL details: service, date, time, seats, name, email, and phone. This does NOT create the booking yet - it shows a confirmation card to the user.",
     schema: z.object({
       service_name: z.string().describe("Name of the service (Racing Simulator or Playstation 5)"),
       date: z.string().describe("Date in YYYY-MM-DD format"),
@@ -359,7 +360,7 @@ export async function createBooking(
     const bookingClient = supabaseAdmin();
     const { data: existing } = await bookingClient
       .from("bookings")
-      .select("seats_booked")
+      .select("seats_booked, seat_labels")
       .eq("service_id", service.id)
       .eq("booking_date", date)
       .eq("start_time", startTime)

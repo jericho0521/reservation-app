@@ -1,13 +1,19 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { jsonError, requireAuthenticatedSupabase } from "@/app/api/api-utils";
+import { jsonError, requireAuthenticatedSupabase, supabaseErrorStatus } from "@/app/api/api-utils";
 import { normalizeSeatLabel, normalizeSeatLabels } from "@/lib/seat-maintenance";
+
+const RACING_SIMULATOR_SEAT_COUNT = 16;
 
 const updateSeatMaintenanceSchema = z.object({
   service_id: z.string().uuid(),
   seat_labels: z.array(z.string()),
   reason: z.string().trim().optional(),
 });
+
+export function isSeatMaintenanceSupportedService(service: { total_seats: number } | null | undefined) {
+  return service?.total_seats === RACING_SIMULATOR_SEAT_COUNT;
+}
 
 function getUserId(user: unknown) {
   return typeof user === "object" && user !== null && "id" in user
@@ -57,6 +63,23 @@ export async function PUT(request: Request) {
 
     if (payload.seat_labels.some((label) => normalizeSeatLabel(label) === null)) {
       return jsonError("Invalid seat labels", 400);
+    }
+
+    const { data: service, error: serviceError } = await auth.supabase
+      .from("services")
+      .select("total_seats")
+      .eq("id", payload.service_id)
+      .single();
+
+    if (serviceError) {
+      return jsonError(
+        supabaseErrorStatus(serviceError) === 404 ? "Service not found" : "Failed to load service",
+        supabaseErrorStatus(serviceError),
+      );
+    }
+
+    if (!isSeatMaintenanceSupportedService(service)) {
+      return jsonError("Seat maintenance is only available for racing simulator services", 400);
     }
 
     const { error: deactivateError } = await auth.supabase

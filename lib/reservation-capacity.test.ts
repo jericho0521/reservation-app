@@ -23,6 +23,15 @@ test("getAvailableSeatsWithMaintenance subtracts blocked seats from capacity", (
   assert.equal(getAvailableSeatsWithMaintenance(8, [{ seats_booked: 2 }], ["RS1", "RS2"]), 4);
 });
 
+test("getAvailableSeatsWithMaintenance does not double-count booked seats under maintenance", () => {
+  assert.equal(
+    getAvailableSeatsWithMaintenance(8, [
+      { seats_booked: 1, seat_labels: ["RS1"] },
+    ], ["RS1", "RS2"]),
+    6,
+  );
+});
+
 test("isOverCapacity detects over-capacity booking requests", () => {
   assert.equal(isOverCapacity(8, [{ seats_booked: 5 }], 4), true);
   assert.equal(isOverCapacity(8, [{ seats_booked: 5 }], 3), false);

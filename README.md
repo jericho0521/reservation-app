@@ -382,7 +382,7 @@ Then start the app:
 pnpm dev
 ```
 
-The Sandbox database is ephemeral. When the script stops, the Supabase containers and database are destroyed. Do not use the printed demo keys or Postgres password for any long-lived or public environment.
+The Sandbox database is ephemeral. When the script stops, the Supabase containers and database are destroyed. The script generates temporary Supabase keys, Studio credentials, and a Postgres password for each run; do not reuse those values in any long-lived or public environment.
 
 To run only selected SQL files, set `SANDBOX_SQL_FILES` to a comma-separated list before starting the Sandbox:
 

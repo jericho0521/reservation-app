@@ -1,6 +1,7 @@
 import { Sandbox } from "@vercel/sandbox";
+import { createHmac, randomBytes } from "node:crypto";
 import { readFile } from "node:fs/promises";
-import { runChecked, runShell, stopSandbox, waitForEnter } from "./vercel-sandbox-utils";
+import { runShell, stopSandbox, waitForEnter } from "./vercel-sandbox-utils";
 
 const SUPABASE_REPO = process.env.SANDBOX_SUPABASE_REPO || "https://github.com/supabase/supabase";
 const SUPABASE_REF = process.env.SANDBOX_SUPABASE_REF || "master";
@@ -19,6 +20,21 @@ const DEFAULT_SQL_FILES = [
   "reservations-rls.sql",
   "security-hardening.sql",
 ];
+const DEFAULT_SECRET_VALUES = new Set([
+  "supabase",
+  "this_password_is_insecure_and_should_be_updated",
+  "your-super-secret-and-long-postgres-password",
+  "super-secret-jwt-token-with-at-least-32-characters-long",
+  "your-super-secret-jwt-token-with-at-least-32-characters-long",
+  "your-super-secret-and-long-jwt-secret",
+  "your-secret-key-base-at-least-64-characters-long",
+  "your-encryption-key-32-chars-min",
+  "your-super-secret-logflare-token",
+  "your-super-secret-logflare-public-token",
+  "your-super-secret-logflare-private-token",
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyAgCiAgICAicm9sZSI6ICJhbm9uIiwKICAgICJpc3MiOiAic3VwYWJhc2UtZGVtbyIsCiAgICAiaWF0IjogMTY0MTc2OTIwMCwKICAgICJleHAiOiAxNzk5NTM1NjAwCn0.dc_X5iR_VP_qT0zsiyj_I_OZ2T9FtRU2BBNWN8Bu4GE",
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyAgCiAgICAicm9sZSI6ICJzZXJ2aWNlX3JvbGUiLAogICAgImlzcyI6ICJzdXBhYmFzZS1kZW1vIiwKICAgICJpYXQiOiAxNjQxNzY5MjAwLAogICAgImV4cCI6IDE3OTk1MzU2MDAKfQ.DaYlNEoUrrEn2Ig7tqibS-PHK5vgusbcbo7X36XVt4Q",
+]);
 
 async function main() {
   let sandbox: Sandbox | undefined;
@@ -78,6 +94,8 @@ async function main() {
     );
 
     console.log("Generating Supabase JWT secrets and patching public URLs...");
+    const secrets = createSupabaseSandboxSecrets();
+
     await runShell(
       sandbox,
       [
@@ -101,6 +119,17 @@ async function main() {
         `cd ${PROJECT_DIR}`,
         "&& if [ -f ./utils/generate-keys.sh ]; then sh ./utils/generate-keys.sh; fi",
         "&& . ./.sandbox-env-helpers",
+        `&& set_env POSTGRES_PASSWORD ${quoteShell(secrets.postgresPassword)}`,
+        `&& set_env JWT_SECRET ${quoteShell(secrets.jwtSecret)}`,
+        `&& set_env ANON_KEY ${quoteShell(secrets.anonKey)}`,
+        `&& set_env SERVICE_ROLE_KEY ${quoteShell(secrets.serviceRoleKey)}`,
+        `&& set_env DASHBOARD_USERNAME ${quoteShell(secrets.dashboardUsername)}`,
+        `&& set_env DASHBOARD_PASSWORD ${quoteShell(secrets.dashboardPassword)}`,
+        `&& set_env SECRET_KEY_BASE ${quoteShell(secrets.secretKeyBase)}`,
+        `&& set_env VAULT_ENC_KEY ${quoteShell(secrets.vaultEncryptionKey)}`,
+        `&& set_env LOGFLARE_PUBLIC_ACCESS_TOKEN ${quoteShell(secrets.logflarePublicAccessToken)}`,
+        `&& set_env LOGFLARE_PRIVATE_ACCESS_TOKEN ${quoteShell(secrets.logflarePrivateAccessToken)}`,
+        `&& set_env POOLER_TENANT_ID ${quoteShell(secrets.poolerTenantId)}`,
         `&& set_env API_EXTERNAL_URL ${quoteShell(apiUrl)}`,
         `&& set_env SUPABASE_PUBLIC_URL ${quoteShell(apiUrl)}`,
         `&& set_env SITE_URL ${quoteShell(apiUrl)}`,
@@ -110,6 +139,7 @@ async function main() {
       ].join(" "),
       { sudo: true },
     );
+    await assertNoDefaultSupabaseSecrets(sandbox);
 
     console.log("Ensuring Supabase Studio is published on the sandbox host...");
     await runShell(
@@ -171,13 +201,23 @@ async function main() {
           `sudo docker exec -i supabase-db psql -v ON_ERROR_STOP=1 -U postgres -d postgres < ${quoteShell(`${SQL_DIR}/${fileName}`)}`,
         );
       }
+
+      console.log("Reloading Supabase API schema cache...");
+      await runShell(
+        sandbox,
+        [
+          `sudo docker exec supabase-db psql -U postgres -d postgres -c ${quoteShell("notify pgrst, 'reload schema';")}`,
+          `cd ${PROJECT_DIR} && sudo docker compose ${COMPOSE_FILES} restart rest`,
+          `for i in $(seq 1 30); do code=$(curl -s -o /dev/null -w "%{http_code}" ${quoteShell(`http://127.0.0.1:${API_PORT}/rest/v1/`)} || true); if [ "$code" != "000" ]; then exit 0; fi; sleep 1; done; exit 1`,
+        ].join(" && "),
+      );
     } else {
       console.log("Skipping reservation app SQL bootstrap because SANDBOX_SQL_FILES=none.");
     }
 
     const envOutput = await runShell(
       sandbox,
-      `cd ${PROJECT_DIR} && grep -E '^(ANON_KEY|SERVICE_ROLE_KEY|POSTGRES_PASSWORD)=' .env`,
+      `cd ${PROJECT_DIR} && grep -E '^(ANON_KEY|SERVICE_ROLE_KEY|POSTGRES_PASSWORD|DASHBOARD_USERNAME|DASHBOARD_PASSWORD)=' .env`,
     );
 
     console.log("\nSupabase is running in Vercel Sandbox.");
@@ -186,12 +226,72 @@ async function main() {
     console.log(`Postgres host: ${postgresHost}`);
     console.log("\nUse these local app values while the script is running:");
     console.log(`NEXT_PUBLIC_SUPABASE_URL=${apiUrl}`);
-    console.log(envOutput.replace(/^ANON_KEY=/m, "NEXT_PUBLIC_SUPABASE_ANON_KEY=").replace(/^SERVICE_ROLE_KEY=/m, "SUPABASE_SERVICE_ROLE_KEY="));
+    console.log(envOutput
+      .replace(/^ANON_KEY=/m, "NEXT_PUBLIC_SUPABASE_ANON_KEY=")
+      .replace(/^SERVICE_ROLE_KEY=/m, "SUPABASE_SERVICE_ROLE_KEY="));
+    console.log("\nUse DASHBOARD_USERNAME and DASHBOARD_PASSWORD to sign in to Supabase Studio.");
     console.log("\nThe sandbox and containers will stop when you press Enter.");
 
     await waitForEnter();
   } finally {
     await stopSandbox(sandbox);
+  }
+}
+
+function createSupabaseSandboxSecrets() {
+  const jwtSecret = randomToken(48);
+
+  return {
+    anonKey: createSupabaseJwt("anon", jwtSecret),
+    dashboardPassword: randomToken(24),
+    dashboardUsername: `sandbox-admin-${randomToken(6)}`,
+    jwtSecret,
+    logflarePrivateAccessToken: randomToken(32),
+    logflarePublicAccessToken: randomToken(32),
+    poolerTenantId: `tenant${randomBytes(8).toString("hex")}`,
+    postgresPassword: randomToken(32),
+    secretKeyBase: randomBytes(64).toString("hex"),
+    serviceRoleKey: createSupabaseJwt("service_role", jwtSecret),
+    vaultEncryptionKey: randomToken(24).slice(0, 32),
+  };
+}
+
+function createSupabaseJwt(role: "anon" | "service_role", jwtSecret: string) {
+  const now = Math.floor(Date.now() / 1000);
+  const header = encodeJwtPart({ alg: "HS256", typ: "JWT" });
+  const payload = encodeJwtPart({
+    role,
+    iss: "supabase-demo",
+    iat: now,
+    exp: now + 10 * 365 * 24 * 60 * 60,
+  });
+  const unsignedToken = `${header}.${payload}`;
+  const signature = createHmac("sha256", jwtSecret)
+    .update(unsignedToken)
+    .digest("base64url");
+
+  return `${unsignedToken}.${signature}`;
+}
+
+function encodeJwtPart(value: Record<string, unknown>) {
+  return Buffer.from(JSON.stringify(value)).toString("base64url");
+}
+
+function randomToken(byteLength: number) {
+  return randomBytes(byteLength).toString("base64url");
+}
+
+async function assertNoDefaultSupabaseSecrets(sandbox: Sandbox) {
+  const secretOutput = await runShell(
+    sandbox,
+    `cd ${PROJECT_DIR} && grep -E '^(POSTGRES_PASSWORD|JWT_SECRET|ANON_KEY|SERVICE_ROLE_KEY|DASHBOARD_USERNAME|DASHBOARD_PASSWORD|SECRET_KEY_BASE|VAULT_ENC_KEY|LOGFLARE_PUBLIC_ACCESS_TOKEN|LOGFLARE_PRIVATE_ACCESS_TOKEN)=' .env`,
+  );
+  const defaultLines = secretOutput
+    .split("\n")
+    .filter((line) => DEFAULT_SECRET_VALUES.has(line.slice(line.indexOf("=") + 1).trim()));
+
+  if (defaultLines.length > 0) {
+    throw new Error(`Refusing to start Supabase with default credentials: ${defaultLines.join(", ")}`);
   }
 }
 

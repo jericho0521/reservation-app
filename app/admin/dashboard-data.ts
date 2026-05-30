@@ -2,6 +2,7 @@ export const ADMIN_BOOKINGS_SELECT = `
     id,
     user_name,
     user_email,
+    user_phone,
     booking_date,
     start_time,
     end_time,
@@ -19,6 +20,7 @@ export interface AdminBooking {
     id: string;
     user_name: string;
     user_email: string;
+    user_phone?: string;
     booking_date: string;
     start_time: string;
     end_time: string;

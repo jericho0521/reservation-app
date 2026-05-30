@@ -27,6 +27,7 @@ export default function MultiStepForm() {
     const [isSuccess, setIsSuccess] = useState(false);
     const [availableSeats, setAvailableSeats] = useState(0);
     const [takenSeatLabels, setTakenSeatLabels] = useState<string[]>([]);
+    const [maintenanceSeatLabels, setMaintenanceSeatLabels] = useState<string[]>([]);
     const [formData, setFormData] = useState<FormData>(() => ({
         interface_type: 'form',
         seats_booked: 1
@@ -53,11 +54,12 @@ export default function MultiStepForm() {
             const response = await fetch('/api/bookings', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    service_id: formData.service_id,
-                    user_name: formData.user_name,
-                    user_email: formData.user_email,
-                    booking_date: formData.booking_date,
+                    body: JSON.stringify({
+                        service_id: formData.service_id,
+                        user_name: formData.user_name,
+                        user_email: formData.user_email,
+                        user_phone: formData.user_phone,
+                        booking_date: formData.booking_date,
                     start_time: formData.start_time,
                     end_time: formData.end_time,
                     seats_booked: formData.seats_booked,
@@ -94,6 +96,7 @@ export default function MultiStepForm() {
                     seats={formData.seats_booked || 1}
                     name={formData.user_name || ''}
                     email={formData.user_email || ''}
+                    phone={formData.user_phone || ''}
                 />
 
                 {/* Make Another Booking Button */}
@@ -102,6 +105,7 @@ export default function MultiStepForm() {
                         setIsSuccess(false);
                         setCurrentStep(1);
                         setAvailableSeats(0);
+                        setMaintenanceSeatLabels([]);
                         setFormData({ interface_type: 'form', seats_booked: 1 });
                     }}
                     className="mt-8 px-6 py-3 bg-white/10 border border-white/20 text-white font-bold rounded-lg hover:bg-white/20 hover:border-neon transition-all"
@@ -141,6 +145,7 @@ export default function MultiStepForm() {
                         onSelect={(serviceId, serviceName, totalSeats) => {
                             setAvailableSeats(0);
                             setTakenSeatLabels([]);
+                            setMaintenanceSeatLabels([]);
                             updateFormData({
                                 service_id: serviceId,
                                 service_name: serviceName,
@@ -161,6 +166,7 @@ export default function MultiStepForm() {
                             onSelect={(date) => {
                                 setAvailableSeats(0);
                                 setTakenSeatLabels([]);
+                                setMaintenanceSeatLabels([]);
                                 updateFormData({
                                     booking_date: date,
                                     start_time: undefined,
@@ -175,7 +181,7 @@ export default function MultiStepForm() {
                                 serviceId={formData.service_id}
                                 date={formData.booking_date}
                                 selectedStart={formData.start_time}
-                                onSelect={(start, end, seats, labels) => {
+                                onSelect={(start, end, seats, labels, maintenanceLabels) => {
                                     updateFormData({
                                         start_time: start,
                                         end_time: end,
@@ -184,6 +190,7 @@ export default function MultiStepForm() {
                                     });
                                     setAvailableSeats(seats);
                                     setTakenSeatLabels(labels);
+                                    setMaintenanceSeatLabels(maintenanceLabels);
                                 }}
                             />
                         )}
@@ -199,6 +206,7 @@ export default function MultiStepForm() {
                                 totalSeats={16}
                                 maxAvailable={availableSeats}
                                 takenSeatLabels={takenSeatLabels}
+                                maintenanceSeatLabels={maintenanceSeatLabels}
                                 onSelectionChange={handleSeatSelectionChange}
                             />
                         ) : (
@@ -247,6 +255,16 @@ export default function MultiStepForm() {
                                     value={formData.user_email || ''}
                                     onChange={(e) => updateFormData({ user_email: e.target.value })}
                                     placeholder="john@example.com"
+                                    className="w-full px-4 py-3 bg-white/5 border border-white/20 rounded-lg text-white focus:border-neon focus:outline-none focus:ring-1 focus:ring-neon transition-colors"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm text-gray-400 mb-2">Phone Number</label>
+                                <input
+                                    type="tel"
+                                    value={formData.user_phone || ''}
+                                    onChange={(e) => updateFormData({ user_phone: e.target.value })}
+                                    placeholder="+60 12-345 6789"
                                     className="w-full px-4 py-3 bg-white/5 border border-white/20 rounded-lg text-white focus:border-neon focus:outline-none focus:ring-1 focus:ring-neon transition-colors"
                                 />
                             </div>
@@ -306,11 +324,12 @@ function isStepValid(step: number, data: Partial<FormData>): boolean {
                     selectedLabels.length > 0 &&
                     data.seats_booked === selectedLabels.length &&
                     !!data.user_name &&
-                    !!data.user_email
+                    !!data.user_email &&
+                    !!data.user_phone
                 );
             }
 
-            return !!data.seats_booked && data.seats_booked > 0 && !!data.user_name && !!data.user_email;
+            return !!data.seats_booked && data.seats_booked > 0 && !!data.user_name && !!data.user_email && !!data.user_phone;
         default:
             return true;
     }

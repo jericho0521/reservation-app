@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { z } from "zod";
 import { getRelevantContext } from "@/lib/knowledge";
 import {
   getChatDomainGuardResponse,
@@ -9,29 +10,60 @@ import {
   type ChatAction,
 } from "@/lib/langchain/chat-agent";
 
-interface ConfirmBookingPayload {
-  service: string;
-  date: string;
-  time: string;
-  seats: number;
-  name: string;
-  email: string;
+const confirmBookingSchema = z.object({
+  service: z.string().trim().min(1),
+  date: z.string().trim().min(1),
+  time: z.string().trim().min(1),
+  seats: z.number().int().positive(),
+  name: z.string().trim().min(1),
+  email: z.string().trim().email(),
+  phone: z.string().trim().min(1),
+});
+
+interface ChatRequestBody {
+  messages?: unknown;
+  confirmBooking?: unknown;
+  threadId?: unknown;
+}
+
+type ConfirmBookingPayload = z.infer<typeof confirmBookingSchema>;
+
+export function parseConfirmBookingPayload(value: unknown): ConfirmBookingPayload | null {
+  const result = confirmBookingSchema.safeParse(value);
+  return result.success ? result.data : null;
+}
+
+function getChatRequestBody(value: unknown): ChatRequestBody {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+    ? value as ChatRequestBody
+    : {};
 }
 
 export async function POST(req: Request) {
   try {
-    const body = await req.json();
+    const body = getChatRequestBody(await req.json());
     const messages = (Array.isArray(body.messages) ? body.messages : []) as ChatMessage[];
-    const confirmBooking = body.confirmBooking as ConfirmBookingPayload | undefined;
+    const threadId = typeof body.threadId === "string" ? body.threadId : undefined;
 
-    if (confirmBooking) {
+    if (body.confirmBooking !== undefined) {
+      const confirmBooking = parseConfirmBookingPayload(body.confirmBooking);
+
+      if (!confirmBooking) {
+        return NextResponse.json({
+          content: "Sorry, the booking confirmation details are incomplete. Please restart the booking and include your phone number.",
+          action: null,
+          threadId: threadId || crypto.randomUUID(),
+        }, { status: 400 });
+      }
+
       const result = await createBooking(
         confirmBooking.service,
         confirmBooking.date,
         confirmBooking.time,
         confirmBooking.seats,
         confirmBooking.name,
-        confirmBooking.email
+        confirmBooking.email,
+        confirmBooking.phone
       );
 
       return Response.json({
@@ -51,7 +83,7 @@ export async function POST(req: Request) {
       return Response.json({
         content: guardResponse,
         action: null,
-        threadId: body.threadId || crypto.randomUUID(),
+        threadId: threadId || crypto.randomUUID(),
       });
     }
 
@@ -60,20 +92,20 @@ export async function POST(req: Request) {
       return Response.json({
         content: `We are located at ${locationAction.data.area}. You can open the directions card below for Waze or Google Maps navigation.`,
         action: locationAction,
-        threadId: body.threadId || crypto.randomUUID(),
+        threadId: threadId || crypto.randomUUID(),
       });
     }
 
     const context = latestUserMessage ? await getRelevantContext(latestUserMessage) : "";
 
-    const threadId = body.threadId || crypto.randomUUID();
+    const chatThreadId = threadId || crypto.randomUUID();
 
-    const result = await runChatAgent(messages, context, threadId);
+    const result = await runChatAgent(messages, context, chatThreadId);
 
     return Response.json({
       content: result.content,
       action: result.action,
-      threadId,
+      threadId: chatThreadId,
     });
   } catch (error) {
     console.error("Chat route error:", error);

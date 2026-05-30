@@ -5,6 +5,7 @@ export interface BookingData {
     seats: number;
     name: string;
     email: string;
+    phone: string;
 }
 
 export interface LocationDirectionsData {

@@ -11,6 +11,7 @@ export interface Booking {
     service_id: string;
     user_name: string;
     user_email: string;
+    user_phone?: string;
     booking_date: string;
     start_time: string;
     end_time: string;
@@ -26,6 +27,7 @@ export interface TimeSlot {
     available_seats: number;
     is_available: boolean;
     taken_seat_labels: string[];
+    maintenance_seat_labels?: string[];
 }
 
 export interface Message {

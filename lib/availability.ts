@@ -1,4 +1,5 @@
 import type { TimeSlot } from '@/types';
+import { normalizeSeatLabels } from './seat-maintenance';
 
 export interface AvailabilityBooking {
     start_time: string;
@@ -22,13 +23,18 @@ function getFallbackSeatLabel(seatNumber: number): string {
     return `RS${seatNumber}`;
 }
 
-function getTakenSeatLabels(totalSeats: number, bookings: AvailabilityBooking[]): string[] {
+function getTakenSeatLabels(
+    totalSeats: number,
+    bookings: AvailabilityBooking[],
+    reservedSeatLabels: string[] = [],
+): string[] {
     const labels = new Set<string>();
+    const reservedLabels = new Set(normalizeSeatLabels(reservedSeatLabels));
     let missingLabelCount = 0;
 
     for (const booking of bookings) {
         const explicitLabels = Array.isArray(booking.seat_labels)
-            ? booking.seat_labels.filter((label): label is string => typeof label === 'string' && label.length > 0)
+            ? normalizeSeatLabels(booking.seat_labels.filter((label): label is string => typeof label === 'string' && label.length > 0))
             : [];
 
         explicitLabels.forEach(label => labels.add(label));
@@ -38,7 +44,7 @@ function getTakenSeatLabels(totalSeats: number, bookings: AvailabilityBooking[])
     for (let seatNumber = totalSeats; seatNumber >= 1 && missingLabelCount > 0; seatNumber -= 1) {
         const fallbackLabel = getFallbackSeatLabel(seatNumber);
 
-        if (!labels.has(fallbackLabel)) {
+        if (!labels.has(fallbackLabel) && !reservedLabels.has(fallbackLabel)) {
             labels.add(fallbackLabel);
             missingLabelCount -= 1;
         }
@@ -59,8 +65,10 @@ function getTakenSeatLabels(totalSeats: number, bookings: AvailabilityBooking[])
 export function generateTimeSlots(
     totalSeats: number,
     bookings: AvailabilityBooking[],
+    maintenanceSeatLabels: string[] = [],
 ): TimeSlot[] {
     const bookingsBySlot = new Map<string, AvailabilityBooking[]>();
+    const normalizedMaintenanceSeatLabels = normalizeSeatLabels(maintenanceSeatLabels);
 
     for (const booking of bookings) {
         const startTime = normalizeSlotTime(booking.start_time);
@@ -72,15 +80,21 @@ export function generateTimeSlots(
     return OPERATING_HOURS.map(hour => {
         const startTime = `${hour.toString().padStart(2, '0')}:00`;
         const slotBookings = bookingsBySlot.get(startTime) ?? [];
-        const bookedSeats = slotBookings.reduce((sum, booking) => sum + booking.seats_booked, 0);
-        const availableSeats = Math.max(0, totalSeats - bookedSeats);
+        const takenSeatLabels = normalizeSeatLabels([
+            ...normalizedMaintenanceSeatLabels,
+            ...getTakenSeatLabels(totalSeats, slotBookings, normalizedMaintenanceSeatLabels),
+        ]);
+        const availableSeats = Math.max(0, totalSeats - takenSeatLabels.length);
 
         return {
             start_time: startTime,
             end_time: getEndTime(startTime),
             available_seats: availableSeats,
             is_available: availableSeats > 0,
-            taken_seat_labels: getTakenSeatLabels(totalSeats, slotBookings),
+            taken_seat_labels: takenSeatLabels,
+            ...(normalizedMaintenanceSeatLabels.length > 0
+                ? { maintenance_seat_labels: normalizedMaintenanceSeatLabels }
+                : {}),
         };
     });
 }

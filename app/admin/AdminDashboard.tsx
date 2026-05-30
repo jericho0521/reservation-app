@@ -34,12 +34,16 @@ export default function AdminDashboard({ bookings: initialBookings, todayCount, 
     const [isRefreshing, setIsRefreshing] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
     const [isSearching, setIsSearching] = useState(false);
+    const searchTermRef = useRef(searchTerm);
     const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const searchRequestIdRef = useRef(0);
+    const searchAbortRef = useRef<AbortController | null>(null);
+    searchTermRef.current = searchTerm;
     const summary = useMemo(() => getBookingSummary(bookings), [bookings]);
     const filteredBookings = useMemo(() => {
         let results = bookings;
         if (searchTerm.trim()) {
-            const term = searchTerm.toLowerCase();
+            const term = searchTerm.trim().toLowerCase();
             results = results.filter(b =>
                 b.user_name.toLowerCase().includes(term) ||
                 b.user_email.toLowerCase().includes(term) ||
@@ -80,7 +84,7 @@ export default function AdminDashboard({ bookings: initialBookings, todayCount, 
             return;
         }
 
-        if (data) {
+        if (data && !searchTermRef.current.trim()) {
             setBookings(data);
             setLastRefresh(new Date());
         }
@@ -88,22 +92,49 @@ export default function AdminDashboard({ bookings: initialBookings, todayCount, 
     }, [getSupabase]);
 
     const performSearch = useCallback(async (term: string) => {
+        searchRequestIdRef.current += 1;
+        const requestId = searchRequestIdRef.current;
+        searchAbortRef.current?.abort();
+        searchAbortRef.current = null;
+
         if (!term.trim()) {
-            await refreshBookings();
+            try {
+                await refreshBookings();
+            } finally {
+                if (requestId === searchRequestIdRef.current) {
+                    setIsSearching(false);
+                }
+            }
             return;
         }
+
+        const controller = new AbortController();
+        searchAbortRef.current = controller;
         setIsSearching(true);
         try {
-            const response = await fetch(`/api/bookings?search=${encodeURIComponent(term.trim())}`);
+            const response = await fetch(`/api/bookings?search=${encodeURIComponent(term.trim())}`, {
+                signal: controller.signal,
+            });
+
+            if (requestId !== searchRequestIdRef.current) {
+                return;
+            }
+
             if (response.ok) {
                 const data = await response.json();
                 setBookings(data);
                 setLastRefresh(new Date());
             }
         } catch (error) {
+            if (error instanceof DOMException && error.name === 'AbortError') {
+                return;
+            }
             console.error('Search failed:', error);
         } finally {
-            setIsSearching(false);
+            if (requestId === searchRequestIdRef.current) {
+                setIsSearching(false);
+                searchAbortRef.current = null;
+            }
         }
     }, [refreshBookings]);
 
@@ -127,6 +158,7 @@ export default function AdminDashboard({ bookings: initialBookings, todayCount, 
             if (searchTimerRef.current) {
                 clearTimeout(searchTimerRef.current);
             }
+            searchAbortRef.current?.abort();
         };
     }, [searchTerm, performSearch]);
 

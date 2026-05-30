@@ -19,6 +19,7 @@ interface BookingConfirmationData {
     seats: number;
     name: string;
     email: string;
+    phone: string;
 }
 
 export function extractPreparedBookingAction(toolCalls: ToolCall[]): {
@@ -32,16 +33,38 @@ export function extractPreparedBookingAction(toolCalls: ToolCall[]): {
 
         try {
             const args = JSON.parse(toolCall.function.arguments || '{}');
+            const {
+                service_name: service,
+                date,
+                start_time: time,
+                seats,
+                user_name: name,
+                user_email: email,
+                user_phone: phone,
+            } = args;
+
+            if (
+                typeof service !== 'string' ||
+                typeof date !== 'string' ||
+                typeof time !== 'string' ||
+                typeof seats !== 'number' ||
+                typeof name !== 'string' ||
+                typeof email !== 'string' ||
+                typeof phone !== 'string'
+            ) {
+                return null;
+            }
 
             return {
                 type: 'booking_confirmation',
                 data: {
-                    service: args.service_name,
-                    date: args.date,
-                    time: args.start_time,
-                    seats: args.seats,
-                    name: args.user_name,
-                    email: args.user_email,
+                    service,
+                    date,
+                    time,
+                    seats,
+                    name,
+                    email,
+                    phone,
                 },
             };
         } catch {

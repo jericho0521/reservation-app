@@ -16,9 +16,11 @@ export function isSeatMaintenanceSupportedService(service: { total_seats: number
 }
 
 function getUserId(user: unknown) {
-  return typeof user === "object" && user !== null && "id" in user
-    ? String((user as { id: unknown }).id)
+  const id = typeof user === "object" && user !== null && "id" in user
+    ? (user as { id: unknown }).id
     : null;
+
+  return typeof id === "string" ? id : null;
 }
 
 export async function GET(request: Request) {
@@ -82,30 +84,14 @@ export async function PUT(request: Request) {
       return jsonError("Seat maintenance is only available for racing simulator services", 400);
     }
 
-    const { error: deactivateError } = await auth.supabase
-      .from("service_seat_maintenance")
-      .update({ is_active: false })
-      .eq("service_id", payload.service_id)
-      .eq("is_active", true);
+    const { error: replaceError } = await auth.supabase.rpc("replace_service_seat_maintenance", {
+      p_service_id: payload.service_id,
+      p_seat_labels: normalizedSeatLabels,
+      p_reason: payload.reason || null,
+      p_created_by: getUserId(auth.user),
+    });
 
-    if (deactivateError) throw deactivateError;
-
-    if (normalizedSeatLabels.length > 0) {
-      const userId = getUserId(auth.user);
-      const rows = normalizedSeatLabels.map((seatLabel) => ({
-        service_id: payload.service_id,
-        seat_label: seatLabel,
-        reason: payload.reason || null,
-        is_active: true,
-        created_by: userId,
-      }));
-
-      const { error: upsertError } = await auth.supabase
-        .from("service_seat_maintenance")
-        .upsert(rows, { onConflict: "service_id,seat_label" });
-
-      if (upsertError) throw upsertError;
-    }
+    if (replaceError) throw replaceError;
 
     return NextResponse.json({ seat_labels: normalizedSeatLabels });
   } catch (error) {

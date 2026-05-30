@@ -166,18 +166,23 @@ const checkAvailabilityTool = tool(
       if (!service) return { error: "Service not found" };
 
       const bookingClient = supabaseAdmin();
-      const { data: bookings } = await bookingClient
+      const { data: bookings, error: bookingsError } = await bookingClient
         .from("bookings")
         .select("start_time, seats_booked, seat_labels")
         .eq("service_id", service.id)
         .eq("booking_date", date)
         .eq("status", "confirmed");
 
-      const { data: maintenanceSeats } = await bookingClient
+      if (bookingsError) throw bookingsError;
+
+      const { data: maintenanceSeats, error: maintenanceError } = await bookingClient
         .from("service_seat_maintenance")
         .select("seat_label")
         .eq("service_id", service.id)
         .eq("is_active", true);
+
+      if (maintenanceError) throw maintenanceError;
+
       const maintenanceSeatLabels = (maintenanceSeats || [])
         .map((seat) => seat.seat_label)
         .filter((label): label is string => typeof label === "string");
@@ -358,7 +363,7 @@ export async function createBooking(
 
   try {
     const bookingClient = supabaseAdmin();
-    const { data: existing } = await bookingClient
+    const { data: existing, error: existingError } = await bookingClient
       .from("bookings")
       .select("seats_booked, seat_labels")
       .eq("service_id", service.id)
@@ -366,11 +371,16 @@ export async function createBooking(
       .eq("start_time", startTime)
       .eq("status", "confirmed");
 
-    const { data: maintenanceSeats } = await bookingClient
+    if (existingError) throw existingError;
+
+    const { data: maintenanceSeats, error: maintenanceError } = await bookingClient
       .from("service_seat_maintenance")
       .select("seat_label")
       .eq("service_id", service.id)
       .eq("is_active", true);
+
+    if (maintenanceError) throw maintenanceError;
+
     const maintenanceSeatLabels = (maintenanceSeats || [])
       .map((seat) => seat.seat_label)
       .filter((label): label is string => typeof label === "string");

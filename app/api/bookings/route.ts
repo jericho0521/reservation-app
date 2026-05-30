@@ -23,6 +23,26 @@ const bookingSchema = z.object({
     interface_type: z.enum(['form', 'chat'])
 });
 
+const MAX_SEARCH_LENGTH = 100;
+
+function quotePostgrestValue(value: string) {
+    return `"${value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
+}
+
+function escapeLikeTerm(value: string) {
+    return value.replace(/[\\%_]/g, '\\$&');
+}
+
+export function normalizeBookingSearchTerm(search: string | null) {
+    const normalized = search?.trim().slice(0, MAX_SEARCH_LENGTH) ?? '';
+    return normalized.length > 0 ? normalized : null;
+}
+
+export function buildBookingSearchFilter(search: string) {
+    const term = quotePostgrestValue(`%${escapeLikeTerm(search)}%`);
+    return `user_name.ilike.${term},user_email.ilike.${term},user_phone.ilike.${term}`;
+}
+
 export async function GET(request: NextRequest) {
     try {
         const auth = await requireAuthenticatedSupabase();
@@ -31,7 +51,7 @@ export async function GET(request: NextRequest) {
             return auth.response;
         }
 
-        const search = request.nextUrl.searchParams.get('search') || null;
+        const search = normalizeBookingSearchTerm(request.nextUrl.searchParams.get('search'));
 
         let query = auth.supabase
             .from('bookings')
@@ -39,9 +59,8 @@ export async function GET(request: NextRequest) {
             .order('booking_date', { ascending: false });
 
         if (search) {
-            const term = `%${search}%`;
             query = query
-                .or(`user_name.ilike.${term},user_email.ilike.${term},user_phone.ilike.${term}`)
+                .or(buildBookingSearchFilter(search))
                 .limit(100);
         }
 

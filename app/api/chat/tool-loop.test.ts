@@ -64,6 +64,7 @@ test('extractPreparedBookingAction reads booking details from tool calls', () =>
                     seats: 2,
                     user_name: 'Alex',
                     user_email: 'alex@example.com',
+                    user_phone: '+60 12-345 6789',
                 }),
             },
         },
@@ -78,6 +79,28 @@ test('extractPreparedBookingAction reads booking details from tool calls', () =>
             seats: 2,
             name: 'Alex',
             email: 'alex@example.com',
+            phone: '+60 12-345 6789',
         },
     });
+});
+
+test('extractPreparedBookingAction rejects booking tool calls without a phone number', () => {
+    const action = extractPreparedBookingAction([
+        {
+            id: 'tool-1',
+            function: {
+                name: 'prepare_booking',
+                arguments: JSON.stringify({
+                    service_name: 'Racing Simulator',
+                    date: '2026-03-12',
+                    start_time: '20:00',
+                    seats: 2,
+                    user_name: 'Alex',
+                    user_email: 'alex@example.com',
+                }),
+            },
+        },
+    ]);
+
+    assert.equal(action, null);
 });

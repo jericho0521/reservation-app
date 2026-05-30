@@ -1,7 +1,7 @@
 'use client';
 
 import type { ReactNode } from 'react';
-import { Check, X, Calendar, Clock, Users, User, Mail } from 'lucide-react';
+import { Check, X, Calendar, Clock, Users, User, Mail, Phone } from 'lucide-react';
 
 interface BookingCardProps {
     service: string;
@@ -10,6 +10,7 @@ interface BookingCardProps {
     seats: number;
     name: string;
     email: string;
+    phone?: string;
     onConfirm: () => void;
     onCancel: () => void;
     status?: 'pending' | 'confirmed' | 'cancelled' | 'loading';
@@ -44,6 +45,7 @@ export default function BookingCard({
     seats,
     name,
     email,
+    phone,
     onConfirm,
     onCancel,
     status = 'pending'
@@ -78,8 +80,15 @@ export default function BookingCard({
                 icon={<Mail className="w-5 h-5 text-neon" />}
                 label="Email"
                 value={email}
-                className="sm:col-span-2"
             />
+            {phone && (
+                <BookingDetail
+                    icon={<Phone className="w-5 h-5 text-neon" />}
+                    label="Phone"
+                    value={phone}
+                    className="sm:col-span-2"
+                />
+            )}
         </>
     );
 

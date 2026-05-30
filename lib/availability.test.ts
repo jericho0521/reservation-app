@@ -40,6 +40,40 @@ test('generateTimeSlots returns actual taken seat labels for each slot', () => {
     assert.deepEqual(slots[3].taken_seat_labels, ['RS12']);
 });
 
+test('generateTimeSlots blocks maintenance seats for every slot', () => {
+    const slots = generateTimeSlots(16, [
+        { start_time: '14:00:00', seats_booked: 1, seat_labels: ['RS3'] },
+    ], ['RS1', 'RS2']);
+
+    assert.equal(slots[0].start_time, '12:00');
+    assert.equal(slots[0].available_seats, 14);
+    assert.deepEqual(slots[0].taken_seat_labels, ['RS1', 'RS2']);
+
+    assert.equal(slots[2].start_time, '14:00');
+    assert.equal(slots[2].available_seats, 13);
+    assert.deepEqual(slots[2].taken_seat_labels, ['RS1', 'RS2', 'RS3']);
+});
+
+test('generateTimeSlots does not double-count booked seats under maintenance', () => {
+    const slots = generateTimeSlots(16, [
+        { start_time: '14:00:00', seats_booked: 1, seat_labels: ['RS1'] },
+    ], ['RS1', 'RS2']);
+
+    assert.equal(slots[2].start_time, '14:00');
+    assert.equal(slots[2].available_seats, 14);
+    assert.deepEqual(slots[2].taken_seat_labels, ['RS1', 'RS2']);
+});
+
+test('generateTimeSlots fills missing seats after normalizing invalid labels', () => {
+    const slots = generateTimeSlots(16, [
+        { start_time: '14:00:00', seats_booked: 3, seat_labels: ['RS1', 'RS1', 'PS1'] },
+    ]);
+
+    assert.equal(slots[2].start_time, '14:00');
+    assert.equal(slots[2].available_seats, 13);
+    assert.deepEqual(slots[2].taken_seat_labels, ['RS1', 'RS15', 'RS16']);
+});
+
 test('getEndTime rolls midnight slots forward correctly', () => {
     assert.equal(getEndTime('23:00'), '00:00');
     assert.equal(getEndTime('00:00'), '01:00');

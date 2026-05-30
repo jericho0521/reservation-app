@@ -6,6 +6,7 @@ interface Props {
     totalSeats: number;
     maxAvailable: number;
     takenSeatLabels?: string[];
+    maintenanceSeatLabels?: string[];
     onSelectionChange: (selectedSeats: number[], seatLabels: string[]) => void;
 }
 
@@ -19,41 +20,55 @@ function getSeatLabel(seatNumber: number) {
     return `RS${seatNumber}`;
 }
 
+export function getSeatNumbersFromLabels(seatLabels: string[], totalSeats: number) {
+    return seatLabels
+        .map(label => {
+            const match = label.trim().match(/^RS\s*(\d{1,2})$/i);
+            return match ? Number.parseInt(match[1], 10) : Number.NaN;
+        })
+        .filter(seatNumber => (
+            Number.isInteger(seatNumber) &&
+            seatNumber >= 1 &&
+            seatNumber <= totalSeats
+        ));
+}
+
 export default function SeatMap({ 
     totalSeats, 
     maxAvailable,
     takenSeatLabels = [],
+    maintenanceSeatLabels = [],
     onSelectionChange 
 }: Props) {
     const [selectedSeats, setSelectedSeats] = useState<number[]>([]);
+    const maintenanceSeats = useMemo(
+        () => getSeatNumbersFromLabels(maintenanceSeatLabels, totalSeats),
+        [maintenanceSeatLabels, totalSeats],
+    );
     const bookedSeats = useMemo(() => {
-        const takenSeatNumbers = takenSeatLabels
-            .map(label => Number.parseInt(label.replace(/\D/g, ''), 10))
-            .filter(seatNumber => (
-                Number.isInteger(seatNumber) &&
-                seatNumber >= 1 &&
-                seatNumber <= totalSeats
-            ));
+        const takenSeatNumbers = getSeatNumbersFromLabels(takenSeatLabels, totalSeats)
+            .filter(seatNumber => !maintenanceSeats.includes(seatNumber));
 
         if (takenSeatNumbers.length > 0) {
             return takenSeatNumbers;
         }
 
-        const unavailable = Math.max(0, totalSeats - maxAvailable);
+        const unavailable = Math.max(0, totalSeats - maxAvailable - maintenanceSeats.length);
         return Array.from({ length: unavailable }, (_, index) => totalSeats - index);
-    }, [totalSeats, maxAvailable, takenSeatLabels]);
+    }, [totalSeats, maxAvailable, takenSeatLabels, maintenanceSeats]);
 
     useEffect(() => {
         onSelectionChange(selectedSeats, selectedSeats.map(getSeatLabel));
     }, [selectedSeats, onSelectionChange]);
 
     const toggleSeat = (seatNumber: number) => {
-        if (bookedSeats.includes(seatNumber)) return;
+        if (bookedSeats.includes(seatNumber) || maintenanceSeats.includes(seatNumber)) return;
 
         setSelectedSeats(prev => computeNextSeatSelection(prev, seatNumber));
     };
 
     const getSeatStatus = (seatNumber: number) => {
+        if (maintenanceSeats.includes(seatNumber)) return 'maintenance';
         if (bookedSeats.includes(seatNumber)) return 'booked';
         if (selectedSeats.includes(seatNumber)) return 'selected';
         return 'available';
@@ -67,11 +82,13 @@ export default function SeatMap({
             <button
                 key={seatNumber}
                 onClick={() => toggleSeat(seatNumber)}
-                disabled={status === 'booked'}
+                disabled={status === 'booked' || status === 'maintenance'}
                 className={`
                     relative w-14 h-14 rounded-lg transition-all duration-200 
                     flex flex-col items-center justify-center
-                    ${status === 'booked' 
+                    ${status === 'maintenance'
+                        ? 'bg-amber-400/20 border border-amber-400/50 cursor-not-allowed'
+                        : status === 'booked'
                         ? 'bg-red-500/20 border border-red-500/40 cursor-not-allowed' 
                         : status === 'selected'
                             ? 'bg-neon/30 border-2 border-neon shadow-[0_0_15px_rgba(185,217,207,0.4)] scale-105'
@@ -82,6 +99,7 @@ export default function SeatMap({
                 {/* Seat Icon */}
                 <svg 
                     className={`w-6 h-6 ${
+                        status === 'maintenance' ? 'text-amber-300' :
                         status === 'booked' ? 'text-red-400' :
                         status === 'selected' ? 'text-neon' : 'text-gray-500'
                     }`}
@@ -173,6 +191,10 @@ export default function SeatMap({
                 <div className="flex items-center gap-2">
                     <div className="w-3 h-3 bg-red-500/20 border border-red-500/40 rounded" />
                     <span className="text-gray-400">Taken</span>
+                </div>
+                <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 bg-amber-400/20 border border-amber-400/50 rounded" />
+                    <span className="text-gray-400">Maintenance</span>
                 </div>
             </div>
 

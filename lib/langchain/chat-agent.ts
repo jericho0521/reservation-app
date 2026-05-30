@@ -12,7 +12,7 @@ import {
 import { supabase } from "@/lib/supabase";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { getEndTime, generateTimeSlots } from "@/lib/availability";
-import { getAvailableSeats } from "@/lib/reservation-capacity";
+import { getAvailableSeatsWithMaintenance } from "@/lib/reservation-capacity";
 import { createOpenRouterChat } from "./models";
 import { buildBookingSystemPromptWithContext } from "./prompts";
 
@@ -36,6 +36,7 @@ export interface BookingAction {
     seats: number;
     name: string;
     email: string;
+    phone: string;
   };
 }
 
@@ -164,14 +165,29 @@ const checkAvailabilityTool = tool(
       const service = await getServiceByName(service_name);
       if (!service) return { error: "Service not found" };
 
-      const { data: bookings } = await supabaseAdmin()
+      const bookingClient = supabaseAdmin();
+      const { data: bookings, error: bookingsError } = await bookingClient
         .from("bookings")
-        .select("start_time, seats_booked")
+        .select("start_time, seats_booked, seat_labels")
         .eq("service_id", service.id)
         .eq("booking_date", date)
         .eq("status", "confirmed");
 
-      const slots = generateTimeSlots(service.total_seats, bookings || [])
+      if (bookingsError) throw bookingsError;
+
+      const { data: maintenanceSeats, error: maintenanceError } = await bookingClient
+        .from("service_seat_maintenance")
+        .select("seat_label")
+        .eq("service_id", service.id)
+        .eq("is_active", true);
+
+      if (maintenanceError) throw maintenanceError;
+
+      const maintenanceSeatLabels = (maintenanceSeats || [])
+        .map((seat) => seat.seat_label)
+        .filter((label): label is string => typeof label === "string");
+
+      const slots = generateTimeSlots(service.total_seats, bookings || [], maintenanceSeatLabels)
         .filter((slot) => slot.is_available)
         .map((slot) => ({
           time: slot.start_time,
@@ -201,7 +217,7 @@ const checkAvailabilityTool = tool(
 );
 
 const prepareBookingTool = tool(
-  async ({ service_name, date, start_time, seats, user_name, user_email }) => {
+  async ({ service_name, date, start_time, seats, user_name, user_email, user_phone }) => {
     return {
       ready_for_confirmation: true,
       service_name,
@@ -210,12 +226,13 @@ const prepareBookingTool = tool(
       seats,
       user_name,
       user_email,
+      user_phone,
     };
   },
   {
     name: "prepare_booking",
     description:
-      "Prepare a booking for user confirmation. Call this when you have ALL details: service, date, time, seats, name, email. This does NOT create the booking yet - it shows a confirmation card to the user.",
+      "Prepare a booking for user confirmation. Call this when you have ALL details: service, date, time, seats, name, email, and phone. This does NOT create the booking yet - it shows a confirmation card to the user.",
     schema: z.object({
       service_name: z.string().describe("Name of the service (Racing Simulator or Playstation 5)"),
       date: z.string().describe("Date in YYYY-MM-DD format"),
@@ -223,6 +240,7 @@ const prepareBookingTool = tool(
       seats: z.number().describe("Number of seats"),
       user_name: z.string().describe("Customer name"),
       user_email: z.string().describe("Customer email"),
+      user_phone: z.string().describe("Customer phone number"),
     }),
   }
 );
@@ -271,6 +289,7 @@ function bookingActionFromArgs(args: Record<string, unknown>): BookingAction | n
   const seats = args.seats;
   const name = args.user_name;
   const email = args.user_email;
+  const phone = args.user_phone;
 
   if (
     typeof service !== "string" ||
@@ -278,7 +297,8 @@ function bookingActionFromArgs(args: Record<string, unknown>): BookingAction | n
     typeof time !== "string" ||
     typeof seats !== "number" ||
     typeof name !== "string" ||
-    typeof email !== "string"
+    typeof email !== "string" ||
+    typeof phone !== "string"
   ) {
     return null;
   }
@@ -292,6 +312,7 @@ function bookingActionFromArgs(args: Record<string, unknown>): BookingAction | n
       seats,
       name,
       email,
+      phone,
     },
   };
 }
@@ -334,22 +355,40 @@ export async function createBooking(
   startTime: string,
   seats: number,
   userName: string,
-  userEmail: string
+  userEmail: string,
+  userPhone: string
 ) {
   const service = await getServiceByName(serviceName);
   if (!service) return { success: false, error: "Service not found" };
 
   try {
     const bookingClient = supabaseAdmin();
-    const { data: existing } = await bookingClient
+    const { data: existing, error: existingError } = await bookingClient
       .from("bookings")
-      .select("seats_booked")
+      .select("seats_booked, seat_labels")
       .eq("service_id", service.id)
       .eq("booking_date", date)
       .eq("start_time", startTime)
       .eq("status", "confirmed");
 
-    const availableSeats = getAvailableSeats(service.total_seats, existing || []);
+    if (existingError) throw existingError;
+
+    const { data: maintenanceSeats, error: maintenanceError } = await bookingClient
+      .from("service_seat_maintenance")
+      .select("seat_label")
+      .eq("service_id", service.id)
+      .eq("is_active", true);
+
+    if (maintenanceError) throw maintenanceError;
+
+    const maintenanceSeatLabels = (maintenanceSeats || [])
+      .map((seat) => seat.seat_label)
+      .filter((label): label is string => typeof label === "string");
+    const availableSeats = getAvailableSeatsWithMaintenance(
+      service.total_seats,
+      existing || [],
+      maintenanceSeatLabels,
+    );
     if (seats > availableSeats) {
       return { success: false, error: `Only ${availableSeats} seats available` };
     }
@@ -362,6 +401,7 @@ export async function createBooking(
         service_id: service.id,
         user_name: userName,
         user_email: userEmail,
+        user_phone: userPhone,
         booking_date: date,
         start_time: startTime,
         end_time: endTime,

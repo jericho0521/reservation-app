@@ -11,6 +11,7 @@ const preparedBookingPayload = {
   seats: 2,
   user_name: "Mo",
   user_email: "mo@example.com",
+  user_phone: "+60 12-345 6789",
 };
 
 test("extractPreparedBookingAction reads LangChain tool results", () => {
@@ -31,6 +32,7 @@ test("extractPreparedBookingAction reads LangChain tool results", () => {
       seats: 2,
       name: "Mo",
       email: "mo@example.com",
+      phone: "+60 12-345 6789",
     },
   });
 });

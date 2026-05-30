@@ -1,11 +1,12 @@
-import { NextResponse } from 'next/server';
+import { NextResponse, NextRequest } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import {
-    getAvailableSeats,
+    getAvailableSeatsWithMaintenance,
     getBookingsForSlot,
     getConflictingSeatLabels,
 } from '@/lib/reservation-capacity';
+import { getMaintenanceSeatConflicts } from '@/lib/seat-maintenance';
 import { jsonError, requireAuthenticatedSupabase, supabaseErrorStatus } from '@/app/api/api-utils';
 import { z } from 'zod';
 
@@ -13,6 +14,7 @@ const bookingSchema = z.object({
     service_id: z.string().uuid(),
     user_name: z.string().min(1),
     user_email: z.string().email(),
+    user_phone: z.string().min(1),
     booking_date: z.string(),
     start_time: z.string(),
     end_time: z.string(),
@@ -21,7 +23,27 @@ const bookingSchema = z.object({
     interface_type: z.enum(['form', 'chat'])
 });
 
-export async function GET() {
+const MAX_SEARCH_LENGTH = 100;
+
+function quotePostgrestValue(value: string) {
+    return `"${value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
+}
+
+function escapeLikeTerm(value: string) {
+    return value.replace(/[\\%_]/g, '\\$&');
+}
+
+export function normalizeBookingSearchTerm(search: string | null) {
+    const normalized = search?.trim().slice(0, MAX_SEARCH_LENGTH) ?? '';
+    return normalized.length > 0 ? normalized : null;
+}
+
+export function buildBookingSearchFilter(search: string) {
+    const term = quotePostgrestValue(`%${escapeLikeTerm(search)}%`);
+    return `user_name.ilike.${term},user_email.ilike.${term},user_phone.ilike.${term}`;
+}
+
+export async function GET(request: NextRequest) {
     try {
         const auth = await requireAuthenticatedSupabase();
 
@@ -29,10 +51,20 @@ export async function GET() {
             return auth.response;
         }
 
-        const { data, error } = await auth.supabase
+        const search = normalizeBookingSearchTerm(request.nextUrl.searchParams.get('search'));
+
+        let query = auth.supabase
             .from('bookings')
             .select('*, services(name)')
             .order('booking_date', { ascending: false });
+
+        if (search) {
+            query = query
+                .or(buildBookingSearchFilter(search))
+                .limit(100);
+        }
+
+        const { data, error } = await query;
 
         if (error) throw error;
 
@@ -74,11 +106,26 @@ export async function POST(request: Request) {
 
         if (bookingsError) throw bookingsError;
 
+        const { data: maintenanceSeats, error: maintenanceError } = await bookingClient
+            .from('service_seat_maintenance')
+            .select('seat_label')
+            .eq('service_id', validatedData.service_id)
+            .eq('is_active', true);
+
+        if (maintenanceError) throw maintenanceError;
+
         const sameSlotBookings = getBookingsForSlot(
             existingBookings || [],
             validatedData.start_time,
         );
-        const availableSeats = getAvailableSeats(service.total_seats, sameSlotBookings);
+        const maintenanceSeatLabels = (maintenanceSeats || [])
+            .map(seat => seat.seat_label)
+            .filter((label): label is string => typeof label === 'string');
+        const availableSeats = getAvailableSeatsWithMaintenance(
+            service.total_seats,
+            sameSlotBookings,
+            maintenanceSeatLabels,
+        );
         const requestedSeatLabels = validatedData.seat_labels ?? [];
 
         if (
@@ -91,6 +138,17 @@ export async function POST(request: Request) {
         if (validatedData.seats_booked > availableSeats) {
             return jsonError('Not enough seats available', 409, {
                 available_seats: availableSeats
+            });
+        }
+
+        const maintenanceConflicts = getMaintenanceSeatConflicts(
+            requestedSeatLabels,
+            maintenanceSeatLabels,
+        );
+
+        if (maintenanceConflicts.length > 0) {
+            return jsonError('Some selected seats are under maintenance', 409, {
+                seat_labels: maintenanceConflicts,
             });
         }
 

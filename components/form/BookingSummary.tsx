@@ -56,9 +56,14 @@ export default function BookingSummary({ booking }: Props) {
                     <span className="font-medium">{booking.user_name}</span>
                 </div>
 
-                <div className="flex justify-between">
+                <div className="flex justify-between border-b border-white/10 pb-4">
                     <span className="text-gray-400">Email</span>
                     <span className="font-medium">{booking.user_email}</span>
+                </div>
+
+                <div className="flex justify-between">
+                    <span className="text-gray-400">Phone</span>
+                    <span className="font-medium">{booking.user_phone}</span>
                 </div>
             </div>
 

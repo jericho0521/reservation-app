@@ -320,12 +320,102 @@ GOOGLE_GENERATIVE_AI_MODEL=gemini-2.5-flash
 
 Run these SQL files in the Supabase SQL editor as needed:
 
-1. `supabase/reservations-rls.sql` - enables RLS for reservation data and allows server routes to keep booking reads private.
-2. `supabase/knowledge.sql` - creates `knowledge_chunks`, pgvector index, and the `match_knowledge` RPC used by LangChain.
-3. `supabase/sales-reports.sql` - creates sales report tables and private storage bucket policies.
+1. `supabase/base-schema.sql` - creates the core reservation tables and default services/venues.
+2. `supabase/blogs.sql` - creates public content tables and storage policies.
+3. `supabase/knowledge.sql` - creates `knowledge_chunks`, pgvector index, and the `match_knowledge` RPC used by LangChain.
 4. `supabase/langchain.sql` - creates LangGraph checkpoint tables if persistent checkpoint storage is later enabled.
+5. `supabase/sales-reports.sql` - creates sales report tables and private storage bucket policies.
+6. `supabase/reservations-rls.sql` - enables RLS for reservation data and allows server routes to keep booking reads private.
+7. `supabase/security-hardening.sql` - reapplies admin-only policies and hardening checks.
 
 After changing SQL functions or policies, refresh the Supabase/PostgREST schema cache if the API still reports missing functions or stale columns.
+
+## Vercel Sandbox Supabase
+
+Vercel Sandbox can run the self-hosted Supabase Docker Compose stack in a temporary remote microVM. This is useful for disposable integration testing, PR checks, and trying schema changes without touching local or production Supabase data.
+
+First-time setup:
+
+1. Link this folder to the existing Vercel project:
+
+```bash
+pnpm dlx vercel@latest link
+```
+
+2. Pull Preview environment variables into `.env.local`:
+
+```bash
+pnpm dlx vercel@latest env pull .env.local --environment=preview
+```
+
+3. Verify basic Sandbox access:
+
+```bash
+pnpm sandbox:smoke
+```
+
+4. Verify Docker can run inside Sandbox:
+
+```bash
+pnpm sandbox:docker
+```
+
+Run the full Supabase stack:
+
+```bash
+pnpm sandbox:supabase
+```
+
+The command creates a Sandbox, installs Docker and Docker Compose, starts the official Supabase self-hosted containers, applies the SQL files listed in [Supabase Setup](#supabase-setup), prints temporary Supabase URLs and keys, then keeps the Sandbox alive until you press Enter.
+
+Use the printed values in another terminal while the script is running:
+
+```env
+NEXT_PUBLIC_SUPABASE_URL=https://...
+NEXT_PUBLIC_SUPABASE_ANON_KEY=...
+SUPABASE_SERVICE_ROLE_KEY=...
+```
+
+Then start the app:
+
+```bash
+pnpm dev
+```
+
+The Sandbox database is ephemeral. When the script stops, the Supabase containers and database are destroyed. The script generates temporary Supabase keys, Studio credentials, and a Postgres password for each run; do not reuse those values in any long-lived or public environment.
+
+To run only selected SQL files, set `SANDBOX_SQL_FILES` to a comma-separated list before starting the Sandbox:
+
+```bash
+SANDBOX_SQL_FILES=base-schema.sql,knowledge.sql,reservations-rls.sql pnpm sandbox:supabase
+```
+
+PowerShell:
+
+```powershell
+$env:SANDBOX_SQL_FILES="base-schema.sql,knowledge.sql,reservations-rls.sql"; pnpm sandbox:supabase
+```
+
+To skip SQL bootstrap:
+
+```bash
+SANDBOX_SQL_FILES=none pnpm sandbox:supabase
+```
+
+PowerShell:
+
+```powershell
+$env:SANDBOX_SQL_FILES="none"; pnpm sandbox:supabase
+```
+
+Optional runtime controls:
+
+```env
+SANDBOX_VCPUS=4
+SANDBOX_TIMEOUT_MS=2700000
+SANDBOX_SUPABASE_REPO=https://github.com/supabase/supabase
+SANDBOX_SUPABASE_REF=master
+```
 
 ## Booking Assistant RAG
 
@@ -371,6 +461,9 @@ pnpm build            # Create a production build
 pnpm start            # Serve the production build
 pnpm lint             # Run ESLint
 pnpm test             # Run the explicit Node test suite via tsx
+pnpm sandbox:smoke    # Verify Vercel Sandbox can run a command
+pnpm sandbox:docker   # Verify Docker can run inside Vercel Sandbox
+pnpm sandbox:supabase # Start disposable Supabase in Vercel Sandbox and apply SQL
 pnpm seed:knowledge   # Rebuild and upload RAG knowledge chunks
 pnpm pr               # Push branch and open a PR helper flow
 ```

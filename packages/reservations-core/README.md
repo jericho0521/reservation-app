@@ -1,0 +1,95 @@
+# @project-play/reservations-core
+
+Framework-neutral reservation domain logic for Project Play reservation flows.
+
+This package contains the shared types, availability calculations, capacity
+checks, conflict detection, validation policies, and repository interfaces used
+by host apps and storage adapters. It has no Next.js, React, or Supabase
+runtime dependency.
+
+## Public API
+
+Import from the package root only:
+
+```ts
+import {
+  generateAvailabilityTimeSlots,
+  validateReservationRequest,
+  type Reservation,
+  type ReservationService,
+} from "@project-play/reservations-core";
+```
+
+The public export surface is intentionally limited to `src/index.ts`. Internal
+files are not exposed as package subpaths.
+
+Key exports:
+
+- Domain types such as `Reservation`, `ReservationService`,
+  `ReservableResource`, `ReservationPolicy`, and repository interfaces.
+- Availability helpers such as `generateAvailabilityTimeSlots`.
+- Capacity and conflict helpers such as `getCapacityResult` and
+  `getConflictingResourceLabels`.
+- Validation helpers such as `validateReservationRequest`.
+- Policy builders such as `createCapacityPolicy`,
+  `createAssignedResourcePolicy`, and `createHybridPolicy`.
+- Legacy adapters for current host app compatibility.
+
+## Build and Test
+
+Run from the repository root:
+
+```powershell
+pnpm --filter @project-play/reservations-core run build
+```
+
+This is safe to run in the current workspace. It compiles the package to
+`packages/reservations-core/dist` and emits declaration files; it does not
+publish or modify production data.
+
+```powershell
+pnpm --filter @project-play/reservations-core run test
+```
+
+This is safe to run in the current workspace. It builds the package first, then
+runs the core and example tests with Node's test runner.
+
+## Example Consumers
+
+Example domain fixtures and host-style calls live in:
+
+- `fixtures/domain-examples.ts`
+- `examples/host-consumers.ts`
+
+The examples cover:
+
+- Racing Simulator assigned-resource reservations.
+- Playstation 5 quantity reservations.
+- Movie ticketing assigned-seat reservations.
+
+## Versioning and Changelog Policy
+
+The package remains private at version `0.0.0` until final package names,
+ownership, and release workflow are approved. After publishing is approved,
+use semantic versioning:
+
+- Patch: bug fixes with no public API contract change.
+- Minor: new public helpers or compatible type additions.
+- Major: breaking type, validation, or repository contract changes.
+
+Record release notes in a package changelog or repository release notes before
+the first public publish.
+
+## Publish Readiness
+
+Ready:
+
+- ESM build output and declaration files are configured.
+- Public exports are rooted at `dist/index.js` and `dist/index.d.ts`.
+- Runtime dependency boundary is clean.
+- Domain examples are included as consumer guidance.
+
+Blocked:
+
+- npm publishing is intentionally blocked by `private: true`.
+- Final package name and release ownership are not approved yet.

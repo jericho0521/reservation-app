@@ -1,11 +1,11 @@
-import { getCapacityResult } from "./capacity";
-import { getUnavailableResourceLabels } from "./availability";
+import { getCapacityResult } from "./capacity.js";
+import { getUnavailableResourceLabels } from "./availability.js";
 import {
   getConflictingResourceLabels,
   getMaintenanceResourceConflicts,
-} from "./conflicts";
-import { getServiceCapacity, requiresAssignedResources } from "./policies";
-import type { Reservation, ReservationService } from "./types";
+} from "./conflicts.js";
+import { getServiceCapacity, requiresAssignedResources } from "./policies.js";
+import type { Reservation, ReservationService } from "./types.js";
 
 export interface ReservationValidationResult {
   ok: boolean;

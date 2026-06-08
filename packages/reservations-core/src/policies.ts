@@ -2,7 +2,7 @@ import type {
   ReservationPolicy,
   ReservationService,
   ReservableResource,
-} from "./types";
+} from "./types.js";
 
 export function getServiceCapacity(
   service: Pick<ReservationService, "total_seats" | "policy" | "resources">,

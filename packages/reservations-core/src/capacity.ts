@@ -1,5 +1,5 @@
-import { getResourceCapacity, getServiceCapacity } from "./policies";
-import type { Reservation, ReservationService, ReservableResource } from "./types";
+import { getResourceCapacity, getServiceCapacity } from "./policies.js";
+import type { Reservation, ReservationService, ReservableResource } from "./types.js";
 
 export interface CapacityResult {
   capacity: number;

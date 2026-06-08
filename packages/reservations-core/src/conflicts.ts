@@ -1,4 +1,4 @@
-import type { Reservation } from "./types";
+import type { Reservation } from "./types.js";
 
 export interface ResourceReservationLike {
   start_time: string;

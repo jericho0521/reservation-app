@@ -1,11 +1,11 @@
-import { getCapacityResult } from "./capacity";
+import { getCapacityResult } from "./capacity.js";
 import {
   getReservationResourceLabels,
   getReservationsForSlot,
   naturalLabelSort,
   normalizeResourceLabels,
-} from "./conflicts";
-import type { Reservation, ReservationService, ReservationTimeSlot } from "./types";
+} from "./conflicts.js";
+import type { Reservation, ReservationService, ReservationTimeSlot } from "./types.js";
 
 export const DEFAULT_OPERATING_HOURS = [12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 0] as const;
 

@@ -1,0 +1,20 @@
+{
+  "name": "reservation-external-consumer-smoke",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "smoke": "tsx smoke.ts"
+  },
+  "dependencies": {
+    "@project-play/reservations-core": "file:../../dist-packages/project-play-reservations-core-0.0.0.tgz",
+    "@project-play/reservations-supabase": "file:../../dist-packages/project-play-reservations-supabase-0.0.0.tgz",
+    "@supabase/supabase-js": "^2.90.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "tsx": "^4.21.0",
+    "typescript": "^5"
+  }
+}

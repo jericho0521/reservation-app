@@ -153,13 +153,13 @@ importers:
 
   packages/reservations-supabase:
     dependencies:
-      '@project-play/reservations-core':
-        specifier: workspace:*
-        version: link:../reservations-core
       '@supabase/supabase-js':
         specifier: ^2.90.1
         version: 2.90.1
     devDependencies:
+      '@project-play/reservations-core':
+        specifier: workspace:*
+        version: link:../reservations-core
       tsx:
         specifier: ^4.21.0
         version: 4.21.0

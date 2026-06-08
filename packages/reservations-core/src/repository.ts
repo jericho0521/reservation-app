@@ -1,4 +1,4 @@
-import type { Reservation, ReservationService } from "./types";
+import type { Reservation, ReservationService } from "./types.js";
 
 export interface ReservationLookup {
   serviceId: string;

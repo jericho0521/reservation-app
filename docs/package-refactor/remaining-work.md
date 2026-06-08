@@ -35,6 +35,19 @@ any app. The remaining work is split into follow-on phases:
 6. [Phase 12: Optional Framework Adapter Proposals](phase-12-framework-adapter-proposals.md)
    - proposed follow-up if framework-specific route/action adapters are
      approved.
+7. [AI Chat Workflow Refactor Overview](ai-chat-workflow-refactor.md)
+   - plan for extracting the current LangChain booking chat into a package.
+8. [Phase 13: AI Chat Boundary Audit](phase-13-ai-chat-boundary-audit.md)
+   - inventory app-specific chat dependencies before extraction.
+9. [Phase 14: Headless Chat Core Package](phase-14-headless-chat-core-package.md)
+   - proposed headless chat package for prompts, action parsing, and guards.
+10. [Phase 15: Reservation Chat Tools](phase-15-reservation-chat-tools.md)
+    - proposed reservation-aware tools built on package repository contracts.
+11. [Phase 16: Host Chat Integration](phase-16-host-chat-integration.md)
+    - implemented migration of the current chat route onto the reusable chat
+      core and package tool descriptors.
+12. [Phase 17: Chat External Consumer Smoke Test](phase-17-chat-external-consumer-smoke-test.md)
+    - proposed proof that another app can install and run the chat workflow.
 
 ## Main Restrictions Until These Phases Finish
 
@@ -53,6 +66,10 @@ any app. The remaining work is split into follow-on phases:
   embeddable UI widget.
 - The plugin host contract is documentation-only. Future host service helpers
   or framework adapters must be separately approved and remain optional.
+- The LangChain AI chat workflow is now host-integrated with
+  `@project-play/reservation-chat-core`, but the LangChain adapter, Project
+  Play prompts, location behavior, model configuration, Supabase access, final
+  booking write, and UI action shapes remain host-owned.
 - Non-Supabase apps need their own repository adapter.
 
 ## Change Propagation Rule

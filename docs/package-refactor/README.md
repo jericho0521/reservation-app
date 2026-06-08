@@ -26,6 +26,12 @@ The selected first target is:
 - [Plugin Host Contract](plugin-host-contract.md)
 - [Phase 11: Optional Host Service Helpers](phase-11-host-service-helpers.md)
 - [Phase 12: Optional Framework Adapter Proposals](phase-12-framework-adapter-proposals.md)
+- [AI Chat Workflow Refactor Overview](ai-chat-workflow-refactor.md)
+- [Phase 13: AI Chat Boundary Audit](phase-13-ai-chat-boundary-audit.md)
+- [Phase 14: Headless Chat Core Package](phase-14-headless-chat-core-package.md)
+- [Phase 15: Reservation Chat Tools](phase-15-reservation-chat-tools.md)
+- [Phase 16: Host Chat Integration](phase-16-host-chat-integration.md)
+- [Phase 17: Chat External Consumer Smoke Test](phase-17-chat-external-consumer-smoke-test.md)
 - [Subagent Template](subagent-template.md)
 - [Handoff Checklist](handoff-checklist.md)
 
@@ -88,3 +94,5 @@ that workspace package into a real drop-in dependency for other apps:
 - Define the optional plugin contract for apps that want a prebuilt host layer.
 - Defer implementation of host service helpers and framework adapters to
   explicit follow-up phases.
+- Keep the LangChain AI chat workflow app-owned until Phases 13-17 extract a
+  headless chat package and host-owned integration contract.

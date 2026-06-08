@@ -232,11 +232,12 @@ Your app needs its database tables, functions, policies, and extensions.
 Apply SQL in this order:
 
 1. `supabase/base-schema.sql` for extensions, base tables, indexes, triggers, and default services.
-2. `supabase/reservations-rls.sql` for RLS enablement and booking/service policies.
-3. `supabase/knowledge.sql`.
-4. `supabase/sales-reports.sql`.
-5. `supabase/langchain.sql`.
-6. `supabase/blogs.sql`.
+2. `supabase/create-reservation-atomic.sql` for the transaction-safe booking RPC used by `POST /api/bookings`.
+3. `supabase/reservations-rls.sql` for RLS enablement and booking/service policies.
+4. `supabase/knowledge.sql`.
+5. `supabase/sales-reports.sql`.
+6. `supabase/langchain.sql`.
+7. `supabase/blogs.sql`.
 
 Open Postgres inside the Supabase DB container:
 
@@ -246,7 +247,7 @@ docker exec -it supabase-db psql -U postgres -d postgres
 
 Then paste SQL or run files from a mounted/copied location.
 
-Do not run `supabase/reservations-rls.sql` before `supabase/base-schema.sql` succeeds.
+Do not run `supabase/create-reservation-atomic.sql` or `supabase/reservations-rls.sql` before `supabase/base-schema.sql` succeeds.
 
 If you see this error:
 
@@ -296,9 +297,25 @@ CREATE TRIGGER
 INSERT 0 1
 ```
 
-If you already ran some feature SQL files first, that is okay. Run `base-schema.sql` now, then rerun `reservations-rls.sql`.
+If you already ran some feature SQL files first, that is okay. Run `base-schema.sql` now, then rerun `create-reservation-atomic.sql` and `reservations-rls.sql`.
 
-### Step 7.2: Run Reservation RLS Policies
+### Step 7.2: Run Atomic Booking RPC
+
+After the base tables exist, run this file from the repo before deploying app code that calls `POST /api/bookings`:
+
+```text
+supabase/create-reservation-atomic.sql
+```
+
+If the file is available on the server, you can run it with:
+
+```sql
+\i /path/to/reservation-app/supabase/create-reservation-atomic.sql
+```
+
+This installs `public.create_reservation_atomic(payload jsonb)`, which validates and inserts bookings in one transaction-safe database operation.
+
+### Step 7.3: Run Reservation RLS Policies
 
 After the base tables exist, run this file from the repo:
 
@@ -403,7 +420,7 @@ DROP POLICY
 
 `DROP POLICY` notices are okay if the policies did not exist yet.
 
-### Step 7.3: Run Remaining SQL Files
+### Step 7.4: Run Remaining SQL Files
 
 After the reservation RLS script succeeds, run:
 
@@ -788,10 +805,10 @@ Check:
 Apply SQL in this order:
 
 ```text
-base-schema.sql -> reservations-rls.sql -> knowledge.sql -> sales-reports.sql -> langchain.sql -> blogs.sql
+base-schema.sql -> create-reservation-atomic.sql -> reservations-rls.sql -> knowledge.sql -> sales-reports.sql -> langchain.sql -> blogs.sql
 ```
 
-If a script complains that `public.services`, `public.venues`, or `public.bookings` does not exist, run `supabase/base-schema.sql` first, then rerun `supabase/reservations-rls.sql`.
+If a script complains that `public.services`, `public.venues`, or `public.bookings` does not exist, run `supabase/base-schema.sql` first, then rerun `supabase/create-reservation-atomic.sql` and `supabase/reservations-rls.sql`.
 
 ### Studio Does Not Open
 

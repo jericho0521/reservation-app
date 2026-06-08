@@ -17,6 +17,7 @@ const DEFAULT_SQL_FILES = [
   "knowledge.sql",
   "langchain.sql",
   "sales-reports.sql",
+  "create-reservation-atomic.sql",
   "reservations-rls.sql",
   "security-hardening.sql",
 ];

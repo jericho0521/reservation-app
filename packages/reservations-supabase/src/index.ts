@@ -7,9 +7,10 @@ import {
   validateReservationRequest,
   type CreateReservationInput,
   type LegacyBookingShape,
+  type ReservationValidationResult,
   type Reservation,
+  type AtomicReservationRepository,
   type ReservationPolicy,
-  type ReservationRepository,
   type ReservationService,
   type ResourceKind,
   type ResourceLayout,
@@ -89,10 +90,62 @@ export interface CreateReservationSupabaseResult {
   atomic: false;
 }
 
+export type SupabaseAtomicReservationErrorCode =
+  | "invalid_service"
+  | "invalid_reservation"
+  | "invalid_resource_labels"
+  | "missing_resource_labels"
+  | "maintenance_conflict"
+  | "resource_conflict"
+  | "not_enough_capacity";
+
+export interface CreateReservationAtomicInput {
+  reservation: Reservation;
+}
+
+export interface CreateReservationAtomicSuccess {
+  ok: true;
+  atomic: true;
+  booking: LegacyBookingShape;
+  reservation: Reservation;
+  validation: { ok: true };
+}
+
+export interface CreateReservationAtomicFailure {
+  ok: false;
+  atomic: true;
+  reservation: Reservation;
+  error: SupabaseAtomicReservationErrorCode;
+  message?: string;
+  validation: ReservationValidationResult;
+}
+
+export type CreateReservationAtomicResult =
+  | CreateReservationAtomicSuccess
+  | CreateReservationAtomicFailure;
+
+export class SupabaseAtomicReservationError extends Error {
+  code: SupabaseAtomicReservationErrorCode;
+  validation: ReservationValidationResult;
+
+  constructor(result: CreateReservationAtomicFailure) {
+    super(result.message ?? result.error);
+    this.name = "SupabaseAtomicReservationError";
+    this.code = result.error;
+    this.validation = result.validation;
+  }
+}
+
 export interface SupabaseReservationRepository
-  extends ReservationRepository {
+  extends AtomicReservationRepository {
   getResources(serviceId: string): Promise<ReservableResource[]>;
   getResourceLayout(serviceId: string): Promise<ResourceLayout>;
+  createReservationAtomic(
+    input: CreateReservationAtomicInput | CreateReservationInput,
+  ): Promise<CreateReservationAtomicResult>;
+  createReservationAtomically(
+    input: CreateReservationAtomicInput | CreateReservationInput,
+  ): Promise<Reservation>;
   createReservationWithValidation(
     input: CreateReservationInput,
   ): Promise<CreateReservationSupabaseResult>;
@@ -100,6 +153,10 @@ export interface SupabaseReservationRepository
 
 interface SupabaseLikeClient {
   from(table: string): unknown;
+  rpc?(
+    fn: string,
+    params?: Record<string, unknown>,
+  ): Promise<QueryResult<unknown>>;
 }
 
 interface SupabaseQueryBuilder {
@@ -322,8 +379,108 @@ function reservationToBookingInsert(reservation: Reservation) {
     end_time: reservation.end_time,
     seats_booked: reservation.quantity,
     seat_labels: reservation.seat_labels,
+    reservation_items: reservation.items.map((item) => ({
+      resource_id: item.resource_id ?? null,
+      resource_label: item.resource_label ?? null,
+      quantity: item.quantity,
+    })),
     status: reservation.status ?? "confirmed",
     interface_type: reservation.interface_type,
+  };
+}
+
+function bookingRowToLegacyBooking(booking: Record<string, unknown>) {
+  return {
+    id: getString(booking.id) ?? undefined,
+    service_id: getString(booking.service_id) ?? "",
+    user_name: getString(booking.user_name) ?? "",
+    user_email: getString(booking.user_email) ?? "",
+    user_phone: getString(booking.user_phone) ?? undefined,
+    booking_date: getString(booking.booking_date) ?? "",
+    start_time: getString(booking.start_time) ?? "",
+    end_time: getString(booking.end_time) ?? "",
+    seats_booked: getNumber(booking.seats_booked) ?? 0,
+    seat_labels: Array.isArray(booking.seat_labels)
+      ? booking.seat_labels.filter((label): label is string => typeof label === "string")
+      : [],
+    status: getString(booking.status) ?? "confirmed",
+    interface_type: booking.interface_type === "chat" ? "chat" : "form",
+  } satisfies LegacyBookingShape;
+}
+
+function atomicErrorCodeFromUnknown(
+  value: unknown,
+): SupabaseAtomicReservationErrorCode {
+  switch (value) {
+    case "invalid_service":
+    case "invalid_reservation":
+    case "invalid_resource_labels":
+    case "missing_resource_labels":
+    case "maintenance_conflict":
+    case "resource_conflict":
+    case "not_enough_capacity":
+      return value;
+    default:
+      return "invalid_reservation";
+  }
+}
+
+function atomicValidationFromRpc(
+  error: SupabaseAtomicReservationErrorCode,
+  data: Record<string, unknown>,
+): ReservationValidationResult {
+  const conflictingLabels = Array.isArray(data.conflicting_resource_labels)
+    ? data.conflicting_resource_labels
+        .filter((label): label is string => typeof label === "string")
+    : undefined;
+  const availableQuantity = getNumber(data.available_quantity) ?? undefined;
+
+  return {
+    ok: false,
+    error: error === "invalid_service" || error === "invalid_reservation" || error === "invalid_resource_labels"
+      ? undefined
+      : error,
+    available_quantity: availableQuantity,
+    conflicting_resource_labels: conflictingLabels,
+  };
+}
+
+function parseAtomicRpcResult(
+  raw: unknown,
+  requestedReservation: Reservation,
+): CreateReservationAtomicResult {
+  if (!isRecord(raw)) {
+    return {
+      ok: false,
+      atomic: true,
+      reservation: requestedReservation,
+      error: "invalid_reservation",
+      message: "Atomic reservation RPC returned an invalid response",
+      validation: { ok: false },
+    };
+  }
+
+  if (raw.ok === true && isRecord(raw.booking)) {
+    const booking = bookingRowToLegacyBooking(raw.booking);
+
+    return {
+      ok: true,
+      atomic: true,
+      booking,
+      reservation: adaptLegacyBooking(booking),
+      validation: { ok: true },
+    };
+  }
+
+  const error = atomicErrorCodeFromUnknown(raw.error_code);
+
+  return {
+    ok: false,
+    atomic: true,
+    reservation: requestedReservation,
+    error,
+    message: getString(raw.message) ?? undefined,
+    validation: atomicValidationFromRpc(error, raw),
   };
 }
 
@@ -410,6 +567,22 @@ export function createSupabaseReservationRepository(
     return created;
   }
 
+  async function createReservationAtomic(
+    input: CreateReservationAtomicInput | CreateReservationInput,
+  ): Promise<CreateReservationAtomicResult> {
+    if (!client.rpc) {
+      throw new Error("Supabase client does not support RPC calls");
+    }
+
+    const payload = reservationToBookingInsert(input.reservation);
+    const data = assertNoSupabaseError(
+      await client.rpc("create_reservation_atomic", { payload }),
+      "Failed to create reservation atomically",
+    );
+
+    return parseAtomicRpcResult(data, input.reservation);
+  }
+
   return {
     async getService(serviceId) {
       const rows = await getServiceRows(serviceId);
@@ -469,6 +642,18 @@ export function createSupabaseReservationRepository(
     },
 
     createReservation,
+
+    createReservationAtomic,
+
+    async createReservationAtomically(input) {
+      const result = await createReservationAtomic(input);
+
+      if (!result.ok) {
+        throw new SupabaseAtomicReservationError(result);
+      }
+
+      return result.reservation;
+    },
 
     async createReservationWithValidation(input) {
       const validation = validateReservationRequest(

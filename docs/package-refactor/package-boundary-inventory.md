@@ -143,8 +143,10 @@ package after preserving the current Racing Simulator and PS5 behavior.
 - `app/api/availability/route.ts` and `app/api/bookings/route.ts` depend on
   Next.js route APIs, Supabase clients, auth utilities, Zod route validation,
   and host error messages.
-- Booking creation is not transaction-safe. Validation plus insert remains
-  race-prone until a Supabase RPC or equivalent atomic operation is added.
+- Booking creation was not transaction-safe during this audit. Phase 7 added
+  `create_reservation_atomic(payload jsonb)` SQL assets and Supabase adapter
+  methods; hosts must apply the SQL and still need live concurrency verification
+  before treating a deployed database as proven.
 - `service_seat_maintenance` remains the compatibility maintenance table name
   even though it now stores generic resource labels.
 - Compatibility naming remains mixed: `seat_labels`, `seats_booked`,

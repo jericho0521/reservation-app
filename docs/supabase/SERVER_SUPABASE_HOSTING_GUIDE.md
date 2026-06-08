@@ -172,11 +172,12 @@ Your app needs its own tables and policies.
 Run SQL in this order:
 
 1. `supabase/base-schema.sql` for extensions, base tables, indexes, triggers, and default services.
-2. `supabase/reservations-rls.sql` for RLS enablement and reservation policies.
-3. `supabase/knowledge.sql`.
-4. `supabase/sales-reports.sql`.
-5. `supabase/langchain.sql`.
-6. `supabase/blogs.sql`.
+2. `supabase/create-reservation-atomic.sql` for the transaction-safe booking RPC used by `POST /api/bookings`.
+3. `supabase/reservations-rls.sql` for RLS enablement and reservation policies.
+4. `supabase/knowledge.sql`.
+5. `supabase/sales-reports.sql`.
+6. `supabase/langchain.sql`.
+7. `supabase/blogs.sql`.
 
 You can use `psql` from the server:
 
@@ -186,7 +187,7 @@ docker exec -it supabase-db psql -U postgres -d postgres
 
 Then paste or run the SQL files.
 
-Do not run `supabase/reservations-rls.sql` before `supabase/base-schema.sql` succeeds. If you already ran other feature SQL files first, run `base-schema.sql` now, then rerun `reservations-rls.sql`.
+Do not run `supabase/create-reservation-atomic.sql` or `supabase/reservations-rls.sql` before `supabase/base-schema.sql` succeeds. If you already ran other feature SQL files first, run `base-schema.sql` now, then rerun `create-reservation-atomic.sql` and `reservations-rls.sql`.
 
 ## Step 6: Seed Knowledge Data
 
@@ -492,10 +493,10 @@ Do not use these as login passwords:
 Apply SQL in the correct order:
 
 ```text
-base-schema.sql -> reservations-rls.sql -> knowledge.sql -> sales-reports.sql -> langchain.sql -> blogs.sql
+base-schema.sql -> create-reservation-atomic.sql -> reservations-rls.sql -> knowledge.sql -> sales-reports.sql -> langchain.sql -> blogs.sql
 ```
 
-If a policy says `public.services`, `public.venues`, or `public.bookings` does not exist, run `supabase/base-schema.sql` first, then rerun `supabase/reservations-rls.sql`.
+If a policy says `public.services`, `public.venues`, or `public.bookings` does not exist, run `supabase/base-schema.sql` first, then rerun `supabase/create-reservation-atomic.sql` and `supabase/reservations-rls.sql`.
 
 ## Final Architecture
 

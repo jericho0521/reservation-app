@@ -325,8 +325,9 @@ Run these SQL files in the Supabase SQL editor as needed:
 3. `supabase/knowledge.sql` - creates `knowledge_chunks`, pgvector index, and the `match_knowledge` RPC used by LangChain.
 4. `supabase/langchain.sql` - creates LangGraph checkpoint tables if persistent checkpoint storage is later enabled.
 5. `supabase/sales-reports.sql` - creates sales report tables and private storage bucket policies.
-6. `supabase/reservations-rls.sql` - enables RLS for reservation data and allows server routes to keep booking reads private.
-7. `supabase/security-hardening.sql` - reapplies admin-only policies and hardening checks.
+6. `supabase/create-reservation-atomic.sql` - installs the transaction-safe booking RPC used by `POST /api/bookings`.
+7. `supabase/reservations-rls.sql` - enables RLS for reservation data and allows server routes to keep booking reads private.
+8. `supabase/security-hardening.sql` - reapplies admin-only policies and hardening checks.
 
 After changing SQL functions or policies, refresh the Supabase/PostgREST schema cache if the API still reports missing functions or stale columns.
 

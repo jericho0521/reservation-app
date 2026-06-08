@@ -8,6 +8,7 @@
     "smoke": "tsx smoke.ts"
   },
   "dependencies": {
+    "@project-play/reservation-chat-core": "file:../../dist-packages/project-play-reservation-chat-core-0.0.0.tgz",
     "@project-play/reservations-core": "file:../../dist-packages/project-play-reservations-core-0.0.0.tgz",
     "@project-play/reservations-supabase": "file:../../dist-packages/project-play-reservations-supabase-0.0.0.tgz",
     "@supabase/supabase-js": "^2.90.1"

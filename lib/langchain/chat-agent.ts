@@ -19,7 +19,11 @@ import { buildBookingSystemPromptWithContext } from "./prompts";
 interface ServiceRecord {
   id: string;
   name: string;
+  description?: string | null;
   total_seats: number;
+  resource_kind?: string | null;
+  selection_mode?: string | null;
+  reservation_policy?: unknown;
 }
 
 export interface ChatMessage {
@@ -133,7 +137,7 @@ export function getLocationDirectionsAction(message: string): LocationDirections
 async function getServiceByName(serviceName: string): Promise<ServiceRecord | null> {
   const { data, error } = await supabase()
     .from("services")
-    .select("id, name, total_seats")
+    .select("id, name, description, total_seats, resource_kind, selection_mode, reservation_policy")
     .ilike("name", `%${serviceName}%`)
     .single();
 
@@ -148,13 +152,23 @@ const getServicesTool = tool(
   async () => {
     const { data, error } = await supabase()
       .from("services")
-      .select("id, name, description, total_seats");
+      .select("id, name, description, total_seats, resource_kind, selection_mode, reservation_policy");
     if (error) return { error: error.message };
-    return { services: data };
+    return {
+      services: data?.map((service) => ({
+        id: service.id,
+        name: service.name,
+        description: service.description,
+        total_capacity: service.total_seats,
+        resource_kind: service.resource_kind,
+        selection_mode: service.selection_mode,
+        reservation_policy: service.reservation_policy,
+      })),
+    };
   },
   {
     name: "get_services",
-    description: "Get list of available services",
+    description: "Get the current list of bookable services and their capacity/resource reservation metadata",
     schema: z.object({}),
   }
 );
@@ -198,7 +212,9 @@ const checkAvailabilityTool = tool(
         service_name: service.name,
         service_id: service.id,
         date,
-        total_seats: service.total_seats,
+        total_capacity: service.total_seats,
+        resource_kind: service.resource_kind,
+        selection_mode: service.selection_mode,
         available_slots: slots,
       };
     } catch (error) {
@@ -208,9 +224,9 @@ const checkAvailabilityTool = tool(
   },
   {
     name: "check_availability",
-    description: "Check available time slots for a service on a specific date",
+    description: "Check available time slots for any bookable service on a specific date",
     schema: z.object({
-      service_name: z.string().describe("Name of the service (Racing Simulator or Playstation 5)"),
+      service_name: z.string().describe("Name of the bookable service from get_services"),
       date: z.string().describe("Date in YYYY-MM-DD format"),
     }),
   }
@@ -234,10 +250,10 @@ const prepareBookingTool = tool(
     description:
       "Prepare a booking for user confirmation. Call this when you have ALL details: service, date, time, seats, name, email, and phone. This does NOT create the booking yet - it shows a confirmation card to the user.",
     schema: z.object({
-      service_name: z.string().describe("Name of the service (Racing Simulator or Playstation 5)"),
+      service_name: z.string().describe("Name of the bookable service from get_services"),
       date: z.string().describe("Date in YYYY-MM-DD format"),
       start_time: z.string().describe("Start time in HH:MM format"),
-      seats: z.number().describe("Number of seats"),
+      seats: z.number().describe("Booking quantity, such as seats, stations, rooms, or capacity units"),
       user_name: z.string().describe("Customer name"),
       user_email: z.string().describe("Customer email"),
       user_phone: z.string().describe("Customer phone number"),

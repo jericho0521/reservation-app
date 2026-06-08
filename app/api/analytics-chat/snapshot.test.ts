@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { buildAnalyticsSnapshot, type AnalyticsBookingRecord } from './snapshot';
+import { buildAnalyticsSnapshot, getEstimatedUnitPrice, type AnalyticsBookingRecord } from './snapshot';
 
 const bookings: AnalyticsBookingRecord[] = [
     {
@@ -100,4 +100,29 @@ test('buildAnalyticsSnapshot uses published daily sales reports as actual revenu
     assert.equal(snapshot.salesMetrics.averageTicket, 27.5);
     assert.deepEqual(snapshot.salesReportCoverage.missingReportDates, ['2026-01-05']);
     assert.deepEqual(snapshot.topLevelCharts.paymentMix.data, snapshot.paymentBreakdown);
+});
+
+test('buildAnalyticsSnapshot handles services without seat labels', () => {
+    const snapshot = buildAnalyticsSnapshot([
+        {
+            booking_date: '2026-01-09',
+            start_time: '15:00',
+            seats_booked: 4,
+            seat_labels: null,
+            status: 'completed',
+            services: { name: 'Movie Screening' },
+        },
+    ]);
+
+    assert.equal(snapshot.totals.seats, 4);
+    assert.deepEqual(snapshot.services, [{
+        name: 'Movie Screening',
+        bookings: 1,
+        seats: 4,
+        revenue: 0,
+        completed: 1,
+        confirmed: 0,
+        cancelled: 0,
+    }]);
+    assert.equal(getEstimatedUnitPrice('Movie Screening'), 0);
 });

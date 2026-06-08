@@ -1,3 +1,15 @@
+import {
+  getBookedQuantity,
+  getCapacityResult,
+  isOverCapacity as isReservationOverCapacity,
+} from "./reservations/capacity";
+import {
+  getBookedResourceLabels,
+  getConflictingResourceLabels as getReservationConflictingResourceLabels,
+  getReservationsForSlot,
+  normalizeSlotTime,
+} from "./reservations/conflicts";
+import { adaptLegacyBooking, createCapacityPolicy } from "./reservations/types";
 import { normalizeSeatLabels } from "./seat-maintenance";
 
 export interface SeatBooking {
@@ -9,46 +21,71 @@ export interface SlotSeatBooking extends SeatBooking {
   seat_labels?: string[] | null;
 }
 
-export function normalizeSlotTime(time: string) {
-  return time.slice(0, 5);
-}
+export { normalizeSlotTime };
 
 export function getBookingsForSlot<T extends SlotSeatBooking>(
   bookings: T[],
   startTime: string,
 ) {
-  const normalizedStartTime = normalizeSlotTime(startTime);
-
-  return bookings.filter(
-    (booking) => normalizeSlotTime(booking.start_time) === normalizedStartTime,
-  );
+  return getReservationsForSlot(bookings, startTime);
 }
 
 export function getBookedSeatLabels(bookings: Pick<SlotSeatBooking, "seat_labels">[]) {
-  return new Set(
-    bookings.flatMap((booking) => (
-      Array.isArray(booking.seat_labels)
-        ? booking.seat_labels.filter((label): label is string => typeof label === "string")
-        : []
-    )),
-  );
+  return getBookedResourceLabels(bookings.map((booking, index) => adaptLegacyBooking({
+    id: `legacy-booking-${index}`,
+    service_id: "legacy",
+    user_name: "",
+    user_email: "",
+    booking_date: "",
+    start_time: "00:00",
+    end_time: "01:00",
+    seats_booked: Array.isArray(booking.seat_labels) ? booking.seat_labels.length : 0,
+    seat_labels: Array.isArray(booking.seat_labels)
+      ? booking.seat_labels.filter((label): label is string => typeof label === "string")
+      : [],
+    interface_type: "form",
+  })));
 }
 
 export function getConflictingSeatLabels(
   bookings: Pick<SlotSeatBooking, "seat_labels">[],
   requestedSeatLabels: string[],
 ) {
-  const bookedSeatLabels = getBookedSeatLabels(bookings);
-
-  return requestedSeatLabels.filter((label) => bookedSeatLabels.has(label));
+  return getReservationConflictingResourceLabels(
+    bookings.map((booking, index) => adaptLegacyBooking({
+      id: `legacy-booking-${index}`,
+      service_id: "legacy",
+      user_name: "",
+      user_email: "",
+      booking_date: "",
+      start_time: "00:00",
+      end_time: "01:00",
+      seats_booked: Array.isArray(booking.seat_labels) ? booking.seat_labels.length : 0,
+      seat_labels: Array.isArray(booking.seat_labels)
+        ? booking.seat_labels.filter((label): label is string => typeof label === "string")
+        : [],
+      interface_type: "form",
+    })),
+    requestedSeatLabels,
+  );
 }
 
 export function getBookedSeats(bookings: SeatBooking[]) {
-  return bookings.reduce((sum, booking) => sum + booking.seats_booked, 0);
+  return getBookedQuantity(bookings.map((booking) => ({
+    quantity: booking.seats_booked,
+  })));
 }
 
 export function getAvailableSeats(totalSeats: number, bookings: SeatBooking[]) {
-  return totalSeats - getBookedSeats(bookings);
+  return getCapacityResult(
+    {
+      total_seats: totalSeats,
+      policy: createCapacityPolicy(totalSeats),
+    },
+    bookings.map((booking) => ({
+      quantity: booking.seats_booked,
+    })),
+  ).available_quantity;
 }
 
 function getFallbackSeatLabel(seatNumber: number) {
@@ -98,5 +135,14 @@ export function getAvailableSeatsWithMaintenance(
 }
 
 export function isOverCapacity(totalSeats: number, bookings: SeatBooking[], requestedSeats: number) {
-  return requestedSeats > getAvailableSeats(totalSeats, bookings);
+  return isReservationOverCapacity(
+    {
+      total_seats: totalSeats,
+      policy: createCapacityPolicy(totalSeats),
+    },
+    bookings.map((booking) => ({
+      quantity: booking.seats_booked,
+    })),
+    requestedSeats,
+  );
 }

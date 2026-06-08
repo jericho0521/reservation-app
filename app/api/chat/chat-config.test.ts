@@ -14,6 +14,15 @@ test('buildSystemPrompt instructs the AI to answer business questions freely', (
   assert.match(prompt, /Answer questions about games, equipment, location, pricing/);
 });
 
+test('buildSystemPrompt uses dynamic service metadata guidance', () => {
+  const prompt = buildSystemPrompt('2026-04-23');
+
+  assert.match(prompt, /Use get_services for the current bookable services/);
+  assert.match(prompt, /capacity-based/);
+  assert.doesNotMatch(prompt, /Racing Simulator \(16 seats\)/);
+  assert.doesNotMatch(prompt, /Playstation 5 \(2 seats\)/);
+});
+
 test('buildSystemPrompt requires confirmation-only booking creation', () => {
   const prompt = buildSystemPrompt('2026-04-23');
 

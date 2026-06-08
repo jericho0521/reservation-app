@@ -1,6 +1,7 @@
 import type { ChartProps } from '@/components/analytics/renderer/spec-types';
 
-const PRICING: Record<string, number> = {
+// Compatibility fallback until service pricing/report metadata is configurable.
+const LEGACY_ESTIMATED_PRICE_BY_SERVICE: Record<string, number> = {
     'Racing Simulator': 15,
     'Playstation 5': 30,
 };
@@ -11,6 +12,7 @@ export interface AnalyticsBookingRecord {
     booking_date: string;
     start_time: string;
     seats_booked: number;
+    seat_labels?: string[] | null;
     status: string;
     services: { name: string } | { name: string }[] | null;
 }
@@ -267,10 +269,11 @@ export function buildAnalyticsSnapshot(
 
     for (const booking of bookings) {
         const serviceName = getServiceName(booking.services);
-        const price = PRICING[serviceName] || 0;
-        const bookingRevenue = booking.seats_booked * price;
+        const quantity = Number(booking.seats_booked ?? 0);
+        const price = getEstimatedUnitPrice(serviceName);
+        const bookingRevenue = quantity * price;
 
-        snapshot.totals.seats += booking.seats_booked;
+        snapshot.totals.seats += quantity;
 
         if (booking.status === 'confirmed') {
             snapshot.totals.confirmed += 1;
@@ -302,7 +305,7 @@ export function buildAnalyticsSnapshot(
             cancelled: 0,
         };
 
-        serviceStats.seats += booking.seats_booked;
+        serviceStats.seats += quantity;
 
         if (booking.status === 'completed') {
             serviceStats.completed += 1;
@@ -424,6 +427,10 @@ export function buildAnalyticsSnapshot(
 
 function getReportRevenue(report: AnalyticsSalesReportRecord) {
     return Number(report.shift_income ?? report.net_sales ?? report.gross_sales ?? 0);
+}
+
+export function getEstimatedUnitPrice(serviceName: string) {
+    return LEGACY_ESTIMATED_PRICE_BY_SERVICE[serviceName] ?? 0;
 }
 
 function buildSalesReportCoverage(

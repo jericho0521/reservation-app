@@ -1,3 +1,9 @@
+import {
+  getMaintenanceResourceConflicts,
+  normalizeResourceLabel,
+  normalizeResourceLabels,
+} from "./reservations/conflicts";
+
 const RACING_SEAT_LABEL_PATTERN = /^RS\s*(\d{1,2})$/i;
 const MIN_RACING_SEAT = 1;
 const MAX_RACING_SEAT = 16;
@@ -48,3 +54,9 @@ export function getMaintenanceSeatConflicts(
   const maintenanceSeats = new Set(normalizeSeatLabels(maintenanceSeatLabels));
   return normalizeSeatLabels(requestedSeatLabels).filter((label) => maintenanceSeats.has(label));
 }
+
+export {
+  getMaintenanceResourceConflicts,
+  normalizeResourceLabel,
+  normalizeResourceLabels,
+};

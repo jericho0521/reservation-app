@@ -18,6 +18,14 @@ The selected first target is:
 - [Phase 4: Host App Integration](phase-4-host-app-integration.md)
 - [Phase 5: Examples and Fixtures](phase-5-examples-and-fixtures.md)
 - [Phase 6: Package Hardening](phase-6-package-hardening.md)
+- [Remaining Work Overview](remaining-work.md)
+- [Phase 7: Atomic Booking RPC](phase-7-atomic-booking-rpc.md)
+- [Phase 8: Package Identity and Release Workflow](phase-8-package-identity-release-workflow.md)
+- [Phase 9: External Consumer Smoke Test](phase-9-external-consumer-smoke-test.md)
+- [Phase 10: Plugin Host Contract](phase-10-plugin-host-contract.md)
+- [Plugin Host Contract](plugin-host-contract.md)
+- [Phase 11: Optional Host Service Helpers](phase-11-host-service-helpers.md)
+- [Phase 12: Optional Framework Adapter Proposals](phase-12-framework-adapter-proposals.md)
 - [Subagent Template](subagent-template.md)
 - [Handoff Checklist](handoff-checklist.md)
 
@@ -50,9 +58,13 @@ Each phase is designed for one worker subagent. Workers should receive the full 
 For every subagent task:
 
 - Provide the phase file content.
-- Provide relevant current files from `docs/modularity-refactor` and `lib/reservations`.
+- Provide relevant current files from `docs/package-refactor`,
+  `packages/reservations-core`, `packages/reservations-supabase`, and host app
+  routes only when the phase explicitly needs them.
 - Enforce the phase's `Allowed Write Scope`.
-- Tell the worker not to edit downstream phase files.
+- Tell the worker not to edit downstream phase files unless the phase's
+  `Downstream Update Requirements` or the change propagation rule explicitly
+  requires those updates.
 - Require final status: `DONE`, `DONE_WITH_CONCERNS`, or `BLOCKED`.
 
 ## Non-Goals For First Package Pass
@@ -63,3 +75,16 @@ For every subagent task:
 - Do not make the core package depend on Supabase.
 - Do not remove the current app's compatibility API fields until the host app is fully migrated.
 
+## Current Status
+
+Phases 0 through 6 created the package structure and proved that the current
+app can consume the package boundaries. The remaining phases are about turning
+that workspace package into a real drop-in dependency for other apps:
+
+- Preserve and verify the Supabase atomic booking RPC setup in release and
+  external consumer workflows.
+- Finalize package names, ownership, and release automation.
+- Prove installation from a clean external app.
+- Define the optional plugin contract for apps that want a prebuilt host layer.
+- Defer implementation of host service helpers and framework adapters to
+  explicit follow-up phases.

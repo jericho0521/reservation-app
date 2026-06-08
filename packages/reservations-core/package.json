@@ -1,8 +1,23 @@
 {
   "name": "@project-play/reservations-core",
   "version": "0.0.0",
+  "description": "Framework-neutral reservation domain logic, validation, availability, and repository contracts.",
   "private": true,
   "type": "module",
+  "license": "UNLICENSED",
+  "author": "Project Play maintainers",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jericho0521/reservation-app.git",
+    "directory": "packages/reservations-core"
+  },
+  "keywords": [
+    "reservations",
+    "booking",
+    "availability",
+    "capacity",
+    "typescript"
+  ],
   "files": [
     "dist",
     "README.md"
@@ -18,6 +33,7 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
+    "prepack": "corepack pnpm run build",
     "test": "tsc -p tsconfig.build.json && node --import tsx --test \"src/**/*.test.ts\" \"examples/**/*.test.ts\"",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },

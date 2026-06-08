@@ -1,8 +1,24 @@
 {
   "name": "@project-play/reservations-supabase",
   "version": "0.0.0",
+  "description": "Supabase repository adapter and SQL setup assets for Project Play reservation packages.",
   "private": true,
   "type": "module",
+  "license": "UNLICENSED",
+  "author": "Project Play maintainers",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jericho0521/reservation-app.git",
+    "directory": "packages/reservations-supabase"
+  },
+  "keywords": [
+    "reservations",
+    "booking",
+    "supabase",
+    "postgres",
+    "rpc",
+    "typescript"
+  ],
   "files": [
     "dist",
     "README.md",
@@ -19,14 +35,18 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
-    "test": "tsc -p tsconfig.build.json && node --import tsx --test",
+    "prepack": "corepack pnpm --filter @project-play/reservations-core run build && corepack pnpm run build",
+    "test": "corepack pnpm --filter @project-play/reservations-core run build && tsc -p tsconfig.build.json && node --import tsx --test",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@project-play/reservations-core": "workspace:*",
     "@supabase/supabase-js": "^2.90.1"
   },
+  "peerDependencies": {
+    "@project-play/reservations-core": "0.0.0"
+  },
   "devDependencies": {
+    "@project-play/reservations-core": "workspace:*",
     "tsx": "^4.21.0",
     "typescript": "^5"
   }

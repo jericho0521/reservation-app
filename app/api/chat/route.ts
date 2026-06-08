@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { getRelevantContext } from "@/lib/knowledge";
+import { getRelevantContext as getChatRelevantContext } from "@/lib/knowledge";
 import {
   getChatDomainGuardResponse,
   getLocationDirectionsAction,
-  runChatAgent,
-  createBooking,
+  runChatAgent as runBookingChatAgent,
+  createBooking as createChatBooking,
   type ChatMessage,
   type ChatAction,
 } from "@/lib/langchain/chat-agent";
@@ -27,6 +27,15 @@ interface ChatRequestBody {
 }
 
 type ConfirmBookingPayload = z.infer<typeof confirmBookingSchema>;
+type CreateBooking = typeof createChatBooking;
+type GetRelevantContext = typeof getChatRelevantContext;
+type RunChatAgent = typeof runBookingChatAgent;
+
+interface ChatRouteDependencies {
+  createBooking: CreateBooking;
+  getRelevantContext: GetRelevantContext;
+  runChatAgent: RunChatAgent;
+}
 
 export function parseConfirmBookingPayload(value: unknown): ConfirmBookingPayload | null {
   const result = confirmBookingSchema.safeParse(value);
@@ -39,7 +48,31 @@ function getChatRequestBody(value: unknown): ChatRequestBody {
     : {};
 }
 
-export async function POST(req: Request) {
+export function createChatPostHandler(
+  dependencies: Partial<ChatRouteDependencies> = {},
+) {
+  const createBooking = dependencies.createBooking ?? createChatBooking;
+  const getRelevantContext = dependencies.getRelevantContext ?? getChatRelevantContext;
+  const runChatAgent = dependencies.runChatAgent ?? runBookingChatAgent;
+
+  return (req: Request) =>
+    handleChatPost(req, {
+      createBooking,
+      getRelevantContext,
+      runChatAgent,
+    });
+}
+
+interface ChatPostHandlerDependencies {
+  createBooking: CreateBooking;
+  getRelevantContext: GetRelevantContext;
+  runChatAgent: RunChatAgent;
+}
+
+async function handleChatPost(
+  req: Request,
+  dependencies: ChatPostHandlerDependencies,
+) {
   try {
     const body = getChatRequestBody(await req.json());
     const messages = (Array.isArray(body.messages) ? body.messages : []) as ChatMessage[];
@@ -56,7 +89,7 @@ export async function POST(req: Request) {
         }, { status: 400 });
       }
 
-      const result = await createBooking(
+      const result = await dependencies.createBooking(
         confirmBooking.service,
         confirmBooking.date,
         confirmBooking.time,
@@ -96,11 +129,13 @@ export async function POST(req: Request) {
       });
     }
 
-    const context = latestUserMessage ? await getRelevantContext(latestUserMessage) : "";
+    const context = latestUserMessage
+      ? await dependencies.getRelevantContext(latestUserMessage)
+      : "";
 
     const chatThreadId = threadId || crypto.randomUUID();
 
-    const result = await runChatAgent(messages, context, chatThreadId);
+    const result = await dependencies.runChatAgent(messages, context, chatThreadId);
 
     return Response.json({
       content: result.content,
@@ -120,3 +155,5 @@ export async function POST(req: Request) {
     return NextResponse.json({ content: userMessage }, { status: 200 });
   }
 }
+
+export const POST = createChatPostHandler();

@@ -1,7 +1,23 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { AIMessage, HumanMessage, ToolMessage } from "@langchain/core/messages";
-import { extractPreparedBookingAction, getChatDomainGuardResponse, getLocationDirectionsAction } from "./chat-agent";
+import {
+  CHECK_AVAILABILITY_TOOL_NAME,
+  GET_SERVICES_TOOL_NAME,
+  PREPARE_BOOKING_TOOL_NAME,
+} from "@project-play/reservation-chat-core";
+import {
+  createAssignedResourcePolicy,
+  createCapacityPolicy,
+  type ReservationRepository,
+  type ReservationService,
+} from "@project-play/reservations-core";
+import {
+  createLangChainReservationTools,
+  extractPreparedBookingAction,
+  getChatDomainGuardResponse,
+  getLocationDirectionsAction,
+} from "./chat-agent";
 
 const preparedBookingPayload = {
   ready_for_confirmation: true,
@@ -13,6 +29,75 @@ const preparedBookingPayload = {
   user_email: "mo@example.com",
   user_phone: "+60 12-345 6789",
 };
+
+const services: ReservationService[] = [
+  {
+    id: "racing-simulator",
+    name: "Racing Simulator",
+    description: "Assigned simulator stations.",
+    total_seats: 2,
+    resource_kind: "station",
+    selection_mode: "assigned_resource",
+    policy: createAssignedResourcePolicy(2),
+    layout: { kind: "grid", columns: 2 },
+    resources: [
+      {
+        id: "sim-1",
+        service_id: "racing-simulator",
+        label: "SIM 1",
+        kind: "station",
+        is_active: true,
+      },
+      {
+        id: "sim-2",
+        service_id: "racing-simulator",
+        label: "SIM 2",
+        kind: "station",
+        is_active: true,
+      },
+    ],
+  },
+  {
+    id: "ps5",
+    name: "PS5",
+    description: "Quantity booking.",
+    total_seats: 2,
+    resource_kind: "capacity_bucket",
+    selection_mode: "quantity",
+    policy: createCapacityPolicy(2),
+    layout: { kind: "none" },
+  },
+];
+
+const repository: ReservationRepository = {
+  async getService(serviceId) {
+    return services.find((service) => service.id === serviceId) ?? null;
+  },
+  async getConfirmedReservations() {
+    return [];
+  },
+  async getMaintenanceResourceLabels() {
+    return [];
+  },
+  async createReservation(input) {
+    return input;
+  },
+};
+
+function getWrappedTool(name: string) {
+  const tools = createLangChainReservationTools({
+    repository,
+    listServices: () => services,
+    resolveServiceByName: (serviceName) =>
+      services.find((service) =>
+        service.name.toLowerCase().includes(serviceName.toLowerCase()),
+      ) ?? null,
+  });
+  const candidate = tools.find((tool) => tool.name === name);
+  assert.ok(candidate);
+
+  return candidate;
+}
 
 test("extractPreparedBookingAction reads LangChain tool results", () => {
   const action = extractPreparedBookingAction([
@@ -34,6 +119,104 @@ test("extractPreparedBookingAction reads LangChain tool results", () => {
       email: "mo@example.com",
       phone: "+60 12-345 6789",
     },
+  });
+});
+
+test("createLangChainReservationTools lets descriptor executors handle invalid availability input", async () => {
+  const checkAvailabilityTool = getWrappedTool(CHECK_AVAILABILITY_TOOL_NAME);
+
+  const result = await checkAvailabilityTool.invoke({
+    service_name: "Racing",
+    date: "tomorrow",
+  });
+
+  assert.deepEqual(result, { error: "Invalid availability request" });
+});
+
+test("createLangChainReservationTools wraps descriptors with permissive schemas and metadata", () => {
+  const checkAvailabilityTool = getWrappedTool(CHECK_AVAILABILITY_TOOL_NAME);
+  const schema = checkAvailabilityTool.schema as {
+    shape: Record<string, unknown>;
+    safeParse(value: unknown): { success: boolean };
+  };
+  const metadata = checkAvailabilityTool.metadata as
+    | { descriptorInputSchema?: unknown }
+    | undefined;
+
+  assert.equal(schema.safeParse({
+    service_name: "Racing",
+    date: "tomorrow",
+  }).success, true);
+  assert.ok("service_name" in schema.shape);
+  assert.ok("date" in schema.shape);
+  assert.ok(metadata?.descriptorInputSchema);
+});
+
+test("createLangChainReservationTools exposes relaxed prepare_booking fields", async () => {
+  const prepareBookingTool = getWrappedTool(PREPARE_BOOKING_TOOL_NAME);
+  const schema = prepareBookingTool.schema as {
+    shape: Record<string, unknown>;
+    safeParse(value: unknown): { success: boolean };
+  };
+
+  assert.ok("service_name" in schema.shape);
+  assert.ok("date" in schema.shape);
+  assert.ok("start_time" in schema.shape);
+  assert.ok("seats" in schema.shape);
+  assert.ok("user_name" in schema.shape);
+  assert.ok("user_email" in schema.shape);
+  assert.ok("user_phone" in schema.shape);
+  assert.equal(schema.safeParse({
+    service_name: "Racing Simulator",
+    date: "2026-04-29",
+    start_time: "14:00",
+    seats: "two",
+    user_name: "Mo",
+    user_email: "mo@example.com",
+    user_phone: "+60 12-345 6789",
+  }).success, true);
+
+  assert.deepEqual(
+    await prepareBookingTool.invoke({
+      service_name: "Racing Simulator",
+      date: "2026-04-29",
+      start_time: "14:00",
+      seats: "two",
+      user_name: "Mo",
+      user_email: "mo@example.com",
+      user_phone: "+60 12-345 6789",
+    }),
+    { error: "Invalid booking confirmation request" },
+  );
+});
+
+test("createLangChainReservationTools keeps resource labels in get_services summaries", async () => {
+  const getServicesTool = getWrappedTool(GET_SERVICES_TOOL_NAME);
+
+  const result = await getServicesTool.invoke({});
+
+  assert.deepEqual(result, {
+    services: [
+      {
+        id: "racing-simulator",
+        name: "Racing Simulator",
+        description: "Assigned simulator stations.",
+        total_capacity: 2,
+        resource_kind: "station",
+        selection_mode: "assigned_resource",
+        reservation_policy: createAssignedResourcePolicy(2),
+        resource_labels: ["SIM 1", "SIM 2"],
+      },
+      {
+        id: "ps5",
+        name: "PS5",
+        description: "Quantity booking.",
+        total_capacity: 2,
+        resource_kind: "capacity_bucket",
+        selection_mode: "quantity",
+        reservation_policy: createCapacityPolicy(2),
+      },
+    ],
   });
 });
 

@@ -1,3 +1,5 @@
+import { extractPreparedBookingActionFromToolCalls } from "@project-play/reservation-chat-core";
+
 export interface ToolCall {
     id: string;
     function: {
@@ -26,53 +28,7 @@ export function extractPreparedBookingAction(toolCalls: ToolCall[]): {
     type: 'booking_confirmation';
     data: BookingConfirmationData;
 } | null {
-    for (const toolCall of toolCalls) {
-        if (toolCall.function.name !== 'prepare_booking') {
-            continue;
-        }
-
-        try {
-            const args = JSON.parse(toolCall.function.arguments || '{}');
-            const {
-                service_name: service,
-                date,
-                start_time: time,
-                seats,
-                user_name: name,
-                user_email: email,
-                user_phone: phone,
-            } = args;
-
-            if (
-                typeof service !== 'string' ||
-                typeof date !== 'string' ||
-                typeof time !== 'string' ||
-                typeof seats !== 'number' ||
-                typeof name !== 'string' ||
-                typeof email !== 'string' ||
-                typeof phone !== 'string'
-            ) {
-                return null;
-            }
-
-            return {
-                type: 'booking_confirmation',
-                data: {
-                    service,
-                    date,
-                    time,
-                    seats,
-                    name,
-                    email,
-                    phone,
-                },
-            };
-        } catch {
-            return null;
-        }
-    }
-
-    return null;
+    return extractPreparedBookingActionFromToolCalls(toolCalls);
 }
 
 export async function resolveToolCalls(

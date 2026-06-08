@@ -1,7 +1,7 @@
-import { z } from "zod";
 import { tool } from "@langchain/core/tools";
 import { createReactAgent } from "@langchain/langgraph/prebuilt";
 import { MemorySaver } from "@langchain/langgraph";
+import { z } from "zod";
 import {
   HumanMessage,
   AIMessage,
@@ -9,12 +9,46 @@ import {
   BaseMessage,
   ToolMessage,
 } from "@langchain/core/messages";
+import {
+  CHECK_AVAILABILITY_TOOL_NAME,
+  GET_SERVICES_TOOL_NAME,
+  PREPARE_BOOKING_TOOL_NAME,
+  bookingConfirmationActionFromPreparedBookingPayload,
+  createDomainGuard,
+  createReservationChatTools,
+  parsePreparedBookingPayloadJson,
+  parsePrepareBookingInput,
+  type BookingAction,
+  type ChatAction as CoreChatAction,
+  type CreateReservationChatToolsInput,
+  type ReservationChatTool,
+} from "@project-play/reservation-chat-core";
+import type { ReservationService } from "@project-play/reservations-core";
+import {
+  adaptServiceMetadata,
+  createSupabaseReservationRepository,
+  getLegacyFallbackLabels,
+  RESERVATION_SUPABASE_SELECTS,
+  type ServiceMetadataRow,
+} from "@project-play/reservations-supabase";
 import { supabase } from "@/lib/supabase";
 import { supabaseAdmin } from "@/lib/supabase-admin";
-import { getEndTime, generateTimeSlots } from "@/lib/availability";
+import { getEndTime } from "@/lib/availability";
 import { getAvailableSeatsWithMaintenance } from "@/lib/reservation-capacity";
 import { createOpenRouterChat } from "./models";
 import { buildBookingSystemPromptWithContext } from "./prompts";
+
+export type { BookingAction };
+
+type SupabaseRepositoryClient = Parameters<typeof createSupabaseReservationRepository>[0];
+type ReservationToolRepository = CreateReservationChatToolsInput["repository"];
+
+interface CreateLangChainReservationToolsOptions {
+  descriptors?: ReservationChatTool[];
+  repository?: CreateReservationChatToolsInput["repository"];
+  listServices?: CreateReservationChatToolsInput["listServices"];
+  resolveServiceByName?: CreateReservationChatToolsInput["resolveServiceByName"];
+}
 
 interface ServiceRecord {
   id: string;
@@ -29,19 +63,6 @@ interface ServiceRecord {
 export interface ChatMessage {
   role: "user" | "assistant";
   content: string;
-}
-
-export interface BookingAction {
-  type: "booking_confirmation" | "booking_success";
-  data: {
-    service: string;
-    date: string;
-    time: string;
-    seats: number;
-    name: string;
-    email: string;
-    phone: string;
-  };
 }
 
 export interface LocationDirectionsAction {
@@ -60,7 +81,7 @@ export interface LocationDirectionsAction {
   };
 }
 
-export type ChatAction = BookingAction | LocationDirectionsAction;
+export type ChatAction = CoreChatAction<LocationDirectionsAction>;
 
 export interface ChatAgentResult {
   content: string;
@@ -100,22 +121,11 @@ const allowedChatTopics = [
   /\b(service|racing|simulator|playstation|ps5|game|games|equipment|price|pricing|cost|policy|policies|rule|rules|faq|location|open|hours|contact|project\s+play)\b/i,
 ];
 
-export function getChatDomainGuardResponse(message: string): string | null {
-  const normalizedMessage = message.trim();
-
-  if (!normalizedMessage) {
-    return null;
-  }
-
-  const isAllowedTopic = allowedChatTopics.some((pattern) => pattern.test(normalizedMessage));
-  if (isAllowedTopic) {
-    return null;
-  }
-
-  return blockedChatTopics.some((pattern) => pattern.test(normalizedMessage))
-    ? CHAT_DOMAIN_GUARD_RESPONSE
-    : null;
-}
+export const getChatDomainGuardResponse = createDomainGuard({
+  allowedTopics: allowedChatTopics,
+  blockedTopics: blockedChatTopics,
+  fallbackResponse: CHAT_DOMAIN_GUARD_RESPONSE,
+});
 
 export function getLocationDirectionsAction(message: string): LocationDirectionsAction | null {
   const normalizedMessage = message.trim();
@@ -148,118 +158,124 @@ async function getServiceByName(serviceName: string): Promise<ServiceRecord | nu
   return data;
 }
 
-const getServicesTool = tool(
-  async () => {
-    const { data, error } = await supabase()
-      .from("services")
-      .select("id, name, description, total_seats, resource_kind, selection_mode, reservation_policy");
-    if (error) return { error: error.message };
-    return {
-      services: data?.map((service) => ({
-        id: service.id,
-        name: service.name,
-        description: service.description,
-        total_capacity: service.total_seats,
-        resource_kind: service.resource_kind,
-        selection_mode: service.selection_mode,
-        reservation_policy: service.reservation_policy,
-      })),
-    };
-  },
-  {
-    name: "get_services",
-    description: "Get the current list of bookable services and their capacity/resource reservation metadata",
-    schema: z.object({}),
+async function listReservationServices(
+  repository: ReservationToolRepository = createChatReservationRepository(),
+): Promise<ReservationService[]> {
+  const { data, error } = await supabase()
+    .from("services")
+    .select(RESERVATION_SUPABASE_SELECTS.service);
+
+  if (error) {
+    throw new Error(error.message);
   }
-);
 
-const checkAvailabilityTool = tool(
-  async ({ service_name, date }) => {
-    try {
-      const service = await getServiceByName(service_name);
-      if (!service) return { error: "Service not found" };
+  return Promise.all(
+    (data ?? []).map(async (service) => {
+      const serviceRow = service as ServiceMetadataRow;
+      return await repository.getService(serviceRow.id) ?? adaptServiceMetadata(serviceRow);
+    })
+  );
+}
 
-      const bookingClient = supabaseAdmin();
-      const { data: bookings, error: bookingsError } = await bookingClient
-        .from("bookings")
-        .select("start_time, seats_booked, seat_labels")
-        .eq("service_id", service.id)
-        .eq("booking_date", date)
-        .eq("status", "confirmed");
+async function resolveReservationServiceByName(
+  serviceName: string,
+  repository: ReservationToolRepository = createChatReservationRepository(),
+): Promise<ReservationService | null> {
+  const service = await getServiceByName(serviceName);
 
-      if (bookingsError) throw bookingsError;
+  return service ? repository.getService(service.id) : null;
+}
 
-      const { data: maintenanceSeats, error: maintenanceError } = await bookingClient
-        .from("service_seat_maintenance")
-        .select("seat_label")
-        .eq("service_id", service.id)
-        .eq("is_active", true);
+function createChatReservationRepository() {
+  return createSupabaseReservationRepository(
+    supabaseAdmin() as unknown as SupabaseRepositoryClient,
+  );
+}
 
-      if (maintenanceError) throw maintenanceError;
-
-      const maintenanceSeatLabels = (maintenanceSeats || [])
-        .map((seat) => seat.seat_label)
-        .filter((label): label is string => typeof label === "string");
-
-      const slots = generateTimeSlots(service.total_seats, bookings || [], maintenanceSeatLabels)
-        .filter((slot) => slot.is_available)
-        .map((slot) => ({
-          time: slot.start_time,
-          available_seats: slot.available_seats,
-        }));
-
-      return {
-        service_name: service.name,
-        service_id: service.id,
-        date,
-        total_capacity: service.total_seats,
-        resource_kind: service.resource_kind,
-        selection_mode: service.selection_mode,
-        available_slots: slots,
-      };
-    } catch (error) {
+async function executeReservationToolDescriptor(
+  descriptor: ReturnType<typeof createReservationChatTools>[number],
+  input: unknown,
+) {
+  try {
+    return await descriptor.execute(input);
+  } catch (error) {
+    if (descriptor.name === CHECK_AVAILABILITY_TOOL_NAME) {
       console.error("Failed to check chat booking availability:", error);
       return { error: "Booking availability is temporarily unavailable" };
     }
-  },
-  {
-    name: "check_availability",
-    description: "Check available time slots for any bookable service on a specific date",
-    schema: z.object({
-      service_name: z.string().describe("Name of the bookable service from get_services"),
-      date: z.string().describe("Date in YYYY-MM-DD format"),
-    }),
-  }
-);
 
-const prepareBookingTool = tool(
-  async ({ service_name, date, start_time, seats, user_name, user_email, user_phone }) => {
-    return {
-      ready_for_confirmation: true,
-      service_name,
-      date,
-      start_time,
-      seats,
-      user_name,
-      user_email,
-      user_phone,
-    };
-  },
-  {
-    name: "prepare_booking",
-    description:
-      "Prepare a booking for user confirmation. Call this when you have ALL details: service, date, time, seats, name, email, and phone. This does NOT create the booking yet - it shows a confirmation card to the user.",
-    schema: z.object({
-      service_name: z.string().describe("Name of the bookable service from get_services"),
-      date: z.string().describe("Date in YYYY-MM-DD format"),
-      start_time: z.string().describe("Start time in HH:MM format"),
-      seats: z.number().describe("Booking quantity, such as seats, stations, rooms, or capacity units"),
-      user_name: z.string().describe("Customer name"),
-      user_email: z.string().describe("Customer email"),
-      user_phone: z.string().describe("Customer phone number"),
-    }),
+    if (descriptor.name === GET_SERVICES_TOOL_NAME) {
+      return {
+        error: error instanceof Error ? error.message : "Services are temporarily unavailable",
+      };
+    }
+
+    throw error;
   }
-);
+}
+
+function getRelaxedLangChainToolSchema(toolName: string) {
+  if (toolName === CHECK_AVAILABILITY_TOOL_NAME) {
+    return z.object({
+      service_name: z.string().optional().describe("Name of the bookable service from get_services"),
+      date: z.string().optional().describe("Date in YYYY-MM-DD format"),
+    }).passthrough();
+  }
+
+  if (toolName === PREPARE_BOOKING_TOOL_NAME) {
+    return z.object({
+      service_name: z.string().optional().describe("Name of the bookable service from get_services"),
+      date: z.string().optional().describe("Date in YYYY-MM-DD format"),
+      start_time: z.string().optional().describe("Start time in HH:MM format"),
+      seats: z.union([z.number(), z.string()]).optional().describe(
+        "Booking quantity, such as seats, stations, rooms, or capacity units",
+      ),
+      user_name: z.string().optional().describe("Customer name"),
+      user_email: z.string().optional().describe("Customer email"),
+      user_phone: z.string().optional().describe("Customer phone number"),
+    }).passthrough();
+  }
+
+  return z.object({}).passthrough();
+}
+
+export function createLangChainReservationTools(
+  options: CreateLangChainReservationToolsOptions = {},
+) {
+  const reservationRepository = options.repository ?? createChatReservationRepository();
+  const descriptors = options.descriptors ?? createReservationChatTools({
+    repository: reservationRepository,
+    listServices: options.listServices ?? (() => listReservationServices(reservationRepository)),
+    resolveServiceByName:
+      options.resolveServiceByName ??
+      ((serviceName) => resolveReservationServiceByName(serviceName, reservationRepository)),
+    copy: {
+      listServicesDescription:
+        "Get the current list of bookable services and their capacity/resource reservation metadata",
+      checkAvailabilityDescription:
+        "Check available time slots for any bookable service on a specific date",
+      prepareBookingDescription:
+        "Prepare a booking for user confirmation. Call this when you have ALL details: service, date, time, seats, name, email, and phone. This does NOT create the booking yet - it shows a confirmation card to the user.",
+    },
+    availability: {
+      legacyFallbackLabels: getLegacyFallbackLabels,
+    },
+  });
+
+  return descriptors.map((descriptor) =>
+    tool(
+      async (input) => executeReservationToolDescriptor(descriptor, input),
+      {
+        name: descriptor.name,
+        description: descriptor.description,
+        metadata: {
+          descriptorInputSchema: descriptor.inputSchema,
+        },
+        schema: getRelaxedLangChainToolSchema(descriptor.name),
+      }
+    )
+  );
+}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
@@ -289,50 +305,6 @@ function getContentText(content: BaseMessage["content"]): string {
     .join("");
 }
 
-function parseJsonRecord(content: string): Record<string, unknown> | null {
-  try {
-    const parsed = JSON.parse(content);
-    return isRecord(parsed) ? parsed : null;
-  } catch {
-    return null;
-  }
-}
-
-function bookingActionFromArgs(args: Record<string, unknown>): BookingAction | null {
-  const service = args.service_name;
-  const date = args.date;
-  const time = args.start_time;
-  const seats = args.seats;
-  const name = args.user_name;
-  const email = args.user_email;
-  const phone = args.user_phone;
-
-  if (
-    typeof service !== "string" ||
-    typeof date !== "string" ||
-    typeof time !== "string" ||
-    typeof seats !== "number" ||
-    typeof name !== "string" ||
-    typeof email !== "string" ||
-    typeof phone !== "string"
-  ) {
-    return null;
-  }
-
-  return {
-    type: "booking_confirmation",
-    data: {
-      service,
-      date,
-      time,
-      seats,
-      name,
-      email,
-      phone,
-    },
-  };
-}
-
 export function extractPreparedBookingAction(messages: BaseMessage[]): BookingAction | null {
   const lastHumanMessageIndex = messages.findLastIndex(
     (message) => message instanceof HumanMessage
@@ -342,9 +314,9 @@ export function extractPreparedBookingAction(messages: BaseMessage[]): BookingAc
 
   for (const message of [...candidateMessages].reverse()) {
     if (ToolMessage.isInstance(message)) {
-      const payload = parseJsonRecord(getContentText(message.content));
-      if (payload?.ready_for_confirmation === true) {
-        return bookingActionFromArgs(payload);
+      const payload = parsePreparedBookingPayloadJson(getContentText(message.content));
+      if (payload) {
+        return bookingConfirmationActionFromPreparedBookingPayload(payload);
       }
     }
 
@@ -352,10 +324,21 @@ export function extractPreparedBookingAction(messages: BaseMessage[]): BookingAc
       const toolCalls = Array.isArray(message.tool_calls) ? message.tool_calls : [];
 
       for (const toolCall of toolCalls) {
-        if (toolCall.name === "prepare_booking" && isRecord(toolCall.args)) {
-          const action = bookingActionFromArgs(toolCall.args);
-          if (action) {
-            return action;
+        if (toolCall.name === PREPARE_BOOKING_TOOL_NAME && isRecord(toolCall.args)) {
+          const payload = parsePrepareBookingInput(toolCall.args);
+          if (payload) {
+            return {
+              type: "booking_confirmation",
+              data: {
+                service: payload.service_name,
+                date: payload.date,
+                time: payload.start_time,
+                seats: payload.seats,
+                name: payload.user_name,
+                email: payload.user_email,
+                phone: payload.user_phone,
+              },
+            };
           }
         }
       }
@@ -445,7 +428,7 @@ function createChatAgent() {
 
   return createReactAgent({
     llm,
-    tools: [getServicesTool, checkAvailabilityTool, prepareBookingTool],
+    tools: createLangChainReservationTools(),
     checkpointSaver: new MemorySaver(),
   });
 }

@@ -1,10 +1,13 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { ReservableResource, ResourceLayout } from '@/types';
 
 interface Props {
     totalSeats: number;
     maxAvailable: number;
+    resources?: ReservableResource[];
+    layout?: ResourceLayout;
     takenSeatLabels?: string[];
     maintenanceSeatLabels?: string[];
     onSelectionChange: (selectedSeats: number[], seatLabels: string[]) => void;
@@ -20,6 +23,17 @@ function getSeatLabel(seatNumber: number) {
     return `RS${seatNumber}`;
 }
 
+function getFallbackResources(totalSeats: number): ReservableResource[] {
+    return Array.from({ length: totalSeats }, (_, index) => ({
+        id: `legacy-rs-${index + 1}`,
+        service_id: 'legacy',
+        label: getSeatLabel(index + 1),
+        kind: 'seat',
+        is_active: true,
+        capacity: 1,
+    }));
+}
+
 export function getSeatNumbersFromLabels(seatLabels: string[], totalSeats: number) {
     return seatLabels
         .map(label => {
@@ -33,33 +47,62 @@ export function getSeatNumbersFromLabels(seatLabels: string[], totalSeats: numbe
         ));
 }
 
+export function getResourceIndexesFromLabels(
+    resourceLabels: string[],
+    resources: Pick<ReservableResource, 'label'>[],
+) {
+    const normalizedIndexes = new Map(
+        resources.map((resource, index) => [resource.label.trim().toLowerCase(), index + 1]),
+    );
+
+    return resourceLabels
+        .map(label => normalizedIndexes.get(label.trim().toLowerCase()) ?? Number.NaN)
+        .filter(resourceIndex => Number.isInteger(resourceIndex));
+}
+
 export default function SeatMap({ 
     totalSeats, 
     maxAvailable,
+    resources,
+    layout,
     takenSeatLabels = [],
     maintenanceSeatLabels = [],
     onSelectionChange 
 }: Props) {
     const [selectedSeats, setSelectedSeats] = useState<number[]>([]);
+    const selectableResources = useMemo(
+        () => (resources && resources.length > 0 ? resources : getFallbackResources(totalSeats)),
+        [resources, totalSeats],
+    );
+    const isRacingFallbackLayout =
+        (!layout || layout.kind === 'none') &&
+        selectableResources.length === 16 &&
+        selectableResources.every((resource, index) => resource.label === getSeatLabel(index + 1));
+    const resourceNoun = selectableResources[0]?.kind === 'seat' ? 'Seats' : 'Resources';
     const maintenanceSeats = useMemo(
-        () => getSeatNumbersFromLabels(maintenanceSeatLabels, totalSeats),
-        [maintenanceSeatLabels, totalSeats],
+        () => getResourceIndexesFromLabels(maintenanceSeatLabels, selectableResources),
+        [maintenanceSeatLabels, selectableResources],
     );
     const bookedSeats = useMemo(() => {
-        const takenSeatNumbers = getSeatNumbersFromLabels(takenSeatLabels, totalSeats)
+        const takenSeatNumbers = getResourceIndexesFromLabels(takenSeatLabels, selectableResources)
             .filter(seatNumber => !maintenanceSeats.includes(seatNumber));
 
         if (takenSeatNumbers.length > 0) {
             return takenSeatNumbers;
         }
 
-        const unavailable = Math.max(0, totalSeats - maxAvailable - maintenanceSeats.length);
-        return Array.from({ length: unavailable }, (_, index) => totalSeats - index);
-    }, [totalSeats, maxAvailable, takenSeatLabels, maintenanceSeats]);
+        const unavailable = Math.max(0, selectableResources.length - maxAvailable - maintenanceSeats.length);
+        return Array.from({ length: unavailable }, (_, index) => selectableResources.length - index);
+    }, [selectableResources, maxAvailable, takenSeatLabels, maintenanceSeats]);
 
     useEffect(() => {
-        onSelectionChange(selectedSeats, selectedSeats.map(getSeatLabel));
-    }, [selectedSeats, onSelectionChange]);
+        onSelectionChange(
+            selectedSeats,
+            selectedSeats
+                .map(seatNumber => selectableResources[seatNumber - 1]?.label)
+                .filter((label): label is string => Boolean(label)),
+        );
+    }, [selectedSeats, selectableResources, onSelectionChange]);
 
     const toggleSeat = (seatNumber: number) => {
         if (bookedSeats.includes(seatNumber) || maintenanceSeats.includes(seatNumber)) return;
@@ -76,7 +119,7 @@ export default function SeatMap({
 
     const renderSeat = (seatNumber: number) => {
         const status = getSeatStatus(seatNumber);
-        const label = getSeatLabel(seatNumber);
+        const label = selectableResources[seatNumber - 1]?.label ?? getSeatLabel(seatNumber);
 
         return (
             <button
@@ -124,33 +167,67 @@ export default function SeatMap({
         );
     };
 
-    // Layout per user's diagram:
-    // Island A: Row 1 = RS1,RS2,RS3,RS4 | Row 2 = RS9,RS10,RS11,RS12
-    // Island B: Row 1 = RS5,RS6,RS7,RS8 | Row 2 = RS13,RS14,RS15,RS16
-    const leftIslandRow1 = [1, 2, 3, 4];
-    const leftIslandRow2 = [9, 10, 11, 12];
-    const rightIslandRow1 = [5, 6, 7, 8];
-    const rightIslandRow2 = [13, 14, 15, 16];
+    const renderResourceGrid = () => {
+        const columns = layout?.kind === 'grid' ? Math.max(1, layout.columns) : 4;
 
-    return (
-        <div className="space-y-6">
-            <div className="text-center">
-                <h3 className="text-xl font-bold font-heading mb-1">Select Your Seats</h3>
-                <p className="text-sm text-gray-400">
-                    Click on available seats • {selectedSeats.length} selected
-                </p>
+        return (
+            <div className="mx-auto grid max-w-2xl gap-2" style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}>
+                {selectableResources.map((resource, index) => renderSeat(index + 1))}
             </div>
+        );
+    };
 
-            {/* Racing Screen / Track View */}
-            <div className="text-center">
-                <div className="mx-auto w-4/5 h-6 bg-gradient-to-b from-neon/20 to-transparent rounded-t-full flex items-center justify-center border-t border-neon/30">
-                    <span className="text-xs text-neon/70 font-heading uppercase tracking-widest">PCs</span>
-                </div>
+    const renderCustomLayout = () => {
+        if (layout?.kind !== 'custom' || layout.positions.length === 0) {
+            return renderResourceGrid();
+        }
+
+        const resourcesById = new Map(selectableResources.map((resource, index) => [resource.id, index + 1]));
+        const groupedPositions = layout.positions.reduce<Record<string, number[]>>((groups, position) => {
+            const resourceIndex = resourcesById.get(position.resource_id);
+
+            if (!resourceIndex) {
+                return groups;
+            }
+
+            const groupLabel = position.group_label ?? 'Resources';
+            groups[groupLabel] = [...(groups[groupLabel] ?? []), resourceIndex];
+            return groups;
+        }, {});
+
+        if (Object.keys(groupedPositions).length === 0) {
+            return renderResourceGrid();
+        }
+
+        return (
+            <div className="flex flex-wrap justify-center gap-8">
+                {Object.entries(groupedPositions).map(([groupLabel, resourceIndexes]) => (
+                    <div key={groupLabel} className="space-y-2">
+                        <div className="text-center text-xs text-gray-500 mb-2">{groupLabel}</div>
+                        <div className="grid grid-cols-4 gap-2">
+                            {resourceIndexes.map(renderSeat)}
+                        </div>
+                    </div>
+                ))}
             </div>
+        );
+    };
 
-            {/* Two Island Layout */}
+    const renderResourceLayout = () => {
+        if (!isRacingFallbackLayout) {
+            return layout?.kind === 'custom' ? renderCustomLayout() : renderResourceGrid();
+        }
+
+        // Layout per user's diagram:
+        // Island A: Row 1 = RS1,RS2,RS3,RS4 | Row 2 = RS9,RS10,RS11,RS12
+        // Island B: Row 1 = RS5,RS6,RS7,RS8 | Row 2 = RS13,RS14,RS15,RS16
+        const leftIslandRow1 = [1, 2, 3, 4];
+        const leftIslandRow2 = [9, 10, 11, 12];
+        const rightIslandRow1 = [5, 6, 7, 8];
+        const rightIslandRow2 = [13, 14, 15, 16];
+
+        return (
             <div className="flex justify-center gap-8">
-                {/* Left Island */}
                 <div className="space-y-2">
                     <div className="text-center text-xs text-gray-500 mb-2">Island A</div>
                     <div className="grid grid-cols-4 gap-2">
@@ -161,12 +238,10 @@ export default function SeatMap({
                     </div>
                 </div>
 
-                {/* Aisle */}
                 <div className="flex flex-col items-center justify-center text-gray-600">
                     <div className="w-px h-full bg-white/10" />
                 </div>
 
-                {/* Right Island */}
                 <div className="space-y-2">
                     <div className="text-center text-xs text-gray-500 mb-2">Island B</div>
                     <div className="grid grid-cols-4 gap-2">
@@ -177,6 +252,27 @@ export default function SeatMap({
                     </div>
                 </div>
             </div>
+        );
+    };
+
+    return (
+        <div className="space-y-6">
+            <div className="text-center">
+                <h3 className="text-xl font-bold font-heading mb-1">Select Your {resourceNoun}</h3>
+                <p className="text-sm text-gray-400">
+                    Click on available {resourceNoun.toLowerCase()} - {selectedSeats.length} selected
+                </p>
+            </div>
+
+            {isRacingFallbackLayout && (
+                <div className="text-center">
+                    <div className="mx-auto w-4/5 h-6 bg-gradient-to-b from-neon/20 to-transparent rounded-t-full flex items-center justify-center border-t border-neon/30">
+                        <span className="text-xs text-neon/70 font-heading uppercase tracking-widest">PCs</span>
+                    </div>
+                </div>
+            )}
+
+            {renderResourceLayout()}
 
             {/* Legend */}
             <div className="flex justify-center gap-6 text-xs pt-2">
@@ -202,8 +298,8 @@ export default function SeatMap({
             {selectedSeats.length > 0 && (
                 <div className="p-3 bg-neon/10 border border-neon/30 rounded-lg text-center">
                     <p className="text-sm text-neon font-medium">
-                        {selectedSeats.length} seat{selectedSeats.length > 1 ? 's' : ''}: {' '}
-                        {[...selectedSeats].sort((a, b) => a - b).map(s => getSeatLabel(s)).join(', ')}
+                        {selectedSeats.length} {resourceNoun.toLowerCase().replace(/s$/, '')}{selectedSeats.length > 1 ? 's' : ''}: {' '}
+                        {[...selectedSeats].sort((a, b) => a - b).map(s => selectableResources[s - 1]?.label ?? getSeatLabel(s)).join(', ')}
                     </p>
                 </div>
             )}

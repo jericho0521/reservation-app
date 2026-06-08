@@ -7,7 +7,7 @@ import DatePicker from './DatePicker';
 import TimeSlotSelector from './TimeSlotSelector';
 import SeatMap from './SeatMap';
 import BookingSummary from './BookingSummary';
-import { Booking } from '@/types';
+import { AvailabilityResponse, Booking, ReservableResource, ReservationPolicy, ResourceLayout, ResourceSelectionMode } from '@/types';
 
 const ConfettiExplosion = dynamic(() => import('../ui/ConfettiExplosion'), {
     ssr: false,
@@ -19,6 +19,10 @@ interface FormData extends Partial<Booking> {
     service_name?: string;
     max_seats?: number;
     selected_seat_labels?: string[];
+    selection_mode?: ResourceSelectionMode;
+    reservation_policy?: ReservationPolicy;
+    resources?: ReservableResource[];
+    layout?: ResourceLayout;
 }
 
 export default function MultiStepForm() {
@@ -45,6 +49,15 @@ export default function MultiStepForm() {
         }));
     }, []);
 
+    const shouldUseResourceSelection = (data: Partial<FormData>) => {
+        return data.selection_mode === 'assigned_resource' || (
+            data.selection_mode === 'hybrid' &&
+            data.reservation_policy?.require_resource_labels === true
+        );
+    };
+
+    const getDefaultQuantity = (data: Partial<FormData>) => shouldUseResourceSelection(data) ? 0 : 1;
+
     const nextStep = () => setCurrentStep(prev => prev + 1);
     const prevStep = () => setCurrentStep(prev => prev - 1);
 
@@ -63,7 +76,7 @@ export default function MultiStepForm() {
                     start_time: formData.start_time,
                     end_time: formData.end_time,
                     seats_booked: formData.seats_booked,
-                    seat_labels: formData.selected_seat_labels || [],
+                    seat_labels: shouldUseResourceSelection(formData) ? (formData.selected_seat_labels || []) : [],
                     interface_type: formData.interface_type
                 })
             });
@@ -142,18 +155,22 @@ export default function MultiStepForm() {
                 {currentStep === 1 && (
                     <ServiceSelector
                         selected={formData.service_id}
-                        onSelect={(serviceId, serviceName, totalSeats) => {
+                        onSelect={(service) => {
                             setAvailableSeats(0);
                             setTakenSeatLabels([]);
                             setMaintenanceSeatLabels([]);
                             updateFormData({
-                                service_id: serviceId,
-                                service_name: serviceName,
-                                max_seats: totalSeats,
+                                service_id: service.id,
+                                service_name: service.name,
+                                max_seats: service.total_seats,
                                 start_time: undefined,
                                 end_time: undefined,
                                 selected_seat_labels: undefined,
-                                seats_booked: totalSeats === 16 ? 0 : 1,
+                                selection_mode: service.selection_mode,
+                                reservation_policy: service.reservation_policy,
+                                resources: service.resources,
+                                layout: service.layout,
+                                seats_booked: getDefaultQuantity(service),
                             });
                         }}
                     />
@@ -172,7 +189,7 @@ export default function MultiStepForm() {
                                     start_time: undefined,
                                     end_time: undefined,
                                     selected_seat_labels: undefined,
-                                    seats_booked: formData.max_seats === 16 ? 0 : 1,
+                                    seats_booked: getDefaultQuantity(formData),
                                 });
                             }}
                         />
@@ -181,12 +198,24 @@ export default function MultiStepForm() {
                                 serviceId={formData.service_id}
                                 date={formData.booking_date}
                                 selectedStart={formData.start_time}
-                                onSelect={(start, end, seats, labels, maintenanceLabels) => {
+                                onSelect={(start, end, seats, labels, maintenanceLabels, metadata: AvailabilityResponse) => {
+                                    const nextData: Partial<FormData> = {
+                                        ...formData,
+                                        selection_mode: metadata.selection_mode ?? formData.selection_mode ?? 'quantity',
+                                        reservation_policy: metadata.reservation_policy ?? formData.reservation_policy,
+                                        resources: metadata.resources ?? formData.resources,
+                                        layout: metadata.layout ?? formData.layout,
+                                    };
+
                                     updateFormData({
                                         start_time: start,
                                         end_time: end,
                                         selected_seat_labels: undefined,
-                                        seats_booked: formData.max_seats === 16 ? 0 : 1,
+                                        selection_mode: nextData.selection_mode,
+                                        reservation_policy: nextData.reservation_policy,
+                                        resources: nextData.resources,
+                                        layout: nextData.layout,
+                                        seats_booked: getDefaultQuantity(nextData),
                                     });
                                     setAvailableSeats(seats);
                                     setTakenSeatLabels(labels);
@@ -199,18 +228,19 @@ export default function MultiStepForm() {
 
                 {currentStep === 3 && (
                     <div className="space-y-8">
-                        {/* Only show SeatMap for Racing Simulator (16 seats) */}
-                        {formData.max_seats === 16 ? (
+                        {shouldUseResourceSelection(formData) ? (
                             <SeatMap
                                 key={`${formData.service_id}-${formData.booking_date}-${formData.start_time}`}
-                                totalSeats={16}
+                                totalSeats={formData.max_seats ?? 0}
                                 maxAvailable={availableSeats}
+                                resources={formData.resources}
+                                layout={formData.layout}
                                 takenSeatLabels={takenSeatLabels}
                                 maintenanceSeatLabels={maintenanceSeatLabels}
                                 onSelectionChange={handleSeatSelectionChange}
                             />
                         ) : (
-                            /* Simple seat count for PS5 (2 seats) */
+                            /* Simple quantity input for count-only services. */
                             <div className="space-y-4">
                                 <h3 className="text-xl font-bold font-heading">Number of Seats</h3>
                                 <p className="text-sm text-gray-400">
@@ -317,7 +347,10 @@ function isStepValid(step: number, data: Partial<FormData>): boolean {
         case 2:
             return !!data.booking_date && !!data.start_time && !!data.end_time;
         case 3:
-            if (data.max_seats === 16) {
+            if (data.selection_mode === 'assigned_resource' || (
+                data.selection_mode === 'hybrid' &&
+                data.reservation_policy?.require_resource_labels === true
+            )) {
                 const selectedLabels = data.selected_seat_labels ?? [];
 
                 return (

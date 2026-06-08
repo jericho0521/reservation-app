@@ -6,7 +6,7 @@ import { BOOKING_WHATSAPP_URL, shouldShowBookingMaintenanceFallback } from './bo
 
 interface Props {
     selected?: string;
-    onSelect: (serviceId: string, serviceName: string, totalSeats: number) => void;
+    onSelect: (service: Service) => void;
 }
 
 const fetcher = async (url: string) => {
@@ -44,8 +44,12 @@ export default function ServiceSelector({ selected, onSelect }: Props) {
         );
     }
 
-    const getServiceIcon = (name: string) => {
-        return name.toLowerCase().includes('racing') ? RacingIcon : PlayIcon;
+    const getServiceIcon = (service: Service) => {
+        if (service.selection_mode === 'assigned_resource' || service.resource_kind === 'station') {
+            return RacingIcon;
+        }
+
+        return service.name.toLowerCase().includes('racing') ? RacingIcon : PlayIcon;
     };
 
     if (shouldShowBookingMaintenanceFallback(services, error, loading)) {
@@ -77,14 +81,14 @@ export default function ServiceSelector({ selected, onSelect }: Props) {
                 {services.map(service => (
                     <div
                         key={service.id}
-                        onClick={() => onSelect(service.id, service.name, service.total_seats)}
+                        onClick={() => onSelect(service)}
                         className={`p-8 border-2 rounded-lg cursor-pointer transition-all duration-300 ${selected === service.id
                             ? 'border-neon bg-neon/10 shadow-[0_0_20px_rgba(185,217,207,0.3)]'
                             : 'border-white/20 hover:border-neon/50 bg-white/5'
                             }`}
                     >
                         <div className={`mb-4 ${selected === service.id ? 'text-neon' : 'text-gray-400'}`}>
-                            {getServiceIcon(service.name)}
+                            {getServiceIcon(service)}
                         </div>
                         <h3 className="font-bold text-xl font-heading mb-2">{service.name}</h3>
                         {service.description && (

@@ -1,7 +1,7 @@
 'use client';
 
 import useSWR from 'swr';
-import { TimeSlot } from '@/types';
+import { AvailabilityResponse } from '@/types';
 
 interface Props {
     serviceId: string;
@@ -12,6 +12,7 @@ interface Props {
         availableSeats: number,
         takenSeatLabels: string[],
         maintenanceSeatLabels: string[],
+        metadata: AvailabilityResponse,
     ) => void;
     selectedStart?: string;
 }
@@ -23,7 +24,7 @@ async function availabilityFetcher([url, serviceId, date]: readonly [string, str
         throw new Error('Failed to fetch time slots');
     }
 
-    return response.json() as Promise<{ timeSlots?: TimeSlot[] }>;
+    return response.json() as Promise<AvailabilityResponse>;
 }
 
 export default function TimeSlotSelector({ serviceId, date, onSelect, selectedStart }: Props) {
@@ -67,6 +68,7 @@ export default function TimeSlotSelector({ serviceId, date, onSelect, selectedSt
                             slot.available_seats,
                             slot.taken_seat_labels,
                             slot.maintenance_seat_labels ?? [],
+                            data ?? {},
                         )}
                         disabled={!slot.is_available}
                         className={`px-4 py-4 rounded-lg text-sm font-medium transition-all duration-300 ${selectedStart === slot.start_time

@@ -3,7 +3,7 @@
 import { Booking } from '@/types';
 
 interface Props {
-    booking: Partial<Booking> & { service_name?: string };
+    booking: Partial<Booking> & { service_name?: string; selected_seat_labels?: string[] };
 }
 
 export default function BookingSummary({ booking }: Props) {
@@ -42,14 +42,14 @@ export default function BookingSummary({ booking }: Props) {
                     <span className="font-medium text-neon">{booking.seats_booked} {booking.seats_booked === 1 ? 'seat' : 'seats'}</span>
                 </div>
 
-                {booking.seat_labels && booking.seat_labels.length > 0 && (
+                {(booking.selected_seat_labels ?? booking.seat_labels)?.length ? (
                     <div className="flex justify-between border-b border-white/10 pb-4 gap-6">
-                        <span className="text-gray-400">Seat Labels</span>
+                        <span className="text-gray-400">Resource Labels</span>
                         <span className="font-medium text-neon text-right">
-                            {booking.seat_labels.join(', ')}
+                            {(booking.selected_seat_labels ?? booking.seat_labels ?? []).join(', ')}
                         </span>
                     </div>
-                )}
+                ) : null}
 
                 <div className="flex justify-between border-b border-white/10 pb-4">
                     <span className="text-gray-400">Name</span>

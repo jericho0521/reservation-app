@@ -50,6 +50,9 @@ importers:
       '@langchain/openai':
         specifier: ^1.4.4
         version: 1.4.4(@langchain/core@1.1.41(@opentelemetry/api@1.9.0)(openai@6.34.0(ws@8.19.0)(zod@3.25.76))(ws@8.19.0))(ws@8.19.0)
+      '@project-play/reservation-chat-core':
+        specifier: workspace:*
+        version: link:packages/reservation-chat-core
       '@project-play/reservations-core':
         specifier: workspace:*
         version: link:packages/reservations-core
@@ -135,6 +138,19 @@ importers:
       ts-node:
         specifier: ^10.9.2
         version: 10.9.2(@types/node@20.19.28)(typescript@5.9.3)
+      tsx:
+        specifier: ^4.21.0
+        version: 4.21.0
+      typescript:
+        specifier: ^5
+        version: 5.9.3
+
+  packages/reservation-chat-core:
+    dependencies:
+      '@project-play/reservations-core':
+        specifier: workspace:*
+        version: link:../reservations-core
+    devDependencies:
       tsx:
         specifier: ^4.21.0
         version: 4.21.0

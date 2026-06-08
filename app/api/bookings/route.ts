@@ -2,12 +2,17 @@ import { NextResponse, NextRequest } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import {
-    getAvailableSeatsWithMaintenance,
     getBookingsForSlot,
-    getConflictingSeatLabels,
 } from '@/lib/reservation-capacity';
-import { getMaintenanceSeatConflicts } from '@/lib/seat-maintenance';
 import { jsonError, requireAuthenticatedSupabase, supabaseErrorStatus } from '@/app/api/api-utils';
+import {
+    adaptBookingRows,
+    adaptServiceMetadata,
+} from '@project-play/reservations-supabase';
+import {
+    adaptLegacyBooking,
+    validateReservationRequest,
+} from '@project-play/reservations-core';
 import { z } from 'zod';
 
 const bookingSchema = z.object({
@@ -80,10 +85,10 @@ export async function POST(request: Request) {
         const body = await request.json();
         const validatedData = bookingSchema.parse(body);
 
-        // Get service to check total seats
+        // Get service metadata for generic reservation validation.
         const { data: service, error: serviceError } = await supabase()
             .from('services')
-            .select('total_seats')
+            .select('id, name, description, total_seats, created_at, resource_kind, selection_mode, reservation_policy')
             .eq('id', validatedData.service_id)
             .single();
 
@@ -99,7 +104,7 @@ export async function POST(request: Request) {
 
         const { data: existingBookings, error: bookingsError } = await bookingClient
             .from('bookings')
-            .select('start_time, seats_booked, seat_labels')
+            .select('id, service_id, user_name, user_email, user_phone, booking_date, start_time, end_time, seats_booked, seat_labels, status, interface_type')
             .eq('service_id', validatedData.service_id)
             .eq('booking_date', validatedData.booking_date)
             .eq('status', 'confirmed');
@@ -114,6 +119,21 @@ export async function POST(request: Request) {
 
         if (maintenanceError) throw maintenanceError;
 
+        const { data: resources, error: resourcesError } = await bookingClient
+            .from('reservable_resources')
+            .select('id, service_id, label, kind, is_active, capacity, metadata')
+            .eq('service_id', validatedData.service_id);
+
+        if (resourcesError) throw resourcesError;
+
+        const { data: layout, error: layoutError } = await bookingClient
+            .from('resource_layouts')
+            .select('layout_kind, metadata')
+            .eq('service_id', validatedData.service_id)
+            .maybeSingle();
+
+        if (layoutError) throw layoutError;
+
         const sameSlotBookings = getBookingsForSlot(
             existingBookings || [],
             validatedData.start_time,
@@ -121,45 +141,36 @@ export async function POST(request: Request) {
         const maintenanceSeatLabels = (maintenanceSeats || [])
             .map(seat => seat.seat_label)
             .filter((label): label is string => typeof label === 'string');
-        const availableSeats = getAvailableSeatsWithMaintenance(
-            service.total_seats,
-            sameSlotBookings,
+        const reservationService = adaptServiceMetadata(service, resources || [], layout);
+        const validation = validateReservationRequest(
+            reservationService,
+            adaptBookingRows(sameSlotBookings.map((booking) => ({
+                ...booking,
+                interface_type: booking.interface_type === 'chat' ? 'chat' : 'form',
+            }))),
+            adaptLegacyBooking(validatedData),
             maintenanceSeatLabels,
         );
-        const requestedSeatLabels = validatedData.seat_labels ?? [];
 
-        if (
-            service.total_seats === 16 &&
-            requestedSeatLabels.length !== validatedData.seats_booked
-        ) {
+        if (validation.error === 'missing_resource_labels') {
             return jsonError('Selected seat labels must match booked seats', 400);
         }
 
-        if (validatedData.seats_booked > availableSeats) {
+        if (validation.error === 'not_enough_capacity') {
             return jsonError('Not enough seats available', 409, {
-                available_seats: availableSeats
+                available_seats: validation.available_quantity ?? 0
             });
         }
 
-        const maintenanceConflicts = getMaintenanceSeatConflicts(
-            requestedSeatLabels,
-            maintenanceSeatLabels,
-        );
-
-        if (maintenanceConflicts.length > 0) {
+        if (validation.error === 'maintenance_conflict') {
             return jsonError('Some selected seats are under maintenance', 409, {
-                seat_labels: maintenanceConflicts,
+                seat_labels: validation.conflicting_resource_labels ?? [],
             });
         }
 
-        const conflictingSeatLabels = getConflictingSeatLabels(
-            sameSlotBookings,
-            requestedSeatLabels,
-        );
-
-        if (conflictingSeatLabels.length > 0) {
+        if (validation.error === 'resource_conflict') {
             return jsonError('Some selected seats are no longer available', 409, {
-                seat_labels: conflictingSeatLabels,
+                seat_labels: validation.conflicting_resource_labels ?? [],
             });
         }
 

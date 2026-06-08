@@ -1,9 +1,22 @@
+import type {
+    ReservationPolicy,
+    ReservableResource,
+    ResourceKind,
+    ResourceLayout,
+    ResourceSelectionMode,
+} from "@project-play/reservations-core";
+
 export interface Service {
     id: string;
     name: string;
     description?: string;
     total_seats: number;
     created_at: string;
+    resource_kind?: ResourceKind;
+    selection_mode?: ResourceSelectionMode;
+    reservation_policy?: ReservationPolicy;
+    resources?: ReservableResource[];
+    layout?: ResourceLayout;
 }
 
 export interface Booking {
@@ -36,3 +49,38 @@ export interface Message {
     content: string;
     timestamp: Date;
 }
+
+export interface AvailabilityResponse {
+    timeSlots?: TimeSlot[];
+    totalSeats?: number;
+    resource_kind?: ResourceKind;
+    selection_mode?: ResourceSelectionMode;
+    reservation_policy?: ReservationPolicy;
+    resources?: ReservableResource[];
+    layout?: ResourceLayout;
+}
+
+export type {
+    AssignedResourceReservationPolicy,
+    AvailabilityWindow,
+    CapacityReservationPolicy,
+    CustomResourceLayout,
+    CustomResourceLayoutPosition,
+    GridResourceLayout,
+    HybridReservationPolicy,
+    LegacyBookingShape,
+    LegacyServiceShape,
+    LegacyTimeSlotShape,
+    NoResourceLayout,
+    ReservableResource,
+    Reservation,
+    ReservationItem,
+    ReservationPolicy,
+    ReservationPolicyKind,
+    ReservationService,
+    ReservationTimeSlot,
+    ResourceKind,
+    ResourceLayout,
+    ResourceLayoutKind,
+    ResourceSelectionMode,
+} from "@project-play/reservations-core";

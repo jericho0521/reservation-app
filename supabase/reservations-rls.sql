@@ -18,6 +18,22 @@ alter table public.bookings enable row level security;
 
 do $$
 begin
+  if to_regclass('public.resource_layouts') is not null then
+    execute 'alter table public.resource_layouts enable row level security';
+  end if;
+
+  if to_regclass('public.reservable_resources') is not null then
+    execute 'alter table public.reservable_resources enable row level security';
+  end if;
+
+  if to_regclass('public.reservation_items') is not null then
+    execute 'alter table public.reservation_items enable row level security';
+  end if;
+
+  if to_regclass('public.service_availability_rules') is not null then
+    execute 'alter table public.service_availability_rules enable row level security';
+  end if;
+
   if to_regclass('public.service_seat_maintenance') is not null then
     execute 'alter table public.service_seat_maintenance enable row level security';
   end if;
@@ -93,5 +109,33 @@ begin
   if to_regclass('public.service_seat_maintenance') is not null then
     execute 'drop policy if exists "Authenticated admins can manage seat maintenance" on public.service_seat_maintenance';
     execute 'create policy "Authenticated admins can manage seat maintenance" on public.service_seat_maintenance for all to authenticated using (public.is_admin()) with check (public.is_admin())';
+  end if;
+
+  if to_regclass('public.resource_layouts') is not null then
+    execute 'drop policy if exists "Public can read resource layouts" on public.resource_layouts';
+    execute 'create policy "Public can read resource layouts" on public.resource_layouts for select to anon, authenticated using (true)';
+    execute 'drop policy if exists "Authenticated admins can manage resource layouts" on public.resource_layouts';
+    execute 'create policy "Authenticated admins can manage resource layouts" on public.resource_layouts for all to authenticated using (public.is_admin()) with check (public.is_admin())';
+  end if;
+
+  if to_regclass('public.reservable_resources') is not null then
+    execute 'drop policy if exists "Public can read reservable resources" on public.reservable_resources';
+    execute 'create policy "Public can read reservable resources" on public.reservable_resources for select to anon, authenticated using (true)';
+    execute 'drop policy if exists "Authenticated admins can manage reservable resources" on public.reservable_resources';
+    execute 'create policy "Authenticated admins can manage reservable resources" on public.reservable_resources for all to authenticated using (public.is_admin()) with check (public.is_admin())';
+  end if;
+
+  if to_regclass('public.reservation_items') is not null then
+    execute 'drop policy if exists "Authenticated admins can manage reservation items" on public.reservation_items';
+    execute 'create policy "Authenticated admins can manage reservation items" on public.reservation_items for all to authenticated using (public.is_admin()) with check (public.is_admin())';
+    execute 'drop policy if exists "Public can create reservation items" on public.reservation_items';
+    execute 'create policy "Public can create reservation items" on public.reservation_items for insert to anon, authenticated with check (exists (select 1 from public.bookings where bookings.id = reservation_items.booking_id and bookings.service_id = reservation_items.service_id and bookings.status = ''confirmed'' and bookings.interface_type in (''form'', ''chat'')))';
+  end if;
+
+  if to_regclass('public.service_availability_rules') is not null then
+    execute 'drop policy if exists "Public can read service availability rules" on public.service_availability_rules';
+    execute 'create policy "Public can read service availability rules" on public.service_availability_rules for select to anon, authenticated using (true)';
+    execute 'drop policy if exists "Authenticated admins can manage service availability rules" on public.service_availability_rules';
+    execute 'create policy "Authenticated admins can manage service availability rules" on public.service_availability_rules for all to authenticated using (public.is_admin()) with check (public.is_admin())';
   end if;
 end $$;

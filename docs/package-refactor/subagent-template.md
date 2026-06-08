@@ -17,6 +17,7 @@ Important coordination rules:
 - Keep your write scope to the phase's Allowed Write Scope.
 - Do not edit downstream phase files.
 - If a decision changes package names, exports, schemas, adapter methods, or host API behavior, report it under Downstream Updates Required.
+- If a phase creates follow-up implementation phases, update the package-refactor README, remaining-work overview, and this template only when the phase explicitly requires downstream updates.
 - Preserve current Racing Simulator and PS5 behavior unless this phase explicitly says otherwise.
 - If dependencies are missing, report attempted commands and why verification could not run.
 
@@ -49,4 +50,3 @@ Report:
 - Tests or verification gaps
 - Approval status
 ```
-

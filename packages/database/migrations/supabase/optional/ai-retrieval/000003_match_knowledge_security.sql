@@ -1,0 +1,4 @@
+-- Optional AI retrieval database bundle artifact.
+-- Source: supabase/security-hardening.sql
+-- Section: match_knowledge function hardening.
+-- Status: scaffolded optional migration target; not part of core bootstrap.

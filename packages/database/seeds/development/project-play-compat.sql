@@ -1,0 +1,9 @@
+-- Development seed bundle artifact.
+-- Source: supabase/base-schema.sql
+-- Section: Project Play venue, service, resource, availability, and
+-- reservation_items compatibility rows.
+-- Source: supabase/security-hardening.sql
+-- Section: Project Play service/resource/backfill compatibility statements.
+-- Status: scaffolded development seed target. This seed is not part of a clean
+-- core platform install and has not been applied to a disposable database in
+-- this slice.

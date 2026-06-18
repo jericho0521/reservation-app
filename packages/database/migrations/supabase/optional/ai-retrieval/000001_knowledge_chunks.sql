@@ -1,0 +1,4 @@
+-- Optional AI retrieval database bundle artifact.
+-- Source: supabase/knowledge.sql
+-- Section: knowledge_chunks, vector index, match_knowledge, and read policies.
+-- Status: scaffolded optional migration target; not part of core bootstrap.

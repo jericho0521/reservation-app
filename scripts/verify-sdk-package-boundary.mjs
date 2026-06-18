@@ -293,10 +293,12 @@ const packageChecks = [
     name: "@reservation-platform/database",
     packageJsonPath: "packages/database/package.json",
     tarballPrefix: "reservation-platform-database-",
-    allowedEntryPattern: /^package\/(?:migrations\/.+|seeds\/.+|README\.md|package\.json)$/,
+    allowedEntryPattern: /^package\/(?:dist\/.+|migrations\/.+|seeds\/.+|README\.md|package\.json)$/,
     requiredEntries: [
       "package/package.json",
       "package/README.md",
+      "package/dist/index.js",
+      "package/dist/index.d.ts",
       "package/migrations/README.md",
       "package/migrations/supabase/migration-index.json",
       "package/migrations/supabase/000001_extensions.sql",

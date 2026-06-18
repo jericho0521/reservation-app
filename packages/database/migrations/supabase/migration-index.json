@@ -1,0 +1,130 @@
+{
+  "schemaVersion": 1,
+  "artifact": "@reservation-platform/database/supabase-migration-index",
+  "note": "Apply-plan/checksum artifact only. It records package-owned migration and seed inputs for future runners; it is not proof that SQL has executed, that RLS or tenant isolation works, or that a live database has been migrated.",
+  "generatedBy": "scripts/generate-database-migration-index.mjs",
+  "sourceManifest": "docs/package-refactor/backend-platform-extraction/database-migration-bundle-manifest.json",
+  "sourceManifestVersion": 1,
+  "coreMigrations": [
+    {
+      "order": 1,
+      "path": "packages/database/migrations/supabase/000001_extensions.sql",
+      "module": "core",
+      "scope": "reservation-platform",
+      "sha256": "6a6504714d0ca20b88ec70941b04afc3c1cbc1132432470db50c823bc4aa786c",
+      "bytes": 383
+    },
+    {
+      "order": 2,
+      "path": "packages/database/migrations/supabase/000002_platform_tenant_auth.sql",
+      "module": "core",
+      "scope": "reservation-platform",
+      "sha256": "95876f22f1432c6bd3c9375b4c599a7a872c565b6fb3e44a52bae4579e36f864",
+      "bytes": 1185
+    },
+    {
+      "order": 3,
+      "path": "packages/database/migrations/supabase/000003_reservation_catalog.sql",
+      "module": "core",
+      "scope": "reservation-platform",
+      "sha256": "50ff575f3dab42f2a165aec373777e35b1bfeeded733247b5867423e733a00e6",
+      "bytes": 3251
+    },
+    {
+      "order": 4,
+      "path": "packages/database/migrations/supabase/000004_reservation_resources.sql",
+      "module": "core",
+      "scope": "reservation-platform",
+      "sha256": "79104fb212abf400ee277686f9c4985de37fbf44f6c582884c4a2448d09c7d05",
+      "bytes": 2406
+    },
+    {
+      "order": 5,
+      "path": "packages/database/migrations/supabase/000005_reservation_bookings.sql",
+      "module": "core",
+      "scope": "reservation-platform",
+      "sha256": "65f8e4ee38e752d9a6ee90e87a375f97d38f3d5b168a54e46e7292a5cb691de0",
+      "bytes": 2421
+    },
+    {
+      "order": 6,
+      "path": "packages/database/migrations/supabase/000006_resource_maintenance.sql",
+      "module": "core",
+      "scope": "reservation-platform",
+      "sha256": "c45c6814538bd5024746d8ec5c19e37efe24e58d404f71c0f5bbc303d9daccf6",
+      "bytes": 3437
+    },
+    {
+      "order": 7,
+      "path": "packages/database/migrations/supabase/000007_availability_rules.sql",
+      "module": "core",
+      "scope": "reservation-platform",
+      "sha256": "f637e5c6e2ed71c9b3583b3f0a47dfda363e5ca6f3df22390e94868a6ffe1ba8",
+      "bytes": 1445
+    },
+    {
+      "order": 8,
+      "path": "packages/database/migrations/supabase/000008_atomic_reservation_rpc.sql",
+      "module": "core",
+      "scope": "reservation-platform",
+      "sha256": "4f21254d535a1f134ff3f2d53d04147d83451b5197e121b88daf9bd52af05ddd",
+      "bytes": 15105
+    },
+    {
+      "order": 9,
+      "path": "packages/database/migrations/supabase/000009_core_rls_policies.sql",
+      "module": "core",
+      "scope": "reservation-platform",
+      "sha256": "f48a7ef432a43d5f8957f37994b6ba62d307d9c40a6c2b7b6d35cbca379b25ca",
+      "bytes": 7231
+    },
+    {
+      "order": 10,
+      "path": "packages/database/migrations/supabase/000010_core_security_hardening.sql",
+      "module": "core",
+      "scope": "reservation-platform",
+      "sha256": "fe15716b4cc3d72c2063181b9925295c2b6375fcd6809531777089e2cf79cef6",
+      "bytes": 1641
+    },
+    {
+      "order": 11,
+      "path": "packages/database/migrations/supabase/000011_platform_idempotency.sql",
+      "module": "core",
+      "scope": "reservation-platform",
+      "sha256": "ef84d9aa4998cc1de0fa0baba6026cdf6a67763dcb9e359a88ba290fe4390f17",
+      "bytes": 5327
+    }
+  ],
+  "optionalMigrations": [
+    {
+      "path": "packages/database/migrations/supabase/optional/ai-retrieval/000001_knowledge_chunks.sql",
+      "module": "ai-retrieval",
+      "scope": "optional-ai-retrieval",
+      "sha256": "9799e98b9abe187b5ba9ff4a1c577ddea5ce22a895baf83e6f5e872005decd71",
+      "bytes": 242
+    },
+    {
+      "path": "packages/database/migrations/supabase/optional/ai-retrieval/000002_langchain_checkpoints.sql",
+      "module": "ai-retrieval",
+      "scope": "optional-ai-retrieval",
+      "sha256": "d3d2f59aa7f5e4a983931d1191866acf0452c250a9178caed7fb089296719c3b",
+      "bytes": 228
+    },
+    {
+      "path": "packages/database/migrations/supabase/optional/ai-retrieval/000003_match_knowledge_security.sql",
+      "module": "ai-retrieval",
+      "scope": "optional-ai-retrieval",
+      "sha256": "1691305a06e2f19f28ef49597bc116155ae2b3ae012094bb603ca92afaa28360",
+      "bytes": 219
+    }
+  ],
+  "developmentSeeds": [
+    {
+      "path": "packages/database/seeds/development/project-play-compat.sql",
+      "module": "development-seed",
+      "scope": "project-play-compatibility",
+      "sha256": "edf6e034d8285cd6a9c06aaa484b9e0624eb3c757938bdb27437e1dd428e981c",
+      "bytes": 476
+    }
+  ]
+}

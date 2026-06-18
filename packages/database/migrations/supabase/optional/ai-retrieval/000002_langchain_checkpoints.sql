@@ -1,0 +1,4 @@
+-- Optional AI retrieval database bundle artifact.
+-- Source: supabase/langchain.sql
+-- Section: LangChain checkpoint persistence tables and policies.
+-- Status: scaffolded optional migration target; not part of core bootstrap.

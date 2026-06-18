@@ -1,0 +1,45 @@
+{
+  "name": "@reservation-platform/contract-types",
+  "version": "0.0.0",
+  "description": "Public DTO and error contracts for the reservation platform API and SDK.",
+  "private": true,
+  "type": "module",
+  "license": "UNLICENSED",
+  "author": "Project Play maintainers",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jericho0521/reservation-app.git",
+    "directory": "packages/contract-types"
+  },
+  "files": [
+    "contracts",
+    "dist",
+    "README.md"
+  ],
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./contracts/openapi.json": "./contracts/openapi.json",
+    "./contracts/json-schema/*.schema.json": "./contracts/json-schema/*.schema.json"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "contracts:generate": "tsx scripts/generate-contract-artifacts.ts",
+    "contracts:check": "tsx scripts/generate-contract-artifacts.ts --check",
+    "prepack": "corepack pnpm run build",
+    "test": "tsc -p tsconfig.build.json && node --import tsx --test \"src/**/*.test.ts\" && corepack pnpm run contracts:check",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "zod": "^3.24.0"
+  },
+  "devDependencies": {
+    "tsx": "^4.21.0",
+    "typescript": "^5"
+  }
+}

@@ -1,0 +1,410 @@
+import assert from "node:assert/strict";
+import { readdir, readFile } from "node:fs/promises";
+import test from "node:test";
+import {
+  createIdempotencyKey,
+  createReservationPlatformClient,
+  isPlatformError,
+} from "./index.js";
+
+test("SDK maps createReservation to POST /v1/reservations with context headers", async () => {
+  const calls: { url: string; init: RequestInit }[] = [];
+  const client = createReservationPlatformClient({
+    baseUrl: "https://api.example.test",
+    tenantId: "tenant_123",
+    venueId: "venue_123",
+    getAccessToken: () => "token_123",
+    fetch: async (url, init) => {
+      calls.push({ url: String(url), init: init ?? {} });
+      return jsonResponse({
+        reservation_id: "res_123",
+        status: "confirmed",
+        service_id: "svc_123",
+        quantity: 1,
+      });
+    },
+  });
+
+  await client.createReservation(
+    {
+      service_id: "svc_123",
+      quantity: 1,
+      customer: { name: "Alex" },
+    },
+    { idempotencyKey: "idem_123", correlationId: "corr_123" },
+  );
+
+  assert.equal(calls[0].url, "https://api.example.test/v1/reservations");
+  assert.equal(calls[0].init.method, "POST");
+  const headers = new Headers(calls[0].init.headers);
+  assert.equal(headers.get("Authorization"), "Bearer token_123");
+  assert.equal(headers.get("X-Reservation-Tenant-Id"), "tenant_123");
+  assert.equal(headers.get("X-Reservation-Venue-Id"), "venue_123");
+  assert.equal(headers.get("X-Correlation-Id"), "corr_123");
+  assert.equal(headers.get("Idempotency-Key"), "idem_123");
+});
+
+test("SDK builds base URL, API version, encoded paths, query strings, and returns raw JSON", async () => {
+  const calls: { url: string; init: RequestInit }[] = [];
+  const rawPayload = {
+    slots: [{
+      start_at: "2026-06-08T12:00:00+08:00",
+      end_at: "2026-06-08T13:00:00+08:00",
+      available_quantity: 2,
+      is_available: true,
+      resource_ids: ["res/a", "res b"],
+    }],
+    total_quantity: 4,
+  };
+  const client = createReservationPlatformClient({
+    baseUrl: "https://api.example.test/platform/",
+    apiVersion: "v2",
+    fetch: async (url, init) => {
+      calls.push({ url: String(url), init: init ?? {} });
+      return jsonResponse(rawPayload);
+    },
+  });
+
+  const response = await client.listAvailability({
+    service_id: "svc 123",
+    quantity: 2,
+    resource_ids: ["res/a", "res b"],
+  });
+
+  const url = new URL(calls[0].url);
+  assert.equal(url.origin, "https://api.example.test");
+  assert.equal(url.pathname, "/platform/v2/availability");
+  assert.equal(url.searchParams.get("service_id"), "svc 123");
+  assert.equal(url.searchParams.get("quantity"), "2");
+  assert.deepEqual(url.searchParams.getAll("resource_ids"), ["res/a", "res b"]);
+  assert.equal(calls[0].init.method, "GET");
+  assert.deepEqual(response, rawPayload);
+});
+
+test("SDK preserves platform error body", async () => {
+  const client = createReservationPlatformClient({
+    baseUrl: "https://api.example.test",
+    fetch: async () => jsonResponse({
+      error: {
+        code: "missing_idempotency_key",
+        message: "Missing idempotency key.",
+        status: 400,
+        request_id: "req_123",
+      },
+    }, 400),
+  });
+
+  await assert.rejects(
+    () => client.createReservation({
+      service_id: "svc_123",
+      quantity: 1,
+      customer: { name: "Alex" },
+    }),
+    (error) => {
+      assert.equal(isPlatformError(error), true);
+      assert.equal(error.body.code, "missing_idempotency_key");
+      assert.equal(error.body.request_id, "req_123");
+      return true;
+    },
+  );
+});
+
+test("SDK omits empty auth tokens and lets request context override constructor context", async () => {
+  const calls: { url: string; init: RequestInit }[] = [];
+  const client = createReservationPlatformClient({
+    baseUrl: "https://api.example.test",
+    tenantId: "tenant_default",
+    venueId: "venue_default",
+    getAccessToken: async () => "",
+    headers: () => ({ "X-App-Header": "app" }),
+    fetch: async (url, init) => {
+      calls.push({ url: String(url), init: init ?? {} });
+      return jsonResponse({ services: [] });
+    },
+  });
+
+  await client.listServices(undefined, {
+    tenantId: "tenant_request",
+    venueId: "venue_request",
+    correlationId: "corr_request",
+    headers: { "X-Request-Header": "request" },
+  });
+
+  const headers = new Headers(calls[0].init.headers);
+  assert.equal(headers.get("Authorization"), null);
+  assert.equal(headers.get("X-Reservation-Tenant-Id"), "tenant_request");
+  assert.equal(headers.get("X-Reservation-Venue-Id"), "venue_request");
+  assert.equal(headers.get("X-Correlation-Id"), "corr_request");
+  assert.equal(headers.get("X-App-Header"), "app");
+  assert.equal(headers.get("X-Request-Header"), "request");
+});
+
+test("SDK exposes an explicit idempotency key helper without using it implicitly", async () => {
+  const generatedKey = createIdempotencyKey("reservation-create");
+  assert.match(generatedKey, /^reservation-create-/);
+  assert.equal(generatedKey.length > "reservation-create-".length + 20, true);
+
+  const calls: { init: RequestInit }[] = [];
+  const client = createReservationPlatformClient({
+    baseUrl: "https://api.example.test",
+    fetch: async (_url, init) => {
+      calls.push({ init: init ?? {} });
+      return jsonResponse({
+        error: {
+          code: "missing_idempotency_key",
+          message: "Missing idempotency key.",
+          status: 400,
+        },
+      }, 400);
+    },
+  });
+
+  await assert.rejects(() => client.createReservation({
+    service_id: "svc_123",
+    quantity: 1,
+    customer: { name: "Alex" },
+  }));
+
+  const headers = new Headers(calls[0].init.headers);
+  assert.equal(headers.get("Idempotency-Key"), null);
+});
+
+test("SDK maps chat JSON endpoints and forwards body plus idempotency", async () => {
+  const calls: { url: string; body: unknown; headers: Headers }[] = [];
+  const client = createReservationPlatformClient({
+    baseUrl: "https://api.example.test",
+    fetch: async (url, init) => {
+      calls.push({
+        url: String(url),
+        body: init?.body ? JSON.parse(String(init.body)) : undefined,
+        headers: new Headers(init?.headers),
+      });
+      return jsonResponse({
+        chat_session_id: "chat_123",
+        status: "open",
+        content: "ok",
+      });
+    },
+  });
+
+  await client.chat.createReservationSession(
+    { service_id: "svc_123", customer: { name: "Alex" } },
+    { idempotencyKey: "idem_chat_create" },
+  );
+  await client.chat.sendMessage(
+    "chat_123",
+    { message: "hello" },
+    { idempotencyKey: "idem_chat_message" },
+  );
+  await client.chat.confirmReservation(
+    "chat_123",
+    { reservation_intent_id: "intent_123" },
+    { idempotencyKey: "idem_chat_confirm" },
+  );
+
+  assert.equal(calls[0].url, "https://api.example.test/v1/chat/reservation-sessions");
+  assert.deepEqual(calls[0].body, { service_id: "svc_123", customer: { name: "Alex" } });
+  assert.equal(calls[0].headers.get("Idempotency-Key"), "idem_chat_create");
+  assert.equal(calls[1].url, "https://api.example.test/v1/chat/reservation-sessions/chat_123/messages");
+  assert.deepEqual(calls[1].body, { message: "hello" });
+  assert.equal(calls[1].headers.get("Idempotency-Key"), "idem_chat_message");
+  assert.equal(calls[2].url, "https://api.example.test/v1/chat/reservation-sessions/chat_123/confirm");
+  assert.deepEqual(calls[2].body, { reservation_intent_id: "intent_123" });
+  assert.equal(calls[2].headers.get("Idempotency-Key"), "idem_chat_confirm");
+});
+
+test("SDK maps streamMessage to messages:stream endpoint", async () => {
+  const calls: string[] = [];
+  const stream = new ReadableStream<Uint8Array>();
+  const client = createReservationPlatformClient({
+    baseUrl: "https://api.example.test/",
+    fetch: async (url) => {
+      calls.push(String(url));
+      return new Response(stream);
+    },
+  });
+
+  const response = await client.chat.streamMessage("chat_123", { message: "hello" });
+
+  assert.equal(calls[0], "https://api.example.test/v1/chat/reservation-sessions/chat_123/messages:stream");
+  assert.equal(response, stream);
+});
+
+test("SDK maps getResourceLayout to the resource-layouts endpoint", async () => {
+  const calls: string[] = [];
+  const client = createReservationPlatformClient({
+    baseUrl: "https://api.example.test",
+    fetch: async (url) => {
+      calls.push(String(url));
+      return jsonResponse({
+        layout_id: "layout_123",
+        kind: "grid",
+        resources: [{ resource_id: "res_123", row: 1, column: 1 }],
+      });
+    },
+  });
+
+  const layout = await client.getResourceLayout("layout_123");
+
+  assert.equal(calls[0], "https://api.example.test/v1/resource-layouts/layout_123");
+  assert.equal(layout.kind, "grid");
+  assert.equal(layout.resources?.[0]?.resource_id, "res_123");
+});
+
+test("SDK retries safe reads when configured", async () => {
+  let attempts = 0;
+  const client = createReservationPlatformClient({
+    baseUrl: "https://api.example.test",
+    retry: { attempts: 2 },
+    fetch: async () => {
+      attempts += 1;
+      if (attempts === 1) {
+        return jsonResponse({
+          error: {
+            code: "temporarily_unavailable",
+            message: "Try again.",
+            status: 503,
+            retryable: true,
+          },
+        }, 503);
+      }
+      return jsonResponse({ venues: [] });
+    },
+  });
+
+  await client.listVenues();
+
+  assert.equal(attempts, 2);
+});
+
+test("SDK does not retry mutations by default", async () => {
+  let attempts = 0;
+  const client = createReservationPlatformClient({
+    baseUrl: "https://api.example.test",
+    retry: { attempts: 2 },
+    fetch: async () => {
+      attempts += 1;
+      return jsonResponse({
+        error: {
+          code: "temporarily_unavailable",
+          message: "Try again.",
+          status: 503,
+          retryable: true,
+        },
+      }, 503);
+    },
+  });
+
+  await assert.rejects(() => client.createReservation({
+    service_id: "svc_123",
+    quantity: 1,
+    customer: { name: "Alex" },
+  }));
+
+  assert.equal(attempts, 1);
+});
+
+test("SDK does not retry aborted safe reads", async () => {
+  let attempts = 0;
+  const controller = new AbortController();
+  controller.abort();
+  const client = createReservationPlatformClient({
+    baseUrl: "https://api.example.test",
+    retry: { attempts: 2 },
+    fetch: async (_url, init) => {
+      attempts += 1;
+      if (init?.signal instanceof AbortSignal && init.signal.aborted) {
+        throw new DOMException("Request aborted.", "AbortError");
+      }
+      return jsonResponse({ venues: [] });
+    },
+  });
+
+  await assert.rejects(() => client.listVenues(undefined, { signal: controller.signal }));
+
+  assert.equal(attempts, 1);
+});
+
+test("SDK timeout aborts a request without retrying it", async () => {
+  let attempts = 0;
+  const client = createReservationPlatformClient({
+    baseUrl: "https://api.example.test",
+    retry: { attempts: 2 },
+    timeoutMs: 1,
+    fetch: async (_url, init) => {
+      attempts += 1;
+      await new Promise((resolve, reject) => {
+        init?.signal?.addEventListener("abort", () => reject(init.signal?.reason), { once: true });
+      });
+      return jsonResponse({ venues: [] });
+    },
+  });
+
+  await assert.rejects(() => client.listVenues());
+
+  assert.equal(attempts, 1);
+});
+
+test("SDK source stays browser-safe and package-boundary clean", async () => {
+  const sourceFiles = await listSourceFiles(new URL(".", import.meta.url));
+  const forbiddenPatterns = [
+    /process\.env/,
+    /@supabase\//,
+    /from\s+["']next\//,
+    /from\s+["']react["']/,
+    /from\s+["']@\/[^"']+/,
+    /from\s+["'](?:\.\.\/){2,}app\//,
+    /from\s+["'](?:\.\.\/){2,}lib\//,
+    /from\s+["'](?:\.\.\/){2,}components\//,
+    /GOOGLE_GENERATIVE_AI_API_KEY/,
+    /OPENROUTER_API_KEY/,
+    /SUPABASE_SERVICE/,
+  ];
+
+  for (const fileUrl of sourceFiles) {
+    const source = await readFile(fileUrl, "utf8");
+    for (const pattern of forbiddenPatterns) {
+      assert.equal(pattern.test(source), false, `${fileUrl.pathname} matched forbidden pattern ${pattern}`);
+    }
+  }
+});
+
+test("SDK package manifest keeps runtime dependencies minimal", async () => {
+  const packageJson = JSON.parse(
+    await readFile(new URL("../package.json", import.meta.url), "utf8"),
+  ) as {
+    dependencies?: Record<string, string>;
+    devDependencies?: Record<string, string>;
+  };
+
+  assert.deepEqual(Object.keys(packageJson.dependencies ?? {}).sort(), [
+    "@reservation-platform/contract-types",
+  ]);
+  assert.equal(packageJson.devDependencies?.typescript !== undefined, true);
+  assert.equal(packageJson.devDependencies?.tsx !== undefined, true);
+});
+
+async function listSourceFiles(directoryUrl: URL): Promise<URL[]> {
+  const entries = await readdir(directoryUrl, { withFileTypes: true });
+  const files: URL[] = [];
+
+  for (const entry of entries) {
+    const entryUrl = new URL(entry.name, directoryUrl);
+    if (entry.isDirectory()) {
+      files.push(...await listSourceFiles(new URL(`${entry.name}/`, directoryUrl)));
+      continue;
+    }
+    if (entry.isFile() && entry.name.endsWith(".ts") && !entry.name.endsWith(".test.ts")) {
+      files.push(entryUrl);
+    }
+  }
+
+  return files;
+}
+
+function jsonResponse(body: unknown, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { "Content-Type": "application/json" },
+  });
+}

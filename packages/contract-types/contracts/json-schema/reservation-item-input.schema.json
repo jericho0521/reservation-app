@@ -1,0 +1,1136 @@
+{
+  "$defs": {
+    "AvailabilityQuery": {
+      "additionalProperties": false,
+      "properties": {
+        "date": {
+          "type": "string"
+        },
+        "end_at": {
+          "type": "string"
+        },
+        "quantity": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "resource_ids": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "service_id": {
+          "type": "string"
+        },
+        "start_at": {
+          "type": "string"
+        },
+        "venue_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "service_id"
+      ],
+      "type": "object"
+    },
+    "AvailabilityResponse": {
+      "additionalProperties": false,
+      "properties": {
+        "layout": {
+          "$ref": "#/$defs/ResourceLayoutResponse"
+        },
+        "reservation_policy": {
+          "$ref": "#/$defs/JsonValue"
+        },
+        "resource_kind": {
+          "$ref": "#/$defs/ResourceKind"
+        },
+        "resource_strategy": {
+          "$ref": "#/$defs/ResourceStrategy"
+        },
+        "resources": {
+          "items": {
+            "$ref": "#/$defs/ResourceResponse"
+          },
+          "type": "array"
+        },
+        "slots": {
+          "items": {
+            "$ref": "#/$defs/AvailabilitySlot"
+          },
+          "type": "array"
+        },
+        "total_quantity": {
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "slots"
+      ],
+      "type": "object"
+    },
+    "AvailabilitySlot": {
+      "additionalProperties": false,
+      "properties": {
+        "available_quantity": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "end_at": {
+          "type": "string"
+        },
+        "end_time": {
+          "type": "string"
+        },
+        "is_available": {
+          "type": "boolean"
+        },
+        "maintenance_resource_labels": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "resource_ids": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "start_at": {
+          "type": "string"
+        },
+        "start_time": {
+          "type": "string"
+        },
+        "taken_resource_labels": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "available_quantity",
+        "is_available"
+      ],
+      "type": "object"
+    },
+    "CancelReservationInput": {
+      "additionalProperties": false,
+      "properties": {
+        "metadata": {
+          "$ref": "#/$defs/MetadataRecord"
+        },
+        "reason": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "ChatConfirmReservationInput": {
+      "additionalProperties": false,
+      "properties": {
+        "metadata": {
+          "$ref": "#/$defs/MetadataRecord"
+        },
+        "reservation_intent_id": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "ChatCreateReservationSessionInput": {
+      "additionalProperties": false,
+      "properties": {
+        "customer": {
+          "$ref": "#/$defs/CustomerSnapshot"
+        },
+        "metadata": {
+          "$ref": "#/$defs/MetadataRecord"
+        },
+        "service_id": {
+          "type": "string"
+        },
+        "venue_id": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "ChatMessageInput": {
+      "additionalProperties": false,
+      "properties": {
+        "message": {
+          "type": "string"
+        },
+        "metadata": {
+          "$ref": "#/$defs/MetadataRecord"
+        }
+      },
+      "required": [
+        "message"
+      ],
+      "type": "object"
+    },
+    "ChatMessageResponse": {
+      "additionalProperties": false,
+      "properties": {
+        "actions": {
+          "items": {
+            "$ref": "#/$defs/JsonValue"
+          },
+          "type": "array"
+        },
+        "chat_session_id": {
+          "type": "string"
+        },
+        "content": {
+          "type": "string"
+        },
+        "message_id": {
+          "type": "string"
+        },
+        "metadata": {
+          "$ref": "#/$defs/MetadataRecord"
+        },
+        "reservation": {
+          "$ref": "#/$defs/ReservationResponse"
+        }
+      },
+      "required": [
+        "chat_session_id"
+      ],
+      "type": "object"
+    },
+    "ChatSessionResponse": {
+      "additionalProperties": false,
+      "properties": {
+        "chat_session_id": {
+          "type": "string"
+        },
+        "metadata": {
+          "$ref": "#/$defs/MetadataRecord"
+        },
+        "status": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "chat_session_id",
+        "status"
+      ],
+      "type": "object"
+    },
+    "CreateReservationInput": {
+      "additionalProperties": false,
+      "properties": {
+        "customer": {
+          "$ref": "#/$defs/CustomerSnapshot"
+        },
+        "date": {
+          "type": "string"
+        },
+        "end_at": {
+          "type": "string"
+        },
+        "end_time": {
+          "type": "string"
+        },
+        "metadata": {
+          "$ref": "#/$defs/MetadataRecord"
+        },
+        "payment_reference": {
+          "$ref": "#/$defs/PaymentReference"
+        },
+        "quantity": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "reservation_items": {
+          "items": {
+            "$ref": "#/$defs/ReservationItemInput"
+          },
+          "type": "array"
+        },
+        "resource_ids": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "service_id": {
+          "type": "string"
+        },
+        "source": {
+          "type": "string"
+        },
+        "start_at": {
+          "type": "string"
+        },
+        "start_time": {
+          "type": "string"
+        },
+        "tenant_id": {
+          "type": "string"
+        },
+        "venue_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "service_id",
+        "quantity",
+        "customer"
+      ],
+      "type": "object"
+    },
+    "CreateResourceMaintenanceInput": {
+      "additionalProperties": false,
+      "properties": {
+        "ends_at": {
+          "type": "string"
+        },
+        "metadata": {
+          "$ref": "#/$defs/MetadataRecord"
+        },
+        "reason": {
+          "type": "string"
+        },
+        "resource_id": {
+          "type": "string"
+        },
+        "service_id": {
+          "type": "string"
+        },
+        "starts_at": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "CustomerSnapshot": {
+      "additionalProperties": false,
+      "properties": {
+        "customer_id": {
+          "type": "string"
+        },
+        "email": {
+          "type": "string"
+        },
+        "external_customer_id": {
+          "type": "string"
+        },
+        "locale": {
+          "type": "string"
+        },
+        "metadata": {
+          "$ref": "#/$defs/MetadataRecord"
+        },
+        "name": {
+          "type": "string"
+        },
+        "phone": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "EndResourceMaintenanceInput": {
+      "additionalProperties": false,
+      "properties": {
+        "ended_at": {
+          "type": "string"
+        },
+        "metadata": {
+          "$ref": "#/$defs/MetadataRecord"
+        },
+        "reason": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "IdempotencyMetadata": {
+      "additionalProperties": false,
+      "properties": {
+        "key": {
+          "type": "string"
+        },
+        "replayed": {
+          "type": "boolean"
+        },
+        "status": {
+          "enum": [
+            "created",
+            "replayed",
+            "rejected"
+          ],
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "JsonPrimitive": {
+      "oneOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "number"
+        },
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "JsonValue": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/JsonPrimitive"
+        },
+        {
+          "items": {
+            "$ref": "#/$defs/JsonValue"
+          },
+          "type": "array"
+        },
+        {
+          "additionalProperties": {
+            "$ref": "#/$defs/JsonValue"
+          },
+          "type": "object"
+        }
+      ]
+    },
+    "ListReservationsQuery": {
+      "additionalProperties": false,
+      "properties": {
+        "customer_id": {
+          "type": "string"
+        },
+        "end_at": {
+          "type": "string"
+        },
+        "service_id": {
+          "type": "string"
+        },
+        "start_at": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "tenant_id": {
+          "type": "string"
+        },
+        "venue_id": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "ListReservationsResponse": {
+      "additionalProperties": false,
+      "properties": {
+        "reservations": {
+          "items": {
+            "$ref": "#/$defs/ReservationResponse"
+          },
+          "type": "array"
+        },
+        "summary": {
+          "$ref": "#/$defs/ReservationListSummary"
+        }
+      },
+      "required": [
+        "reservations"
+      ],
+      "type": "object"
+    },
+    "ListResourceMaintenanceQuery": {
+      "additionalProperties": false,
+      "properties": {
+        "active_only": {
+          "type": "boolean"
+        },
+        "resource_id": {
+          "type": "string"
+        },
+        "service_id": {
+          "type": "string"
+        },
+        "venue_id": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "ListResourceMaintenanceResponse": {
+      "additionalProperties": false,
+      "properties": {
+        "maintenance": {
+          "items": {
+            "$ref": "#/$defs/ResourceMaintenanceResponse"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "maintenance"
+      ],
+      "type": "object"
+    },
+    "ListResourcesQuery": {
+      "additionalProperties": false,
+      "properties": {
+        "include_inactive": {
+          "type": "boolean"
+        },
+        "service_id": {
+          "type": "string"
+        },
+        "venue_id": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "ListResourcesResponse": {
+      "additionalProperties": false,
+      "properties": {
+        "resources": {
+          "items": {
+            "$ref": "#/$defs/ResourceResponse"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "resources"
+      ],
+      "type": "object"
+    },
+    "ListServicesQuery": {
+      "additionalProperties": false,
+      "properties": {
+        "include_inactive": {
+          "type": "boolean"
+        },
+        "venue_id": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "ListServicesResponse": {
+      "additionalProperties": false,
+      "properties": {
+        "services": {
+          "items": {
+            "$ref": "#/$defs/ServiceResponse"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "services"
+      ],
+      "type": "object"
+    },
+    "ListVenuesQuery": {
+      "additionalProperties": false,
+      "properties": {
+        "include_inactive": {
+          "type": "boolean"
+        },
+        "tenant_id": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "ListVenuesResponse": {
+      "additionalProperties": false,
+      "properties": {
+        "venues": {
+          "items": {
+            "$ref": "#/$defs/VenueResponse"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "venues"
+      ],
+      "type": "object"
+    },
+    "MetadataRecord": {
+      "additionalProperties": {
+        "$ref": "#/$defs/MetadataValue"
+      },
+      "type": "object"
+    },
+    "MetadataResponse": {
+      "additionalProperties": false,
+      "properties": {
+        "api_version": {
+          "type": "string"
+        },
+        "compatibility": {
+          "additionalProperties": false,
+          "properties": {
+            "contract_types_versions": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "notices": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "sdk_versions": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "type": "object"
+        },
+        "modules": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "api_version",
+        "modules"
+      ],
+      "type": "object"
+    },
+    "MetadataValue": {
+      "$ref": "#/$defs/JsonPrimitive"
+    },
+    "PaymentReference": {
+      "additionalProperties": false,
+      "properties": {
+        "metadata": {
+          "$ref": "#/$defs/MetadataRecord"
+        },
+        "payment_reference_id": {
+          "type": "string"
+        },
+        "provider": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "PlatformErrorBody": {
+      "additionalProperties": false,
+      "properties": {
+        "causes": {
+          "items": {
+            "$ref": "#/$defs/JsonValue"
+          },
+          "type": "array"
+        },
+        "code": {
+          "$ref": "#/$defs/PlatformErrorCode"
+        },
+        "details": {
+          "$ref": "#/$defs/JsonValue"
+        },
+        "documentation_url": {
+          "type": "string"
+        },
+        "idempotency": {
+          "$ref": "#/$defs/IdempotencyMetadata"
+        },
+        "message": {
+          "type": "string"
+        },
+        "request_id": {
+          "type": "string"
+        },
+        "retryable": {
+          "type": "boolean"
+        },
+        "status": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "code",
+        "message",
+        "status"
+      ],
+      "type": "object"
+    },
+    "PlatformErrorCode": {
+      "description": "Stable machine-readable platform error code. Known codes include bad_request, unauthorized, forbidden, not_found, conflict, validation_failed, missing_idempotency_key, idempotency_key_reused_with_different_request, idempotency_replay_unavailable, and chat_module_disabled.",
+      "type": "string"
+    },
+    "PlatformErrorResponse": {
+      "additionalProperties": false,
+      "properties": {
+        "error": {
+          "$ref": "#/$defs/PlatformErrorBody"
+        }
+      },
+      "required": [
+        "error"
+      ],
+      "type": "object"
+    },
+    "RequestContext": {
+      "additionalProperties": false,
+      "properties": {
+        "correlation_id": {
+          "type": "string"
+        },
+        "tenant_id": {
+          "type": "string"
+        },
+        "venue_id": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "RescheduleReservationInput": {
+      "additionalProperties": false,
+      "properties": {
+        "date": {
+          "type": "string"
+        },
+        "end_at": {
+          "type": "string"
+        },
+        "end_time": {
+          "type": "string"
+        },
+        "metadata": {
+          "$ref": "#/$defs/MetadataRecord"
+        },
+        "quantity": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "reservation_items": {
+          "items": {
+            "$ref": "#/$defs/ReservationItemInput"
+          },
+          "type": "array"
+        },
+        "resource_ids": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "start_at": {
+          "type": "string"
+        },
+        "start_time": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "ReservationItemInput": {
+      "additionalProperties": false,
+      "properties": {
+        "quantity": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "resource_id": {
+          "type": "string"
+        },
+        "resource_label": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "quantity"
+      ],
+      "type": "object"
+    },
+    "ReservationListSummary": {
+      "additionalProperties": false,
+      "properties": {
+        "confirmed_today": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "total": {
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "type": "object"
+    },
+    "ReservationResponse": {
+      "additionalProperties": false,
+      "properties": {
+        "created_at": {
+          "type": "string"
+        },
+        "customer": {
+          "$ref": "#/$defs/CustomerSnapshot"
+        },
+        "date": {
+          "type": "string"
+        },
+        "end_at": {
+          "type": "string"
+        },
+        "end_time": {
+          "type": "string"
+        },
+        "metadata": {
+          "$ref": "#/$defs/MetadataRecord"
+        },
+        "payment_reference": {
+          "$ref": "#/$defs/PaymentReference"
+        },
+        "quantity": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "reservation_id": {
+          "type": "string"
+        },
+        "reservation_items": {
+          "items": {
+            "$ref": "#/$defs/ReservationItemInput"
+          },
+          "type": "array"
+        },
+        "service_id": {
+          "type": "string"
+        },
+        "start_at": {
+          "type": "string"
+        },
+        "start_time": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "tenant_id": {
+          "type": "string"
+        },
+        "updated_at": {
+          "type": "string"
+        },
+        "venue_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "reservation_id",
+        "status",
+        "service_id",
+        "quantity"
+      ],
+      "type": "object"
+    },
+    "ResourceKind": {
+      "enum": [
+        "seat",
+        "station",
+        "room",
+        "court",
+        "screening",
+        "capacity_bucket",
+        "custom"
+      ],
+      "type": "string"
+    },
+    "ResourceLayoutResource": {
+      "additionalProperties": false,
+      "properties": {
+        "column": {
+          "type": "integer"
+        },
+        "height": {
+          "exclusiveMinimum": 0,
+          "type": "number"
+        },
+        "label": {
+          "type": "string"
+        },
+        "metadata": {
+          "$ref": "#/$defs/MetadataRecord"
+        },
+        "resource_id": {
+          "type": "string"
+        },
+        "row": {
+          "type": "integer"
+        },
+        "width": {
+          "exclusiveMinimum": 0,
+          "type": "number"
+        },
+        "x": {
+          "type": "number"
+        },
+        "y": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "resource_id"
+      ],
+      "type": "object"
+    },
+    "ResourceLayoutResponse": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "enum": [
+            "none",
+            "grid",
+            "custom"
+          ],
+          "type": "string"
+        },
+        "layout_id": {
+          "type": "string"
+        },
+        "metadata": {
+          "$ref": "#/$defs/MetadataRecord"
+        },
+        "resources": {
+          "items": {
+            "$ref": "#/$defs/ResourceLayoutResource"
+          },
+          "type": "array"
+        },
+        "service_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "layout_id",
+        "kind"
+      ],
+      "type": "object"
+    },
+    "ResourceMaintenanceResponse": {
+      "additionalProperties": false,
+      "properties": {
+        "ends_at": {
+          "type": "string"
+        },
+        "maintenance_id": {
+          "type": "string"
+        },
+        "metadata": {
+          "$ref": "#/$defs/MetadataRecord"
+        },
+        "reason": {
+          "type": "string"
+        },
+        "resource_id": {
+          "type": "string"
+        },
+        "service_id": {
+          "type": "string"
+        },
+        "starts_at": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "maintenance_id"
+      ],
+      "type": "object"
+    },
+    "ResourceResponse": {
+      "additionalProperties": false,
+      "properties": {
+        "capacity": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "is_active": {
+          "type": "boolean"
+        },
+        "kind": {
+          "$ref": "#/$defs/ResourceKind"
+        },
+        "label": {
+          "type": "string"
+        },
+        "metadata": {
+          "$ref": "#/$defs/MetadataRecord"
+        },
+        "resource_id": {
+          "type": "string"
+        },
+        "service_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "resource_id",
+        "label",
+        "kind",
+        "is_active"
+      ],
+      "type": "object"
+    },
+    "ResourceStrategy": {
+      "enum": [
+        "quantity",
+        "assigned_resource",
+        "hybrid"
+      ],
+      "type": "string"
+    },
+    "ServiceResponse": {
+      "additionalProperties": false,
+      "properties": {
+        "description": {
+          "type": "string"
+        },
+        "duration_minutes": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "layout": {
+          "$ref": "#/$defs/ResourceLayoutResponse"
+        },
+        "metadata": {
+          "$ref": "#/$defs/MetadataRecord"
+        },
+        "name": {
+          "type": "string"
+        },
+        "reservation_policy": {
+          "$ref": "#/$defs/JsonValue"
+        },
+        "resource_kind": {
+          "$ref": "#/$defs/ResourceKind"
+        },
+        "resource_strategy": {
+          "$ref": "#/$defs/ResourceStrategy"
+        },
+        "resources": {
+          "items": {
+            "$ref": "#/$defs/ResourceResponse"
+          },
+          "type": "array"
+        },
+        "service_id": {
+          "type": "string"
+        },
+        "total_quantity": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "venue_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "service_id",
+        "name"
+      ],
+      "type": "object"
+    },
+    "TenantResponse": {
+      "additionalProperties": false,
+      "properties": {
+        "default_venue_id": {
+          "type": "string"
+        },
+        "metadata": {
+          "$ref": "#/$defs/MetadataRecord"
+        },
+        "name": {
+          "type": "string"
+        },
+        "tenant_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "tenant_id"
+      ],
+      "type": "object"
+    },
+    "UpdateReservationPatch": {
+      "additionalProperties": false,
+      "properties": {
+        "customer": {
+          "$ref": "#/$defs/CustomerSnapshot"
+        },
+        "metadata": {
+          "$ref": "#/$defs/MetadataRecord"
+        },
+        "notes": {
+          "type": "string"
+        },
+        "payment_reference": {
+          "$ref": "#/$defs/PaymentReference"
+        },
+        "source": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "VenueResponse": {
+      "additionalProperties": false,
+      "properties": {
+        "metadata": {
+          "$ref": "#/$defs/MetadataRecord"
+        },
+        "name": {
+          "type": "string"
+        },
+        "tenant_id": {
+          "type": "string"
+        },
+        "timezone": {
+          "type": "string"
+        },
+        "venue_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "venue_id",
+        "name"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://reservation-platform.local/contracts/json-schema/reservation-item-input.schema.json",
+  "$ref": "#/$defs/ReservationItemInput",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ReservationItemInput"
+}

@@ -1,0 +1,2775 @@
+{
+  "components": {
+    "parameters": {
+      "CorrelationIdHeader": {
+        "in": "header",
+        "name": "X-Correlation-Id",
+        "required": false,
+        "schema": {
+          "type": "string"
+        }
+      },
+      "IdempotencyKeyHeader": {
+        "in": "header",
+        "name": "Idempotency-Key",
+        "required": true,
+        "schema": {
+          "type": "string"
+        }
+      },
+      "TenantIdHeader": {
+        "in": "header",
+        "name": "X-Reservation-Tenant-Id",
+        "required": false,
+        "schema": {
+          "type": "string"
+        }
+      },
+      "VenueIdHeader": {
+        "in": "header",
+        "name": "X-Reservation-Venue-Id",
+        "required": false,
+        "schema": {
+          "type": "string"
+        }
+      }
+    },
+    "schemas": {
+      "AvailabilityQuery": {
+        "additionalProperties": false,
+        "properties": {
+          "date": {
+            "type": "string"
+          },
+          "end_at": {
+            "type": "string"
+          },
+          "quantity": {
+            "minimum": 1,
+            "type": "integer"
+          },
+          "resource_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "service_id": {
+            "type": "string"
+          },
+          "start_at": {
+            "type": "string"
+          },
+          "venue_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "service_id"
+        ],
+        "type": "object"
+      },
+      "AvailabilityResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "layout": {
+            "$ref": "#/components/schemas/ResourceLayoutResponse"
+          },
+          "reservation_policy": {
+            "$ref": "#/components/schemas/JsonValue"
+          },
+          "resource_kind": {
+            "$ref": "#/components/schemas/ResourceKind"
+          },
+          "resource_strategy": {
+            "$ref": "#/components/schemas/ResourceStrategy"
+          },
+          "resources": {
+            "items": {
+              "$ref": "#/components/schemas/ResourceResponse"
+            },
+            "type": "array"
+          },
+          "slots": {
+            "items": {
+              "$ref": "#/components/schemas/AvailabilitySlot"
+            },
+            "type": "array"
+          },
+          "total_quantity": {
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "slots"
+        ],
+        "type": "object"
+      },
+      "AvailabilitySlot": {
+        "additionalProperties": false,
+        "properties": {
+          "available_quantity": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "end_at": {
+            "type": "string"
+          },
+          "end_time": {
+            "type": "string"
+          },
+          "is_available": {
+            "type": "boolean"
+          },
+          "maintenance_resource_labels": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "resource_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "start_at": {
+            "type": "string"
+          },
+          "start_time": {
+            "type": "string"
+          },
+          "taken_resource_labels": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "available_quantity",
+          "is_available"
+        ],
+        "type": "object"
+      },
+      "CancelReservationInput": {
+        "additionalProperties": false,
+        "properties": {
+          "metadata": {
+            "$ref": "#/components/schemas/MetadataRecord"
+          },
+          "reason": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ChatConfirmReservationInput": {
+        "additionalProperties": false,
+        "properties": {
+          "metadata": {
+            "$ref": "#/components/schemas/MetadataRecord"
+          },
+          "reservation_intent_id": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ChatCreateReservationSessionInput": {
+        "additionalProperties": false,
+        "properties": {
+          "customer": {
+            "$ref": "#/components/schemas/CustomerSnapshot"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/MetadataRecord"
+          },
+          "service_id": {
+            "type": "string"
+          },
+          "venue_id": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ChatMessageInput": {
+        "additionalProperties": false,
+        "properties": {
+          "message": {
+            "type": "string"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/MetadataRecord"
+          }
+        },
+        "required": [
+          "message"
+        ],
+        "type": "object"
+      },
+      "ChatMessageResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "actions": {
+            "items": {
+              "$ref": "#/components/schemas/JsonValue"
+            },
+            "type": "array"
+          },
+          "chat_session_id": {
+            "type": "string"
+          },
+          "content": {
+            "type": "string"
+          },
+          "message_id": {
+            "type": "string"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/MetadataRecord"
+          },
+          "reservation": {
+            "$ref": "#/components/schemas/ReservationResponse"
+          }
+        },
+        "required": [
+          "chat_session_id"
+        ],
+        "type": "object"
+      },
+      "ChatSessionResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "chat_session_id": {
+            "type": "string"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/MetadataRecord"
+          },
+          "status": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "chat_session_id",
+          "status"
+        ],
+        "type": "object"
+      },
+      "CreateReservationInput": {
+        "additionalProperties": false,
+        "properties": {
+          "customer": {
+            "$ref": "#/components/schemas/CustomerSnapshot"
+          },
+          "date": {
+            "type": "string"
+          },
+          "end_at": {
+            "type": "string"
+          },
+          "end_time": {
+            "type": "string"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/MetadataRecord"
+          },
+          "payment_reference": {
+            "$ref": "#/components/schemas/PaymentReference"
+          },
+          "quantity": {
+            "minimum": 1,
+            "type": "integer"
+          },
+          "reservation_items": {
+            "items": {
+              "$ref": "#/components/schemas/ReservationItemInput"
+            },
+            "type": "array"
+          },
+          "resource_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "service_id": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string"
+          },
+          "start_at": {
+            "type": "string"
+          },
+          "start_time": {
+            "type": "string"
+          },
+          "tenant_id": {
+            "type": "string"
+          },
+          "venue_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "service_id",
+          "quantity",
+          "customer"
+        ],
+        "type": "object"
+      },
+      "CreateResourceMaintenanceInput": {
+        "additionalProperties": false,
+        "properties": {
+          "ends_at": {
+            "type": "string"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/MetadataRecord"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "resource_id": {
+            "type": "string"
+          },
+          "service_id": {
+            "type": "string"
+          },
+          "starts_at": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "CustomerSnapshot": {
+        "additionalProperties": false,
+        "properties": {
+          "customer_id": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "external_customer_id": {
+            "type": "string"
+          },
+          "locale": {
+            "type": "string"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/MetadataRecord"
+          },
+          "name": {
+            "type": "string"
+          },
+          "phone": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "EndResourceMaintenanceInput": {
+        "additionalProperties": false,
+        "properties": {
+          "ended_at": {
+            "type": "string"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/MetadataRecord"
+          },
+          "reason": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "IdempotencyMetadata": {
+        "additionalProperties": false,
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "replayed": {
+            "type": "boolean"
+          },
+          "status": {
+            "enum": [
+              "created",
+              "replayed",
+              "rejected"
+            ],
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "JsonPrimitive": {
+        "oneOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "number"
+          },
+          {
+            "type": "boolean"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "JsonValue": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/JsonPrimitive"
+          },
+          {
+            "items": {
+              "$ref": "#/components/schemas/JsonValue"
+            },
+            "type": "array"
+          },
+          {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/JsonValue"
+            },
+            "type": "object"
+          }
+        ]
+      },
+      "ListReservationsQuery": {
+        "additionalProperties": false,
+        "properties": {
+          "customer_id": {
+            "type": "string"
+          },
+          "end_at": {
+            "type": "string"
+          },
+          "service_id": {
+            "type": "string"
+          },
+          "start_at": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "tenant_id": {
+            "type": "string"
+          },
+          "venue_id": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ListReservationsResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "reservations": {
+            "items": {
+              "$ref": "#/components/schemas/ReservationResponse"
+            },
+            "type": "array"
+          },
+          "summary": {
+            "$ref": "#/components/schemas/ReservationListSummary"
+          }
+        },
+        "required": [
+          "reservations"
+        ],
+        "type": "object"
+      },
+      "ListResourceMaintenanceQuery": {
+        "additionalProperties": false,
+        "properties": {
+          "active_only": {
+            "type": "boolean"
+          },
+          "resource_id": {
+            "type": "string"
+          },
+          "service_id": {
+            "type": "string"
+          },
+          "venue_id": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ListResourceMaintenanceResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "maintenance": {
+            "items": {
+              "$ref": "#/components/schemas/ResourceMaintenanceResponse"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "maintenance"
+        ],
+        "type": "object"
+      },
+      "ListResourcesQuery": {
+        "additionalProperties": false,
+        "properties": {
+          "include_inactive": {
+            "type": "boolean"
+          },
+          "service_id": {
+            "type": "string"
+          },
+          "venue_id": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ListResourcesResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "resources": {
+            "items": {
+              "$ref": "#/components/schemas/ResourceResponse"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "resources"
+        ],
+        "type": "object"
+      },
+      "ListServicesQuery": {
+        "additionalProperties": false,
+        "properties": {
+          "include_inactive": {
+            "type": "boolean"
+          },
+          "venue_id": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ListServicesResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "services": {
+            "items": {
+              "$ref": "#/components/schemas/ServiceResponse"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "services"
+        ],
+        "type": "object"
+      },
+      "ListVenuesQuery": {
+        "additionalProperties": false,
+        "properties": {
+          "include_inactive": {
+            "type": "boolean"
+          },
+          "tenant_id": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ListVenuesResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "venues": {
+            "items": {
+              "$ref": "#/components/schemas/VenueResponse"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "venues"
+        ],
+        "type": "object"
+      },
+      "MetadataRecord": {
+        "additionalProperties": {
+          "$ref": "#/components/schemas/MetadataValue"
+        },
+        "type": "object"
+      },
+      "MetadataResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "api_version": {
+            "type": "string"
+          },
+          "compatibility": {
+            "additionalProperties": false,
+            "properties": {
+              "contract_types_versions": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "notices": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "sdk_versions": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              }
+            },
+            "type": "object"
+          },
+          "modules": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "api_version",
+          "modules"
+        ],
+        "type": "object"
+      },
+      "MetadataValue": {
+        "$ref": "#/components/schemas/JsonPrimitive"
+      },
+      "PaymentReference": {
+        "additionalProperties": false,
+        "properties": {
+          "metadata": {
+            "$ref": "#/components/schemas/MetadataRecord"
+          },
+          "payment_reference_id": {
+            "type": "string"
+          },
+          "provider": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "PlatformErrorBody": {
+        "additionalProperties": false,
+        "properties": {
+          "causes": {
+            "items": {
+              "$ref": "#/components/schemas/JsonValue"
+            },
+            "type": "array"
+          },
+          "code": {
+            "$ref": "#/components/schemas/PlatformErrorCode"
+          },
+          "details": {
+            "$ref": "#/components/schemas/JsonValue"
+          },
+          "documentation_url": {
+            "type": "string"
+          },
+          "idempotency": {
+            "$ref": "#/components/schemas/IdempotencyMetadata"
+          },
+          "message": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          },
+          "retryable": {
+            "type": "boolean"
+          },
+          "status": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "status"
+        ],
+        "type": "object"
+      },
+      "PlatformErrorCode": {
+        "description": "Stable machine-readable platform error code. Known codes include bad_request, unauthorized, forbidden, not_found, conflict, validation_failed, missing_idempotency_key, idempotency_key_reused_with_different_request, idempotency_replay_unavailable, and chat_module_disabled.",
+        "type": "string"
+      },
+      "PlatformErrorResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "error": {
+            "$ref": "#/components/schemas/PlatformErrorBody"
+          }
+        },
+        "required": [
+          "error"
+        ],
+        "type": "object"
+      },
+      "RequestContext": {
+        "additionalProperties": false,
+        "properties": {
+          "correlation_id": {
+            "type": "string"
+          },
+          "tenant_id": {
+            "type": "string"
+          },
+          "venue_id": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "RescheduleReservationInput": {
+        "additionalProperties": false,
+        "properties": {
+          "date": {
+            "type": "string"
+          },
+          "end_at": {
+            "type": "string"
+          },
+          "end_time": {
+            "type": "string"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/MetadataRecord"
+          },
+          "quantity": {
+            "minimum": 1,
+            "type": "integer"
+          },
+          "reservation_items": {
+            "items": {
+              "$ref": "#/components/schemas/ReservationItemInput"
+            },
+            "type": "array"
+          },
+          "resource_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "start_at": {
+            "type": "string"
+          },
+          "start_time": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ReservationItemInput": {
+        "additionalProperties": false,
+        "properties": {
+          "quantity": {
+            "minimum": 1,
+            "type": "integer"
+          },
+          "resource_id": {
+            "type": "string"
+          },
+          "resource_label": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "quantity"
+        ],
+        "type": "object"
+      },
+      "ReservationListSummary": {
+        "additionalProperties": false,
+        "properties": {
+          "confirmed_today": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "total": {
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "ReservationResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "created_at": {
+            "type": "string"
+          },
+          "customer": {
+            "$ref": "#/components/schemas/CustomerSnapshot"
+          },
+          "date": {
+            "type": "string"
+          },
+          "end_at": {
+            "type": "string"
+          },
+          "end_time": {
+            "type": "string"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/MetadataRecord"
+          },
+          "payment_reference": {
+            "$ref": "#/components/schemas/PaymentReference"
+          },
+          "quantity": {
+            "minimum": 1,
+            "type": "integer"
+          },
+          "reservation_id": {
+            "type": "string"
+          },
+          "reservation_items": {
+            "items": {
+              "$ref": "#/components/schemas/ReservationItemInput"
+            },
+            "type": "array"
+          },
+          "service_id": {
+            "type": "string"
+          },
+          "start_at": {
+            "type": "string"
+          },
+          "start_time": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "tenant_id": {
+            "type": "string"
+          },
+          "updated_at": {
+            "type": "string"
+          },
+          "venue_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "reservation_id",
+          "status",
+          "service_id",
+          "quantity"
+        ],
+        "type": "object"
+      },
+      "ResourceKind": {
+        "enum": [
+          "seat",
+          "station",
+          "room",
+          "court",
+          "screening",
+          "capacity_bucket",
+          "custom"
+        ],
+        "type": "string"
+      },
+      "ResourceLayoutResource": {
+        "additionalProperties": false,
+        "properties": {
+          "column": {
+            "type": "integer"
+          },
+          "height": {
+            "exclusiveMinimum": 0,
+            "type": "number"
+          },
+          "label": {
+            "type": "string"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/MetadataRecord"
+          },
+          "resource_id": {
+            "type": "string"
+          },
+          "row": {
+            "type": "integer"
+          },
+          "width": {
+            "exclusiveMinimum": 0,
+            "type": "number"
+          },
+          "x": {
+            "type": "number"
+          },
+          "y": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "resource_id"
+        ],
+        "type": "object"
+      },
+      "ResourceLayoutResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "enum": [
+              "none",
+              "grid",
+              "custom"
+            ],
+            "type": "string"
+          },
+          "layout_id": {
+            "type": "string"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/MetadataRecord"
+          },
+          "resources": {
+            "items": {
+              "$ref": "#/components/schemas/ResourceLayoutResource"
+            },
+            "type": "array"
+          },
+          "service_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "layout_id",
+          "kind"
+        ],
+        "type": "object"
+      },
+      "ResourceMaintenanceResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "ends_at": {
+            "type": "string"
+          },
+          "maintenance_id": {
+            "type": "string"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/MetadataRecord"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "resource_id": {
+            "type": "string"
+          },
+          "service_id": {
+            "type": "string"
+          },
+          "starts_at": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "maintenance_id"
+        ],
+        "type": "object"
+      },
+      "ResourceResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "capacity": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "is_active": {
+            "type": "boolean"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/ResourceKind"
+          },
+          "label": {
+            "type": "string"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/MetadataRecord"
+          },
+          "resource_id": {
+            "type": "string"
+          },
+          "service_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "resource_id",
+          "label",
+          "kind",
+          "is_active"
+        ],
+        "type": "object"
+      },
+      "ResourceStrategy": {
+        "enum": [
+          "quantity",
+          "assigned_resource",
+          "hybrid"
+        ],
+        "type": "string"
+      },
+      "ServiceResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "description": {
+            "type": "string"
+          },
+          "duration_minutes": {
+            "minimum": 1,
+            "type": "integer"
+          },
+          "layout": {
+            "$ref": "#/components/schemas/ResourceLayoutResponse"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/MetadataRecord"
+          },
+          "name": {
+            "type": "string"
+          },
+          "reservation_policy": {
+            "$ref": "#/components/schemas/JsonValue"
+          },
+          "resource_kind": {
+            "$ref": "#/components/schemas/ResourceKind"
+          },
+          "resource_strategy": {
+            "$ref": "#/components/schemas/ResourceStrategy"
+          },
+          "resources": {
+            "items": {
+              "$ref": "#/components/schemas/ResourceResponse"
+            },
+            "type": "array"
+          },
+          "service_id": {
+            "type": "string"
+          },
+          "total_quantity": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "venue_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "service_id",
+          "name"
+        ],
+        "type": "object"
+      },
+      "TenantResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "default_venue_id": {
+            "type": "string"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/MetadataRecord"
+          },
+          "name": {
+            "type": "string"
+          },
+          "tenant_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "tenant_id"
+        ],
+        "type": "object"
+      },
+      "UpdateReservationPatch": {
+        "additionalProperties": false,
+        "properties": {
+          "customer": {
+            "$ref": "#/components/schemas/CustomerSnapshot"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/MetadataRecord"
+          },
+          "notes": {
+            "type": "string"
+          },
+          "payment_reference": {
+            "$ref": "#/components/schemas/PaymentReference"
+          },
+          "source": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "VenueResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "metadata": {
+            "$ref": "#/components/schemas/MetadataRecord"
+          },
+          "name": {
+            "type": "string"
+          },
+          "tenant_id": {
+            "type": "string"
+          },
+          "timezone": {
+            "type": "string"
+          },
+          "venue_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "venue_id",
+          "name"
+        ],
+        "type": "object"
+      }
+    },
+    "securitySchemes": {
+      "bearerAuth": {
+        "scheme": "bearer",
+        "type": "http"
+      }
+    }
+  },
+  "info": {
+    "description": "Public /v1 reservation platform API contract generated from @reservation-platform/contract-types.",
+    "title": "Reservation Platform API",
+    "version": "0.0.0"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/v1/availability": {
+      "get": {
+        "operationId": "listAvailability",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "venue_id",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "service_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "date",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "start_at",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "end_at",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "quantity",
+            "required": false,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "resource_ids",
+            "required": false,
+            "schema": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/TenantIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/VenueIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/CorrelationIdHeader"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AvailabilityResponse"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformErrorResponse"
+                }
+              }
+            },
+            "description": "Platform error response."
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "List available reservation slots.",
+        "tags": [
+          "Availability"
+        ]
+      }
+    },
+    "/v1/chat/reservation-sessions": {
+      "post": {
+        "operationId": "createChatReservationSession",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/TenantIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/VenueIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/CorrelationIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKeyHeader"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChatCreateReservationSessionInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatSessionResponse"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformErrorResponse"
+                }
+              }
+            },
+            "description": "chat_module_disabled module-disabled response."
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformErrorResponse"
+                }
+              }
+            },
+            "description": "Platform error response."
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Create a chat reservation session when the chat module is enabled.",
+        "tags": [
+          "Chat"
+        ],
+        "x-disabled-error-code": "chat_module_disabled",
+        "x-idempotency-required": true,
+        "x-module-gated": "chat"
+      }
+    },
+    "/v1/chat/reservation-sessions/{chat_session_id}/confirm": {
+      "post": {
+        "operationId": "confirmChatReservation",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "chat_session_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/TenantIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/VenueIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/CorrelationIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKeyHeader"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChatConfirmReservationInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatMessageResponse"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformErrorResponse"
+                }
+              }
+            },
+            "description": "chat_module_disabled module-disabled response."
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformErrorResponse"
+                }
+              }
+            },
+            "description": "Platform error response."
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Confirm a chat-prepared reservation when the chat module is enabled.",
+        "tags": [
+          "Chat"
+        ],
+        "x-disabled-error-code": "chat_module_disabled",
+        "x-idempotency-required": true,
+        "x-module-gated": "chat"
+      }
+    },
+    "/v1/chat/reservation-sessions/{chat_session_id}/messages": {
+      "post": {
+        "operationId": "sendChatMessage",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "chat_session_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/TenantIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/VenueIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/CorrelationIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKeyHeader"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChatMessageInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatMessageResponse"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformErrorResponse"
+                }
+              }
+            },
+            "description": "chat_module_disabled module-disabled response."
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformErrorResponse"
+                }
+              }
+            },
+            "description": "Platform error response."
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Send a chat message when the chat module is enabled.",
+        "tags": [
+          "Chat"
+        ],
+        "x-disabled-error-code": "chat_module_disabled",
+        "x-idempotency-required": true,
+        "x-module-gated": "chat"
+      }
+    },
+    "/v1/chat/reservation-sessions/{chat_session_id}/messages:stream": {
+      "post": {
+        "operationId": "streamChatMessage",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "chat_session_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/TenantIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/VenueIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/CorrelationIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKeyHeader"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChatMessageInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Streaming chat response."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformErrorResponse"
+                }
+              }
+            },
+            "description": "chat_module_disabled module-disabled response."
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformErrorResponse"
+                }
+              }
+            },
+            "description": "Platform error response."
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Stream a chat response when the chat module is enabled.",
+        "tags": [
+          "Chat"
+        ],
+        "x-disabled-error-code": "chat_module_disabled",
+        "x-idempotency-required": true,
+        "x-module-gated": "chat"
+      }
+    },
+    "/v1/metadata": {
+      "get": {
+        "operationId": "getMetadata",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/TenantIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/VenueIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/CorrelationIdHeader"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MetadataResponse"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformErrorResponse"
+                }
+              }
+            },
+            "description": "Platform error response."
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Read platform metadata and enabled module notices.",
+        "tags": [
+          "Metadata"
+        ]
+      }
+    },
+    "/v1/reservations": {
+      "get": {
+        "operationId": "listReservations",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "tenant_id",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "venue_id",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "service_id",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "customer_id",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "start_at",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "end_at",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/TenantIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/VenueIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/CorrelationIdHeader"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListReservationsResponse"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformErrorResponse"
+                }
+              }
+            },
+            "description": "Platform error response."
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "List reservations visible to the caller.",
+        "tags": [
+          "Reservations"
+        ]
+      },
+      "post": {
+        "operationId": "createReservation",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/TenantIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/VenueIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/CorrelationIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKeyHeader"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateReservationInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReservationResponse"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformErrorResponse"
+                }
+              }
+            },
+            "description": "Platform error response."
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Create a reservation.",
+        "tags": [
+          "Reservations"
+        ],
+        "x-idempotency-required": true
+      }
+    },
+    "/v1/reservations/{reservation_id}": {
+      "get": {
+        "operationId": "getReservation",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "reservation_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/TenantIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/VenueIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/CorrelationIdHeader"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReservationResponse"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformErrorResponse"
+                }
+              }
+            },
+            "description": "Platform error response."
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Read one reservation by id.",
+        "tags": [
+          "Reservations"
+        ]
+      },
+      "patch": {
+        "operationId": "updateReservation",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "reservation_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/TenantIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/VenueIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/CorrelationIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKeyHeader"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateReservationPatch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReservationResponse"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformErrorResponse"
+                }
+              }
+            },
+            "description": "Platform error response."
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Patch non-slot reservation fields.",
+        "tags": [
+          "Reservations"
+        ],
+        "x-idempotency-required": true
+      }
+    },
+    "/v1/reservations/{reservation_id}/cancel": {
+      "post": {
+        "operationId": "cancelReservation",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "reservation_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/TenantIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/VenueIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/CorrelationIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKeyHeader"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CancelReservationInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReservationResponse"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformErrorResponse"
+                }
+              }
+            },
+            "description": "Platform error response."
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Cancel a reservation.",
+        "tags": [
+          "Reservations"
+        ],
+        "x-idempotency-required": true
+      }
+    },
+    "/v1/reservations/{reservation_id}/reschedule": {
+      "post": {
+        "operationId": "rescheduleReservation",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "reservation_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/TenantIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/VenueIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/CorrelationIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKeyHeader"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RescheduleReservationInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReservationResponse"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformErrorResponse"
+                }
+              }
+            },
+            "description": "Platform error response."
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Move a reservation to another slot or resource assignment.",
+        "tags": [
+          "Reservations"
+        ],
+        "x-idempotency-required": true
+      }
+    },
+    "/v1/resource-layouts/{layout_id}": {
+      "get": {
+        "operationId": "getResourceLayout",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "layout_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/TenantIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/VenueIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/CorrelationIdHeader"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResourceLayoutResponse"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformErrorResponse"
+                }
+              }
+            },
+            "description": "Platform error response."
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Read one resource layout by id.",
+        "tags": [
+          "Catalog"
+        ]
+      }
+    },
+    "/v1/resource-maintenance": {
+      "get": {
+        "operationId": "listResourceMaintenance",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "venue_id",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "service_id",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "resource_id",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "active_only",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/TenantIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/VenueIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/CorrelationIdHeader"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListResourceMaintenanceResponse"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformErrorResponse"
+                }
+              }
+            },
+            "description": "Platform error response."
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "List resource maintenance blocks.",
+        "tags": [
+          "Resource maintenance"
+        ]
+      },
+      "post": {
+        "operationId": "createResourceMaintenance",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/TenantIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/VenueIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/CorrelationIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKeyHeader"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateResourceMaintenanceInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResourceMaintenanceResponse"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformErrorResponse"
+                }
+              }
+            },
+            "description": "Platform error response."
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Create a resource maintenance block.",
+        "tags": [
+          "Resource maintenance"
+        ],
+        "x-idempotency-required": true
+      }
+    },
+    "/v1/resource-maintenance/{maintenance_id}/end": {
+      "post": {
+        "operationId": "endResourceMaintenance",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "maintenance_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/TenantIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/VenueIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/CorrelationIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKeyHeader"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EndResourceMaintenanceInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResourceMaintenanceResponse"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformErrorResponse"
+                }
+              }
+            },
+            "description": "Platform error response."
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "End a resource maintenance block.",
+        "tags": [
+          "Resource maintenance"
+        ],
+        "x-idempotency-required": true
+      }
+    },
+    "/v1/resources": {
+      "get": {
+        "operationId": "listResources",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "venue_id",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "service_id",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "include_inactive",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/TenantIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/VenueIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/CorrelationIdHeader"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListResourcesResponse"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformErrorResponse"
+                }
+              }
+            },
+            "description": "Platform error response."
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "List reservable resources.",
+        "tags": [
+          "Catalog"
+        ]
+      }
+    },
+    "/v1/resources/{resource_id}": {
+      "get": {
+        "operationId": "getResource",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "resource_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/TenantIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/VenueIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/CorrelationIdHeader"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResourceResponse"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformErrorResponse"
+                }
+              }
+            },
+            "description": "Platform error response."
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Read one reservable resource by id.",
+        "tags": [
+          "Catalog"
+        ]
+      }
+    },
+    "/v1/services": {
+      "get": {
+        "operationId": "listServices",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "venue_id",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "include_inactive",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/TenantIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/VenueIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/CorrelationIdHeader"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListServicesResponse"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformErrorResponse"
+                }
+              }
+            },
+            "description": "Platform error response."
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "List reservable services.",
+        "tags": [
+          "Catalog"
+        ]
+      }
+    },
+    "/v1/services/{service_id}": {
+      "get": {
+        "operationId": "getService",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "service_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/TenantIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/VenueIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/CorrelationIdHeader"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceResponse"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformErrorResponse"
+                }
+              }
+            },
+            "description": "Platform error response."
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Read one reservable service by id.",
+        "tags": [
+          "Catalog"
+        ]
+      }
+    },
+    "/v1/tenants/current": {
+      "get": {
+        "operationId": "getCurrentTenant",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/TenantIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/VenueIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/CorrelationIdHeader"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenantResponse"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformErrorResponse"
+                }
+              }
+            },
+            "description": "Platform error response."
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Read the tenant resolved from request context.",
+        "tags": [
+          "Tenants"
+        ]
+      }
+    },
+    "/v1/venues": {
+      "get": {
+        "operationId": "listVenues",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "tenant_id",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "include_inactive",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/TenantIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/VenueIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/CorrelationIdHeader"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListVenuesResponse"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformErrorResponse"
+                }
+              }
+            },
+            "description": "Platform error response."
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "List visible venues.",
+        "tags": [
+          "Catalog"
+        ]
+      }
+    },
+    "/v1/venues/{venue_id}": {
+      "get": {
+        "operationId": "getVenue",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "venue_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/TenantIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/VenueIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/CorrelationIdHeader"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VenueResponse"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformErrorResponse"
+                }
+              }
+            },
+            "description": "Platform error response."
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Read one venue by id.",
+        "tags": [
+          "Catalog"
+        ]
+      }
+    }
+  },
+  "servers": [
+    {
+      "description": "Replace with the reservation platform backend base URL.",
+      "url": "https://api.example.com"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Metadata"
+    },
+    {
+      "name": "Tenants"
+    },
+    {
+      "name": "Catalog"
+    },
+    {
+      "name": "Availability"
+    },
+    {
+      "name": "Reservations"
+    },
+    {
+      "name": "Resource maintenance"
+    },
+    {
+      "description": "Module-gated. Disabled backends return chat_module_disabled in the shared error shape.",
+      "name": "Chat"
+    }
+  ]
+}

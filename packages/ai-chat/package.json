@@ -1,0 +1,47 @@
+{
+  "name": "@reservation-platform/ai-chat",
+  "version": "0.0.0",
+  "description": "Provider-neutral optional AI chat workflow contracts for the reservation platform backend.",
+  "private": true,
+  "type": "module",
+  "license": "UNLICENSED",
+  "author": "Reservation Platform maintainers",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jericho0521/reservation-app.git",
+    "directory": "packages/ai-chat"
+  },
+  "keywords": [
+    "reservations",
+    "booking",
+    "chat",
+    "backend",
+    "typescript"
+  ],
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "prepack": "corepack pnpm run build",
+    "test": "tsc -p tsconfig.build.json && node --import tsx --test \"src/**/*.test.ts\"",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@reservation-platform/contract-types": "workspace:*"
+  },
+  "devDependencies": {
+    "tsx": "^4.21.0",
+    "typescript": "^5"
+  }
+}

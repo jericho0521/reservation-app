@@ -59,6 +59,15 @@ importers:
       '@project-play/reservations-supabase':
         specifier: workspace:*
         version: link:packages/reservations-supabase
+      '@reservation-platform/api':
+        specifier: workspace:*
+        version: link:packages/reservation-platform-api
+      '@reservation-platform/contract-types':
+        specifier: workspace:*
+        version: link:packages/contract-types
+      '@reservation-platform/sdk':
+        specifier: workspace:*
+        version: link:packages/sdk
       '@supabase/ssr':
         specifier: ^0.8.0
         version: 0.8.0(@supabase/supabase-js@2.90.1)
@@ -132,6 +141,9 @@ importers:
       eslint-config-next:
         specifier: 16.1.1
         version: 16.1.1(@typescript-eslint/parser@8.52.0(eslint@9.39.2(jiti@2.6.1))(typescript@5.9.3))(eslint@9.39.2(jiti@2.6.1))(typescript@5.9.3)
+      playwright:
+        specifier: 1.59.1
+        version: 1.59.1
       tailwindcss:
         specifier: ^4
         version: 4.1.18
@@ -145,11 +157,82 @@ importers:
         specifier: ^5
         version: 5.9.3
 
+  apps/api:
+    dependencies:
+      '@project-play/reservations-supabase':
+        specifier: workspace:*
+        version: link:../../packages/reservations-supabase
+      '@reservation-platform/api':
+        specifier: workspace:*
+        version: link:../../packages/reservation-platform-api
+      '@reservation-platform/contract-types':
+        specifier: workspace:*
+        version: link:../../packages/contract-types
+      '@supabase/supabase-js':
+        specifier: ^2.90.1
+        version: 2.90.1
+    devDependencies:
+      '@types/node':
+        specifier: ^20
+        version: 20.19.28
+      tsx:
+        specifier: ^4.21.0
+        version: 4.21.0
+      typescript:
+        specifier: ^5
+        version: 5.9.3
+
+  packages/ai-chat:
+    dependencies:
+      '@reservation-platform/contract-types':
+        specifier: workspace:*
+        version: link:../contract-types
+    devDependencies:
+      tsx:
+        specifier: ^4.21.0
+        version: 4.21.0
+      typescript:
+        specifier: ^5
+        version: 5.9.3
+
+  packages/contract-types:
+    dependencies:
+      zod:
+        specifier: ^3.24.0
+        version: 3.25.76
+    devDependencies:
+      tsx:
+        specifier: ^4.21.0
+        version: 4.21.0
+      typescript:
+        specifier: ^5
+        version: 5.9.3
+
+  packages/database: {}
+
   packages/reservation-chat-core:
+    devDependencies:
+      '@project-play/reservations-core':
+        specifier: workspace:*
+        version: link:../reservations-core
+      tsx:
+        specifier: ^4.21.0
+        version: 4.21.0
+      typescript:
+        specifier: ^5
+        version: 5.9.3
+
+  packages/reservation-platform-api:
     dependencies:
       '@project-play/reservations-core':
         specifier: workspace:*
         version: link:../reservations-core
+      '@reservation-platform/contract-types':
+        specifier: workspace:*
+        version: link:../contract-types
+      zod:
+        specifier: ^3.24.0
+        version: 3.25.76
     devDependencies:
       tsx:
         specifier: ^4.21.0
@@ -176,6 +259,22 @@ importers:
       '@project-play/reservations-core':
         specifier: workspace:*
         version: link:../reservations-core
+      '@reservation-platform/api':
+        specifier: workspace:*
+        version: link:../reservation-platform-api
+      tsx:
+        specifier: ^4.21.0
+        version: 4.21.0
+      typescript:
+        specifier: ^5
+        version: 5.9.3
+
+  packages/sdk:
+    dependencies:
+      '@reservation-platform/contract-types':
+        specifier: workspace:*
+        version: link:../contract-types
+    devDependencies:
       tsx:
         specifier: ^4.21.0
         version: 4.21.0

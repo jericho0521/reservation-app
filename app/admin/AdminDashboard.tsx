@@ -2,10 +2,11 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { createClient } from '@/lib/supabase-browser';
 import { Check, X, RotateCcw, LogOut, RefreshCw, Search, XCircle } from 'lucide-react';
 import { Sidebar } from '@/components/admin/Sidebar';
-import { ADMIN_BOOKINGS_SELECT, filterBookings, formatRefreshTime, getBookingSummary, getServiceName, type AdminBooking, type AdminFilter } from './dashboard-data';
+import { filterBookings, formatRefreshTime, getBookingSummary, getServiceName, type AdminBooking, type AdminFilter } from './dashboard-data';
+import { listAdminReservations, updateReservationStatus } from '@/lib/reservation-platform-client';
+import { getAdminAuthClient } from '@/lib/admin-auth-client';
 
 interface AdminDashboardProps {
     bookings: AdminBooking[];
@@ -29,7 +30,6 @@ export default function AdminDashboard({ bookings: initialBookings, todayCount, 
     const [filter, setFilter] = useState<AdminFilter>('all');
     const [isUpdating, setIsUpdating] = useState<string | null>(null);
     const router = useRouter();
-    const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null);
     const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
     const [isRefreshing, setIsRefreshing] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
@@ -58,38 +58,24 @@ export default function AdminDashboard({ bookings: initialBookings, todayCount, 
         day: 'numeric',
     }), []);
 
-    const getSupabase = useCallback(() => {
-        if (!supabaseRef.current) {
-            supabaseRef.current = createClient();
-        }
-
-        return supabaseRef.current;
-    }, []);
-
     const refreshBookings = useCallback(async () => {
         setIsRefreshing(true);
-        const supabase = getSupabase();
 
-        const { data, error } = await supabase
-            .from('bookings')
-            .select(ADMIN_BOOKINGS_SELECT)
-            .order('booking_date', { ascending: false })
-            .order('start_time', { ascending: false })
-            .limit(50);
-
-        if (error) {
+        try {
+            const data = await listAdminReservations();
+            if (!searchTermRef.current.trim()) {
+                setBookings(data);
+                setLastRefresh(new Date());
+            }
+        } catch (error) {
             console.error('Failed to refresh bookings:', error);
-            alert(`Failed to refresh bookings: ${error.message}`);
+            alert(error instanceof Error ? `Failed to refresh bookings: ${error.message}` : 'Failed to refresh bookings');
             setIsRefreshing(false);
             return;
         }
 
-        if (data && !searchTermRef.current.trim()) {
-            setBookings(data);
-            setLastRefresh(new Date());
-        }
         setIsRefreshing(false);
-    }, [getSupabase]);
+    }, []);
 
     const performSearch = useCallback(async (term: string) => {
         searchRequestIdRef.current += 1;
@@ -112,19 +98,14 @@ export default function AdminDashboard({ bookings: initialBookings, todayCount, 
         searchAbortRef.current = controller;
         setIsSearching(true);
         try {
-            const response = await fetch(`/api/bookings?search=${encodeURIComponent(term.trim())}`, {
-                signal: controller.signal,
-            });
+            const data = await listAdminReservations({ search: term, signal: controller.signal });
 
             if (requestId !== searchRequestIdRef.current) {
                 return;
             }
 
-            if (response.ok) {
-                const data = await response.json();
-                setBookings(data);
-                setLastRefresh(new Date());
-            }
+            setBookings(data);
+            setLastRefresh(new Date());
         } catch (error) {
             if (error instanceof DOMException && error.name === 'AbortError') {
                 return;
@@ -163,9 +144,12 @@ export default function AdminDashboard({ bookings: initialBookings, todayCount, 
     }, [searchTerm, performSearch]);
 
     const handleLogout = async () => {
-        const supabase = getSupabase();
+        const { errorMessage } = await getAdminAuthClient().signOut();
 
-        await supabase.auth.signOut();
+        if (errorMessage) {
+            console.error('Failed to sign out:', errorMessage);
+        }
+
         router.push('/admin/login');
         router.refresh();
     };
@@ -173,14 +157,7 @@ export default function AdminDashboard({ bookings: initialBookings, todayCount, 
     const updateBookingStatus = async (bookingId: string, newStatus: string) => {
         setIsUpdating(bookingId);
         try {
-            const supabase = getSupabase();
-
-            const { error } = await supabase
-                .from('bookings')
-                .update({ status: newStatus })
-                .eq('id', bookingId);
-
-            if (error) throw error;
+            await updateReservationStatus(bookingId, newStatus);
 
             setBookings(prev =>
                 prev.map(b => b.id === bookingId ? { ...b, status: newStatus } : b)

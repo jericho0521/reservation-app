@@ -3,21 +3,14 @@
 import useSWR from 'swr';
 import { Service } from '@/types';
 import { BOOKING_WHATSAPP_URL, shouldShowBookingMaintenanceFallback } from './booking-maintenance';
+import { listReservationServices } from '@/lib/reservation-platform-client';
 
 interface Props {
     selected?: string;
     onSelect: (service: Service) => void;
 }
 
-const fetcher = async (url: string) => {
-    const response = await fetch(url);
-
-    if (!response.ok) {
-        throw new Error('Failed to load services');
-    }
-
-    return response.json();
-};
+const fetcher = () => listReservationServices();
 
 // Hoisted static SVG icons - avoid re-creation on each render
 const RacingIcon = (
@@ -34,7 +27,7 @@ const PlayIcon = (
 );
 
 export default function ServiceSelector({ selected, onSelect }: Props) {
-    const { data: services = [], error, isLoading: loading } = useSWR<Service[]>('/api/services', fetcher);
+    const { data: services = [], error, isLoading: loading } = useSWR<Service[]>('reservation-services', fetcher);
 
     if (loading) {
         return (

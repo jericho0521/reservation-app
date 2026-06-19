@@ -2,6 +2,7 @@
 
 import useSWR from 'swr';
 import { AvailabilityResponse } from '@/types';
+import { getReservationAvailability } from '@/lib/reservation-platform-client';
 
 interface Props {
     serviceId: string;
@@ -17,20 +18,14 @@ interface Props {
     selectedStart?: string;
 }
 
-async function availabilityFetcher([url, serviceId, date]: readonly [string, string, string]) {
-    const response = await fetch(`${url}?service_id=${serviceId}&date=${date}`);
-
-    if (!response.ok) {
-        throw new Error('Failed to fetch time slots');
-    }
-
-    return response.json() as Promise<AvailabilityResponse>;
+async function availabilityFetcher([, serviceId, date]: readonly [string, string, string]) {
+    return getReservationAvailability(serviceId, date);
 }
 
 export default function TimeSlotSelector({ serviceId, date, onSelect, selectedStart }: Props) {
     const shouldFetch = Boolean(serviceId && date);
     const { data, error, isLoading } = useSWR(
-        shouldFetch ? ['/api/availability', serviceId, date] as const : null,
+        shouldFetch ? ['reservation-availability', serviceId, date] as const : null,
         availabilityFetcher,
         {
             revalidateOnFocus: false,

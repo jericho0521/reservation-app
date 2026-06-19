@@ -8,6 +8,7 @@ import TimeSlotSelector from './TimeSlotSelector';
 import SeatMap from './SeatMap';
 import BookingSummary from './BookingSummary';
 import { AvailabilityResponse, Booking, ReservableResource, ReservationPolicy, ResourceLayout, ResourceSelectionMode } from '@/types';
+import { createReservationFromBookingForm } from '@/lib/reservation-platform-client';
 
 const ConfettiExplosion = dynamic(() => import('../ui/ConfettiExplosion'), {
     ssr: false,
@@ -64,32 +65,14 @@ export default function MultiStepForm() {
     const handleSubmit = async () => {
         setIsSubmitting(true);
         try {
-            const response = await fetch('/api/bookings', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        service_id: formData.service_id,
-                        user_name: formData.user_name,
-                        user_email: formData.user_email,
-                        user_phone: formData.user_phone,
-                        booking_date: formData.booking_date,
-                    start_time: formData.start_time,
-                    end_time: formData.end_time,
-                    seats_booked: formData.seats_booked,
-                    seat_labels: shouldUseResourceSelection(formData) ? (formData.selected_seat_labels || []) : [],
-                    interface_type: formData.interface_type
-                })
+            await createReservationFromBookingForm({
+                ...formData,
+                selected_seat_labels: shouldUseResourceSelection(formData) ? (formData.selected_seat_labels || []) : [],
             });
-
-            if (response.ok) {
-                setIsSuccess(true);
-            } else {
-                const error = await response.json();
-                alert(error.error || 'Booking failed. Please try again.');
-            }
+            setIsSuccess(true);
         } catch (error) {
             console.error('Booking failed:', error);
-            alert('Booking failed. Please try again.');
+            alert(error instanceof Error ? error.message : 'Booking failed. Please try again.');
         } finally {
             setIsSubmitting(false);
         }

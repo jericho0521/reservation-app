@@ -3,16 +3,16 @@
 import { useEffect, useMemo, useState } from "react";
 import { Save, Wrench } from "lucide-react";
 import { Sidebar } from "@/components/admin/Sidebar";
-import type { Service } from "@/types";
-import type { ReservableResource } from "@/lib/reservations/types";
+import {
+  listReservationServices,
+  listResourceMaintenanceSeats,
+  saveResourceMaintenanceSeats,
+  type LegacyMaintenanceSeatRow,
+} from "@/lib/reservation-platform-client";
+import type { ReservableResource, Service } from "@/types";
 
 interface SeatMaintenanceManagerProps {
   userEmail: string;
-}
-
-interface MaintenanceSeatRow {
-  seat_label: string;
-  reason?: string | null;
 }
 
 const RACING_ISLANDS = [
@@ -90,13 +90,7 @@ export function SeatMaintenanceManager({ userEmail }: SeatMaintenanceManagerProp
       setError(null);
 
       try {
-        const response = await fetch("/api/services");
-
-        if (!response.ok) {
-          throw new Error("Failed to load services");
-        }
-
-        const data = (await response.json()) as Service[];
+        const data = await listReservationServices();
 
         if (!isMounted) return;
 
@@ -135,18 +129,12 @@ export function SeatMaintenanceManager({ userEmail }: SeatMaintenanceManagerProp
       setError(null);
 
       try {
-        const response = await fetch(`/api/seat-maintenance?service_id=${selectedServiceId}`);
-
-        if (!response.ok) {
-          throw new Error("Failed to load maintenance seats");
-        }
-
-        const data = (await response.json()) as { seats?: MaintenanceSeatRow[] };
-        const seatLabels = (data.seats ?? []).map((seat) => seat.seat_label);
+        const seats: LegacyMaintenanceSeatRow[] = await listResourceMaintenanceSeats(selectedServiceId);
+        const seatLabels = seats.map((seat) => seat.seat_label);
 
         if (isMounted) {
           setMaintenanceSeats(seatLabels);
-          setReason(data.seats?.find((seat) => seat.reason)?.reason ?? "");
+          setReason(seats.find((seat) => seat.reason)?.reason ?? "");
         }
       } catch (loadError) {
         console.error("Failed to load maintenance seats:", loadError);
@@ -199,22 +187,12 @@ export function SeatMaintenanceManager({ userEmail }: SeatMaintenanceManagerProp
     setError(null);
 
     try {
-      const response = await fetch("/api/seat-maintenance", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          service_id: selectedServiceId,
-          seat_labels: maintenanceSeats,
-          reason: reason.trim() || undefined,
-        }),
+      const seatLabels = await saveResourceMaintenanceSeats({
+        serviceId: selectedServiceId,
+        seatLabels: maintenanceSeats,
+        reason: reason.trim() || undefined,
       });
-
-      if (!response.ok) {
-        throw new Error("Failed to save maintenance seats");
-      }
-
-      const data = (await response.json()) as { seat_labels?: string[] };
-      setMaintenanceSeats(data.seat_labels ?? []);
+      setMaintenanceSeats(seatLabels);
     } catch (saveError) {
       console.error("Failed to save maintenance seats:", saveError);
       setError("Failed to save seat maintenance");

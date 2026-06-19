@@ -1,8 +1,8 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { createClient } from '@/lib/supabase-browser';
+import { getAdminAuthClient } from '@/lib/admin-auth-client';
 
 export default function AdminLoginPage() {
     const [email, setEmail] = useState('');
@@ -10,11 +10,6 @@ export default function AdminLoginPage() {
     const [error, setError] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const router = useRouter();
-    const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null);
-    const getSupabase = () => {
-        if (!supabaseRef.current) supabaseRef.current = createClient();
-        return supabaseRef.current;
-    };
 
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -22,13 +17,13 @@ export default function AdminLoginPage() {
         setIsLoading(true);
 
         try {
-            const { error } = await getSupabase().auth.signInWithPassword({
+            const { errorMessage } = await getAdminAuthClient().signInWithPassword({
                 email,
                 password,
             });
 
-            if (error) {
-                setError(error.message);
+            if (errorMessage) {
+                setError(errorMessage);
             } else {
                 router.push('/admin');
                 router.refresh();

@@ -248,8 +248,8 @@ The branch now includes the first SDK-specific external fixtures:
   boundaries including committed contract artifacts, checks that external
   fixture manifests and lockfiles point at the current SDK and contract
   tarball versions, installs every external fixture from those tarballs, and
-  runs the fixture smoke suite plus the current frontend platform-mode browser
-  smokes.
+  runs the safe `sdk:registry-install-proof` readiness check, the fixture smoke
+  suite, and the current frontend platform-mode browser smokes.
 - `current-frontend:platform-smoke` starts the current Next.js app with
   `NEXT_PUBLIC_RESERVATION_API_MODE=platform` and CI placeholder public env
   vars, drives `/form-booking` in headless Chromium, mocks only the `/api/v1`
@@ -323,8 +323,11 @@ This is useful external-consumer and current-frontend consumer evidence, but it
 is a local-tarball proof only, not the full Phase 7 release gate. Remaining
 proof includes workspace-link fast-iteration fixtures if desired, direct HTTP
 parity against a real seeded backend, live enabled-chat backend/provider parity
-if chat is released, live backend parity for browser flows, private/public
-registry install checks, and final standalone backend extraction.
+if chat is released, live backend parity for browser flows, passed strict
+private/public registry install proof against exact package versions, and final
+standalone backend extraction. The registry harness is CI-safe and never
+publishes; default runs skip without network/install unless mode-specific env
+and `RESERVATION_SDK_REGISTRY_ALLOW_INSTALL=1` are configured.
 
 ## Deliverables
 

@@ -152,6 +152,10 @@ Release candidate CI must fail on:
 - Direct HTTP parity test failure.
 - Phase 7 external consumer smoke test failure.
 - Local tarball install failure.
+- Registry install proof env/config drift, including malformed private/public
+  mode selection, non-exact package specs, missing private registry URL/token
+  when private mode is selected, or missing explicit install opt-in in strict
+  publish/pilot proof.
 - Packed package `exports` or file-list failure.
 - Forbidden dependency/import check failure.
 - Browser bundle check that finds server-only secrets, Node-only root APIs,
@@ -293,14 +297,24 @@ Current branch implementation for the local-tarball subset:
   `RESERVATION_PLATFORM_LIVE_ALLOW_MUTATIONS=1` against a disposable seeded
   backend, creates through the SDK, replays the same idempotency key through
   direct HTTP, and compares reservation reads through both paths.
+- `sdk:registry-install-proof` is now included as a safe registry readiness
+  gate. It exports the unit-tested `readSdkRegistryInstallConfig` parser,
+  supports `RESERVATION_SDK_REGISTRY_PROOF_MODE=private|public`, requires exact
+  package version specs through `RESERVATION_SDK_REGISTRY_PACKAGE_SPECS`, and
+  validates private registry URL/token shape when private mode is selected.
+  Default CI exits `SKIPPED` without installing anything when the env is absent,
+  incomplete, malformed, or lacks the explicit
+  `RESERVATION_SDK_REGISTRY_ALLOW_INSTALL=1` opt-in.
 - `sdk:release-gate:strict` is the publish/pilot readiness gate. It runs the
-  normal local `sdk:release-gate` and then requires `sdk:live-parity:strict`.
-  This prevents a skipped live backend check from being treated as proof that
-  an unrelated frontend can plug into a real backend service.
+  normal local `sdk:release-gate` and then requires `sdk:live-parity:strict`
+  and `sdk:registry-install-proof:strict`. This prevents skipped live backend
+  or registry install checks from being treated as proof that an unrelated
+  frontend can plug into a real backend service or install from a registry.
 - It does not yet cover completed strict live seeded backend parity, real
-  enabled-chat provider/workflow or live backend parity, private/public
-  registry install checks, executed database migrations, RLS/tenant isolation
-  proof, public changelog publication, or final standalone backend extraction.
+  enabled-chat provider/workflow or live backend parity, a passed strict
+  private/public registry install proof, executed database migrations,
+  RLS/tenant isolation proof, public changelog publication, or final standalone
+  backend extraction.
 
 ## Documentation Requirements
 
@@ -371,9 +385,12 @@ Deprecation:
 7. Verify local tarball install across Phase 7 fixtures.
 8. After Phase 7 external smoke and local tarball gates pass, execute private
    registry publish/install verification before internal release, if used.
+   Current branch readiness covers only install proof configuration and an
+   explicit no-publish install/type-import verifier; publish remains outside
+   the script.
 9. After Phase 7 external smoke and local tarball gates pass, execute public
    npm publish only if product direction allows it, then verify public install
-   by version.
+   by exact version with the strict registry install proof.
 10. Publish documentation covering installation, auth, tenant/venue context,
     idempotency, errors, direct HTTP parity, core methods, optional chat, and
     deprecation policy.

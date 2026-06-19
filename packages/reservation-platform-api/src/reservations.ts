@@ -274,6 +274,22 @@ function invalidUuidIssues(id: string) {
   })];
 }
 
+function resourceLabelDetails(labels: string[] | undefined) {
+  const resourceLabels = labels ?? [];
+  return {
+    resource_labels: resourceLabels,
+    seat_labels: resourceLabels,
+  };
+}
+
+function availableQuantityDetails(availableQuantity: number | undefined) {
+  const quantity = availableQuantity ?? 0;
+  return {
+    available_quantity: quantity,
+    available_seats: quantity,
+  };
+}
+
 function validateReservationId(reservationId: string, message: string) {
   if (reservationIdPattern.test(reservationId)) {
     return null;
@@ -392,7 +408,7 @@ function legacyUpdateValidationIssues(patch: unknown) {
   if (issues.length === 0 && Object.keys(record).length === 0) {
     issues.push(validationIssue({
       code: "custom",
-      message: "At least one booking field is required",
+      message: "At least one reservation field is required",
     }));
   }
 
@@ -411,7 +427,7 @@ function validateLegacyReservationUpdatePatch(patch: unknown): LegacyReservation
     return {
       error: platformErrorBody(
         "validation_failed",
-        "Invalid booking update data",
+        "Invalid reservation update data",
         400,
         issues,
       ),
@@ -507,7 +523,7 @@ function platformAtomicCreateErrorBody(
   if (error === "invalid_reservation") {
     return {
       status: 400,
-      body: platformErrorBody("validation_failed", "Invalid booking data", 400),
+      body: platformErrorBody("validation_failed", "Invalid reservation data", 400),
     };
   }
 
@@ -516,9 +532,9 @@ function platformAtomicCreateErrorBody(
       status: 400,
       body: platformErrorBody(
         "validation_failed",
-        "Selected seat labels are not valid for this service",
+        "Selected resource labels are not valid for this service",
         400,
-        { seat_labels: validation.conflicting_resource_labels ?? [] },
+        resourceLabelDetails(validation.conflicting_resource_labels),
       ),
     };
   }
@@ -528,9 +544,9 @@ function platformAtomicCreateErrorBody(
       status: 400,
       body: platformErrorBody(
         "validation_failed",
-        "Selected seat labels must match booked seats",
+        "Selected resource labels must match requested quantity",
         400,
-        { seat_labels: validation.conflicting_resource_labels ?? [] },
+        resourceLabelDetails(validation.conflicting_resource_labels),
       ),
     };
   }
@@ -540,9 +556,9 @@ function platformAtomicCreateErrorBody(
       status: 409,
       body: platformErrorBody(
         "conflict",
-        "Not enough seats available",
+        "Not enough resources available",
         409,
-        { available_seats: validation.available_quantity ?? 0 },
+        availableQuantityDetails(validation.available_quantity),
       ),
     };
   }
@@ -552,9 +568,9 @@ function platformAtomicCreateErrorBody(
       status: 409,
       body: platformErrorBody(
         "conflict",
-        "Some selected seats are under maintenance",
+        "Some selected resources are under maintenance",
         409,
-        { seat_labels: validation.conflicting_resource_labels ?? [] },
+        resourceLabelDetails(validation.conflicting_resource_labels),
       ),
     };
   }
@@ -564,16 +580,16 @@ function platformAtomicCreateErrorBody(
       status: 409,
       body: platformErrorBody(
         "conflict",
-        "Some selected seats are no longer available",
+        "Some selected resources are no longer available",
         409,
-        { seat_labels: validation.conflicting_resource_labels ?? [] },
+        resourceLabelDetails(validation.conflicting_resource_labels),
       ),
     };
   }
 
   return {
     status: 500,
-    body: platformErrorBody("internal_error", "Failed to create booking", 500),
+    body: platformErrorBody("internal_error", "Failed to create reservation", 500),
   };
 }
 
@@ -589,7 +605,7 @@ function validateLegacyBookingCreateInput(input: unknown): LegacyBookingCreateVa
     return {
       error: platformErrorBody(
         "validation_failed",
-        "Invalid booking data",
+        "Invalid reservation data",
         400,
         parsed.error.issues,
       ),
@@ -630,7 +646,7 @@ export async function createReservation(input: {
   } catch {
     return {
       status: 500,
-      body: platformErrorBody("internal_error", "Failed to create booking", 500),
+      body: platformErrorBody("internal_error", "Failed to create reservation", 500),
     };
   }
 }
@@ -652,7 +668,7 @@ export async function listReservations(input: {
     if (error) {
       return {
         status: 500,
-        body: platformErrorBody("internal_error", "Failed to fetch bookings", 500),
+        body: platformErrorBody("internal_error", "Failed to fetch reservations", 500),
       };
     }
 
@@ -667,7 +683,7 @@ export async function listReservations(input: {
     if (summaryResult?.error) {
       return {
         status: 500,
-        body: platformErrorBody("internal_error", "Failed to fetch booking summary", 500),
+        body: platformErrorBody("internal_error", "Failed to fetch reservation summary", 500),
       };
     }
 
@@ -678,7 +694,7 @@ export async function listReservations(input: {
   } catch {
     return {
       status: 500,
-      body: platformErrorBody("internal_error", "Failed to fetch bookings", 500),
+      body: platformErrorBody("internal_error", "Failed to fetch reservations", 500),
     };
   }
 }
@@ -693,7 +709,7 @@ export async function readReservationById(input: {
       status: 400,
       body: platformErrorBody(
         "validation_failed",
-        "Invalid booking id",
+        "Invalid reservation id",
         400,
         invalidReservationIdIssues(reservationId),
       ),
@@ -709,7 +725,7 @@ export async function readReservationById(input: {
         status,
         body: platformErrorBody(
           status === 404 ? "not_found" : "internal_error",
-          status === 404 ? "Booking not found" : "Failed to fetch booking",
+          status === 404 ? "Reservation not found" : "Failed to fetch reservation",
           status,
         ),
       };
@@ -722,7 +738,7 @@ export async function readReservationById(input: {
   } catch {
     return {
       status: 500,
-      body: platformErrorBody("internal_error", "Failed to fetch booking", 500),
+      body: platformErrorBody("internal_error", "Failed to fetch reservation", 500),
     };
   }
 }
@@ -733,7 +749,7 @@ export async function updateReservationWithLegacyPatch(input: {
   legacyPatch: unknown;
   now?: () => Date;
 }): Promise<ReservationApplicationResult<ReservationResponse>> {
-  const invalidId = validateReservationId(input.reservationId, "Invalid booking update data");
+  const invalidId = validateReservationId(input.reservationId, "Invalid reservation update data");
   if (invalidId) {
     return {
       status: 400,
@@ -764,7 +780,7 @@ export async function updateReservationWithLegacyPatch(input: {
         status,
         body: platformErrorBody(
           status === 404 ? "not_found" : "internal_error",
-          status === 404 ? "Booking not found" : "Failed to update booking",
+          status === 404 ? "Reservation not found" : "Failed to update reservation",
           status,
         ),
       };
@@ -777,7 +793,7 @@ export async function updateReservationWithLegacyPatch(input: {
   } catch {
     return {
       status: 500,
-      body: platformErrorBody("internal_error", "Failed to update booking", 500),
+      body: platformErrorBody("internal_error", "Failed to update reservation", 500),
     };
   }
 }
@@ -787,7 +803,7 @@ export async function cancelReservation(input: {
   reservationId: string;
   now?: () => Date;
 }): Promise<ReservationApplicationResult<ReservationResponse>> {
-  const invalidId = validateReservationId(input.reservationId, "Invalid booking id");
+  const invalidId = validateReservationId(input.reservationId, "Invalid reservation id");
   if (invalidId) {
     return {
       status: 400,
@@ -810,7 +826,7 @@ export async function cancelReservation(input: {
         status,
         body: platformErrorBody(
           status === 404 ? "not_found" : "internal_error",
-          status === 404 ? "Booking not found" : "Failed to cancel booking",
+          status === 404 ? "Reservation not found" : "Failed to cancel reservation",
           status,
         ),
       };
@@ -823,7 +839,7 @@ export async function cancelReservation(input: {
   } catch {
     return {
       status: 500,
-      body: platformErrorBody("internal_error", "Failed to cancel booking", 500),
+      body: platformErrorBody("internal_error", "Failed to cancel reservation", 500),
     };
   }
 }

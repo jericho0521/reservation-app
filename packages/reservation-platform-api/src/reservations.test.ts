@@ -42,6 +42,14 @@ const validCreateInput = {
   },
 };
 
+function assertGenericPublicErrorMessage(body: unknown) {
+  assert.equal(typeof body, "object");
+  assert.ok(body !== null && "error" in body);
+  const message = (body as { error: { message?: unknown } }).error.message;
+  assert.equal(typeof message, "string");
+  assert.doesNotMatch(message, /\bbookings?\b|\bseats?\b/i);
+}
+
 test("reservation services stay framework-neutral at the source boundary", () => {
   const source = readFileSync(join(apiPackageSrcDir, "reservations.ts"), "utf8");
 
@@ -80,7 +88,8 @@ test("reservation update service validates ids before repository access", async 
 
   assert.equal(called, false);
   assert.equal(result.status, 400);
-  assert.equal("error" in result.body ? result.body.error.message : null, "Invalid booking update data");
+  assert.equal("error" in result.body ? result.body.error.message : null, "Invalid reservation update data");
+  assertGenericPublicErrorMessage(result.body);
   assert.ok(Array.isArray("error" in result.body ? result.body.error.details : null));
 });
 
@@ -99,7 +108,8 @@ test("reservation update service validates legacy patches before repository acce
 
   assert.equal(called, false);
   assert.equal(result.status, 400);
-  assert.equal("error" in result.body ? result.body.error.message : null, "Invalid booking update data");
+  assert.equal("error" in result.body ? result.body.error.message : null, "Invalid reservation update data");
+  assertGenericPublicErrorMessage(result.body);
   assert.ok(Array.isArray("error" in result.body ? result.body.error.details : null));
 });
 
@@ -160,7 +170,7 @@ test("reservation update service maps repository not-found and generic failures"
     body: {
       error: {
         code: "not_found",
-        message: "Booking not found",
+        message: "Reservation not found",
         status: 404,
       },
     },
@@ -181,7 +191,7 @@ test("reservation update service maps repository not-found and generic failures"
     body: {
       error: {
         code: "internal_error",
-        message: "Failed to update booking",
+        message: "Failed to update reservation",
         status: 500,
       },
     },
@@ -199,7 +209,8 @@ test("reservation cancel service validates ids, stamps cancelled patch, and maps
   });
 
   assert.equal(invalid.status, 400);
-  assert.equal("error" in invalid.body ? invalid.body.error.message : null, "Invalid booking id");
+  assert.equal("error" in invalid.body ? invalid.body.error.message : null, "Invalid reservation id");
+  assertGenericPublicErrorMessage(invalid.body);
 
   let call: unknown;
   const cancelled = await cancelReservation({
@@ -250,7 +261,7 @@ test("reservation cancel service maps repository not-found and generic failures"
     body: {
       error: {
         code: "not_found",
-        message: "Booking not found",
+        message: "Reservation not found",
         status: 404,
       },
     },
@@ -270,7 +281,7 @@ test("reservation cancel service maps repository not-found and generic failures"
     body: {
       error: {
         code: "internal_error",
-        message: "Failed to cancel booking",
+        message: "Failed to cancel reservation",
         status: 500,
       },
     },
@@ -443,7 +454,7 @@ test("reservation list service maps summary failures to platform errors", async 
     body: {
       error: {
         code: "internal_error",
-        message: "Failed to fetch booking summary",
+        message: "Failed to fetch reservation summary",
         status: 500,
       },
     },
@@ -485,7 +496,7 @@ test("reservation list service maps repository failures to platform errors", asy
     body: {
       error: {
         code: "internal_error",
-        message: "Failed to fetch bookings",
+        message: "Failed to fetch reservations",
         status: 500,
       },
     },
@@ -507,7 +518,8 @@ test("reservation read service validates ids before repository access", async ()
   assert.equal(called, false);
   assert.equal(result.status, 400);
   assert.equal("error" in result.body ? result.body.error.code : null, "validation_failed");
-  assert.equal("error" in result.body ? result.body.error.message : null, "Invalid booking id");
+  assert.equal("error" in result.body ? result.body.error.message : null, "Invalid reservation id");
+  assertGenericPublicErrorMessage(result.body);
   assert.ok(Array.isArray("error" in result.body ? result.body.error.details : null));
 });
 
@@ -548,7 +560,7 @@ test("reservation read service maps repository rows and not-found errors", async
     body: {
       error: {
         code: "not_found",
-        message: "Booking not found",
+        message: "Reservation not found",
         status: 404,
       },
     },
@@ -688,7 +700,8 @@ test("reservation create service validates legacy create input before repository
   assert.equal(called, false);
   assert.equal(result.status, 400);
   assert.equal("error" in result.body ? result.body.error.code : null, "validation_failed");
-  assert.equal("error" in result.body ? result.body.error.message : null, "Invalid booking data");
+  assert.equal("error" in result.body ? result.body.error.message : null, "Invalid reservation data");
+  assertGenericPublicErrorMessage(result.body);
   assert.ok(Array.isArray("error" in result.body ? result.body.error.details : null));
 });
 
@@ -801,14 +814,98 @@ test("reservation create service maps atomic failures to platform errors", async
     body: {
       error: {
         code: "conflict",
-        message: "Some selected seats are no longer available",
+        message: "Some selected resources are no longer available",
         status: 409,
         details: {
+          resource_labels: ["RS2"],
           seat_labels: ["RS2"],
         },
       },
     },
   });
+});
+
+test("reservation create public atomic errors use reservation/resource language and aliases", async () => {
+  const legacyInput = {
+    service_id: "00000000-0000-4000-8000-000000000020",
+    user_name: "Grace Hopper",
+    user_email: "grace@example.com",
+    user_phone: "555-0200",
+    booking_date: "2026-01-02",
+    start_time: "10:00",
+    end_time: "11:00",
+    seats_booked: 1,
+    seat_labels: ["RS2"],
+    interface_type: "chat" as const,
+  };
+
+  const cases = [
+    {
+      error: "invalid_reservation" as const,
+      status: 400,
+      message: "Invalid reservation data",
+      validation: { ok: false },
+    },
+    {
+      error: "invalid_resource_labels" as const,
+      status: 400,
+      message: "Selected resource labels are not valid for this service",
+      validation: { ok: false, conflicting_resource_labels: ["RS2"] },
+      details: { resource_labels: ["RS2"], seat_labels: ["RS2"] },
+    },
+    {
+      error: "missing_resource_labels" as const,
+      status: 400,
+      message: "Selected resource labels must match requested quantity",
+      validation: { ok: false, conflicting_resource_labels: ["RS2"] },
+      details: { resource_labels: ["RS2"], seat_labels: ["RS2"] },
+    },
+    {
+      error: "not_enough_capacity" as const,
+      status: 409,
+      message: "Not enough resources available",
+      validation: { ok: false, available_quantity: 0 },
+      details: { available_quantity: 0, available_seats: 0 },
+    },
+    {
+      error: "maintenance_conflict" as const,
+      status: 409,
+      message: "Some selected resources are under maintenance",
+      validation: { ok: false, conflicting_resource_labels: ["RS2"] },
+      details: { resource_labels: ["RS2"], seat_labels: ["RS2"] },
+    },
+    {
+      error: "resource_conflict" as const,
+      status: 409,
+      message: "Some selected resources are no longer available",
+      validation: { ok: false, conflicting_resource_labels: ["RS2"] },
+      details: { resource_labels: ["RS2"], seat_labels: ["RS2"] },
+    },
+  ];
+
+  for (const testCase of cases) {
+    const result = await createReservation({
+      repository: {
+        async createReservationAtomic(input) {
+          return {
+            ok: false,
+            atomic: true,
+            reservation: input.reservation,
+            error: testCase.error,
+            validation: testCase.validation,
+          };
+        },
+      },
+      legacyInput,
+    });
+
+    assert.equal(result.status, testCase.status);
+    assert.equal("error" in result.body ? result.body.error.message : null, testCase.message);
+    assertGenericPublicErrorMessage(result.body);
+    if (testCase.details) {
+      assert.deepEqual("error" in result.body ? result.body.error.details : null, testCase.details);
+    }
+  }
 });
 
 test("reservation create legacy mapping preserves resource_ids and item resource labels", () => {

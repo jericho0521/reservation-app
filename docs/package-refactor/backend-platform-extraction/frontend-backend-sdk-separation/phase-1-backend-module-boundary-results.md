@@ -266,6 +266,16 @@ idempotency-before-body parsing, public create input preparation, and
 resource-id label resolution ordering, but it no longer runs
 `platformResponseFromLegacy` for create success or error responses.
 
+Public reservation service errors emitted by `@reservation-platform/api` now use
+generic reservation/resource language rather than booking/seat copy for create
+validation, atomic resource-label/capacity conflicts, list/read failures,
+update failures, and cancel failures. Atomic resource conflict details include
+generic `resource_labels` and capacity errors include generic
+`available_quantity`; the legacy `seat_labels` and `available_seats` detail
+keys remain as compatibility aliases while current storage rows, fixtures, and
+legacy adapter internals still use booking/seat field names until the final
+DB/API migration.
+
 Resource-maintenance list/create/end behavior now uses backend-owned
 application-service functions in `@reservation-platform/api`. The package
 defines a small `ResourceMaintenanceRepositoryPort` matching the methods
@@ -287,6 +297,10 @@ Remaining Phase 1 work:
 - Extract these platform route handlers into backend-owned application services; `/api/v1/availability` orchestration now lives in framework-neutral `@reservation-platform/api` behind an injected availability repository port, catalog list/read orchestration for venues/services/resources/resource-layouts now lives in framework-neutral `@reservation-platform/api` behind an injected catalog repository port, `/api/v1/reservations` list/read-by-id plus create/update/cancel/reschedule orchestration now lives in framework-neutral `@reservation-platform/api` application services behind repository ports, and `/api/v1/resource-maintenance` list/create/end orchestration now lives in framework-neutral `@reservation-platform/api` application services.
 - Split Next.js handler glue from backend service logic.
 - Replace legacy booking/seat naming with generic resource service contracts.
+  Public `@reservation-platform/api` reservation error bodies now use generic
+  reservation/resource messages and generic detail aliases while preserving
+  legacy detail keys for compatibility; DB fields, fixtures, and compatibility
+  adapter internals still need the final schema/API migration.
 - Replace the current Next.js compatibility route auth with the standalone
   bearer-token/JWT auth path after live provider configuration and tenant/RLS
   proof exist. The standalone skeleton has provider-neutral service-token and

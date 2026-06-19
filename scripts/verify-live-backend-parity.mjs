@@ -5,9 +5,7 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 
 const rootDir = process.cwd();
-const strict = process.argv.includes("--strict") || process.env.RESERVATION_PLATFORM_LIVE_STRICT === "1";
-const allowMutations = process.env.RESERVATION_PLATFORM_LIVE_ALLOW_MUTATIONS === "1";
-const requiredEnvNames = [
+export const liveBackendParityRequiredEnvNames = [
   "RESERVATION_PLATFORM_LIVE_BASE_URL",
   "RESERVATION_PLATFORM_LIVE_TENANT_ID",
   "RESERVATION_PLATFORM_LIVE_API_KEY",
@@ -41,13 +39,42 @@ export function buildResourceMaintenanceListQuery(config) {
   };
 }
 
-function readConfig(env) {
-  const values = Object.fromEntries(requiredEnvNames.map((name) => [name, env[name]?.trim() ?? ""]));
-  values.RESERVATION_PLATFORM_LIVE_VENUE_ID = env.RESERVATION_PLATFORM_LIVE_VENUE_ID?.trim() ?? "";
-  values.RESERVATION_PLATFORM_LIVE_QUANTITY = env.RESERVATION_PLATFORM_LIVE_QUANTITY?.trim() ?? "1";
+function trimEnvValue(env, name) {
+  return env[name]?.trim() ?? "";
+}
+
+function validateRequiredEnvNames(requiredEnvNames) {
+  const invalidNames = requiredEnvNames.filter((name) => typeof name !== "string" || name.trim().length === 0);
+  return invalidNames.length === 0 ? [] : ["live backend parity required env names must be non-empty strings."];
+}
+
+function buildConfig(values) {
+  return {
+    baseUrl: values.RESERVATION_PLATFORM_LIVE_BASE_URL,
+    tenantId: values.RESERVATION_PLATFORM_LIVE_TENANT_ID,
+    venueId: values.RESERVATION_PLATFORM_LIVE_VENUE_ID,
+    apiKey: values.RESERVATION_PLATFORM_LIVE_API_KEY,
+    serviceId: values.RESERVATION_PLATFORM_LIVE_SERVICE_ID,
+    resourceId: values.RESERVATION_PLATFORM_LIVE_RESOURCE_ID,
+    startAt: values.RESERVATION_PLATFORM_LIVE_START_AT,
+    endAt: values.RESERVATION_PLATFORM_LIVE_END_AT,
+    quantity: Number.parseInt(values.RESERVATION_PLATFORM_LIVE_QUANTITY, 10),
+  };
+}
+
+export function readLiveBackendParityConfig(env, options = {}) {
+  const argv = options.argv ?? [];
+  const requiredEnvNames = options.requiredEnvNames ?? liveBackendParityRequiredEnvNames;
+  const strict =
+    argv.includes("--strict") ||
+    trimEnvValue(env, "RESERVATION_PLATFORM_LIVE_STRICT") === "1";
+  const allowMutations = trimEnvValue(env, "RESERVATION_PLATFORM_LIVE_ALLOW_MUTATIONS") === "1";
+  const values = Object.fromEntries(requiredEnvNames.map((name) => [name, trimEnvValue(env, name)]));
+  values.RESERVATION_PLATFORM_LIVE_VENUE_ID = trimEnvValue(env, "RESERVATION_PLATFORM_LIVE_VENUE_ID");
+  values.RESERVATION_PLATFORM_LIVE_QUANTITY = trimEnvValue(env, "RESERVATION_PLATFORM_LIVE_QUANTITY") || "1";
   const missing = requiredEnvNames.filter((name) => values[name].length === 0);
   const configured = requiredEnvNames.filter((name) => values[name].length > 0);
-  const errors = [];
+  const errors = validateRequiredEnvNames(requiredEnvNames);
 
   if (values.RESERVATION_PLATFORM_LIVE_BASE_URL) {
     try {
@@ -78,12 +105,39 @@ function readConfig(env) {
     errors.push("RESERVATION_PLATFORM_LIVE_QUANTITY must be a positive integer when set.");
   }
 
+  const ready = missing.length === 0 && errors.length === 0;
+  let status = "ready";
+  let message = "";
+
+  if (errors.length > 0) {
+    message = errors.join(" ");
+    status = strict ? "fail" : "skip";
+  } else if (!ready) {
+    const details = [
+      `missing ${missing.join(", ")}`,
+      configured.length > 0 ? `configured ${configured.join(", ")}` : "no live env configured",
+    ].join("; ");
+    message = `required live backend config is incomplete: ${details}.`;
+    status = strict ? "fail" : "skip";
+  } else if (strict && !allowMutations) {
+    message = "strict live backend parity requires RESERVATION_PLATFORM_LIVE_ALLOW_MUTATIONS=1 against a disposable seeded backend.";
+    status = "fail";
+  }
+
   return {
     values,
+    config: ready ? buildConfig(values) : null,
     missing,
     configured,
     errors,
-    ready: missing.length === 0 && errors.length === 0,
+    strict,
+    allowMutations,
+    ready,
+    mutationReady: ready && strict && allowMutations,
+    status,
+    shouldSkip: status === "skip",
+    shouldFail: status === "fail",
+    message,
   };
 }
 
@@ -240,48 +294,20 @@ async function importSdk() {
 }
 
 async function main() {
-  const parsed = readConfig(process.env);
+  const parsed = readLiveBackendParityConfig(process.env, { argv: process.argv.slice(2) });
+  const { strict, allowMutations } = parsed;
   console.log("Live backend SDK parity env contract checked.");
 
-  if (parsed.errors.length > 0) {
-    const message = parsed.errors.join(" ");
-    if (strict) {
-      fail(message);
-      return;
-    }
-    skip(`${message} No live HTTP calls were made.`);
+  if (parsed.shouldFail) {
+    fail(parsed.message);
+    return;
+  }
+  if (parsed.shouldSkip) {
+    skip(`${parsed.message} No live HTTP calls were made.`);
     return;
   }
 
-  if (!parsed.ready) {
-    const details = [
-      `missing ${parsed.missing.join(", ")}`,
-      parsed.configured.length > 0 ? `configured ${parsed.configured.join(", ")}` : "no live env configured",
-    ].join("; ");
-    if (strict) {
-      fail(`required live backend config is incomplete: ${details}.`);
-      return;
-    }
-    skip(`required live backend config is incomplete: ${details}. No live HTTP calls were made.`);
-    return;
-  }
-
-  if (strict && !allowMutations) {
-    fail("strict live backend parity requires RESERVATION_PLATFORM_LIVE_ALLOW_MUTATIONS=1 against a disposable seeded backend.");
-    return;
-  }
-
-  const config = {
-    baseUrl: parsed.values.RESERVATION_PLATFORM_LIVE_BASE_URL,
-    tenantId: parsed.values.RESERVATION_PLATFORM_LIVE_TENANT_ID,
-    venueId: parsed.values.RESERVATION_PLATFORM_LIVE_VENUE_ID,
-    apiKey: parsed.values.RESERVATION_PLATFORM_LIVE_API_KEY,
-    serviceId: parsed.values.RESERVATION_PLATFORM_LIVE_SERVICE_ID,
-    resourceId: parsed.values.RESERVATION_PLATFORM_LIVE_RESOURCE_ID,
-    startAt: parsed.values.RESERVATION_PLATFORM_LIVE_START_AT,
-    endAt: parsed.values.RESERVATION_PLATFORM_LIVE_END_AT,
-    quantity: Number.parseInt(parsed.values.RESERVATION_PLATFORM_LIVE_QUANTITY, 10),
-  };
+  const config = parsed.config;
   const { createReservationPlatformClient } = await importSdk();
   const client = createReservationPlatformClient({
     baseUrl: config.baseUrl,

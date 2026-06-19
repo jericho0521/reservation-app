@@ -4,7 +4,21 @@ import test from "node:test";
 import {
   buildReservationListQuery,
   buildResourceMaintenanceListQuery,
+  readLiveBackendParityConfig,
 } from "./verify-live-backend-parity.mjs";
+
+function validLiveEnv(overrides = {}) {
+  return {
+    RESERVATION_PLATFORM_LIVE_BASE_URL: "https://backend.example.test/platform",
+    RESERVATION_PLATFORM_LIVE_TENANT_ID: "tenant_123",
+    RESERVATION_PLATFORM_LIVE_API_KEY: "live_api_key",
+    RESERVATION_PLATFORM_LIVE_SERVICE_ID: "svc_123",
+    RESERVATION_PLATFORM_LIVE_RESOURCE_ID: "resrc_123",
+    RESERVATION_PLATFORM_LIVE_START_AT: "2026-06-13T10:00:00.000Z",
+    RESERVATION_PLATFORM_LIVE_END_AT: "2026-06-13T11:00:00.000Z",
+    ...overrides,
+  };
+}
 
 test("buildReservationListQuery targets seeded reservation context", () => {
   const query = buildReservationListQuery({
@@ -50,6 +64,110 @@ test("buildReservationListQuery narrows to the created reservation context", () 
     start_at: "2026-06-14T12:00:00.000Z",
     end_at: "2026-06-14T13:00:00.000Z",
   });
+});
+
+test("readLiveBackendParityConfig safely skips when live env is absent", () => {
+  const parsed = readLiveBackendParityConfig({}, { argv: [] });
+
+  assert.equal(parsed.status, "skip");
+  assert.equal(parsed.shouldSkip, true);
+  assert.equal(parsed.shouldFail, false);
+  assert.equal(parsed.ready, false);
+  assert.equal(parsed.mutationReady, false);
+  assert.equal(parsed.config, null);
+  assert.deepEqual(parsed.configured, []);
+  assert.deepEqual(parsed.missing, [
+    "RESERVATION_PLATFORM_LIVE_BASE_URL",
+    "RESERVATION_PLATFORM_LIVE_TENANT_ID",
+    "RESERVATION_PLATFORM_LIVE_API_KEY",
+    "RESERVATION_PLATFORM_LIVE_SERVICE_ID",
+    "RESERVATION_PLATFORM_LIVE_RESOURCE_ID",
+    "RESERVATION_PLATFORM_LIVE_START_AT",
+    "RESERVATION_PLATFORM_LIVE_END_AT",
+  ]);
+  assert.match(parsed.message, /required live backend config is incomplete/);
+});
+
+test("readLiveBackendParityConfig trims values and returns normalized ready config", () => {
+  const parsed = readLiveBackendParityConfig(
+    validLiveEnv({
+      RESERVATION_PLATFORM_LIVE_BASE_URL: " https://backend.example.test/platform ",
+      RESERVATION_PLATFORM_LIVE_TENANT_ID: " tenant_123 ",
+      RESERVATION_PLATFORM_LIVE_VENUE_ID: " venue_123 ",
+      RESERVATION_PLATFORM_LIVE_API_KEY: " live_api_key ",
+      RESERVATION_PLATFORM_LIVE_QUANTITY: " 2 ",
+      RESERVATION_PLATFORM_LIVE_ALLOW_MUTATIONS: " 1 ",
+    }),
+    { argv: ["--strict"] },
+  );
+
+  assert.equal(parsed.status, "ready");
+  assert.equal(parsed.strict, true);
+  assert.equal(parsed.allowMutations, true);
+  assert.equal(parsed.ready, true);
+  assert.equal(parsed.mutationReady, true);
+  assert.deepEqual(parsed.errors, []);
+  assert.deepEqual(parsed.config, {
+    baseUrl: "https://backend.example.test/platform",
+    tenantId: "tenant_123",
+    venueId: "venue_123",
+    apiKey: "live_api_key",
+    serviceId: "svc_123",
+    resourceId: "resrc_123",
+    startAt: "2026-06-13T10:00:00.000Z",
+    endAt: "2026-06-13T11:00:00.000Z",
+    quantity: 2,
+  });
+});
+
+test("readLiveBackendParityConfig fails strict runs when mutation opt-in is absent", () => {
+  const parsed = readLiveBackendParityConfig(
+    validLiveEnv({
+      RESERVATION_PLATFORM_LIVE_STRICT: " 1 ",
+    }),
+  );
+
+  assert.equal(parsed.status, "fail");
+  assert.equal(parsed.strict, true);
+  assert.equal(parsed.allowMutations, false);
+  assert.equal(parsed.ready, true);
+  assert.equal(parsed.mutationReady, false);
+  assert.match(parsed.message, /RESERVATION_PLATFORM_LIVE_ALLOW_MUTATIONS=1/);
+});
+
+test("readLiveBackendParityConfig reports malformed env without making live readiness claims", () => {
+  const parsed = readLiveBackendParityConfig(
+    validLiveEnv({
+      RESERVATION_PLATFORM_LIVE_BASE_URL: "ftp://backend.example.test",
+      RESERVATION_PLATFORM_LIVE_START_AT: "2026-06-13T11:00:00.000Z",
+      RESERVATION_PLATFORM_LIVE_END_AT: "2026-06-13T10:00:00.000Z",
+      RESERVATION_PLATFORM_LIVE_QUANTITY: "0",
+    }),
+  );
+
+  assert.equal(parsed.status, "skip");
+  assert.equal(parsed.shouldSkip, true);
+  assert.equal(parsed.ready, false);
+  assert.equal(parsed.mutationReady, false);
+  assert.equal(parsed.config, null);
+  assert.match(parsed.message, /BASE_URL must use http or https/);
+  assert.match(parsed.message, /START_AT must be before RESERVATION_PLATFORM_LIVE_END_AT/);
+  assert.match(parsed.message, /QUANTITY must be a positive integer/);
+});
+
+test("readLiveBackendParityConfig validates date parseability before readiness", () => {
+  const parsed = readLiveBackendParityConfig(
+    validLiveEnv({
+      RESERVATION_PLATFORM_LIVE_START_AT: "not-a-date",
+    }),
+    { argv: ["--strict"] },
+  );
+
+  assert.equal(parsed.status, "fail");
+  assert.equal(parsed.ready, false);
+  assert.equal(parsed.mutationReady, false);
+  assert.equal(parsed.config, null);
+  assert.match(parsed.message, /RESERVATION_PLATFORM_LIVE_START_AT must be an ISO-compatible date\/time string/);
 });
 
 test("live parity script compares reservation list responses with assertDeepEqual", async () => {

@@ -146,6 +146,50 @@ async function freshRouteUtils() {
   return import(`./route-utils?test=${Date.now()}-${Math.random()}`) as Promise<typeof import("./route-utils")>;
 }
 
+test("/api/v1 catalog routes use shared platform catalog route glue", () => {
+  const catalogRouteFiles = [
+    "venues/route.ts",
+    "venues/[id]/route.ts",
+    "services/route.ts",
+    "services/[id]/route.ts",
+    "resources/route.ts",
+    "resources/[id]/route.ts",
+    "resource-layouts/[id]/route.ts",
+  ];
+  const directServiceCalls = [
+    "listPlatformVenues",
+    "getPlatformVenue",
+    "listPlatformServices",
+    "getPlatformService",
+    "listPlatformResources",
+    "getPlatformResource",
+    "getPlatformResourceLayout",
+  ];
+
+  for (const routeFile of catalogRouteFiles) {
+    const source = readApiV1Source(routeFile);
+    assert.match(source, /platformCatalogResponse/, `${routeFile} should use shared catalog route glue`);
+    assert.equal(
+      source.includes("@reservation-platform/api"),
+      false,
+      `${routeFile} should not import package services directly`,
+    );
+
+    for (const serviceCall of directServiceCalls) {
+      assert.equal(
+        source.includes(serviceCall),
+        false,
+        `${routeFile} should not directly call ${serviceCall}`,
+      );
+    }
+  }
+
+  const glueSource = readApiV1Source("catalog-route.ts");
+  assert.match(glueSource, /handlePlatformCatalogRequest/);
+  assert.match(glueSource, /createPlatformCatalogRepository/);
+  assert.match(glueSource, /NextResponse\.json/);
+});
+
 test("/api/v1 reservation cancel routes use local cancel compatibility code", () => {
   const routeFiles = [
     "reservations/[id]/route.ts",

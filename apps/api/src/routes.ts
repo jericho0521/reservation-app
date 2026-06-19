@@ -9,6 +9,7 @@ import {
   endResourceMaintenance,
   listAvailability,
   listResourceMaintenance,
+  handlePlatformCatalogRequest,
   platformErrorBody,
   prepareAvailabilityQuery,
   prepareLegacyReservationReschedule,
@@ -21,13 +22,6 @@ import {
   requireIdempotencyKey,
   requirePlatformBearerToken,
   getPlatformMetadata,
-  getPlatformResource,
-  getPlatformResourceLayout,
-  getPlatformService,
-  getPlatformVenue,
-  listPlatformResources,
-  listPlatformServices,
-  listPlatformVenues,
   listReservations,
   readReservationById,
   rescheduleReservationWithLegacyPatch,
@@ -36,7 +30,6 @@ import {
   type AuthenticatedPlatformPrincipal,
   type IdempotencyRepository,
   type PlatformCatalogRepository,
-  type PlatformCatalogResult,
   type PlatformRequestContext,
   type PlatformTenantVenueRepository,
   type ReservationCreateRepositoryPort,
@@ -892,55 +885,15 @@ async function handleCatalogRequest(
   url: URL,
   repository: PlatformCatalogRepository | undefined,
 ): Promise<StandaloneApiResponse | undefined> {
-  if (path === "/v1/venues") {
-    return withCatalogRepository(repository, (catalogRepository) => listPlatformVenues(catalogRepository));
+  const result = await handlePlatformCatalogRequest({
+    path,
+    repository,
+    url,
+  });
+  if (!result) {
+    return undefined;
   }
 
-  const venueId = venuePattern.exec(path)?.[1];
-  if (venueId) {
-    return withCatalogRepository(repository, (catalogRepository) => getPlatformVenue(catalogRepository, decodeURIComponent(venueId)));
-  }
-
-  if (path === "/v1/services") {
-    return withCatalogRepository(repository, (catalogRepository) => listPlatformServices(catalogRepository));
-  }
-
-  const serviceId = servicePattern.exec(path)?.[1];
-  if (serviceId) {
-    return withCatalogRepository(repository, (catalogRepository) => getPlatformService(catalogRepository, decodeURIComponent(serviceId)));
-  }
-
-  if (path === "/v1/resources") {
-    const serviceFilter = url.searchParams.get("service_id");
-    return withCatalogRepository(repository, (catalogRepository) => (
-      listPlatformResources(catalogRepository, { serviceId: serviceFilter })
-    ));
-  }
-
-  const resourceId = resourcePattern.exec(path)?.[1];
-  if (resourceId) {
-    return withCatalogRepository(repository, (catalogRepository) => getPlatformResource(catalogRepository, decodeURIComponent(resourceId)));
-  }
-
-  const layoutId = resourceLayoutPattern.exec(path)?.[1];
-  if (layoutId) {
-    return withCatalogRepository(repository, (catalogRepository) => (
-      getPlatformResourceLayout(catalogRepository, decodeURIComponent(layoutId))
-    ));
-  }
-
-  return undefined;
-}
-
-async function withCatalogRepository<T>(
-  repository: PlatformCatalogRepository | undefined,
-  action: (repository: PlatformCatalogRepository) => Promise<PlatformCatalogResult<T>>,
-): Promise<StandaloneApiResponse> {
-  if (!repository) {
-    return platformError(503, "bad_request", "Catalog repository is not configured.");
-  }
-
-  const result = await action(repository);
   return jsonResponse(result.status, result.body);
 }
 

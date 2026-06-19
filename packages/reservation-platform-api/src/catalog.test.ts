@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  handlePlatformCatalogRequest,
   getPlatformResourceLayout,
   getPlatformResource,
   getPlatformService,
@@ -40,6 +41,84 @@ test("catalog service maps venue list rows into platform responses", async () =>
       metadata: undefined,
     }],
   });
+});
+
+test("catalog request dispatcher routes list requests through repository ports", async () => {
+  const result = await handlePlatformCatalogRequest({
+    path: "/v1/venues/",
+    repository: repository({
+      listVenues: async () => ({ data: [{ id: "venue_1", name: "Main" }] }),
+    }),
+  });
+
+  assert.equal(result?.status, 200);
+  assert.deepEqual(result?.body, {
+    venues: [{
+      venue_id: "venue_1",
+      tenant_id: undefined,
+      name: "Main",
+      timezone: undefined,
+      metadata: undefined,
+    }],
+  });
+});
+
+test("catalog request dispatcher decodes ids before repository reads", async () => {
+  let observedId: string | undefined;
+  const result = await handlePlatformCatalogRequest({
+    path: "/v1/services/service%20one",
+    repository: repository({
+      getService: async (id) => {
+        observedId = id;
+        return { data: { id, name: "Private room" } };
+      },
+    }),
+  });
+
+  assert.equal(observedId, "service one");
+  assert.equal(result?.status, 200);
+});
+
+test("catalog request dispatcher forwards resource service_id filters", async () => {
+  let observedServiceId: string | null | undefined;
+  const result = await handlePlatformCatalogRequest({
+    path: "/v1/resources",
+    url: "http://platform.local/v1/resources?service_id=svc_1",
+    repository: repository({
+      listResources: async ({ serviceId } = {}) => {
+        observedServiceId = serviceId;
+        return { data: [] };
+      },
+    }),
+  });
+
+  assert.equal(observedServiceId, "svc_1");
+  assert.equal(result?.status, 200);
+  assert.deepEqual(result?.body, { resources: [] });
+});
+
+test("catalog request dispatcher returns stable errors for missing repositories", async () => {
+  const result = await handlePlatformCatalogRequest({
+    path: "/v1/resource-layouts/layout_1",
+  });
+
+  assert.equal(result?.status, 503);
+  assert.deepEqual(result?.body, {
+    error: {
+      code: "bad_request",
+      message: "Catalog repository is not configured.",
+      status: 503,
+    },
+  });
+});
+
+test("catalog request dispatcher ignores non-catalog routes", async () => {
+  const result = await handlePlatformCatalogRequest({
+    path: "/v1/reservations",
+    repository: repository({}),
+  });
+
+  assert.equal(result, undefined);
 });
 
 test("catalog service maps missing service errors to platform not_found", async () => {

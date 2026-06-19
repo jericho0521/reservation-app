@@ -44,6 +44,17 @@ export type PlatformCatalogResult<T> = {
   status: number;
 };
 
+export type PlatformCatalogRequestInput = {
+  path: string;
+  repository?: PlatformCatalogRepository;
+  url?: URL | string | { searchParams: URLSearchParams };
+};
+
+const venuePathPattern = /^\/v1\/venues\/([^/]+)$/;
+const servicePathPattern = /^\/v1\/services\/([^/]+)$/;
+const resourcePathPattern = /^\/v1\/resources\/([^/]+)$/;
+const resourceLayoutPathPattern = /^\/v1\/resource-layouts\/([^/]+)$/;
+
 export function catalogErrorStatus(error: unknown) {
   const record = error && typeof error === "object" ? error as { code?: unknown; status?: unknown } : {};
   if (record.status === 404 || record.code === "PGRST116") {
@@ -53,6 +64,30 @@ export function catalogErrorStatus(error: unknown) {
     return 503;
   }
   return 500;
+}
+
+export async function handlePlatformCatalogRequest(
+  input: PlatformCatalogRequestInput,
+): Promise<PlatformCatalogResult<
+  | ListResourcesResponse
+  | ListServicesResponse
+  | ListVenuesResponse
+  | ResourceLayoutResponse
+  | ResourceResponse
+  | ServiceResponse
+  | VenueResponse
+> | undefined> {
+  const path = normalizeCatalogPath(input.path);
+  const action = readPlatformCatalogAction(path, input.url);
+  if (!action) {
+    return undefined;
+  }
+
+  if (!input.repository) {
+    return catalogFailure("bad_request", "Catalog repository is not configured.", 503);
+  }
+
+  return action(input.repository);
 }
 
 export async function listPlatformVenues(
@@ -238,4 +273,67 @@ function catalogFailure(
     body: platformErrorBody(code, message, status),
     status,
   };
+}
+
+function readPlatformCatalogAction(
+  path: string,
+  url: PlatformCatalogRequestInput["url"],
+): ((repository: PlatformCatalogRepository) => Promise<PlatformCatalogResult<
+  | ListResourcesResponse
+  | ListServicesResponse
+  | ListVenuesResponse
+  | ResourceLayoutResponse
+  | ResourceResponse
+  | ServiceResponse
+  | VenueResponse
+>>) | undefined {
+  if (path === "/v1/venues") {
+    return (repository) => listPlatformVenues(repository);
+  }
+
+  const venueId = venuePathPattern.exec(path)?.[1];
+  if (venueId) {
+    return (repository) => getPlatformVenue(repository, decodeURIComponent(venueId));
+  }
+
+  if (path === "/v1/services") {
+    return (repository) => listPlatformServices(repository);
+  }
+
+  const serviceId = servicePathPattern.exec(path)?.[1];
+  if (serviceId) {
+    return (repository) => getPlatformService(repository, decodeURIComponent(serviceId));
+  }
+
+  if (path === "/v1/resources") {
+    const serviceFilter = readCatalogSearchParams(url).get("service_id");
+    return (repository) => listPlatformResources(repository, { serviceId: serviceFilter });
+  }
+
+  const resourceId = resourcePathPattern.exec(path)?.[1];
+  if (resourceId) {
+    return (repository) => getPlatformResource(repository, decodeURIComponent(resourceId));
+  }
+
+  const layoutId = resourceLayoutPathPattern.exec(path)?.[1];
+  if (layoutId) {
+    return (repository) => getPlatformResourceLayout(repository, decodeURIComponent(layoutId));
+  }
+
+  return undefined;
+}
+
+function readCatalogSearchParams(url: PlatformCatalogRequestInput["url"]) {
+  if (typeof url === "string") {
+    return new URL(url, "http://platform.local").searchParams;
+  }
+  if (url instanceof URL) {
+    return url.searchParams;
+  }
+  return url?.searchParams ?? new URLSearchParams();
+}
+
+function normalizeCatalogPath(path: string) {
+  const normalized = path.replace(/\/+$/, "");
+  return normalized === "" ? "/" : normalized;
 }

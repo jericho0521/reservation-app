@@ -1,19 +1,9 @@
-import { NextResponse } from "next/server";
-import { listPlatformVenues } from "@reservation-platform/api";
-import { createPlatformCatalogRepository } from "../catalog-repository";
+import { platformCatalogResponse } from "../catalog-route";
 
 export async function GET() {
-  try {
-    const result = await listPlatformVenues(createPlatformCatalogRepository());
-    return NextResponse.json(result.body, { status: result.status });
-  } catch (error) {
-    console.error("Failed to fetch platform venues:", error);
-    return NextResponse.json({
-      error: {
-        code: "bad_request",
-        message: "Failed to fetch venues.",
-        status: 500,
-      },
-    }, { status: 500 });
-  }
+  return platformCatalogResponse({
+    path: "/v1/venues",
+    logLabel: "venues",
+    failureMessage: "Failed to fetch venues.",
+  });
 }

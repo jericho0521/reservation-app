@@ -145,10 +145,10 @@ Added runtime surfaces:
 | Surface | Current implementation |
 | --- | --- |
 | `/api/v1/metadata` | Returns API version and enabled module metadata. |
-| `/api/v1/venues`, `/api/v1/venues/{id}` | Reads existing venue rows and adapts to platform venue DTOs. |
-| `/api/v1/services`, `/api/v1/services/{id}` | Reads existing service rows and adapts to platform service DTOs. |
-| `/api/v1/resources` | Reads `reservable_resources` rows and adapts to platform resource DTOs. |
-| `/api/v1/resource-layouts/{id}` | Reads resource layout metadata and adapts to platform layout DTOs. |
+| `/api/v1/venues`, `/api/v1/venues/{id}` | Dispatches through a framework-neutral catalog request handler in `@reservation-platform/api`, reads existing venue rows through an injected repository port, and adapts to platform venue DTOs. |
+| `/api/v1/services`, `/api/v1/services/{id}` | Dispatches through a framework-neutral catalog request handler in `@reservation-platform/api`, reads existing service rows through an injected repository port, and adapts to platform service DTOs. |
+| `/api/v1/resources` | Dispatches through a framework-neutral catalog request handler in `@reservation-platform/api`, forwards the optional `service_id` filter through an injected repository port, reads `reservable_resources` rows, and adapts to platform resource DTOs. |
+| `/api/v1/resource-layouts/{id}` | Dispatches through a framework-neutral catalog request handler in `@reservation-platform/api`, reads resource layout metadata through an injected repository port, and adapts to platform layout DTOs. |
 | `/api/v1/availability` | Calls a framework-neutral `listAvailability` application service in `@reservation-platform/api`. The package service prepares and validates public query parameters, lazily reads through an injected `AvailabilityRepositoryPort`, generates slots, applies metadata/default-label behavior, adapts `timeSlots` to `{ slots }`, and shapes platform errors. The Next route now only supplies the current repository factory, logs service causes, and serializes `Response.json(...)`. |
 | `/api/v1/reservations*` | List and read-by-id orchestration now run through framework-neutral application-service functions in `@reservation-platform/api` backed by an injected `ReservationReadRepositoryPort`. Those package services own search normalization, the legacy-compatible search filter expression, search-only limit decision, UUID validation, repository error classification, and platform DTO/error response shaping. Create, update, cancel, and reschedule mutation orchestration now also runs through framework-neutral `@reservation-platform/api` functions backed by injected repository ports. The create service owns legacy create validation, legacy booking-to-reservation conversion, atomic result/error mapping, and platform DTO/error body shaping through `ReservationCreateRepositoryPort`; update/cancel/reschedule services own UUID validation, legacy update patch schema validation, `updated_at` stamping, cancel status construction, not-found/generic repository error classification, and platform DTO/error response shaping through `ReservationMutationRepositoryPort`. The current Next compatibility files now keep auth preflight, storage package repository factory wiring, create repository construction, resource-id label resolution for create/reschedule preparation, and JSON serialization. `createSupabaseReservationReadRepository()` preserves `*, services(name)`, descending `booking_date` ordering, search filter application, search-only `limit(100)`, `id` equality, and `.single()` behavior inside `@project-play/reservations-supabase`. `createSupabaseReservationMutationRepository()` preserves the authenticated `bookings.update(patch).eq("id", reservationId).select().single()` query shape while receiving already prepared patches from the package service. Reschedule preserves missing-idempotency, auth preflight, body parsing, idempotency claim, resource-id-to-label lookup, and legacy patch preparation ordering before calling the same package update orchestration as PATCH. Create preserves missing-idempotency before body parsing, public create input preparation, resource-id-to-label lookup ordering, lazy Supabase repository construction after legacy validation, atomic create execution through `createSupabaseReservationRepository(supabaseAdmin()).createReservationAtomic(...)`, and direct 201 platform reservation DTO responses without legacy response double mapping. Resource-id-to-label storage lookup now lives in `createSupabaseReservationResourceLabelRepository()` from `@project-play/reservations-supabase`, while the Next.js helper still owns JSON parsing, legacy DTO transformation, and compatibility routing. `PATCH` rejects movement fields so rescheduling uses the dedicated route. |
 | `/api/v1/resource-maintenance` | Lists legacy seat maintenance rows and executes create/end mutations through framework-neutral resource-maintenance application-service functions in `@reservation-platform/api`. Those services use an injected repository port, call `createSupabaseResourceMaintenanceRepository()` from the Next host, preserve create-time service support, label normalization, legacy row construction, repository error classification, empty list behavior, and platform DTO mapping. The Next routes now keep only service-id/body schema validation, protected auth/idempotency ordering, Supabase repository construction, and `Response.json(...)` host glue. |
@@ -169,6 +169,18 @@ resources, and resource layouts now lives behind
 wires the current anon Supabase client for venue/service reads and service-role
 Supabase client for resource/layout reads. This is a bounded storage-adapter
 slice, not a standalone backend extraction.
+
+Catalog route orchestration for venues, services, resources, and resource
+layouts now also lives in `@reservation-platform/api` through
+`handlePlatformCatalogRequest()`. The package owns catalog endpoint matching,
+trailing-slash normalization, id decoding, `service_id` resource filter
+extraction, missing-repository error shaping, repository-port dispatch, and
+platform DTO/error result shaping. The current Next.js route files call shared
+`app/api/v1/catalog-route.ts` glue that wires the current repository factory
+and serializes `NextResponse.json(...)`; `apps/api` uses the same package
+dispatcher and converts the plain result into its standalone JSON response.
+This is still a compatibility-host slice and does not prove live standalone
+backend parity.
 
 The current `/api/v1/availability` storage query logic lives behind
 `createSupabaseAvailabilityRepository()` in
@@ -272,7 +284,7 @@ call the package services, and serialize their plain result objects with
 
 Remaining Phase 1 work:
 
-- Extract these platform route handlers into backend-owned application services; `/api/v1/availability` orchestration now lives in framework-neutral `@reservation-platform/api` behind an injected availability repository port, `/api/v1/reservations` list/read-by-id plus create/update/cancel/reschedule orchestration now lives in framework-neutral `@reservation-platform/api` application services behind repository ports, and `/api/v1/resource-maintenance` list/create/end orchestration now lives in framework-neutral `@reservation-platform/api` application services.
+- Extract these platform route handlers into backend-owned application services; `/api/v1/availability` orchestration now lives in framework-neutral `@reservation-platform/api` behind an injected availability repository port, catalog list/read orchestration for venues/services/resources/resource-layouts now lives in framework-neutral `@reservation-platform/api` behind an injected catalog repository port, `/api/v1/reservations` list/read-by-id plus create/update/cancel/reschedule orchestration now lives in framework-neutral `@reservation-platform/api` application services behind repository ports, and `/api/v1/resource-maintenance` list/create/end orchestration now lives in framework-neutral `@reservation-platform/api` application services.
 - Split Next.js handler glue from backend service logic.
 - Replace legacy booking/seat naming with generic resource service contracts.
 - Replace the current Next.js compatibility route auth with the standalone
@@ -281,7 +293,7 @@ Remaining Phase 1 work:
   JWT/JWKS verifier readiness only.
 - Move remaining storage access behind backend repository interfaces rather
   than route files. Catalog reads for the current `/api/v1` shim now use the
-  Supabase storage adapter, and `/api/v1/availability` reads now use a
+  Supabase storage adapter and package-owned catalog request dispatcher, and `/api/v1/availability` reads now use a
   compatibility Supabase availability adapter wired through local `/api/v1`
   factory glue instead of direct route imports of app Supabase helpers.
   Reservation create/reschedule resource-label lookup now uses a Supabase
@@ -293,8 +305,7 @@ Remaining Phase 1 work:
   update/cancel/reschedule now use package repository ports backed by Supabase
   read/mutation adapters in `@project-play/reservations-supabase`, and
   reservation create now uses a package create repository port backed by the
-  existing Supabase reservation repository. Resource orchestration is still not
-  fully backend-owned.
+  existing Supabase reservation repository.
 - Replace compatibility-level reservation create/update/cancel/reschedule
   mapping with true backend application service commands. Create, cancel, and
   reschedule preparation plus create/update/cancel/reschedule mutation

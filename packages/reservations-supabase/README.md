@@ -118,7 +118,9 @@ builds the adapter, then runs the adapter tests with Node's test runner.
 
 Example Supabase-shaped rows live in `examples/domain-row-examples.ts` and map
 to the same Racing Simulator, Playstation 5 quantity, and Movie Ticketing
-domains documented in `docs/package-refactor/example-consumers.md`.
+domains used by the modularity planning examples. Current external consumer
+planning lives in
+`docs/package-refactor/backend-platform-extraction/sdk-readiness/phase-7-external-consumer-smoke-tests.md`.
 
 An external tarball smoke fixture lives in
 `../../examples/external-consumer-smoke` and verifies repository construction
@@ -140,13 +142,14 @@ publish packages or touch production data.
 Install the adapter with the matching core tarball in the consumer app:
 
 ```powershell
-corepack pnpm add C:\path\to\reservation-app\dist-packages\project-play-reservations-core-0.0.0.tgz C:\path\to\reservation-app\dist-packages\project-play-reservations-supabase-0.0.0.tgz @supabase/supabase-js@^2.90.1
+corepack pnpm add C:\path\to\reservation-app\dist-packages\project-play-reservations-core-0.0.0.tgz C:\path\to\reservation-app\dist-packages\reservation-platform-api-0.0.0.tgz C:\path\to\reservation-app\dist-packages\project-play-reservations-supabase-0.0.0.tgz @supabase/supabase-js@^2.90.1
 ```
 
-The adapter declares `@project-play/reservations-core` as a peer dependency, so
-the matching core tarball must be installed alongside the adapter tarball. The
-consumer should import from `@project-play/reservations-supabase` only, not
-from this repository's source paths.
+The adapter declares `@project-play/reservations-core` and
+`@reservation-platform/api` as peer dependencies, so the matching core and API
+tarballs must be installed alongside the adapter tarball. The consumer should
+import from `@project-play/reservations-supabase` only, not from this
+repository's source paths.
 
 ## Versioning and Changelog Policy
 

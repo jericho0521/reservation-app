@@ -17,8 +17,22 @@ import {
   type ResourceSelectionMode,
   type ReservableResource,
 } from "@project-play/reservations-core";
+import type {
+  CatalogListResult,
+  CatalogReadResult,
+  IdempotencyCommitRecord,
+  IdempotencyRecord,
+  IdempotencyRepository,
+  IdempotencyStoredResponse,
+  PlatformCatalogRepository,
+  PlatformTenantVenueRepository,
+  ReservationMutationRepositoryPort,
+  ReservationReadRepositoryPort,
+} from "@reservation-platform/api";
 
 export const RESERVATION_SUPABASE_TABLES = {
+  platformTenants: "tenants",
+  venues: "venues",
   services: "services",
   bookings: "bookings",
   reservableResources: "reservable_resources",
@@ -29,17 +43,45 @@ export const RESERVATION_SUPABASE_TABLES = {
 } as const;
 
 export const RESERVATION_SUPABASE_SELECTS = {
+  platformTenant: "id",
+  venueContext: "id, tenant_id",
+  catalogVenue: "*",
+  catalogVenueWithEquipment: "*, equipment(*)",
+  catalogServiceWithResources: `
+  *,
+  resources:reservable_resources(id, service_id, label, kind, is_active, capacity, metadata),
+  layout:resource_layouts(id, service_id, layout_kind, metadata)
+`,
+  catalogResource: "id, service_id, label, kind, is_active, capacity, metadata",
+  catalogResourceLayout: "id, service_id, layout_kind, metadata",
   service:
     "id, name, description, total_seats, created_at, resource_kind, selection_mode, reservation_policy",
   booking:
     "id, service_id, user_name, user_email, user_phone, booking_date, start_time, end_time, seats_booked, seat_labels, status, interface_type",
+  reservationCompatibility: "*, services(name)",
+  availabilityResource:
+    "id, service_id, label, kind, is_active, capacity, metadata",
+  availabilityLayout: "layout_kind, metadata",
   resource:
     "id, service_id, label, resource_label, kind, resource_kind, status, is_active, capacity, metadata",
   layout: "layout_kind, kind, metadata",
   maintenance: "seat_label",
+  resourceMaintenanceResource: "id, service_id, label",
+  resourceMaintenanceService:
+    "total_seats, selection_mode, reservation_policy, resources:reservable_resources(label, is_active)",
+  resourceMaintenance:
+    "id, service_id, seat_label, reason, is_active, updated_at",
   availabilityRule:
     "day_of_week, start_time, end_time, interval_minutes, is_active",
+  resourceLabel: "id, label",
 } as const;
+
+export const RESERVATION_SUPABASE_IDEMPOTENCY_RPCS = {
+  claim: "platform_claim_idempotency_record",
+  storeCompleted: "platform_store_idempotency_record",
+} as const;
+
+const IDEMPOTENCY_UNSCOPED_TENANT = "__platform_unscoped__";
 
 export interface ServiceMetadataRow {
   id: string;
@@ -151,6 +193,40 @@ export interface SupabaseReservationRepository
   ): Promise<CreateReservationSupabaseResult>;
 }
 
+export interface SupabaseAvailabilityRead {
+  service: ReservationService;
+  bookings: Reservation[];
+  maintenanceResourceLabels: string[];
+}
+
+export interface SupabaseAvailabilityRepository {
+  readAvailability(input: {
+    serviceId: string;
+    date: string;
+  }): Promise<SupabaseAvailabilityRead>;
+}
+
+export interface SupabaseReservationResourceLabelRow {
+  id: string;
+  label: string;
+}
+
+export interface SupabaseReservationResourceLabelRepository {
+  resolveLabelsById(serviceId: string, ids: string[]): Promise<Map<string, string>>;
+}
+
+export interface PlatformIdempotencyRow {
+  key?: string | null;
+  tenant_id?: string | null;
+  method?: string | null;
+  path?: string | null;
+  fingerprint?: string | null;
+  status?: string | null;
+  response_status?: number | null;
+  response_body?: unknown;
+  claimed?: boolean | null;
+}
+
 interface SupabaseLikeClient {
   from(table: string): unknown;
   rpc?(
@@ -160,17 +236,31 @@ interface SupabaseLikeClient {
 }
 
 interface SupabaseQueryBuilder {
-  select(columns?: string): SupabaseQueryBuilder;
+  select(columns?: string, options?: Record<string, unknown>): SupabaseQueryBuilder;
   eq(column: string, value: unknown): SupabaseQueryBuilder;
+  in(column: string, values: unknown[]): SupabaseQueryBuilder;
+  or(expression: string): SupabaseQueryBuilder;
+  order(column: string, options?: Record<string, unknown>): SupabaseQueryBuilder;
+  limit(count: number): SupabaseQueryBuilder;
   insert(rows: unknown[]): SupabaseQueryBuilder;
+  upsert(row: unknown, options?: Record<string, unknown>): SupabaseQueryBuilder;
+  update(row: unknown): SupabaseQueryBuilder;
   single(): Promise<QueryResult<unknown>>;
   maybeSingle(): Promise<QueryResult<unknown>>;
   then(resolve: (value: QueryResult<unknown>) => unknown): Promise<unknown>;
 }
 
+interface SupabaseQueryError {
+  message?: string;
+  code?: string;
+  status?: number;
+  [key: string]: unknown;
+}
+
 interface QueryResult<T> {
   data: T | null;
-  error: { message?: string; code?: string } | null;
+  error: SupabaseQueryError | null;
+  count?: number | null;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -196,8 +286,541 @@ function assertNoSupabaseError<T>(
   return result.data;
 }
 
+function createSupabaseNotFoundError(message: string): SupabaseQueryError {
+  return {
+    message,
+    code: "PGRST116",
+    status: 404,
+  };
+}
+
+function maybeSingleRpcRow(raw: unknown): Record<string, unknown> | null {
+  if (Array.isArray(raw)) {
+    const [row] = raw;
+    return isRecord(row) ? row : null;
+  }
+
+  return isRecord(raw) ? raw : null;
+}
+
+function adaptIdempotencyRow(raw: unknown): IdempotencyRecord | null {
+  const row = maybeSingleRpcRow(raw) as PlatformIdempotencyRow | null;
+
+  if (!row) {
+    return null;
+  }
+
+  const key = getString(row.key);
+  const method = getString(row.method);
+  const path = getString(row.path);
+  const fingerprint = getString(row.fingerprint);
+  const status = row.status === "completed" ? "completed" : row.status === "in_progress" ? "in_progress" : null;
+  const tenantId = getString(row.tenant_id);
+  const normalizedTenantId = tenantId === IDEMPOTENCY_UNSCOPED_TENANT ? undefined : tenantId ?? undefined;
+
+  if (!key || !method || !path || !fingerprint || !status) {
+    return null;
+  }
+
+  const response = status === "completed"
+    && typeof row.response_status === "number"
+    ? {
+        status: row.response_status,
+        body: row.response_body,
+      } satisfies IdempotencyStoredResponse
+    : undefined;
+
+  return {
+    key,
+    ...(normalizedTenantId ? { tenantId: normalizedTenantId } : {}),
+    method,
+    path,
+    fingerprint,
+    status,
+    ...(response ? { response } : {}),
+  };
+}
+
 function fromTable(client: SupabaseLikeClient, table: string) {
   return client.from(table) as SupabaseQueryBuilder;
+}
+
+function toPlatformContextReadResult(result: QueryResult<unknown>) {
+  if (result.error) {
+    return { data: result.data, error: result.error };
+  }
+
+  return { data: result.data };
+}
+
+function toCatalogReadResult(result: QueryResult<unknown>): CatalogReadResult<unknown> {
+  if (result.error) {
+    return { data: result.data, error: result.error };
+  }
+
+  return { data: result.data };
+}
+
+function toCatalogListResult(result: QueryResult<unknown>): CatalogListResult<unknown> {
+  const data = result.data as unknown[] | null | undefined;
+
+  if (result.error) {
+    return { data, error: result.error };
+  }
+
+  return { data };
+}
+
+export interface SupabasePlatformCatalogRepositoryClients {
+  publicClient: SupabaseLikeClient;
+  adminClient?: SupabaseLikeClient | (() => SupabaseLikeClient);
+}
+
+function resolvePlatformCatalogClients(
+  input: SupabaseLikeClient | SupabasePlatformCatalogRepositoryClients,
+) {
+  if ("publicClient" in input) {
+    const adminClient = input.adminClient ?? input.publicClient;
+    return {
+      publicClient: input.publicClient,
+      adminClient: () => typeof adminClient === "function" ? adminClient() : adminClient,
+    };
+  }
+
+  return {
+    publicClient: input,
+    adminClient: () => input,
+  };
+}
+
+export function createSupabasePlatformCatalogRepository(
+  input: SupabaseLikeClient | SupabasePlatformCatalogRepositoryClients,
+): PlatformCatalogRepository {
+  const { publicClient, adminClient } = resolvePlatformCatalogClients(input);
+
+  return {
+    async listVenues() {
+      return toCatalogListResult(
+        await fromTable(publicClient, RESERVATION_SUPABASE_TABLES.venues)
+          .select(RESERVATION_SUPABASE_SELECTS.catalogVenue)
+          .order("name") as QueryResult<unknown>,
+      );
+    },
+
+    async getVenue(id) {
+      return toCatalogReadResult(
+        await fromTable(publicClient, RESERVATION_SUPABASE_TABLES.venues)
+          .select(RESERVATION_SUPABASE_SELECTS.catalogVenueWithEquipment)
+          .eq("id", id)
+          .single() as QueryResult<unknown>,
+      );
+    },
+
+    async listServices() {
+      let result = await fromTable(publicClient, RESERVATION_SUPABASE_TABLES.services)
+        .select(RESERVATION_SUPABASE_SELECTS.catalogServiceWithResources)
+        .order("name") as QueryResult<unknown>;
+
+      if (result.error) {
+        result = await fromTable(publicClient, RESERVATION_SUPABASE_TABLES.services)
+          .select("*")
+          .order("name") as QueryResult<unknown>;
+      }
+
+      return toCatalogListResult(result);
+    },
+
+    async getService(id) {
+      let result = await fromTable(publicClient, RESERVATION_SUPABASE_TABLES.services)
+        .select(RESERVATION_SUPABASE_SELECTS.catalogServiceWithResources)
+        .eq("id", id)
+        .single() as QueryResult<unknown>;
+
+      if (result.error) {
+        result = await fromTable(publicClient, RESERVATION_SUPABASE_TABLES.services)
+          .select("*")
+          .eq("id", id)
+          .single() as QueryResult<unknown>;
+      }
+
+      return toCatalogReadResult(result);
+    },
+
+    async listResources({ serviceId } = {}) {
+      let query = fromTable(adminClient(), RESERVATION_SUPABASE_TABLES.reservableResources)
+        .select(RESERVATION_SUPABASE_SELECTS.catalogResource)
+        .order("label");
+
+      if (serviceId) {
+        query = query.eq("service_id", serviceId);
+      }
+
+      return toCatalogListResult(await query as QueryResult<unknown>);
+    },
+
+    async getResource(id) {
+      return toCatalogReadResult(
+        await fromTable(adminClient(), RESERVATION_SUPABASE_TABLES.reservableResources)
+          .select(RESERVATION_SUPABASE_SELECTS.catalogResource)
+          .eq("id", id)
+          .single() as QueryResult<unknown>,
+      );
+    },
+
+    async getResourceLayout(id) {
+      return toCatalogReadResult(
+        await fromTable(adminClient(), RESERVATION_SUPABASE_TABLES.resourceLayouts)
+          .select(RESERVATION_SUPABASE_SELECTS.catalogResourceLayout)
+          .eq("id", id)
+          .maybeSingle() as QueryResult<unknown>,
+      );
+    },
+  };
+}
+
+export function createSupabaseAvailabilityRepository(
+  input: SupabaseLikeClient | SupabasePlatformCatalogRepositoryClients,
+): SupabaseAvailabilityRepository {
+  const { publicClient, adminClient } = resolvePlatformCatalogClients(input);
+
+  return {
+    async readAvailability({ serviceId, date }) {
+      const serviceResult = await fromTable(publicClient, RESERVATION_SUPABASE_TABLES.services)
+        .select(RESERVATION_SUPABASE_SELECTS.service)
+        .eq("id", serviceId)
+        .single() as QueryResult<ServiceMetadataRow>;
+
+      if (serviceResult.error) {
+        throw serviceResult.error;
+      }
+
+      const service = serviceResult.data;
+      if (!service) {
+        throw createSupabaseNotFoundError(`Service not found: ${serviceId}`);
+      }
+
+      const admin = adminClient();
+      const bookingsResult = await fromTable(admin, RESERVATION_SUPABASE_TABLES.bookings)
+        .select(RESERVATION_SUPABASE_SELECTS.booking)
+        .eq("service_id", serviceId)
+        .eq("booking_date", date)
+        .eq("status", "confirmed") as QueryResult<LegacyBookingShape[]>;
+      if (bookingsResult.error) {
+        throw bookingsResult.error;
+      }
+      const bookings = bookingsResult.data ?? [];
+
+      const maintenanceResult = await fromTable(admin, RESERVATION_SUPABASE_TABLES.serviceSeatMaintenance)
+        .select(RESERVATION_SUPABASE_SELECTS.maintenance)
+        .eq("service_id", serviceId)
+        .eq("is_active", true) as QueryResult<MaintenanceRow[]>;
+      if (maintenanceResult.error) {
+        throw maintenanceResult.error;
+      }
+      const maintenanceRows = maintenanceResult.data ?? [];
+
+      const resourcesResult = await fromTable(admin, RESERVATION_SUPABASE_TABLES.reservableResources)
+        .select(RESERVATION_SUPABASE_SELECTS.availabilityResource)
+        .eq("service_id", serviceId) as QueryResult<ResourceRow[]>;
+      if (resourcesResult.error) {
+        throw resourcesResult.error;
+      }
+      const resources = resourcesResult.data ?? [];
+
+      const layoutResult = await fromTable(admin, RESERVATION_SUPABASE_TABLES.resourceLayouts)
+        .select(RESERVATION_SUPABASE_SELECTS.availabilityLayout)
+        .eq("service_id", serviceId)
+        .eq("is_active", true)
+        .maybeSingle() as QueryResult<LayoutRow>;
+      if (layoutResult.error) {
+        throw layoutResult.error;
+      }
+
+      return {
+        service: adaptServiceMetadata(service, resources, layoutResult.data),
+        bookings: adaptBookingRows(bookings.map((booking) => ({
+          ...booking,
+          interface_type: booking.interface_type === "chat" ? "chat" : "form",
+        }))),
+        maintenanceResourceLabels: adaptMaintenanceRows(maintenanceRows),
+      };
+    },
+  };
+}
+
+export function createSupabaseReservationResourceLabelRepository(
+  client: SupabaseLikeClient,
+): SupabaseReservationResourceLabelRepository {
+  return {
+    async resolveLabelsById(serviceId, ids) {
+      if (ids.length === 0) {
+        return new Map();
+      }
+
+      const { data, error } = await fromTable(client, RESERVATION_SUPABASE_TABLES.reservableResources)
+        .select(RESERVATION_SUPABASE_SELECTS.resourceLabel)
+        .eq("service_id", serviceId)
+        .in("id", ids) as QueryResult<unknown[]>;
+
+      if (error) {
+        throw error;
+      }
+
+      return new Map(
+        (data ?? [])
+          .filter((row): row is SupabaseReservationResourceLabelRow => (
+            isRecord(row)
+            && typeof row.id === "string"
+            && typeof row.label === "string"
+          ))
+          .map((row) => [row.id, row.label]),
+      );
+    },
+  };
+}
+
+export function createSupabaseReservationReadRepository(
+  client: SupabaseLikeClient,
+): ReservationReadRepositoryPort {
+  function applyReservationListFilters(
+    query: SupabaseQueryBuilder,
+    input: { searchFilterExpression: string | null },
+  ) {
+    return input.searchFilterExpression
+      ? query.or(input.searchFilterExpression)
+      : query;
+  }
+
+  return {
+    async listReservations({ searchFilterExpression, limit }) {
+      let query = applyReservationListFilters(
+        fromTable(client, RESERVATION_SUPABASE_TABLES.bookings)
+        .select(RESERVATION_SUPABASE_SELECTS.reservationCompatibility)
+        .order("booking_date", { ascending: false }),
+        { searchFilterExpression },
+      );
+
+      if (limit) {
+        query = query.limit(limit);
+      }
+
+      return await query as QueryResult<unknown[]>;
+    },
+
+    async getReservationsSummary({ searchFilterExpression, today }) {
+      const totalQuery = applyReservationListFilters(
+        fromTable(client, RESERVATION_SUPABASE_TABLES.bookings)
+          .select("id", { count: "exact", head: true }),
+        { searchFilterExpression },
+      );
+      const todayQuery = applyReservationListFilters(
+        fromTable(client, RESERVATION_SUPABASE_TABLES.bookings)
+          .select("id", { count: "exact", head: true })
+          .eq("booking_date", today)
+          .eq("status", "confirmed"),
+        { searchFilterExpression },
+      );
+      const [totalResult, todayResult] = await Promise.all([
+        totalQuery as unknown as Promise<QueryResult<unknown[]>>,
+        todayQuery as unknown as Promise<QueryResult<unknown[]>>,
+      ]);
+
+      if (totalResult.error) {
+        return { summary: null, error: totalResult.error };
+      }
+      if (todayResult.error) {
+        return { summary: null, error: todayResult.error };
+      }
+
+      return {
+        summary: {
+          total: totalResult.count ?? 0,
+          confirmed_today: todayResult.count ?? 0,
+        },
+      };
+    },
+
+    async readReservationById(reservationId) {
+      return await fromTable(client, RESERVATION_SUPABASE_TABLES.bookings)
+        .select(RESERVATION_SUPABASE_SELECTS.reservationCompatibility)
+        .eq("id", reservationId)
+        .single() as QueryResult<unknown>;
+    },
+  };
+}
+
+export function createSupabaseReservationMutationRepository(
+  client: SupabaseLikeClient,
+): ReservationMutationRepositoryPort {
+  return {
+    async updateReservation({ reservationId, patch }) {
+      return await fromTable(client, RESERVATION_SUPABASE_TABLES.bookings)
+        .update(patch)
+        .eq("id", reservationId)
+        .select()
+        .single() as QueryResult<unknown>;
+    },
+  };
+}
+
+export function createSupabaseTenantVenueRepository(
+  client: SupabaseLikeClient,
+): PlatformTenantVenueRepository {
+  return {
+    async getTenant(id) {
+      return toPlatformContextReadResult(
+        await fromTable(client, RESERVATION_SUPABASE_TABLES.platformTenants)
+          .select(RESERVATION_SUPABASE_SELECTS.platformTenant)
+          .eq("id", id)
+          .maybeSingle() as QueryResult<unknown>,
+      );
+    },
+
+    async getVenue(id) {
+      return toPlatformContextReadResult(
+        await fromTable(client, RESERVATION_SUPABASE_TABLES.venues)
+          .select(RESERVATION_SUPABASE_SELECTS.venueContext)
+          .eq("id", id)
+          .maybeSingle() as QueryResult<unknown>,
+      );
+    },
+  };
+}
+
+export function createSupabaseIdempotencyRepository(
+  client: SupabaseLikeClient,
+): IdempotencyRepository {
+  const rpc = client.rpc?.bind(client);
+
+  if (!rpc) {
+    throw new Error("Supabase client does not support RPC calls");
+  }
+
+  return {
+    async claimInProgress(record) {
+      const row = maybeSingleRpcRow(assertNoSupabaseError(
+        await rpc(RESERVATION_SUPABASE_IDEMPOTENCY_RPCS.claim, {
+          p_key: record.key,
+          p_tenant_id: record.tenantId ?? null,
+          p_method: record.method,
+          p_path: record.path,
+          p_fingerprint: record.fingerprint,
+        }),
+        "Failed to claim idempotency record",
+      ));
+
+      if (!row || row.claimed === true) {
+        return null;
+      }
+
+      return adaptIdempotencyRow(row);
+    },
+
+    async storeCompleted(record: IdempotencyCommitRecord) {
+      assertNoSupabaseError(
+        await rpc(RESERVATION_SUPABASE_IDEMPOTENCY_RPCS.storeCompleted, {
+          p_key: record.key,
+          p_tenant_id: record.tenantId ?? null,
+          p_method: record.method,
+          p_path: record.path,
+          p_fingerprint: record.fingerprint,
+          p_response_status: record.response.status,
+          p_response_body: record.response.body,
+        }),
+        "Failed to store completed idempotency record",
+      );
+    },
+  };
+}
+
+export interface SupabaseResourceMaintenanceResolvedResource {
+  serviceId?: string;
+  label?: string;
+}
+
+export interface SupabaseResourceMaintenanceRepository {
+  listActiveMaintenance(serviceId: string): Promise<QueryResult<unknown[]>>;
+  resolveResource(input: {
+    service_id?: string;
+    resource_id?: string;
+    metadata?: { resource_label?: unknown } | null;
+  }): Promise<SupabaseResourceMaintenanceResolvedResource>;
+  loadService(serviceId: string): Promise<QueryResult<unknown>>;
+  createMaintenance(row: unknown): Promise<QueryResult<unknown>>;
+  endMaintenance(
+    id: string,
+    input?: { reason?: string | null },
+  ): Promise<QueryResult<unknown>>;
+}
+
+export function createSupabaseResourceMaintenanceRepository(
+  client: SupabaseLikeClient,
+): SupabaseResourceMaintenanceRepository {
+  return {
+    async listActiveMaintenance(serviceId) {
+      return await fromTable(client, RESERVATION_SUPABASE_TABLES.serviceSeatMaintenance)
+        .select(RESERVATION_SUPABASE_SELECTS.resourceMaintenance)
+        .eq("service_id", serviceId)
+        .eq("is_active", true)
+        .order("seat_label") as QueryResult<unknown[]>;
+    },
+
+    async resolveResource(input) {
+      if (!input.resource_id) {
+        return {
+          serviceId: input.service_id,
+          label: typeof input.metadata?.resource_label === "string"
+            ? input.metadata.resource_label
+            : undefined,
+        };
+      }
+
+      const { data, error } = await fromTable(client, RESERVATION_SUPABASE_TABLES.reservableResources)
+        .select(RESERVATION_SUPABASE_SELECTS.resourceMaintenanceResource)
+        .eq("id", input.resource_id)
+        .maybeSingle() as QueryResult<Record<string, unknown>>;
+
+      if (error) {
+        throw error;
+      }
+
+      if (!data) {
+        throw createSupabaseNotFoundError(
+          `Reservable resource not found: ${input.resource_id}`,
+        );
+      }
+
+      return {
+        serviceId: typeof data?.service_id === "string" ? data.service_id : input.service_id,
+        label: typeof data?.label === "string" ? data.label : input.resource_id,
+      };
+    },
+
+    async loadService(serviceId) {
+      return fromTable(client, RESERVATION_SUPABASE_TABLES.services)
+        .select(RESERVATION_SUPABASE_SELECTS.resourceMaintenanceService)
+        .eq("id", serviceId)
+        .single() as Promise<QueryResult<unknown>>;
+    },
+
+    async createMaintenance(row) {
+      return fromTable(client, RESERVATION_SUPABASE_TABLES.serviceSeatMaintenance)
+        .upsert(row, { onConflict: "service_id,seat_label" })
+        .select(RESERVATION_SUPABASE_SELECTS.resourceMaintenance)
+        .single() as Promise<QueryResult<unknown>>;
+    },
+
+    async endMaintenance(id, input = {}) {
+      return fromTable(client, RESERVATION_SUPABASE_TABLES.serviceSeatMaintenance)
+        .update({
+          is_active: false,
+          reason: input.reason ?? undefined,
+        })
+        .eq("id", id)
+        .select(RESERVATION_SUPABASE_SELECTS.resourceMaintenance)
+        .single() as Promise<QueryResult<unknown>>;
+    },
+  };
 }
 
 export function parseReservationPolicy(

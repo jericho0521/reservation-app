@@ -35,18 +35,20 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
-    "prepack": "corepack pnpm --filter @project-play/reservations-core run build && corepack pnpm run build",
-    "test": "corepack pnpm --filter @project-play/reservations-core run build && tsc -p tsconfig.build.json && node --import tsx --test",
+    "prepack": "corepack pnpm --filter @project-play/reservations-core run build && corepack pnpm --filter @reservation-platform/contract-types run build && corepack pnpm --filter @reservation-platform/api run build && corepack pnpm run build",
+    "test": "corepack pnpm --filter @project-play/reservations-core run build && corepack pnpm --filter @reservation-platform/contract-types run build && corepack pnpm --filter @reservation-platform/api run build && tsc -p tsconfig.build.json && node --import tsx --test",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.90.1"
   },
   "peerDependencies": {
-    "@project-play/reservations-core": "0.0.0"
+    "@project-play/reservations-core": "0.0.0",
+    "@reservation-platform/api": "0.0.0"
   },
   "devDependencies": {
     "@project-play/reservations-core": "workspace:*",
+    "@reservation-platform/api": "workspace:*",
     "tsx": "^4.21.0",
     "typescript": "^5"
   }

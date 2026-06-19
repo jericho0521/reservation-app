@@ -3,6 +3,7 @@
 # dependencies
 /node_modules
 **/node_modules
+/.pnpm-store/
 /.pnp
 .pnp.*
 .yarn/*
@@ -16,11 +17,13 @@
 
 # next.js
 /.next/
+examples/**/.next/
 /out/
 
 # production
 /build
 packages/*/dist
+/apps/*/dist
 /dist-packages/
 
 # misc

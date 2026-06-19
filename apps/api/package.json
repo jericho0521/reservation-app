@@ -1,0 +1,22 @@
+{
+  "name": "@reservation-platform/standalone-api-skeleton",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Backend-only standalone API skeleton proving reservation platform packages can be hosted outside the Next frontend.",
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "tsc -p tsconfig.json --noEmit && node --import tsx --test \"src/**/*.test.ts\""
+  },
+  "dependencies": {
+    "@project-play/reservations-supabase": "workspace:*",
+    "@reservation-platform/api": "workspace:*",
+    "@reservation-platform/contract-types": "workspace:*",
+    "@supabase/supabase-js": "^2.90.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "tsx": "^4.21.0",
+    "typescript": "^5"
+  }
+}

@@ -1,0 +1,232 @@
+{
+  "schemaVersion": 1,
+  "backendRepositoryName": "reservation-platform-backend",
+  "description": "Deterministic manifest for standalone backend extraction readiness. This does not move files or prove final repository extraction.",
+  "entries": [
+    {
+      "id": "domain-reservations-core",
+      "classification": "move-candidate",
+      "currentPaths": ["packages/reservations-core"],
+      "targetBackendPaths": ["packages/domain"],
+      "ownershipCategory": "domain",
+      "status": "ready-for-extraction-planning",
+      "rationale": "Headless reservation domain services, availability, capacity, conflicts, repository contracts, fixtures, and examples are backend platform core."
+    },
+    {
+      "id": "adapter-reservations-supabase",
+      "classification": "move-candidate",
+      "currentPaths": ["packages/reservations-supabase/src"],
+      "targetBackendPaths": ["packages/adapter-supabase/src"],
+      "ownershipCategory": "adapter-supabase",
+      "status": "requires-reconciliation",
+      "rationale": "Supabase storage adapter source is backend-owned and should move to the standalone adapter package after naming and compatibility cleanup."
+    },
+    {
+      "id": "adapter-reservations-supabase-docs-and-fixtures",
+      "classification": "move-candidate",
+      "currentPaths": ["packages/reservations-supabase/examples"],
+      "targetBackendPaths": ["packages/adapter-supabase/tests/fixtures"],
+      "ownershipCategory": "adapter-supabase",
+      "status": "requires-generalization",
+      "rationale": "Supabase adapter examples are backend adapter fixture candidates once current-app assumptions are removed."
+    },
+    {
+      "id": "adapter-reservations-supabase-readme",
+      "classification": "copy-candidate",
+      "currentPaths": ["packages/reservations-supabase/README.md"],
+      "targetBackendPaths": ["packages/adapter-supabase/README.md"],
+      "ownershipCategory": "adapter-supabase",
+      "status": "requires-generalization",
+      "rationale": "The current Supabase adapter README should inform backend adapter documentation but needs platform-owned wording."
+    },
+    {
+      "id": "adapter-reservations-supabase-package-sql",
+      "classification": "compatibility-shim",
+      "currentPaths": ["packages/reservations-supabase/sql"],
+      "targetBackendPaths": ["packages/database/migrations/supabase/package-reservations-supabase"],
+      "ownershipCategory": "database",
+      "status": "requires-reconciliation",
+      "rationale": "Package SQL assets remain backend-owned reconciliation/reference inputs for the database migration bundle, but the dry-run extraction plan must move the existing packages/database scaffold directly instead of copying these legacy SQL files into additional package paths."
+    },
+    {
+      "id": "database-migration-bundle-package",
+      "classification": "move-candidate",
+      "currentPaths": ["packages/database"],
+      "targetBackendPaths": ["packages/database"],
+      "ownershipCategory": "database",
+      "status": "partial-extraction",
+      "rationale": "The private backend-owned database package scaffold already exists in this repository with migration bundle targets, seeds, and ownership docs, so standalone backend extraction planning must include the package itself directly while the older root and adapter SQL assets remain reconciliation inputs only."
+    },
+    {
+      "id": "optional-ai-chat-package",
+      "classification": "move-candidate",
+      "currentPaths": ["packages/ai-chat"],
+      "targetBackendPaths": ["packages/ai-chat"],
+      "ownershipCategory": "ai-chat",
+      "status": "optional-module",
+      "rationale": "The backend-owned provider-neutral optional AI chat scaffold is an explicit standalone backend package candidate and must be represented directly in extraction planning."
+    },
+    {
+      "id": "legacy-reservation-chat-core-reference",
+      "classification": "compatibility-shim",
+      "currentPaths": ["packages/reservation-chat-core"],
+      "targetBackendPaths": ["packages/ai-chat"],
+      "ownershipCategory": "ai-chat",
+      "status": "requires-reimplementation",
+      "rationale": "The older reservation-chat-core package remains a current-app reference source for message/action/tool schema behavior that may inform the provider-neutral backend chat module, but it must not be planned as a verbatim copy onto the new ai-chat package target."
+    },
+    {
+      "id": "contract-types-package",
+      "classification": "move-candidate",
+      "currentPaths": ["packages/contract-types"],
+      "targetBackendPaths": ["packages/contract-types"],
+      "ownershipCategory": "contract-types",
+      "status": "ready-for-extraction-planning",
+      "rationale": "Shared API payload and error/idempotency types are backend platform contracts consumed by API, SDK, and external frontends."
+    },
+    {
+      "id": "typescript-sdk-package",
+      "classification": "copy-candidate",
+      "currentPaths": ["packages/sdk"],
+      "targetBackendPaths": ["packages/sdk"],
+      "ownershipCategory": "sdk",
+      "status": "ready-for-extraction-planning",
+      "rationale": "The SDK is a typed consumer surface for the backend API and should ship from the backend platform repo while current frontend integration remains compatible."
+    },
+    {
+      "id": "framework-neutral-api-package",
+      "classification": "move-candidate",
+      "currentPaths": ["packages/reservation-platform-api"],
+      "targetBackendPaths": ["packages/api"],
+      "ownershipCategory": "api",
+      "status": "partial-extraction",
+      "rationale": "Framework-neutral /v1 metadata, catalog read service/result mapping, repository ports, availability query preparation, reservation create validation/input preparation, reservation cancel validation/input preparation and response mapping, reservation reschedule validation/input preparation, reservation update policy mapping, resource-maintenance create policy, auth/context/idempotency/error helpers, and compatibility DTO mapping helpers are now backend-owned package source. Current Next.js route handlers remain compatibility shims while the standalone API skeleton proves injected route wiring only, not live backend parity or final extraction."
+    },
+    {
+      "id": "standalone-api-skeleton",
+      "classification": "move-candidate",
+      "currentPaths": ["apps/api"],
+      "targetBackendPaths": ["apps/api"],
+      "ownershipCategory": "api",
+      "status": "partial-extraction",
+      "rationale": "The private standalone API skeleton is backend-owned source for optional Node HTTP hosting, framework-neutral /v1 route dispatch, injected repositories, service-token/JWT auth hooks, idempotency handling, and backend-only Supabase runtime dependency construction. It is a source-boundary and fake-repository/runtime-config proof only, not live database/RLS/deploy parity or final separate repository extraction."
+    },
+    {
+      "id": "current-v1-api-routes",
+      "classification": "compatibility-shim",
+      "currentPaths": ["app/api/v1"],
+      "targetBackendPaths": ["apps/api/src/routes"],
+      "ownershipCategory": "api",
+      "status": "migration-shim",
+      "rationale": "Current versioned Next.js route behavior maps to the standalone backend API contract, but route handlers should be reimplemented for the backend API app instead of copied verbatim."
+    },
+    {
+      "id": "legacy-reservation-api-shims",
+      "classification": "compatibility-shim",
+      "currentPaths": ["app/api/availability", "app/api/bookings", "app/api/services", "app/api/seat-maintenance", "app/api/venues"],
+      "targetBackendPaths": ["apps/api/src/routes"],
+      "ownershipCategory": "api",
+      "status": "migration-shim",
+      "rationale": "Legacy current-app API routes document compatibility behavior for availability, reservations, catalog, venues, and resource maintenance while the frontend migrates to backend API or SDK calls."
+    },
+    {
+      "id": "chat-api-shim",
+      "classification": "compatibility-shim",
+      "currentPaths": ["app/api/chat"],
+      "targetBackendPaths": ["apps/api/src/modules/chat", "packages/ai-chat"],
+      "ownershipCategory": "ai-chat",
+      "status": "migration-shim",
+      "rationale": "Current chat API route, tool loop, and config inform the optional backend chat module, but Project Play prompt copy and provider wiring must be split before extraction."
+    },
+    {
+      "id": "backend-contract-docs",
+      "classification": "copy-candidate",
+      "currentPaths": ["docs/package-refactor/backend-platform-extraction/contracts"],
+      "targetBackendPaths": ["contracts"],
+      "ownershipCategory": "contracts",
+      "status": "ready-for-extraction-planning",
+      "rationale": "API resources, SDK methods, error conventions, and idempotency conventions define backend platform public contracts."
+    },
+    {
+      "id": "database-reservation-sql-assets",
+      "classification": "compatibility-shim",
+      "currentPaths": ["supabase/base-schema.sql", "supabase/reservations-rls.sql", "supabase/create-reservation-atomic.sql", "supabase/security-hardening.sql"],
+      "targetBackendPaths": ["packages/database/migrations/supabase"],
+      "ownershipCategory": "database",
+      "status": "requires-reconciliation",
+      "rationale": "Reservation tables, RLS policies, atomic RPCs, and applicable security hardening remain Phase 5 reconciliation/reference inputs mapped by the SQL inventory and migration bundle manifests; the extraction dry run must not copy them verbatim into extra packages/database files."
+    },
+    {
+      "id": "optional-knowledge-sql-assets",
+      "classification": "compatibility-shim",
+      "currentPaths": ["supabase/knowledge.sql", "supabase/langchain.sql"],
+      "targetBackendPaths": ["packages/database/migrations/supabase/optional/ai-retrieval"],
+      "ownershipCategory": "ai-chat",
+      "status": "optional-module",
+      "rationale": "Structured retrieval schema remains optional reconciliation/reference input mapped by the SQL inventory and migration bundle manifests; the extraction dry run must not copy these legacy SQL files into the package-owned database scaffold."
+    },
+    {
+      "id": "backend-operations-supabase-smoke",
+      "classification": "copy-candidate",
+      "currentPaths": ["scripts/vercel-sandbox-supabase.ts", "scripts/start-local-supabase.ps1", "scripts/stop-local-supabase.ps1"],
+      "targetBackendPaths": ["scripts"],
+      "ownershipCategory": "operations",
+      "status": "requires-generalization",
+      "rationale": "Database bootstrap and smoke helpers are backend operations candidates once environment names and current-app assumptions are generalized."
+    },
+    {
+      "id": "frontend-pages-and-booking-ui",
+      "classification": "exclude",
+      "currentPaths": ["app/page.tsx", "app/form-booking", "app/chat-booking", "components/form", "components/chat"],
+      "targetBackendPaths": [],
+      "ownershipCategory": "frontend-ui",
+      "status": "excluded",
+      "rationale": "Frontend pages, booking form flow, visual resource picker, chat rendering, and user interaction state remain current frontend app responsibilities."
+    },
+    {
+      "id": "admin-ui",
+      "classification": "exclude",
+      "currentPaths": ["app/admin", "components/admin"],
+      "targetBackendPaths": [],
+      "ownershipCategory": "admin-ui",
+      "status": "excluded",
+      "rationale": "Current admin screens and dashboard navigation stay frontend-owned; the backend platform may expose admin-capable APIs but not this React UI."
+    },
+    {
+      "id": "analytics-reporting",
+      "classification": "exclude",
+      "currentPaths": ["app/api/analytics-chat", "app/api/analytics-reports", "components/analytics", "lib/langchain/analytics-agent.ts", "lib/langchain/sales-report-pipeline.ts", "lib/sales-reports.ts", "lib/sales-report-extraction.ts", "supabase/sales-reports.sql"],
+      "targetBackendPaths": [],
+      "ownershipCategory": "analytics-reporting",
+      "status": "excluded",
+      "rationale": "Analytics and sales reporting are a separate product area and are not part of the standalone reservation backend platform unless a reports module is explicitly scoped later."
+    },
+    {
+      "id": "content-and-blog",
+      "classification": "exclude",
+      "currentPaths": ["app/blog", "app/updates", "app/api/blogs", "app/api/updates", "components/content", "lib/blogs.ts", "lib/content-posts.ts", "supabase/blogs.sql"],
+      "targetBackendPaths": [],
+      "ownershipCategory": "content-cms",
+      "status": "excluded",
+      "rationale": "Blog, update, and CMS behavior is Project Play frontend/content ownership, not reservation platform core."
+    },
+    {
+      "id": "frontend-supabase-and-platform-client",
+      "classification": "exclude",
+      "currentPaths": ["lib/supabase.ts", "lib/supabase-admin.ts", "lib/supabase-browser.ts", "lib/supabase-server.ts", "lib/reservation-platform-client.ts"],
+      "targetBackendPaths": [],
+      "ownershipCategory": "host-auth",
+      "status": "excluded",
+      "rationale": "Current app Supabase client factories, auth/session helpers, and frontend platform client wrapper stay with this consumer app; the backend repo needs its own server-side environment boundaries."
+    },
+    {
+      "id": "marketing-and-shared-ui",
+      "classification": "exclude",
+      "currentPaths": ["components/landing", "components/shared", "components/ui", "app/layout.tsx", "app/globals.css"],
+      "targetBackendPaths": [],
+      "ownershipCategory": "marketing-ui",
+      "status": "excluded",
+      "rationale": "Project Play branding, shared UI primitives, layout, styling, and marketing surfaces are frontend-owned and must not become backend platform source."
+    }
+  ]
+}

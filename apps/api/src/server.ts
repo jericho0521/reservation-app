@@ -1,0 +1,228 @@
+import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
+import { fileURLToPath } from "node:url";
+
+import { platformError, type StandaloneApiRequest, type StandaloneApiResponse } from "./http.js";
+import {
+  createStandaloneApiHandler,
+  handleStandaloneApiRequest,
+  type StandaloneApiHandler,
+} from "./routes.js";
+import { createStandaloneSupabaseDependenciesFromEnv } from "./runtime.js";
+
+export function createStandaloneNodeServer(handler: StandaloneApiHandler = handleStandaloneApiRequest) {
+  return createServer(async (request, response) => {
+    const method = request.method ?? "GET";
+    const path = request.url ?? "/";
+    const headers = request.headers as StandaloneApiRequest["headers"];
+
+    if (shouldHandleBeforeJsonParse({ method, path, headers })) {
+      const result = await handler({ method, path, headers });
+      writeStandaloneResponse(response, result);
+      return;
+    }
+
+    if (shouldRunHandlerPreflight({ method, path, headers })) {
+      const result = await handler({ method, path, headers, internalPreflight: "auth-only" });
+      if (!isSuccessfulPreflightResponse(result)) {
+        writeStandaloneResponse(response, result);
+        return;
+      }
+    }
+
+    const rawBody = await readRawBody(request);
+    const bodyResult = parseJsonBody(rawBody);
+    if (bodyResult.error) {
+      writeStandaloneResponse(response, bodyResult.error);
+      return;
+    }
+
+    const result = await handler({
+      method,
+      path,
+      headers,
+      body: bodyResult.body,
+    });
+
+    writeStandaloneResponse(response, result);
+  });
+}
+
+if (isDirectRun()) {
+  const port = Number.parseInt(process.env.PORT ?? "4100", 10);
+  const dependencies = createStandaloneSupabaseDependenciesFromEnv();
+  const server = createStandaloneNodeServer(createStandaloneApiHandler(dependencies));
+
+  server.listen(port, () => {
+    console.log(`Standalone reservation API skeleton listening on http://localhost:${port}`);
+  });
+}
+
+type JsonBodyReadResult = {
+  body?: unknown;
+  error?: ReturnType<typeof platformError>;
+};
+
+async function readRawBody(request: IncomingMessage): Promise<string | undefined> {
+  if (request.method === "GET" || request.method === "HEAD") {
+    return undefined;
+  }
+
+  const chunks: Buffer[] = [];
+  for await (const chunk of request) {
+    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+  }
+
+  if (chunks.length === 0) {
+    return undefined;
+  }
+
+  const rawBody = Buffer.concat(chunks).toString("utf8").trim();
+  if (rawBody.length === 0) {
+    return undefined;
+  }
+
+  return rawBody;
+}
+
+function parseJsonBody(rawBody: string | undefined): JsonBodyReadResult {
+  if (rawBody === undefined) {
+    return {};
+  }
+
+  try {
+    return { body: JSON.parse(rawBody) as unknown };
+  } catch {
+    return {
+      error: platformError(400, "validation_failed", "Invalid JSON body."),
+    };
+  }
+}
+
+function writeStandaloneResponse(
+  response: ServerResponse,
+  result: StandaloneApiResponse,
+) {
+  response.writeHead(result.status, result.headers);
+  response.end(serializeStandaloneResponseBody(result));
+}
+
+function serializeStandaloneResponseBody(result: StandaloneApiResponse) {
+  if (result.body === undefined) {
+    return undefined;
+  }
+
+  if (!isJsonContentType(getHeader(result.headers, "Content-Type")) && isRawResponseBody(result.body)) {
+    return result.body;
+  }
+
+  return JSON.stringify(result.body);
+}
+
+function isRawResponseBody(body: unknown): body is string | Buffer | Uint8Array {
+  return typeof body === "string" || Buffer.isBuffer(body) || body instanceof Uint8Array;
+}
+
+function isJsonContentType(contentType: string | undefined) {
+  const mediaType = contentType?.split(";")[0]?.trim().toLowerCase();
+  return mediaType === "application/json" || mediaType?.endsWith("+json") === true;
+}
+
+function shouldHandleBeforeJsonParse(request: Pick<StandaloneApiRequest, "method" | "path" | "headers">) {
+  const method = request.method.toUpperCase();
+  if (method !== "POST" && method !== "PATCH") {
+    return false;
+  }
+
+  const path = normalizePath(new URL(request.path, "http://standalone-api.local").pathname);
+  if (!isIdempotentMutationRoute(method, path)) {
+    return false;
+  }
+
+  return getHeader(request.headers, "Idempotency-Key") === undefined;
+}
+
+function shouldRunHandlerPreflight(request: Pick<StandaloneApiRequest, "method" | "path" | "headers">) {
+  const method = request.method.toUpperCase();
+  if (method !== "POST" && method !== "PATCH") {
+    return false;
+  }
+
+  const path = normalizePath(new URL(request.path, "http://standalone-api.local").pathname);
+  return getHeader(request.headers, "Idempotency-Key") !== undefined
+    && isIdempotentMutationRoute(method, path);
+}
+
+function isSuccessfulPreflightResponse(result: StandaloneApiResponse) {
+  return result.status === 204;
+}
+
+function isIdempotentMutationRoute(method: string, path: string) {
+  if (method === "POST" && path === "/v1/reservations") {
+    return true;
+  }
+
+  if (method === "PATCH" && /^\/v1\/reservations\/[^/]+$/.test(path)) {
+    return true;
+  }
+
+  if (method === "POST" && /^\/v1\/reservations\/[^/]+\/(?:cancel|reschedule)$/.test(path)) {
+    return true;
+  }
+
+  if (method === "POST" && path === "/v1/resource-maintenance") {
+    return true;
+  }
+
+  if (method === "POST" && /^\/v1\/resource-maintenance\/[^/]+\/end$/.test(path)) {
+    return true;
+  }
+
+  return false;
+}
+
+function isBodyRequiredIdempotentMutationRoute(method: string, path: string) {
+  if (method === "POST" && path === "/v1/reservations") {
+    return true;
+  }
+
+  if (method === "PATCH" && /^\/v1\/reservations\/[^/]+$/.test(path)) {
+    return true;
+  }
+
+  if (method === "POST" && /^\/v1\/reservations\/[^/]+\/reschedule$/.test(path)) {
+    return true;
+  }
+
+  if (method === "POST" && path === "/v1/resource-maintenance") {
+    return true;
+  }
+
+  return false;
+}
+
+function normalizePath(path: string) {
+  const normalized = path.replace(/\/+$/, "");
+  return normalized === "" ? "/" : normalized;
+}
+
+function getHeader(
+  headers: StandaloneApiRequest["headers"],
+  name: string,
+) {
+  if (!headers) {
+    return undefined;
+  }
+
+  const normalizedName = name.toLowerCase();
+  for (const [headerName, value] of Object.entries(headers)) {
+    if (headerName.toLowerCase() === normalizedName) {
+      return Array.isArray(value) ? value[0] : value;
+    }
+  }
+
+  return undefined;
+}
+
+function isDirectRun() {
+  return process.argv[1] !== undefined && fileURLToPath(import.meta.url) === process.argv[1];
+}

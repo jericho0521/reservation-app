@@ -5,7 +5,7 @@
   "private": true,
   "type": "module",
   "license": "UNLICENSED",
-  "author": "Project Play maintainers",
+  "author": "Reservation Platform maintainers",
   "repository": {
     "type": "git",
     "url": "https://github.com/jericho0521/reservation-app.git",

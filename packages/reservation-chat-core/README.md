@@ -1,7 +1,15 @@
 # @project-play/reservation-chat-core
 
-Framework-neutral booking chat contracts, guard helpers, prompt sections, tool
-name constants, prepared booking parsing, and reservation chat tool factories.
+Legacy framework-neutral booking chat contracts, guard helpers, prompt sections,
+tool name constants, prepared booking parsing, and reservation chat tool
+factories.
+
+This package remains in the repository as reference and compatibility context
+for older `@project-play/*` reservation package work. It is not the active
+plug-and-play chat package for new external consumers. Current consumers should
+use the `@reservation-platform/sdk` chat namespace for SDK-facing chat flows and
+the backend-owned `@reservation-platform/ai-chat` module for provider-neutral
+backend chat contracts.
 
 This package is intentionally headless. It does not import React, Next.js,
 Supabase, OpenRouter, LangChain, or LangGraph. Hosts provide venue copy,
@@ -66,14 +74,10 @@ Built-in tools:
 - `search_knowledge`, when configured: requires a non-empty `query` string
   before calling the host retriever.
 
-## Install
+## Legacy verification
 
-```sh
-pnpm add @project-play/reservation-chat-core
-```
-
-For internal tarball verification before registry publishing, generate
-artifacts from the repository root:
+For legacy internal tarball verification, generate artifacts from the repository
+root:
 
 ```powershell
 corepack pnpm run packages:pack
@@ -83,20 +87,19 @@ This is safe to run in the current workspace. It builds package declarations
 and writes generated tarballs under ignored `dist-packages/`; it does not
 publish packages or touch production data.
 
-Install the chat package with the matching reservation core tarball in an
-external consumer:
+Legacy compatibility fixtures may install this package with the matching
+reservation core tarball:
 
 ```powershell
 corepack pnpm add C:\path\to\reservation-app\dist-packages\project-play-reservation-chat-core-0.0.0.tgz C:\path\to\reservation-app\dist-packages\project-play-reservations-core-0.0.0.tgz
 ```
 
 The package declares `@project-play/reservations-core` as a peer dependency, so
-the matching core tarball must be installed alongside the chat tarball until
-registry publishing is approved. The consumer should import from
-`@project-play/reservation-chat-core` only for chat APIs, not from this
-repository's `lib/`, `app/`, or `components/` directories. The headless chat
-package does not require Next.js, React, Supabase, OpenRouter, LangChain, or
-LangGraph.
+legacy compatibility checks install the matching core tarball alongside the chat
+tarball. New external consumer proofs should use the `examples/sdk-*` fixtures
+and import chat APIs through `@reservation-platform/sdk` instead of installing
+this package directly. The headless chat package does not require Next.js,
+React, Supabase, OpenRouter, LangChain, or LangGraph.
 
 ## Parse a prepared booking action
 

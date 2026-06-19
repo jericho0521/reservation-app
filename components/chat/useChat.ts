@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { confirmChatBooking, sendChatMessage } from '@/lib/reservation-chat-client';
 import type { BookingData, Message } from './chat-types';
 
 export function useChat() {
@@ -32,21 +33,20 @@ export function useChat() {
         ));
 
         try {
-            const response = await fetch('/api/chat', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    messages: [],
-                    confirmBooking: data,
-                    threadId: threadIdRef.current || undefined,
-                }),
+            const result = await confirmChatBooking({
+                confirmBooking: data,
+                threadId: threadIdRef.current || undefined,
             });
 
-            const result = await response.json();
+            if (result.threadId) {
+                threadIdRef.current = result.threadId;
+            }
 
             setMessages(prev => {
                 const updated = prev.map(m =>
-                    m.id === messageId ? { ...m, actionStatus: 'confirmed' as const } : m
+                    m.id === messageId
+                        ? { ...m, actionStatus: result.confirmed ? 'confirmed' as const : 'pending' as const }
+                        : m
                 );
                 return [
                     ...updated,
@@ -97,23 +97,13 @@ export function useChat() {
         setIsLoading(true);
 
         try {
-            const response = await fetch('/api/chat', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    messages: newMessages.map(m => ({
-                        role: m.role,
-                        content: m.content,
-                    })),
-                    threadId: threadIdRef.current || undefined,
-                }),
+            const result = await sendChatMessage({
+                messages: newMessages.map(m => ({
+                    role: m.role,
+                    content: m.content,
+                })),
+                threadId: threadIdRef.current || undefined,
             });
-
-            if (!response.ok) {
-                throw new Error('Failed to get response');
-            }
-
-            const result = await response.json();
 
             if (result.threadId) {
                 threadIdRef.current = result.threadId;
@@ -123,7 +113,7 @@ export function useChat() {
                 id: (Date.now() + 1).toString(),
                 role: 'assistant',
                 content: result.content,
-                action: result.action,
+                action: (result.action as Message['action']) ?? undefined,
                 actionStatus: result.action ? 'pending' : undefined
             };
 

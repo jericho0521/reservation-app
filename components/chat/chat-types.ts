@@ -6,6 +6,7 @@ export interface BookingData {
     name: string;
     email: string;
     phone: string;
+    reservation_intent_id?: string;
 }
 
 export interface LocationDirectionsData {

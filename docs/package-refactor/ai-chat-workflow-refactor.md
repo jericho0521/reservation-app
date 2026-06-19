@@ -1,6 +1,20 @@
 # AI Chat Workflow Refactor Overview
 
-## Goal
+## Status
+
+This document is retained as source context for the current app-specific chat
+workflow. It is not the active modularity roadmap.
+
+The active direction is:
+
+- [Backend Platform Phase 6: AI Chat Backend Service Contract](backend-platform-extraction/phase-6-ai-chat-backend-service-contract.md)
+- [SDK Readiness Phase 6: Optional Chat SDK Namespace](backend-platform-extraction/sdk-readiness/phase-6-optional-chat-sdk.md)
+- [SDK Readiness Phase 7: External Consumer Smoke Tests](backend-platform-extraction/sdk-readiness/phase-7-external-consumer-smoke-tests.md)
+
+If this file conflicts with those backend-platform documents, the
+backend-platform documents win.
+
+## Original Goal
 
 Turn the current LangChain booking chat workflow into an optional reusable
 package layer that can sit on top of `@project-play/reservations-core` and an
@@ -46,20 +60,25 @@ The current chat agent directly knows about:
 - OpenRouter model configuration.
 - Confirmation cards rendered by the current frontend.
 
-## Desired Package Shape
+## Superseded Chat Package Proposal
 
-Proposed package names remain temporary until Phase 8-style package identity is
-approved:
+This section is historical and superseded. It records the old proposal only so
+reviewers can understand why the deleted package phases existed. It must not be
+used as an instruction to revive those phases or package names.
 
-- `@project-play/reservation-chat-core`
-- Optional later package: `@project-play/reservation-chat-langchain`
+The removed proposal split chat into Project Play-scoped core and LangChain
+packages. That package identity is no longer the roadmap.
 
-`reservation-chat-core` should stay framework-neutral. It must not depend on
-Next.js, React, Supabase, or this app's components.
+The current target is the backend-owned optional
+`@reservation-platform/ai-chat` module under `packages/ai-chat`, with
+provider-neutral workflow ports and provider adapters kept behind the backend
+platform. External frontends should use direct `/v1/chat/**` HTTP endpoints or
+the optional `@reservation-platform/sdk` chat namespace when released.
 
-`reservation-chat-langchain`, if created, may depend on LangChain/LangGraph,
-but should still accept host-provided model, tools, memory/checkpointer, and
-knowledge retriever.
+`packages/reservation-chat-core` remains legacy compatibility/reference
+context only. LangChain/LangGraph, model providers, retrieval, and tool
+orchestration belong behind backend provider adapters, not in frontend-facing
+SDK or revived Project Play-scoped chat packages.
 
 ## Host Responsibilities
 
@@ -87,13 +106,13 @@ The chat packages may own:
 - reusable prompt sections and guard helpers
 - factory functions that bind tools to a reservation repository
 
-## Planned Phases
+## Superseded Phase Plan
 
-1. [Phase 13: AI Chat Boundary Audit](phase-13-ai-chat-boundary-audit.md)
-2. [Phase 14: Headless Chat Core Package](phase-14-headless-chat-core-package.md)
-3. [Phase 15: Reservation Chat Tools](phase-15-reservation-chat-tools.md)
-4. [Phase 16: Host Chat Integration](phase-16-host-chat-integration.md)
-5. [Phase 17: Chat External Consumer Smoke Test](phase-17-chat-external-consumer-smoke-test.md)
+The old Phase 13 through Phase 17 chat package plan was removed from this
+branch. The newer architecture keeps LangChain, model providers, retrieval, and
+tool orchestration inside the backend platform. External frontends use direct
+HTTP or the optional SDK chat namespace instead of importing chat workflow
+packages.
 
 ## Non-Goals
 
@@ -105,7 +124,7 @@ The chat packages may own:
   later phase explicitly approves that behavior.
 - Do not require LangChain for hosts that only want reservation logic.
 
-## Change Propagation Rule
+## Historical Change Propagation Rule
 
 If a chat phase changes package names, action payloads, tool names, prompt
 contracts, repository requirements, model provider contracts, or confirmation

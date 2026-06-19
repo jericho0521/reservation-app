@@ -34,7 +34,7 @@ jobs:
       - name: Set up pnpm
         uses: pnpm/action-setup@v4
         with:
-          version: 10
+          version: 10.33.2
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -46,11 +46,17 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Install current frontend platform smoke browser
+        run: pnpm run current-frontend:platform-smoke:install
+
       - name: Run tests
         run: pnpm test
 
       - name: Run linter
         run: pnpm lint
+
+      - name: Run SDK release gate
+        run: pnpm run sdk:release-gate
 
       - name: Build application
         run: pnpm build

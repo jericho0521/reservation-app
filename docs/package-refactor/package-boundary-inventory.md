@@ -1,5 +1,23 @@
 # Package Boundary Inventory
 
+## Status
+
+This file is retained as historical/source inventory for the modularity work.
+It is not the active roadmap.
+
+The active direction is the backend platform plus optional SDK plan:
+
+- [Backend Platform Extraction Plan](backend-platform-extraction/README.md)
+- [SDK Readiness Plan](backend-platform-extraction/sdk-readiness/README.md)
+
+Older references in this file to package phases, direct internal package
+consumption, or `@project-play/*` package extraction are preserved only to
+explain how the current package foundations were identified. If this inventory
+conflicts with the backend-platform documents, the backend-platform documents
+win.
+
+## Historical Inventory
+
 Phase 0 audit output for the package refactor. This file is documentation-only
 and records current boundaries before any package scaffold or code movement.
 

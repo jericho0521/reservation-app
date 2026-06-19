@@ -1,98 +1,66 @@
-# Plug-And-Play Package Refactor Plan
+# Modular Backend Platform Refactor
 
-This plan turns the internal reservation module into a workspace package that can later become a drop-in npm package or app plugin.
+This directory now tracks the backend-platform architecture direction.
 
-The selected first target is:
+The current product goal is not a frontend plugin and not direct installation of
+internal reservation/database packages into another app. The goal is a reusable
+backend platform, with an optional TypeScript SDK, that any frontend can call.
 
-- Workspace package first, inside this repository.
-- Headless core first, with no React, Next.js, or Supabase dependency.
-- Official Supabase adapter package second.
-- Current app remains the reference host application.
+## Canonical Plan
 
-## Phase Files
+- [Backend Platform Extraction Plan](backend-platform-extraction/README.md)
+- [SDK Readiness Plan](backend-platform-extraction/sdk-readiness/README.md)
+- [Frontend, Backend Modules, and SDK Separation Plan](backend-platform-extraction/frontend-backend-sdk-separation/README.md)
+- [API Resource List](backend-platform-extraction/contracts/api-resource-list.md)
+- [SDK Method List](backend-platform-extraction/contracts/sdk-method-list.md)
+- [Error Conventions](backend-platform-extraction/contracts/error-conventions.md)
+- [Idempotency Conventions](backend-platform-extraction/contracts/idempotency-conventions.md)
+- [Backend Platform Boundary Inventory](backend-platform-extraction/backend-platform-boundary-inventory.md)
+- [Backend Platform Subagent Handoff Template](backend-platform-extraction/subagent-handoff-template.md)
 
-- [Phase 0: Package Boundary Audit](phase-0-package-boundary-audit.md)
-- [Phase 1: Workspace Scaffold](phase-1-workspace-scaffold.md)
-- [Phase 2: Headless Core Extraction](phase-2-headless-core-extraction.md)
-- [Phase 3: Supabase Adapter](phase-3-supabase-adapter.md)
-- [Phase 4: Host App Integration](phase-4-host-app-integration.md)
-- [Phase 5: Examples and Fixtures](phase-5-examples-and-fixtures.md)
-- [Phase 6: Package Hardening](phase-6-package-hardening.md)
-- [Remaining Work Overview](remaining-work.md)
-- [Phase 7: Atomic Booking RPC](phase-7-atomic-booking-rpc.md)
-- [Phase 8: Package Identity and Release Workflow](phase-8-package-identity-release-workflow.md)
-- [Phase 9: External Consumer Smoke Test](phase-9-external-consumer-smoke-test.md)
-- [Phase 10: Plugin Host Contract](phase-10-plugin-host-contract.md)
-- [Plugin Host Contract](plugin-host-contract.md)
-- [Phase 11: Optional Host Service Helpers](phase-11-host-service-helpers.md)
-- [Phase 12: Optional Framework Adapter Proposals](phase-12-framework-adapter-proposals.md)
+## Retained Source Inventories
+
+These files are kept as source context for the canonical plan:
+
+- [Package Boundary Inventory](package-boundary-inventory.md)
+- [AI Chat Boundary Inventory](ai-chat-boundary-inventory.md)
 - [AI Chat Workflow Refactor Overview](ai-chat-workflow-refactor.md)
-- [Phase 13: AI Chat Boundary Audit](phase-13-ai-chat-boundary-audit.md)
-- [Phase 14: Headless Chat Core Package](phase-14-headless-chat-core-package.md)
-- [Phase 15: Reservation Chat Tools](phase-15-reservation-chat-tools.md)
-- [Phase 16: Host Chat Integration](phase-16-host-chat-integration.md)
-- [Phase 17: Chat External Consumer Smoke Test](phase-17-chat-external-consumer-smoke-test.md)
-- [Subagent Template](subagent-template.md)
-- [Handoff Checklist](handoff-checklist.md)
 
-## Package Goal
+They are not the active implementation roadmap. If they conflict with the
+backend-platform extraction plan or SDK readiness plan, the backend-platform
+documents win.
 
-The outcome is not just "modular inside this app." The outcome is a reservation system that another app can install and use without copying the racing simulator frontend or this Next.js route structure.
+## Removed Stale Plans
 
-The first reusable surfaces should be:
+The older package-first and plugin-host phase docs were removed from this
+branch because they described a different direction:
 
-- `@project-play/reservations-core`: framework-agnostic TypeScript package.
-- `@project-play/reservations-supabase`: Supabase adapter package using the core contracts.
+- installing internal `@project-play/*` packages directly in external apps
+- exposing Supabase adapters as the consumer integration path
+- building plugin host/framework adapter layers before the backend platform
+- extracting chat as direct frontend-consumed LangChain packages
 
-Names can change later, but every phase should use these names until an intentional downstream update changes them.
+Those ideas were superseded by the backend API + SDK model.
+
+## Current Target Shape
+
+```mermaid
+flowchart LR
+  A["Any frontend app"] --> B["@reservation-platform/sdk or direct HTTP"]
+  B --> C["Backend platform /v1 API"]
+  C --> D["Domain services"]
+  C --> E["Database adapters and migrations"]
+  C --> F["Optional backend chat service"]
+```
+
+Frontend repositories should configure a backend URL, auth/session strategy,
+tenant or venue context, and optional SDK client. They should not copy booking
+logic, database queries, Supabase RPC details, LangChain workflow internals, or
+this app's Next.js route structure.
 
 ## Change Propagation Rule
 
-If a phase changes package names, public exports, table names, adapter interfaces, route expectations, or test strategy, the same change must review all later phase docs and update affected assumptions before the next phase is assigned.
-
-Use this workflow:
-
-1. Update the phase file where the decision changed.
-2. Search later phase files for the old decision.
-3. Update downstream `Upstream Dependencies`, `Deliverables`, and `Acceptance Criteria`.
-4. Record unaffected downstream phases in the changed phase notes.
-
-## Subagent Execution Rules
-
-Each phase is designed for one worker subagent. Workers should receive the full phase text and should not be asked to infer missing scope from chat history.
-
-For every subagent task:
-
-- Provide the phase file content.
-- Provide relevant current files from `docs/package-refactor`,
-  `packages/reservations-core`, `packages/reservations-supabase`, and host app
-  routes only when the phase explicitly needs them.
-- Enforce the phase's `Allowed Write Scope`.
-- Tell the worker not to edit downstream phase files unless the phase's
-  `Downstream Update Requirements` or the change propagation rule explicitly
-  requires those updates.
-- Require final status: `DONE`, `DONE_WITH_CONCERNS`, or `BLOCKED`.
-
-## Non-Goals For First Package Pass
-
-- Do not publish to npm yet.
-- Do not build a full embeddable booking widget yet.
-- Do not move app-specific landing pages, chat UI, analytics dashboards, or admin UI into packages.
-- Do not make the core package depend on Supabase.
-- Do not remove the current app's compatibility API fields until the host app is fully migrated.
-
-## Current Status
-
-Phases 0 through 6 created the package structure and proved that the current
-app can consume the package boundaries. The remaining phases are about turning
-that workspace package into a real drop-in dependency for other apps:
-
-- Preserve and verify the Supabase atomic booking RPC setup in release and
-  external consumer workflows.
-- Finalize package names, ownership, and release automation.
-- Prove installation from a clean external app.
-- Define the optional plugin contract for apps that want a prebuilt host layer.
-- Defer implementation of host service helpers and framework adapters to
-  explicit follow-up phases.
-- Keep the LangChain AI chat workflow app-owned until Phases 13-17 extract a
-  headless chat package and host-owned integration contract.
+If a canonical phase changes API endpoints, SDK method names, DTO names, package
+names, auth/tenant/idempotency behavior, database ownership, or optional chat
+contracts, update all later backend-platform and SDK-readiness phase docs before
+implementation continues.

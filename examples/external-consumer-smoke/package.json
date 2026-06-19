@@ -1,6 +1,7 @@
 {
-  "name": "reservation-external-consumer-smoke",
+  "name": "reservation-legacy-external-consumer-smoke",
   "version": "0.0.0",
+  "description": "Legacy smoke fixture for old @project-play reservation package tarballs; current external proofs live in examples/sdk-*.",
   "private": true,
   "type": "module",
   "scripts": {

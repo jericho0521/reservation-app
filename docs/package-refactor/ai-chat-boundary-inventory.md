@@ -1,5 +1,24 @@
 # AI Chat Boundary Inventory
 
+## Status
+
+This file is retained as historical/source inventory for the modularity work.
+It is not the active roadmap.
+
+The active direction keeps LangChain, provider clients, retrieval, and tool
+orchestration inside the backend platform. External frontends use direct HTTP
+or the optional SDK chat namespace:
+
+- [Backend Platform Phase 6: AI Chat Backend Service Contract](backend-platform-extraction/phase-6-ai-chat-backend-service-contract.md)
+- [SDK Readiness Phase 6: Optional Chat SDK Namespace](backend-platform-extraction/sdk-readiness/phase-6-optional-chat-sdk.md)
+
+Older references in this file to Phase 13 through Phase 17, direct chat package
+consumption, or `@project-play/*` chat packages are preserved only to explain
+the original boundary audit. If this inventory conflicts with the
+backend-platform documents, the backend-platform documents win.
+
+## Historical Inventory
+
 Phase 13 audits the current LangChain booking chat workflow for extraction into
 optional reusable chat packages. This is a documentation-only inventory. No
 runtime behavior changed.
@@ -42,7 +61,7 @@ final booking creation.
 
 | Dependency or surface | Current file | Owner for extraction | Notes |
 | --- | --- | --- | --- |
-| `ChatMessage` `{ role, content }` | `lib/langchain/chat-agent.ts`, `components/chat/chat-types.ts` | Package-owned | Pure serializable contract. Keep roles as `"user" | "assistant"` unless Phase 14 adds an extension point. |
+| `ChatMessage` `{ role, content }` | `lib/langchain/chat-agent.ts`, `components/chat/chat-types.ts` | Package-owned | Pure serializable contract. Keep roles as `"user" | "assistant"` unless the current backend chat contract adds an extension point. |
 | `BookingData` / `BookingAction` | `lib/langchain/chat-agent.ts`, `components/chat/chat-types.ts`, `app/api/chat/tool-loop.ts` | Package-owned | Reusable booking action payload. Current fields are `service`, `date`, `time`, `seats`, `name`, `email`, `phone`. |
 | `booking_confirmation` action type | same as above | Package-owned | Emitted when `prepare_booking` has complete user-provided details. |
 | `booking_success` action type | `app/api/chat/route.ts`, `components/chat/chat-types.ts` | Package-owned contract, host-produced event | Reusable action name and payload shape, but final creation stays host-owned. |
@@ -58,7 +77,7 @@ final booking creation.
 | Model factories | `lib/langchain/models.ts` | Host-owned | OpenRouter/Gemini choices, API keys, headers, temperature, token limits, and environment variables stay in host app. |
 | Knowledge retriever | `lib/knowledge.ts`, `lib/langchain/vector-store.ts` | Host-owned input | Package may accept a retriever function. Supabase vector store, Google embeddings, table name, RPC name, and error logging stay host-owned. |
 | Next.js chat route | `app/api/chat/route.ts` | Host-owned | Request parsing, HTTP status, `NextResponse`, `crypto.randomUUID`, confirmation endpoint behavior, and user-facing error text stay in host integration. |
-| Zod confirmation schema | `app/api/chat/route.ts` | Package-owned payload type, host-owned validation surface | Phase 14 can export schema-free types or optional validators. Route status and messages stay host-owned. |
+| Zod confirmation schema | `app/api/chat/route.ts` | Package-owned payload type, host-owned validation surface | Current backend chat contract work can export schema-free types or optional validators. Route status and messages stay host-owned. |
 | Chat UI components and hook | `components/chat/**` | Host-owned | Rendering, pending/confirmed/cancelled/loading state, fetch behavior, and copy stay out of package. |
 | `@/lib/supabase` and `@/lib/supabase-admin` | `lib/langchain/chat-agent.ts`, `lib/langchain/vector-store.ts` | Host-owned / repository adapter-owned | Core package must not import host clients. Reservation tool factories should accept repository functions. |
 | `@/lib/availability` and `@/lib/reservation-capacity` | `lib/langchain/chat-agent.ts` | Package-adjacent reservation core | Chat tools should call `@project-play/reservations-core` availability helpers through repository-backed service data. |
@@ -165,9 +184,9 @@ Current shape:
 }
 ```
 
-This should be treated as a host custom action. Phase 14 should expose an
-extension point for host-defined actions rather than making directions part of
-the reservation chat core.
+This should be treated as a host custom action. Current backend chat contract
+work should expose an extension point for host-defined actions rather than
+making directions part of the reservation chat core.
 
 ## Current Tool Contracts
 
@@ -243,9 +262,10 @@ Current response shape:
 Boundary decision:
 
 - Tool name and broad schema are reusable.
-- Phase 15 should decide whether `service_name` remains the public tool input
-  or whether tools also accept a stable `service_id`. The current prompt tells
-  the model to use service names from `get_services`.
+- Current Phase 6 AI chat backend contract and SDK readiness work should decide
+  whether `service_name` remains the public tool input or whether tools also
+  accept a stable `service_id`. The current prompt tells the model to use
+  service names from `get_services`.
 - Availability calculation should use repository calls plus
   `generateAvailabilityTimeSlots` from reservation core, not host Supabase
   queries or legacy host helpers.
@@ -348,7 +368,7 @@ phases:
 
 | Current dependency | Current use | Replacement direction |
 | --- | --- | --- |
-| `supabase().from("services").select(...).ilike("name", ...).single()` | Find a service by model-provided name. | Add a chat repository method or tool factory callback such as `findServiceByName(name)` / `listServices()`. Current `ReservationRepository` only has `getService(serviceId)`, so Phase 15 has a repository contract gap to resolve. |
+| `supabase().from("services").select(...).ilike("name", ...).single()` | Find a service by model-provided name. | Add a chat repository method or tool factory callback such as `findServiceByName(name)` / `listServices()`. Current `ReservationRepository` only has `getService(serviceId)`, so Backend Platform Phase 6 AI chat contract work and the current Phase 5 AI chat workflow split results own this repository contract gap. |
 | `supabase().from("services").select(...)` | `get_services` tool. | Add `listServices()` or require a host callback returning `ReservationService[]`. |
 | `supabaseAdmin().from("bookings").select("start_time, seats_booked, seat_labels").eq(...confirmed)` | Availability check. | Use `repository.getConfirmedReservations({ serviceId, bookingDate })`. |
 | `supabaseAdmin().from("service_seat_maintenance").select("seat_label").eq(...is_active)` | Availability and create booking validation. | Use `repository.getMaintenanceResourceLabels(serviceId)`. |
@@ -358,10 +378,10 @@ phases:
 | `SupabaseVectorStore(... tableName: "knowledge_chunks", queryName: "match_knowledge")` | Business knowledge retrieval. | Host-provided retriever `(query, count) => Promise<string[]>` or context string. |
 
 The existing `ReservationRepository` does not currently support listing
-services or resolving a service by name. Phase 15 should either extend the
-repository contract with reviewed methods or define chat-tool factory inputs
-that accept `listServices` and `findServiceByName` callbacks separately from
-the core reservation repository.
+services or resolving a service by name. Current Phase 6 AI chat backend
+contract work should either extend the repository contract with reviewed methods
+or define chat-tool factory inputs that accept `listServices` and
+`findServiceByName` callbacks separately from the core reservation repository.
 
 ## Model, Memory, And Retrieval Inputs
 
@@ -408,7 +428,7 @@ Host-owned prompt inputs:
 - Fallback and error copy.
 - Venue-specific policy text.
 
-## Safe Phase 14 Extraction Candidates
+## Historical Safe Extraction Candidates
 
 Safe candidates for a framework-neutral `reservation-chat-core` package:
 
@@ -426,11 +446,11 @@ Safe candidates for a framework-neutral `reservation-chat-core` package:
 - Prompt section builders that accept host-supplied brand copy, date, operating
   hours, and context.
 
-Do not extract in Phase 14:
+Do not extract into the backend chat core:
 
 - LangChain `BaseMessage`, `AIMessage`, `HumanMessage`, or `ToolMessage`
-  traversal unless Phase 14 creates a separate adapter entry point with a
-  LangChain dependency.
+  traversal unless the current backend chat contract creates a separate adapter
+  entry point with a LangChain dependency.
 - `createReactAgent`, `MemorySaver`, or `runChatAgent`.
 - `createOpenRouterChat`, `createGeminiChat`, or environment-based model
   helpers.
@@ -472,18 +492,22 @@ Host-owned:
 
 ## Downstream Assumption Check
 
-No downstream phase assumptions need to change from this audit. The existing
-Phase 14 through Phase 17 docs already expect:
+This historical audit is superseded for downstream planning by the current
+backend-platform extraction Phase 6 AI chat documents and the
+frontend-backend-sdk-separation Phase 5/6 results. Those documents now own the
+active assumptions:
 
 - `booking_confirmation` and `booking_success` as reusable action contracts.
 - `get_services`, `check_availability`, and `prepare_booking` as reusable tool
   names.
-- Project Play location and copy to remain host-owned.
-- Model provider setup and knowledge retrieval to remain host-owned.
-- Reservation tools to move from direct Supabase calls to repository-backed
-  tool factories.
+- Project Play location, UI copy, model provider setup, and knowledge retrieval
+  to remain backend/host-owned rather than frontend-owned.
+- External frontends to consume chat through the backend `/v1` API or optional
+  SDK namespace instead of direct package consumption.
+- Reservation tools to move from direct Supabase calls to backend service or
+  repository-backed tool factories.
 
-The only implementation note for Phase 15 is the current repository gap for
-`listServices()` and service-name lookup. That can be handled in Phase 15 as a
-tool factory input or reviewed repository extension without changing the phase
-plan.
+The service listing and service-name lookup gap should be resolved in the
+current Phase 6 AI chat backend contract and SDK readiness work, or in the
+frontend-backend SDK separation Phase 5/6 follow-up if it affects frontend
+integration contracts.

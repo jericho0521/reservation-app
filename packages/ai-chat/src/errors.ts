@@ -52,6 +52,14 @@ export function modelProviderUnavailableError(): PlatformErrorBody {
   };
 }
 
+export function invalidChatTenantScopeError(): PlatformErrorBody {
+  return {
+    code: "bad_request",
+    message: "Chat tenant scope is required.",
+    status: 400,
+  };
+}
+
 export function publicChatError(error: unknown): PlatformErrorBody {
   if (error instanceof ChatWorkflowError) {
     return sanitizeInternalPlatformError(error.toPlatformError());

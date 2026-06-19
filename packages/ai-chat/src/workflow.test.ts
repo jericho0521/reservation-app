@@ -3,10 +3,12 @@ import test from "node:test";
 import type { ChatAuditEvent, ChatCheckpoint, ChatModelProvider, ProviderStreamEvent } from "./index.js";
 import {
   ChatWorkflowError,
+  normalizeChatTenantConfig,
   publicChatError,
   runChatWorkflow,
   streamChatWorkflow,
   toPublicStreamEvent,
+  validateChatTenantScope,
 } from "./index.js";
 
 const tenantConfig = {
@@ -55,6 +57,153 @@ test("missing provider maps to public provider unavailable error", async () => {
       return true;
     },
   );
+});
+
+test("tenant config normalization trims scope values", () => {
+  assert.deepEqual(
+    normalizeChatTenantConfig({
+      scope: {
+        tenant_id: " tenant_123 ",
+        venue_id: " venue_123 ",
+      },
+    }),
+    {
+      scope: {
+        tenant_id: "tenant_123",
+        venue_id: "venue_123",
+      },
+    },
+  );
+});
+
+test("tenant scope validation fails closed for missing runtime tenant id", () => {
+  assert.deepEqual(validateChatTenantScope({}), { valid: false });
+});
+
+test("run workflow rejects invalid tenant scope before injected ports", async () => {
+  const calls: string[] = [];
+
+  await assert.rejects(
+    () =>
+      runChatWorkflow(
+        {
+          tenant_config: {
+            scope: {
+              tenant_id: "   ",
+            },
+          },
+          session_id: "session_123",
+          messages: [{ role: "user", content: "hello" }],
+          retrieval_query: "hours",
+        },
+        {
+          model_provider: {
+            async generate() {
+              calls.push("generate");
+              throw new Error("should not generate");
+            },
+          },
+          retriever: {
+            async search() {
+              calls.push("search");
+              return [];
+            },
+          },
+          checkpoint_store: {
+            async load() {
+              calls.push("load");
+              return undefined;
+            },
+            async save() {
+              calls.push("save");
+              throw new Error("should not save");
+            },
+          },
+          audit_sink: {
+            record() {
+              calls.push("audit");
+            },
+          },
+        },
+      ),
+    (error) => {
+      assert.ok(error instanceof ChatWorkflowError);
+      assert.equal(error.code, "bad_request");
+      assert.equal(error.status, 400);
+      assert.equal(error.message, "Chat tenant scope is required.");
+      return true;
+    },
+  );
+
+  assert.deepEqual(calls, []);
+});
+
+test("stream workflow rejects invalid tenant scope before injected ports", async () => {
+  const calls: string[] = [];
+  const events = [];
+
+  await assert.rejects(
+    async () => {
+      for await (const event of streamChatWorkflow(
+        {
+          tenant_config: {
+            scope: {
+              tenant_id: "tenant_123",
+              venue_id: "   ",
+            },
+          },
+          session_id: "session_123",
+          messages: [{ role: "user", content: "hello" }],
+          retrieval_query: "hours",
+        },
+        {
+          model_provider: {
+            async generate() {
+              calls.push("generate");
+              throw new Error("should not generate");
+            },
+            async *stream() {
+              calls.push("stream");
+              yield { type: "provider.delta", delta: "unused" };
+            },
+          },
+          retriever: {
+            async search() {
+              calls.push("search");
+              return [];
+            },
+          },
+          checkpoint_store: {
+            async load() {
+              calls.push("load");
+              return undefined;
+            },
+            async save() {
+              calls.push("save");
+              throw new Error("should not save");
+            },
+          },
+          audit_sink: {
+            record() {
+              calls.push("audit");
+            },
+          },
+        },
+      )) {
+        events.push(event);
+      }
+    },
+    (error) => {
+      assert.ok(error instanceof ChatWorkflowError);
+      assert.equal(error.code, "bad_request");
+      assert.equal(error.status, 400);
+      assert.equal(error.message, "Chat tenant scope is required.");
+      return true;
+    },
+  );
+
+  assert.deepEqual(events, []);
+  assert.deepEqual(calls, []);
 });
 
 test("streaming provider events convert to public-safe events", async () => {
@@ -126,6 +275,7 @@ test("retrieval and checkpoint ports are optional and injected", async () => {
       retriever: {
         async search(query) {
           assert.equal(query.scope.tenant_id, "tenant_123");
+          assert.equal(query.scope.venue_id, "venue_123");
           assert.equal(query.query, "hours");
           return [
             {

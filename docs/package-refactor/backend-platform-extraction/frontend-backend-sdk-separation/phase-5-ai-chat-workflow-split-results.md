@@ -118,6 +118,21 @@ This guardrail is boundary hygiene only. It does not run LangChain, provider
 adapters, retrieval, checkpoint persistence, tenant isolation, seeded live
 backend parity, or the current React chat UI.
 
+## Tenant Scope Runtime Guard
+
+`@reservation-platform/ai-chat` now exports provider-neutral tenant scope
+validation helpers for `ChatTenantConfig` / `ChatTenantScope` and normalizes
+trimmed `tenant_id` plus optional `venue_id` values before enabled chat
+workflow execution. Both `runChatWorkflow` and `streamChatWorkflow` fail closed
+with a public `bad_request` `ChatWorkflowError` when `tenant_id` is missing or
+blank, or when a provided `venue_id` is blank. This guard runs before model
+provider, retriever, checkpoint store, or audit sink calls, while preserving the
+existing disabled-module and missing-provider behavior for valid tenant scopes.
+
+This is bounded runtime request-scope validation readiness only. It does not
+prove durable tenant isolation, provider-backed chat execution, live retrieval,
+checkpoint persistence, database/RLS enforcement, or seeded live backend parity.
+
 ## Downstream Updates Required
 
 Phase 6 must include optional chat proof in external fixtures. SDK readiness
@@ -151,6 +166,9 @@ contract parity against a fixture-owned fake `/v1/chat` backend. It verifies:
 
 The standalone API injectable boundary now proves enabled route wiring with a
 fake app-owned module. This is still not a real backend/provider workflow proof.
-LangChain/provider adapters, live retrieval, checkpoint persistence, live chat
-configuration, durable tenant-isolation enforcement, deployment wiring, and
-seeded live backend parity remain future backend module work.
+The backend-owned AI chat package also now fails closed on missing or blank
+runtime tenant scope before provider/retrieval/checkpoint/audit work. LangChain
+/ provider adapters, live retrieval, checkpoint persistence, live chat
+configuration, durable tenant-isolation enforcement beyond request-scope
+validation, deployment wiring, and seeded live backend parity remain future
+backend module work.

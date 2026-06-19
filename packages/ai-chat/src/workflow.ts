@@ -1,7 +1,13 @@
 import type { JsonValue, MetadataRecord, PlatformErrorBody } from "@reservation-platform/contract-types";
 import type { ChatAuditSink } from "./audit.js";
 import type { ChatCheckpointStore } from "./checkpoint.js";
-import { ChatWorkflowError, modelProviderUnavailableError, moduleDisabledError, publicChatError } from "./errors.js";
+import {
+  ChatWorkflowError,
+  invalidChatTenantScopeError,
+  modelProviderUnavailableError,
+  moduleDisabledError,
+  publicChatError,
+} from "./errors.js";
 import type {
   ChatModelProvider,
   ModelGenerationOutput,
@@ -11,7 +17,7 @@ import type {
 } from "./model-provider.js";
 import type { ChatMessage, ChatToolDefinition } from "./messages.js";
 import type { ChatRetriever } from "./retrieval.js";
-import type { ChatTenantConfig } from "./tenant-config.js";
+import { normalizeChatTenantConfig, type ChatTenantConfig } from "./tenant-config.js";
 
 export interface ChatWorkflowDependencies {
   model_provider?: ChatModelProvider;
@@ -39,6 +45,7 @@ export async function runChatWorkflow(
   input: RunChatWorkflowInput,
   dependencies: ChatWorkflowDependencies,
 ): Promise<RunChatWorkflowResult> {
+  input = normalizeChatWorkflowInput(input);
   assertWorkflowEnabled(input.tenant_config, dependencies);
   await recordAudit(input, dependencies, "chat.workflow.started");
 
@@ -94,6 +101,7 @@ export async function* streamChatWorkflow(
   input: RunChatWorkflowInput,
   dependencies: ChatWorkflowDependencies,
 ): AsyncIterable<PublicChatStreamEvent> {
+  input = normalizeChatWorkflowInput(input);
   assertWorkflowEnabled(input.tenant_config, dependencies);
 
   try {
@@ -263,6 +271,18 @@ function assertWorkflowEnabled(
   if (!dependencies.model_provider) {
     throw new ChatWorkflowError(modelProviderUnavailableError());
   }
+}
+
+function normalizeChatWorkflowInput(input: RunChatWorkflowInput): RunChatWorkflowInput {
+  const tenantConfig = normalizeChatTenantConfig(input.tenant_config);
+  if (!tenantConfig) {
+    throw new ChatWorkflowError(invalidChatTenantScopeError());
+  }
+
+  return {
+    ...input,
+    tenant_config: tenantConfig,
+  };
 }
 
 async function getRetrievalContext(

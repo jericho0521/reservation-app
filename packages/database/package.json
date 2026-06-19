@@ -23,6 +23,8 @@
     "build": "tsc -p tsconfig.build.json",
     "index:generate": "node ../../scripts/generate-database-migration-index.mjs",
     "index:check": "node ../../scripts/generate-database-migration-index.mjs --check",
+    "live-proof": "node ../../scripts/verify-database-live-proof.mjs",
+    "live-proof:strict": "node ../../scripts/verify-database-live-proof.mjs --strict",
     "prepack": "corepack pnpm run build",
     "test": "tsc -p tsconfig.build.json && node --import tsx --test \"src/**/*.test.ts\"",
     "typecheck": "tsc -p tsconfig.json --noEmit",

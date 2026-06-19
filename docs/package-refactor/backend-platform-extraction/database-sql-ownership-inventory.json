@@ -1,0 +1,141 @@
+{
+  "inventoryVersion": 1,
+  "purpose": "Source-level ownership inventory for current SQL files while Phase 5 database migration ownership is still in progress.",
+  "scope": [
+    "all .sql files under supabase/",
+    "all .sql files under packages/reservations-supabase/sql/"
+  ],
+  "notes": [
+    "This inventory is a guardrail only. It does not install migrations, execute SQL, prove RLS or tenant isolation, prove live seeded backend parity, or complete standalone database package extraction.",
+    "Backend destinations are target migration or documentation locations for the future standalone backend repository, not current files created by this inventory."
+  ],
+  "assets": [
+    {
+      "path": "supabase/base-schema.sql",
+      "classification": "core-platform",
+      "intendedBackendDestination": [
+        "packages/database/migrations/supabase/000001_extensions.sql",
+        "packages/database/migrations/supabase/000002_platform_tenant_auth.sql",
+        "packages/database/migrations/supabase/000003_reservation_catalog.sql",
+        "packages/database/migrations/supabase/000004_reservation_resources.sql",
+        "packages/database/migrations/supabase/000005_reservation_bookings.sql",
+        "packages/database/migrations/supabase/000006_resource_maintenance.sql",
+        "packages/database/migrations/supabase/000007_availability_rules.sql"
+      ],
+      "exclusions": [
+        {
+          "scope": "Project Play venue, Racing Simulator, Playstation 5, RS resource rows, operating-window rows, and legacy reservation_items backfill",
+          "reason": "Development seed/compatibility data must move to packages/database/seeds/development/project-play-compat.sql or fixture data, not core schema bootstrap."
+        }
+      ]
+    },
+    {
+      "path": "supabase/blogs.sql",
+      "classification": "non-platform-content",
+      "exclusionReason": "Blog/update content tables and blog storage policies belong to frontend/CMS ownership or a separately scoped content module, not reservation platform core."
+    },
+    {
+      "path": "supabase/create-reservation-atomic.sql",
+      "classification": "core-platform",
+      "intendedBackendDestination": [
+        "packages/database/migrations/supabase/000008_atomic_reservation_rpc.sql"
+      ],
+      "duplicateGroup": "create-reservation-atomic"
+    },
+    {
+      "path": "supabase/knowledge.sql",
+      "classification": "optional-ai-retrieval",
+      "intendedBackendDestination": [
+        "packages/database/migrations/supabase/optional/ai-retrieval/000001_knowledge_chunks.sql"
+      ],
+      "exclusionReason": "Install only when structured AI retrieval is enabled; Project Play editorial knowledge content remains host/tenant data."
+    },
+    {
+      "path": "supabase/langchain.sql",
+      "classification": "optional-ai-retrieval",
+      "intendedBackendDestination": [
+        "packages/database/migrations/supabase/optional/ai-retrieval/000002_langchain_checkpoints.sql"
+      ],
+      "exclusionReason": "Install only when AI chat checkpoint persistence is enabled; not part of core reservation schema."
+    },
+    {
+      "path": "supabase/reservations-rls.sql",
+      "classification": "core-platform",
+      "intendedBackendDestination": [
+        "packages/database/migrations/supabase/000009_core_rls_policies.sql"
+      ],
+      "notes": [
+        "Future backend migration must replace broad public policies with tenant-scoped API/server access where applicable."
+      ]
+    },
+    {
+      "path": "supabase/sales-reports.sql",
+      "classification": "non-platform-analytics",
+      "exclusionReason": "Sales report document tables, daily sales reports, and report storage policies belong to analytics/reporting ownership or a separately scoped optional module, not reservation platform core."
+    },
+    {
+      "path": "supabase/security-hardening.sql",
+      "classification": "mixed-ownership",
+      "intendedBackendDestination": [
+        "packages/database/migrations/supabase/000010_core_security_hardening.sql",
+        "packages/database/migrations/supabase/optional/ai-retrieval/000003_match_knowledge_security.sql",
+        "packages/database/seeds/development/project-play-compat.sql"
+      ],
+      "ownershipSections": [
+        {
+          "classification": "core-platform",
+          "destination": "packages/database/migrations/supabase/000010_core_security_hardening.sql",
+          "scope": "Reservation table hardening, reservation/resource maintenance policies, function search paths, grants, and indexes."
+        },
+        {
+          "classification": "optional-ai-retrieval",
+          "destination": "packages/database/migrations/supabase/optional/ai-retrieval/000003_match_knowledge_security.sql",
+          "scope": "AI retrieval function hardening such as match_knowledge."
+        },
+        {
+          "classification": "development-seed-or-compat",
+          "destination": "packages/database/seeds/development/project-play-compat.sql",
+          "scope": "Project Play compatibility service/resource/backfill statements."
+        }
+      ],
+      "exclusions": [
+        {
+          "scope": "content_posts, blog storage policies, and blog-assets policies",
+          "reason": "Content/CMS hardening remains outside core reservation platform ownership."
+        },
+        {
+          "scope": "sales_report_documents, daily_sales_reports, report document storage policies, and sales-report-documents policies",
+          "reason": "Analytics/reporting hardening remains outside core reservation platform ownership."
+        },
+        {
+          "scope": "LangChain checkpoint policies",
+          "reason": "Checkpoint hardening is optional AI chat/retrieval scope, not core reservation schema."
+        },
+        {
+          "scope": "Project Play service/resource/backfill statements",
+          "reason": "Current tenant/example compatibility data must stay in development seed or fixture data."
+        }
+      ]
+    },
+    {
+      "path": "packages/reservations-supabase/sql/create-reservation-atomic.sql",
+      "classification": "duplicate-core",
+      "duplicateOf": "supabase/create-reservation-atomic.sql",
+      "duplicateGroup": "create-reservation-atomic",
+      "intendedBackendDestination": [
+        "packages/database/migrations/supabase/000008_atomic_reservation_rpc.sql"
+      ],
+      "exclusionReason": "Package mirror is duplicate evidence for the same canonical atomic RPC migration and must not become a second runnable migration source."
+    },
+    {
+      "path": "packages/reservations-supabase/sql/platform-idempotency.sql",
+      "classification": "core-platform",
+      "intendedBackendDestination": [
+        "packages/database/migrations/supabase/000011_platform_idempotency.sql"
+      ],
+      "notes": [
+        "Backend-owned durable idempotency table and RPC shape for tenant-scoped claim/store semantics. This is a planning asset only until live route wiring and disposable database proof are completed."
+      ]
+    }
+  ]
+}

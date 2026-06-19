@@ -1,0 +1,222 @@
+{
+  "manifestVersion": 1,
+  "purpose": "Machine-readable Phase 5 database migration bundle plan for the future standalone backend database package.",
+  "scope": [
+    "Maps current SQL assets from database-sql-ownership-inventory.json to target backend migration bundle entries.",
+    "Separates ordered core migrations, optional AI retrieval migrations, development seed/compat data, duplicate-only evidence, and excluded non-platform SQL."
+  ],
+  "notes": [
+    "This manifest maps to package-owned migration bundle scaffold files under packages/database for runnable core, optional AI retrieval, and development seed entries.",
+    "packages/database/migrations/supabase/migration-index.json is generated from this manifest and package-owned files as an ordered apply-plan/checksum artifact for future migration runners.",
+    "The scaffold files are extraction artifacts only. They do not execute SQL, create a database, prove RLS or tenant isolation, prove live seeded backend parity, prove durable idempotency, or complete standalone database package extraction."
+  ],
+  "entries": [
+    {
+      "kind": "core-migration",
+      "order": 1,
+      "targetPath": "packages/database/migrations/supabase/000001_extensions.sql",
+      "sourceAssets": [
+        {
+          "path": "supabase/base-schema.sql",
+          "section": "pgcrypto and pg_trgm extension setup"
+        }
+      ]
+    },
+    {
+      "kind": "core-migration",
+      "order": 2,
+      "targetPath": "packages/database/migrations/supabase/000002_platform_tenant_auth.sql",
+      "sourceAssets": [
+        {
+          "path": "supabase/base-schema.sql",
+          "section": "tenant/auth support, admin_users, and is_admin compatibility"
+        }
+      ]
+    },
+    {
+      "kind": "core-migration",
+      "order": 3,
+      "targetPath": "packages/database/migrations/supabase/000003_reservation_catalog.sql",
+      "sourceAssets": [
+        {
+          "path": "supabase/base-schema.sql",
+          "section": "services, venues, and catalog tables"
+        }
+      ]
+    },
+    {
+      "kind": "core-migration",
+      "order": 4,
+      "targetPath": "packages/database/migrations/supabase/000004_reservation_resources.sql",
+      "sourceAssets": [
+        {
+          "path": "supabase/base-schema.sql",
+          "section": "equipment, resource layouts, reservable resources, reservation items, indexes, and triggers"
+        }
+      ]
+    },
+    {
+      "kind": "core-migration",
+      "order": 5,
+      "targetPath": "packages/database/migrations/supabase/000005_reservation_bookings.sql",
+      "sourceAssets": [
+        {
+          "path": "supabase/base-schema.sql",
+          "section": "bookings schema, constraints, indexes, and compatibility fields"
+        }
+      ]
+    },
+    {
+      "kind": "core-migration",
+      "order": 6,
+      "targetPath": "packages/database/migrations/supabase/000006_resource_maintenance.sql",
+      "sourceAssets": [
+        {
+          "path": "supabase/base-schema.sql",
+          "section": "service_seat_maintenance and replace_service_seat_maintenance compatibility behavior"
+        }
+      ]
+    },
+    {
+      "kind": "core-migration",
+      "order": 7,
+      "targetPath": "packages/database/migrations/supabase/000007_availability_rules.sql",
+      "sourceAssets": [
+        {
+          "path": "supabase/base-schema.sql",
+          "section": "service_availability_rules schema, constraints, indexes, and triggers"
+        }
+      ]
+    },
+    {
+      "kind": "core-migration",
+      "order": 8,
+      "targetPath": "packages/database/migrations/supabase/000008_atomic_reservation_rpc.sql",
+      "sourceAssets": [
+        {
+          "path": "supabase/create-reservation-atomic.sql",
+          "section": "canonical public.create_reservation_atomic(payload jsonb) RPC"
+        }
+      ]
+    },
+    {
+      "kind": "core-migration",
+      "order": 9,
+      "targetPath": "packages/database/migrations/supabase/000009_core_rls_policies.sql",
+      "sourceAssets": [
+        {
+          "path": "supabase/reservations-rls.sql",
+          "section": "reservation platform RLS enablement and policies"
+        }
+      ]
+    },
+    {
+      "kind": "core-migration",
+      "order": 10,
+      "targetPath": "packages/database/migrations/supabase/000010_core_security_hardening.sql",
+      "sourceAssets": [
+        {
+          "path": "supabase/security-hardening.sql",
+          "section": "reservation table hardening, function search paths, grants, indexes, and core policy hardening"
+        }
+      ]
+    },
+    {
+      "kind": "core-migration",
+      "order": 11,
+      "targetPath": "packages/database/migrations/supabase/000011_platform_idempotency.sql",
+      "sourceAssets": [
+        {
+          "path": "packages/reservations-supabase/sql/platform-idempotency.sql",
+          "section": "platform_idempotency_records table and platform_claim/store idempotency RPCs"
+        }
+      ]
+    },
+    {
+      "kind": "optional-ai-retrieval",
+      "targetPath": "packages/database/migrations/supabase/optional/ai-retrieval/000001_knowledge_chunks.sql",
+      "sourceAssets": [
+        {
+          "path": "supabase/knowledge.sql",
+          "section": "knowledge_chunks, vector index, match_knowledge, and read policies"
+        }
+      ]
+    },
+    {
+      "kind": "optional-ai-retrieval",
+      "targetPath": "packages/database/migrations/supabase/optional/ai-retrieval/000002_langchain_checkpoints.sql",
+      "sourceAssets": [
+        {
+          "path": "supabase/langchain.sql",
+          "section": "LangChain checkpoint persistence tables and policies"
+        }
+      ]
+    },
+    {
+      "kind": "optional-ai-retrieval",
+      "targetPath": "packages/database/migrations/supabase/optional/ai-retrieval/000003_match_knowledge_security.sql",
+      "sourceAssets": [
+        {
+          "path": "supabase/security-hardening.sql",
+          "section": "match_knowledge function hardening"
+        }
+      ]
+    },
+    {
+      "kind": "development-seed-compat",
+      "targetPath": "packages/database/seeds/development/project-play-compat.sql",
+      "sourceAssets": [
+        {
+          "path": "supabase/base-schema.sql",
+          "section": "Project Play venue, service, resource, availability, and reservation_items compatibility rows"
+        },
+        {
+          "path": "supabase/security-hardening.sql",
+          "section": "Project Play service/resource/backfill compatibility statements"
+        }
+      ]
+    },
+    {
+      "kind": "duplicate-only",
+      "sourceAssets": [
+        {
+          "path": "packages/reservations-supabase/sql/create-reservation-atomic.sql",
+          "section": "byte-identical package mirror of canonical atomic reservation RPC"
+        }
+      ],
+      "duplicateOf": "supabase/create-reservation-atomic.sql",
+      "canonicalTargetPath": "packages/database/migrations/supabase/000008_atomic_reservation_rpc.sql",
+      "reason": "Duplicate evidence only; must not become a second runnable migration entry."
+    },
+    {
+      "kind": "excluded",
+      "sourceAssets": [
+        {
+          "path": "supabase/blogs.sql",
+          "section": "content_posts tables, content policies, and blog storage policies"
+        }
+      ],
+      "reason": "Non-platform CMS/content SQL remains frontend/CMS ownership or a separately scoped content module."
+    },
+    {
+      "kind": "excluded",
+      "sourceAssets": [
+        {
+          "path": "supabase/sales-reports.sql",
+          "section": "sales_report_documents, daily_sales_reports, reporting policies, and report storage policies"
+        }
+      ],
+      "reason": "Non-platform analytics/reporting SQL remains reporting ownership or a separately scoped optional reports module."
+    },
+    {
+      "kind": "excluded",
+      "sourceAssets": [
+        {
+          "path": "supabase/security-hardening.sql",
+          "section": "content_posts, blog-assets, sales_report_documents, daily_sales_reports, sales-report-documents, and non-core storage policy hardening"
+        }
+      ],
+      "reason": "Mixed hardening file contains non-platform content/reporting sections that must not enter core or optional AI retrieval migrations."
+    }
+  ]
+}

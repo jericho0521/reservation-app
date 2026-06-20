@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { once } from "node:events";
 import { readFileSync, readdirSync, statSync } from "node:fs";
-import type { Server } from "node:http";
+import { request as httpRequest, type IncomingHttpHeaders, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { fileURLToPath } from "node:url";
 import { join } from "node:path";
@@ -48,6 +48,12 @@ const disabledChatBody = {
     status: 404,
   },
 };
+const standaloneHealthBody = {
+  status: "ok",
+  service: "standalone-api-skeleton",
+  api_version: "v1",
+  readiness: "alive",
+};
 
 test("GET /v1/metadata returns platform metadata from the backend package", async () => {
   const response = await handleStandaloneApiRequest({ method: "GET", path: "/v1/metadata" });
@@ -65,6 +71,52 @@ test("GET /v1/metadata returns platform metadata from the backend package", asyn
       ],
     },
   });
+});
+
+test("GET health endpoints return public readiness metadata without dependencies", async () => {
+  const routes = ["/healthz", "/v1/health"];
+
+  for (const path of routes) {
+    const response = await handleStandaloneApiRequest({ method: "GET", path });
+
+    assert.equal(response.status, 200, path);
+    assert.equal(response.headers["content-type"], "application/json; charset=utf-8", path);
+    assert.deepEqual(response.body, standaloneHealthBody, path);
+  }
+});
+
+test("service-token and JWT auth leave health endpoints unprotected", async () => {
+  let verifierCalls = 0;
+  let tenantVenueCalls = 0;
+  const handler = createStandaloneApiHandler({
+    auth: {
+      serviceApiKey: "platform-service-secret",
+      requireTenant: true,
+      verifyBearerToken() {
+        verifierCalls += 1;
+        throw new Error("health should not invoke bearer-token verification");
+      },
+    },
+    tenantVenueRepository: tenantVenueRepository({
+      async getTenant() {
+        tenantVenueCalls += 1;
+        throw new Error("health should not validate tenant context");
+      },
+      async getVenue() {
+        tenantVenueCalls += 1;
+        throw new Error("health should not validate venue context");
+      },
+    }),
+  });
+
+  for (const path of ["/healthz", "/v1/health"]) {
+    const response = await handler({ method: "GET", path });
+
+    assert.equal(response.status, 200, path);
+    assert.deepEqual(response.body, standaloneHealthBody, path);
+  }
+  assert.equal(verifierCalls, 0);
+  assert.equal(tenantVenueCalls, 0);
 });
 
 test("disabled chat reservation routes return the shared platform error body", async () => {
@@ -282,6 +334,41 @@ test("standalone Node server writes raw string bodies with canonical Content-Typ
     assert.equal(response.headers.get("content-type"), "application/x-ndjson; charset=utf-8");
     assert.equal(body, ndjson);
     assert.notEqual(body, JSON.stringify(ndjson));
+  }, handler);
+});
+
+test("standalone Node server answers health without parsing malformed GET bodies", async () => {
+  let repositoryCalls = 0;
+  const handler = createStandaloneApiHandler({
+    auth: {
+      serviceApiKey: "platform-service-secret",
+      verifyBearerToken() {
+        throw new Error("health should not invoke auth verification");
+      },
+    },
+    availabilityRepository: availabilityRepository({
+      async readAvailability() {
+        repositoryCalls += 1;
+        throw new Error("health should not read availability");
+      },
+    }),
+  });
+
+  await withStandaloneNodeServer(async (baseUrl) => {
+    const response = await rawHttpRequest(`${baseUrl}/healthz`, {
+      method: "GET",
+      headers: {
+        "content-type": "application/json",
+        "content-length": "1",
+      },
+      body: "{",
+    });
+    const body = JSON.parse(response.body) as unknown;
+
+    assert.equal(response.statusCode, 200);
+    assert.equal(response.headers["content-type"], "application/json; charset=utf-8");
+    assert.deepEqual(body, standaloneHealthBody);
+    assert.equal(repositoryCalls, 0);
   }, handler);
 });
 
@@ -2039,7 +2126,7 @@ test("reservation read route validates invalid ids before storage work", async (
   assert.deepEqual(response.body, {
     error: {
       code: "validation_failed",
-      message: "Invalid booking id",
+      message: "Invalid reservation id",
       status: 400,
       details: [{
         code: "invalid_string",
@@ -3161,6 +3248,50 @@ async function withStandaloneNodeServer<T>(
   } finally {
     await closeServer(server);
   }
+}
+
+function rawHttpRequest(
+  url: string,
+  options: {
+    method: string;
+    headers?: Record<string, string>;
+    body?: string;
+  },
+): Promise<{
+  statusCode: number | undefined;
+  headers: IncomingHttpHeaders;
+  body: string;
+}> {
+  const target = new URL(url);
+
+  return new Promise((resolve, reject) => {
+    const request = httpRequest({
+      hostname: target.hostname,
+      port: target.port,
+      path: `${target.pathname}${target.search}`,
+      method: options.method,
+      headers: options.headers,
+    }, (response) => {
+      const chunks: Buffer[] = [];
+
+      response.on("data", (chunk: Buffer | string) => {
+        chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+      });
+      response.on("end", () => {
+        resolve({
+          statusCode: response.statusCode,
+          headers: response.headers,
+          body: Buffer.concat(chunks).toString("utf8"),
+        });
+      });
+    });
+
+    request.on("error", reject);
+    if (options.body !== undefined) {
+      request.write(options.body);
+    }
+    request.end();
+  });
 }
 
 function closeServer(server: Server): Promise<void> {

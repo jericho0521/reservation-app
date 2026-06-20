@@ -157,6 +157,12 @@ const reservationCancelPattern = /^\/v1\/reservations\/([^/]+)\/cancel$/;
 const reservationReschedulePattern = /^\/v1\/reservations\/([^/]+)\/reschedule$/;
 const resourceMaintenanceEndPattern = /^\/v1\/resource-maintenance\/([^/]+)\/end$/;
 const reservationIdPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const standaloneHealthBody = {
+  status: "ok",
+  service: "standalone-api-skeleton",
+  api_version: "v1",
+  readiness: "alive",
+};
 
 export function createStandaloneApiHandler(dependencies: StandaloneApiDependencies = {}): StandaloneApiHandler {
   return async (request) => handleStandaloneApiRequest(request, dependencies);
@@ -172,6 +178,10 @@ export async function handleStandaloneApiRequest(
 
   if (method === "GET" && path === "/v1/metadata") {
     return jsonResponse(200, getPlatformMetadata());
+  }
+
+  if (method === "GET" && (path === "/healthz" || path === "/v1/health")) {
+    return jsonResponse(200, standaloneHealthBody);
   }
 
   if (isProtectedPlatformDataRoute(method, path)) {

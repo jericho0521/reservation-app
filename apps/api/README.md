@@ -7,7 +7,8 @@ It is intentionally small:
 
 - imports backend-owned packages such as `@reservation-platform/api` and
   `@reservation-platform/contract-types`;
-- exposes framework-neutral route handlers for `GET /v1/metadata`, injected
+- exposes framework-neutral route handlers for `GET /healthz` and
+  `GET /v1/health` liveness/readiness hygiene, `GET /v1/metadata`, injected
   catalog repository reads, injected availability reads, injected read-only
   reservation reads, injected idempotent `POST /v1/reservations` creation,
   injected idempotent reservation lifecycle mutations (`PATCH
@@ -24,9 +25,15 @@ It is intentionally small:
 - can optionally protect catalog, availability, reservation, and
   resource-maintenance data routes with a backend-only service bearer token or
   an injected bearer-token verifier plus tenant/venue context validation,
-  while keeping metadata and disabled chat responses unprotected;
+  while keeping health, metadata, and disabled chat responses unprotected;
 - avoids `app/`, `components/`, React, Next.js, browser Supabase helpers,
   LangChain, and provider SDK imports.
+
+The health endpoints are intentionally cheap public checks. `GET /healthz` and
+`GET /v1/health` return the same stable JSON body with only public status and
+API/service metadata. They do not require auth, tenant headers, Supabase env,
+repository dependencies, idempotency storage, or request-body parsing, and they
+do not echo runtime secrets or environment values.
 
 The default handler is deliberately safe: catalog, availability, and
 reservation routes return stable platform errors until a host supplies
@@ -69,8 +76,8 @@ The authenticated principal, whether service or verifier-provided, is passed to
 `auth.requiredScopes`. When a `tenantVenueRepository` is supplied, the
 authorized tenant and optional venue context are validated before route
 repositories run. The auth preflight runs before idempotency claim/storage work
-and mutation body validation. `GET /v1/metadata` and disabled chat routes
-remain unprotected.
+and mutation body validation. `GET /healthz`, `GET /v1/health`,
+`GET /v1/metadata`, and disabled chat routes remain unprotected.
 
 `createStandaloneSupabaseDependencies(config, options?)` in `src/runtime.ts`
 can build those dependencies from backend-owned Supabase clients. Public catalog
@@ -112,7 +119,11 @@ These are standalone backend secrets/config values. They are not frontend SDK
 configuration and must not be exposed through `NEXT_PUBLIC_*` or browser
 bundles.
 
-It is not live backend parity. It now has backend-only Supabase repository
+It is not live backend parity. The health endpoints are deployability/readiness
+hygiene only: they prove that a deployed host process can answer a cheap public
+request, not that the service has been deployed, connected to Supabase, applied
+database migrations, enforced RLS/tenant isolation, or reached live reservation
+parity. It now has backend-only Supabase repository
 wiring plus service-token/context validation, provider-neutral standalone
 JWT/JWKS bearer-token verification, bounded JWKS cache/unknown-`kid` refresh
 behavior, and claim-to-principal mapping, but it does not prove live provider

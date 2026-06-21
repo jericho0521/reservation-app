@@ -86,6 +86,7 @@ flowchart LR
 - [Phase 23: SDK Package Materialization](phase-23-sdk-package-materialization.md)
 - [Phase 24: Cross-Repo Adoption Proof](phase-24-cross-repo-adoption-proof.md)
 - [Remaining Modularity Gaps Index](remaining-modularity-gaps.md)
+- [Focused Backend Platform, SDK, and Frontend Split Execution Plan](plugin-platform-split/README.md)
 
 ## Separation Rules
 

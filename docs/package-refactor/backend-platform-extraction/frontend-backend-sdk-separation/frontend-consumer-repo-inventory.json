@@ -1,0 +1,592 @@
+{
+  "schemaVersion": 1,
+  "phase": "phase-12-frontend-repo-consumer-proof",
+  "lastUpdated": "2026-06-21",
+  "status": "partial-readiness-only",
+  "proofScope": {
+    "createdFrontendRepository": false,
+    "deletedCompatibilityRoutes": false,
+    "publishedSdk": false,
+    "performedNetworkInstallOrBuild": false
+  },
+  "requiredPrerequisiteCommands": [
+    "current-frontend:verify-platform-boundary",
+    "current-frontend:verify-platform-secrets"
+  ],
+  "minimumFrontendEnvironment": [
+    "NEXT_PUBLIC_RESERVATION_API_MODE",
+    "NEXT_PUBLIC_RESERVATION_PLATFORM_BASE_URL",
+    "NEXT_PUBLIC_RESERVATION_CHAT_MODE",
+    "NEXT_PUBLIC_RESERVATION_TENANT_ID",
+    "NEXT_PUBLIC_RESERVATION_VENUE_ID"
+  ],
+  "sourceAreaClassifications": {
+    "include": "Reservation consumer proof source or configuration that may remain with the separated consumer app.",
+    "exclude": "Backend platform, compatibility route, storage, provider, migration, or monorepo infrastructure source that a separated frontend repo must not need.",
+    "reference-only": "Current-app owned source, documentation, tests, or proof fixtures that explain the migration but are not included in this reservation consumer repo proof."
+  },
+  "dependencyClassifications": {
+    "frontend-runtime": "Runtime package that a separated frontend repo may need.",
+    "frontend-dev": "Development, typecheck, lint, or test package that a separated frontend repo may need.",
+    "sdk-consumer": "Published SDK or public contract package expected to replace workspace/internal imports.",
+    "backend-only-excluded": "Backend platform, provider, storage, database, or workflow package excluded from the separated frontend repo.",
+    "current-monorepo-only": "Package kept for the current monorepo proof harness or legacy app modules but not required by the frontend consumer repository."
+  },
+  "sourceAreas": [
+    {
+      "path": "app/form-booking",
+      "classification": "reference-only",
+      "notes": "Current booking route shell imports shared header/navigation that links to broader current-app routes; the included proof is limited to the form components and reservation wrapper closure."
+    },
+    {
+      "path": "app/chat-booking",
+      "classification": "reference-only",
+      "notes": "Current chat UI still has local /api/chat compatibility fallback and is not part of this reservation consumer repo proof until optional chat platform cutover is complete."
+    },
+    {
+      "path": "app/admin",
+      "classification": "reference-only",
+      "notes": "Broad current admin area includes content and analytics screens that call app-owned /api routes. Only the narrower reservation admin files listed separately are included in this proof."
+    },
+    {
+      "path": "app/blog",
+      "classification": "reference-only",
+      "notes": "Current-app content surface that depends on app-owned content APIs; not part of this reservation consumer repo proof."
+    },
+    {
+      "path": "app/updates",
+      "classification": "reference-only",
+      "notes": "Current-app update surface that depends on app-owned content APIs; not part of this reservation consumer repo proof."
+    },
+    {
+      "path": "app/admin/AdminDashboard.tsx",
+      "classification": "reference-only",
+      "notes": "Reservation admin UI is covered by the existing boundary scan, but its sidebar links to current-app analytics/blog/update routes, so it is not included in this extractable proof slice."
+    },
+    {
+      "path": "app/admin/login/page.tsx",
+      "classification": "reference-only",
+      "notes": "Admin auth UX is current-app owned and not part of this reservation platform client/wrapper proof."
+    },
+    {
+      "path": "app/admin/platform-smoke",
+      "classification": "reference-only",
+      "notes": "Platform smoke route shells are covered by the existing boundary scan, but their UI imports current admin navigation; this inventory proof keeps only the underlying wrapper/helper closure included."
+    },
+    {
+      "path": "app/layout.tsx",
+      "classification": "reference-only",
+      "notes": "Frontend app layout is outside this source-inventory proof; no complete runnable app slice is claimed."
+    },
+    {
+      "path": "app/page.tsx",
+      "classification": "reference-only",
+      "notes": "Current landing page includes chat affordances outside this reservation consumer repo proof."
+    },
+    {
+      "path": "app/globals.css",
+      "classification": "reference-only",
+      "notes": "Global styles are outside this source-inventory proof; no complete runnable app slice is claimed."
+    },
+    {
+      "path": "components/form",
+      "classification": "include",
+      "notes": "Reservation form UI components covered by the existing current frontend platform boundary scan."
+    },
+    {
+      "path": "components/shared/Header.tsx",
+      "classification": "reference-only",
+      "notes": "Header imports landing navigation that links to broader current-app routes; not part of this reservation platform client/wrapper proof."
+    },
+    {
+      "path": "components/shared/Footer.tsx",
+      "classification": "reference-only",
+      "notes": "Shared footer belongs to the broader current app shell, not this reservation platform client/wrapper proof."
+    },
+    {
+      "path": "components/admin/SeatMaintenanceManager.tsx",
+      "classification": "reference-only",
+      "notes": "Reservation maintenance UI is covered by the existing boundary scan, but imports the broad admin sidebar navigation; not included in this extractable proof slice."
+    },
+    {
+      "path": "components/admin/Sidebar.tsx",
+      "classification": "reference-only",
+      "notes": "Admin navigation links to current-app analytics/blog/update routes; not part of this reservation platform client/wrapper proof."
+    },
+    {
+      "path": "components/admin/Sidebar.css",
+      "classification": "reference-only",
+      "notes": "Styles for current-app admin navigation outside this proof slice."
+    },
+    {
+      "path": "components/admin/ContentEditor.tsx",
+      "classification": "reference-only",
+      "notes": "Current-app content editor calls app-owned /api/blogs and /api/updates routes; not part of this reservation consumer repo proof."
+    },
+    {
+      "path": "components/admin/ContentManager.tsx",
+      "classification": "reference-only",
+      "notes": "Current-app content manager calls app-owned content routes; not part of this reservation consumer repo proof."
+    },
+    {
+      "path": "components/analytics",
+      "classification": "reference-only",
+      "notes": "Current-app analytics UI calls app-owned /api/analytics-reports routes; not part of this reservation consumer repo proof."
+    },
+    {
+      "path": "components/chat",
+      "classification": "reference-only",
+      "notes": "Current chat UI remains tied to optional chat compatibility and is not included until chat cutover is proven."
+    },
+    {
+      "path": "components/content",
+      "classification": "reference-only",
+      "notes": "Current-app content UI is outside this reservation consumer repo proof."
+    },
+    {
+      "path": "components/landing",
+      "classification": "reference-only",
+      "notes": "Current landing components are outside this reservation consumer repo proof."
+    },
+    {
+      "path": "components/ui",
+      "classification": "reference-only",
+      "notes": "Shared UI primitives are not needed by the currently included reservation proof paths."
+    },
+    {
+      "path": "components/ui/BookingTicket.tsx",
+      "classification": "include",
+      "notes": "Self-contained success-ticket UI imported by the included reservation form component closure."
+    },
+    {
+      "path": "components/ui/ConfettiExplosion.tsx",
+      "classification": "include",
+      "notes": "Self-contained success animation UI imported by the included reservation form component closure."
+    },
+    {
+      "path": "lib/reservation-platform-client.ts",
+      "classification": "include",
+      "notes": "Browser-safe direct HTTP wrapper for /v1 or temporary /api compatibility routes."
+    },
+    {
+      "path": "lib/reservation-chat-client.ts",
+      "classification": "reference-only",
+      "notes": "Chat consumer wrapper still keeps local /api/chat compatibility fallback; optional chat separation remains outside this reservation consumer proof."
+    },
+    {
+      "path": "lib/admin-auth-client.ts",
+      "classification": "reference-only",
+      "notes": "Frontend-owned admin auth facade is current-app auth UX and not part of this reservation platform client/wrapper proof."
+    },
+    {
+      "path": "lib/admin-reservations-loader.ts",
+      "classification": "include",
+      "notes": "Server-side frontend loader that delegates reservation reads to the public wrapper."
+    },
+    {
+      "path": "lib/supabase-browser.ts",
+      "classification": "reference-only",
+      "notes": "Browser auth/session helper is current-app auth UX and not part of this reservation platform client/wrapper proof."
+    },
+    {
+      "path": "lib/supabase-server.ts",
+      "classification": "reference-only",
+      "notes": "Server auth/session helper is current-app auth UX and not part of this reservation platform client/wrapper proof."
+    },
+    {
+      "path": "lib/supabase.ts",
+      "classification": "reference-only",
+      "notes": "Legacy public-anon helper for current-app surfaces outside this reservation consumer repo proof."
+    },
+    {
+      "path": "lib/blogs.ts",
+      "classification": "reference-only",
+      "notes": "Current-app content helper outside this reservation consumer repo proof."
+    },
+    {
+      "path": "lib/content-posts.ts",
+      "classification": "reference-only",
+      "notes": "Current-app content helper outside this reservation consumer repo proof."
+    },
+    {
+      "path": "lib/sales-reports.ts",
+      "classification": "reference-only",
+      "notes": "Current-app analytics helper outside this reservation consumer repo proof."
+    },
+    {
+      "path": "types",
+      "classification": "include",
+      "notes": "Current frontend public DTO compatibility types backed by contract-types."
+    },
+    {
+      "path": "app/admin/dashboard-data.ts",
+      "classification": "include",
+      "notes": "Pure admin reservation DTO/filter helper imported by the reservation platform client and admin reservation loader."
+    },
+    {
+      "path": "public",
+      "classification": "reference-only",
+      "notes": "Static assets are outside this source-inventory proof; no complete runnable app slice is claimed."
+    },
+    {
+      "path": "next.config.ts",
+      "classification": "reference-only",
+      "notes": "Frontend config is outside this source-inventory proof; no complete runnable app slice is claimed."
+    },
+    {
+      "path": "tsconfig.json",
+      "classification": "reference-only",
+      "notes": "Frontend TypeScript config is outside this source-inventory proof; no complete runnable app slice is claimed."
+    },
+    {
+      "path": "postcss.config.mjs",
+      "classification": "reference-only",
+      "notes": "Frontend CSS tooling config is outside this source-inventory proof; no complete runnable app slice is claimed."
+    },
+    {
+      "path": "eslint.config.mjs",
+      "classification": "reference-only",
+      "notes": "Frontend lint config is outside this source-inventory proof; no complete runnable app slice is claimed."
+    },
+    {
+      "path": "app/api",
+      "classification": "exclude",
+      "notes": "Current app API routes include reservation compatibility and app-owned server routes. Reservation compatibility route removal remains owned by Phase 9."
+    },
+    {
+      "path": "apps/api",
+      "classification": "exclude",
+      "notes": "Standalone backend app candidate, not frontend repo source."
+    },
+    {
+      "path": "packages",
+      "classification": "exclude",
+      "notes": "Workspace backend, SDK, contract, database, and storage packages should be consumed as published packages where needed, not copied into the frontend repo."
+    },
+    {
+      "path": "lib/langchain",
+      "classification": "exclude",
+      "notes": "Provider/retrieval workflow code belongs behind backend chat services."
+    },
+    {
+      "path": "lib/reservations",
+      "classification": "exclude",
+      "notes": "Legacy reservation core facades are backend/platform internals for the consumer repo proof."
+    },
+    {
+      "path": "lib/supabase-admin.ts",
+      "classification": "exclude",
+      "notes": "Service-role/admin storage helper is backend-only."
+    },
+    {
+      "path": "supabase",
+      "classification": "exclude",
+      "notes": "Database migrations and local Supabase assets are backend platform/database ownership."
+    },
+    {
+      "path": "scripts",
+      "classification": "reference-only",
+      "notes": "Current monorepo proof and verification scripts; only frontend-safe checks would move or be recreated."
+    },
+    {
+      "path": "docs/package-refactor/backend-platform-extraction/frontend-backend-sdk-separation",
+      "classification": "reference-only",
+      "notes": "Migration proof documentation and inventories."
+    },
+    {
+      "path": "examples",
+      "classification": "reference-only",
+      "notes": "SDK and consumer smoke fixtures, not current frontend runtime source."
+    }
+  ],
+  "dependencies": [
+    {
+      "name": "@ai-sdk/google",
+      "section": "dependencies",
+      "classification": "backend-only-excluded",
+      "notes": "Provider adapter belongs behind backend chat or analytics services."
+    },
+    {
+      "name": "@ai-sdk/openai",
+      "section": "dependencies",
+      "classification": "backend-only-excluded",
+      "notes": "Provider adapter belongs behind backend chat or analytics services."
+    },
+    {
+      "name": "@ai-sdk/react",
+      "section": "dependencies",
+      "classification": "current-monorepo-only",
+      "notes": "Not required by the current reservation consumer proof."
+    },
+    {
+      "name": "@dnd-kit/core",
+      "section": "dependencies",
+      "classification": "frontend-runtime",
+      "notes": "Frontend drag-and-drop UI dependency."
+    },
+    {
+      "name": "@dnd-kit/sortable",
+      "section": "dependencies",
+      "classification": "frontend-runtime",
+      "notes": "Frontend drag-and-drop UI dependency."
+    },
+    {
+      "name": "@dnd-kit/utilities",
+      "section": "dependencies",
+      "classification": "frontend-runtime",
+      "notes": "Frontend drag-and-drop UI dependency."
+    },
+    {
+      "name": "@google/generative-ai",
+      "section": "dependencies",
+      "classification": "backend-only-excluded",
+      "notes": "Provider SDK belongs behind backend services."
+    },
+    {
+      "name": "@langchain/community",
+      "section": "dependencies",
+      "classification": "backend-only-excluded",
+      "notes": "Retrieval/workflow package belongs behind backend chat services."
+    },
+    {
+      "name": "@langchain/core",
+      "section": "dependencies",
+      "classification": "backend-only-excluded",
+      "notes": "Retrieval/workflow package belongs behind backend chat services."
+    },
+    {
+      "name": "@langchain/google-genai",
+      "section": "dependencies",
+      "classification": "backend-only-excluded",
+      "notes": "Provider workflow package belongs behind backend chat services."
+    },
+    {
+      "name": "@langchain/langgraph",
+      "section": "dependencies",
+      "classification": "backend-only-excluded",
+      "notes": "Workflow/checkpoint orchestration belongs behind backend chat services."
+    },
+    {
+      "name": "@langchain/langgraph-checkpoint-postgres",
+      "section": "dependencies",
+      "classification": "backend-only-excluded",
+      "notes": "Backend persistence adapter."
+    },
+    {
+      "name": "@langchain/openai",
+      "section": "dependencies",
+      "classification": "backend-only-excluded",
+      "notes": "Provider workflow package belongs behind backend chat services."
+    },
+    {
+      "name": "@project-play/reservation-chat-core",
+      "section": "dependencies",
+      "classification": "backend-only-excluded",
+      "notes": "Legacy backend chat core package."
+    },
+    {
+      "name": "@project-play/reservations-core",
+      "section": "dependencies",
+      "classification": "backend-only-excluded",
+      "notes": "Backend reservation rule package."
+    },
+    {
+      "name": "@project-play/reservations-supabase",
+      "section": "dependencies",
+      "classification": "backend-only-excluded",
+      "notes": "Backend storage adapter package."
+    },
+    {
+      "name": "@reservation-platform/api",
+      "section": "dependencies",
+      "classification": "backend-only-excluded",
+      "notes": "Backend platform application-service package."
+    },
+    {
+      "name": "@reservation-platform/contract-types",
+      "section": "dependencies",
+      "classification": "sdk-consumer",
+      "notes": "Public platform DTO and schema contract package."
+    },
+    {
+      "name": "@reservation-platform/sdk",
+      "section": "dependencies",
+      "classification": "sdk-consumer",
+      "notes": "Published SDK package candidate for separate frontend consumers."
+    },
+    {
+      "name": "@supabase/ssr",
+      "section": "dependencies",
+      "classification": "current-monorepo-only",
+      "notes": "Current-app auth/session helper dependency; not required by this reservation platform client/wrapper proof."
+    },
+    {
+      "name": "@supabase/supabase-js",
+      "section": "dependencies",
+      "classification": "current-monorepo-only",
+      "notes": "Current-app auth/session helper dependency; not required by this reservation platform client/wrapper proof."
+    },
+    {
+      "name": "@vercel/sandbox",
+      "section": "dependencies",
+      "classification": "current-monorepo-only",
+      "notes": "Repository sandbox smoke tooling, not frontend runtime."
+    },
+    {
+      "name": "ai",
+      "section": "dependencies",
+      "classification": "backend-only-excluded",
+      "notes": "AI runtime belongs behind backend chat or analytics services for this proof."
+    },
+    {
+      "name": "clsx",
+      "section": "dependencies",
+      "classification": "frontend-runtime",
+      "notes": "Frontend UI utility."
+    },
+    {
+      "name": "date-fns",
+      "section": "dependencies",
+      "classification": "frontend-runtime",
+      "notes": "Frontend date utility."
+    },
+    {
+      "name": "lucide-react",
+      "section": "dependencies",
+      "classification": "frontend-runtime",
+      "notes": "Frontend icon library."
+    },
+    {
+      "name": "next",
+      "section": "dependencies",
+      "classification": "frontend-runtime",
+      "notes": "Frontend framework."
+    },
+    {
+      "name": "react",
+      "section": "dependencies",
+      "classification": "frontend-runtime",
+      "notes": "Frontend framework runtime."
+    },
+    {
+      "name": "react-dom",
+      "section": "dependencies",
+      "classification": "frontend-runtime",
+      "notes": "Frontend framework runtime."
+    },
+    {
+      "name": "react-markdown",
+      "section": "dependencies",
+      "classification": "frontend-runtime",
+      "notes": "Frontend markdown rendering."
+    },
+    {
+      "name": "recharts",
+      "section": "dependencies",
+      "classification": "frontend-runtime",
+      "notes": "Frontend chart rendering."
+    },
+    {
+      "name": "remark-gfm",
+      "section": "dependencies",
+      "classification": "frontend-runtime",
+      "notes": "Frontend markdown extension."
+    },
+    {
+      "name": "swr",
+      "section": "dependencies",
+      "classification": "frontend-runtime",
+      "notes": "Frontend data fetching/cache utility."
+    },
+    {
+      "name": "tailwind-merge",
+      "section": "dependencies",
+      "classification": "frontend-runtime",
+      "notes": "Frontend class merge utility."
+    },
+    {
+      "name": "zod",
+      "section": "dependencies",
+      "classification": "frontend-runtime",
+      "notes": "Frontend-safe validation utility."
+    },
+    {
+      "name": "zustand",
+      "section": "dependencies",
+      "classification": "frontend-runtime",
+      "notes": "Frontend state management."
+    },
+    {
+      "name": "@tailwindcss/postcss",
+      "section": "devDependencies",
+      "classification": "frontend-dev",
+      "notes": "Frontend CSS build tooling."
+    },
+    {
+      "name": "@types/node",
+      "section": "devDependencies",
+      "classification": "frontend-dev",
+      "notes": "TypeScript type support."
+    },
+    {
+      "name": "@types/react",
+      "section": "devDependencies",
+      "classification": "frontend-dev",
+      "notes": "TypeScript type support."
+    },
+    {
+      "name": "@types/react-dom",
+      "section": "devDependencies",
+      "classification": "frontend-dev",
+      "notes": "TypeScript type support."
+    },
+    {
+      "name": "dotenv",
+      "section": "devDependencies",
+      "classification": "frontend-dev",
+      "notes": "Local environment loading for scripts."
+    },
+    {
+      "name": "eslint",
+      "section": "devDependencies",
+      "classification": "frontend-dev",
+      "notes": "Frontend lint tooling."
+    },
+    {
+      "name": "eslint-config-next",
+      "section": "devDependencies",
+      "classification": "frontend-dev",
+      "notes": "Next.js lint tooling."
+    },
+    {
+      "name": "playwright",
+      "section": "devDependencies",
+      "classification": "frontend-dev",
+      "notes": "Frontend smoke/browser test tooling."
+    },
+    {
+      "name": "tailwindcss",
+      "section": "devDependencies",
+      "classification": "frontend-dev",
+      "notes": "Frontend CSS tooling."
+    },
+    {
+      "name": "ts-node",
+      "section": "devDependencies",
+      "classification": "frontend-dev",
+      "notes": "Current repo TypeScript script support."
+    },
+    {
+      "name": "tsx",
+      "section": "devDependencies",
+      "classification": "frontend-dev",
+      "notes": "Current repo TypeScript test runner support."
+    },
+    {
+      "name": "typescript",
+      "section": "devDependencies",
+      "classification": "frontend-dev",
+      "notes": "Frontend TypeScript compiler."
+    }
+  ]
+}

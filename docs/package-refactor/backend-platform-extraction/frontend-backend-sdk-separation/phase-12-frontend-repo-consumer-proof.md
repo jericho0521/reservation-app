@@ -81,6 +81,45 @@ It must not need:
 - Frontend-only environment contract.
 - Updated remaining-gap status for current frontend ownership.
 
+## Partial Implementation Result
+
+Local frontend consumer repository readiness infrastructure now exists.
+
+- Inventory:
+  `docs/package-refactor/backend-platform-extraction/frontend-backend-sdk-separation/frontend-consumer-repo-inventory.json`
+- Verifier:
+  `corepack pnpm run current-frontend:consumer-repo-readiness`
+- Unit tests:
+  `node --import tsx --test scripts\verify-current-frontend-consumer-repo-readiness.test.mjs`
+- Existing prerequisite scans retained:
+  `corepack pnpm run current-frontend:verify-platform-boundary`
+  and `corepack pnpm run current-frontend:verify-platform-secrets`
+
+The inventory is deliberately scoped to reservation platform
+client/wrapper/proof source, not a complete runnable frontend app slice. It
+separates the reservation form component closure, the reservation platform
+client, public DTO types, admin reservation data helpers, and the admin
+reservation loader as `include`; backend platform, storage, route, migration,
+and provider areas as `exclude`; and route shells/navigation/admin UI, chat,
+content, analytics, broad admin, landing, and app scaffolding areas as
+`reference-only` until their app-owned API and navigation dependencies are
+separated or intentionally included in a later frontend repo proof. Root
+package dependencies are separated into `frontend-runtime`, `frontend-dev`,
+`sdk-consumer`, `backend-only-excluded`, and `current-monorepo-only`. The
+verifier performs no network, install, build, deploy, database, or publish
+work. It validates the inventory shape, listed path existence, root package
+dependency coverage, browser-safe `NEXT_PUBLIC_*` frontend environment names,
+and package/script references. It rejects backend-only packages or paths if
+they are classified as frontend runtime/source includes, and it rejects any
+included local source file that imports another local source file not also
+classified as `include`.
+
+This proves a bounded local inventory/readiness slice only. No new frontend
+repository was created, no compatibility routes were deleted or marked
+removable, no SDK package was published, and no separated frontend install,
+build, run, or browser smoke proof has been completed. Phase 9 compatibility
+routes remain temporary until every removal gate passes.
+
 ## Acceptance Criteria
 
 - The frontend can be described as a consumer app, not the backend owner.

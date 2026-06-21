@@ -100,6 +100,39 @@ This is partial Phase 8 readiness only. It does not remove `app/api`
 compatibility routes, complete a full `/v1` standalone backend cutover, or close
 Phase 9 removal gates.
 
+An additional local frontend consumer repository readiness proof now exists:
+
+- Inventory:
+  `docs/package-refactor/backend-platform-extraction/frontend-backend-sdk-separation/frontend-consumer-repo-inventory.json`
+- Verifier:
+  `corepack pnpm run current-frontend:consumer-repo-readiness`
+- Unit tests:
+  `node --import tsx --test scripts\verify-current-frontend-consumer-repo-readiness.test.mjs`
+
+The inventory is scoped to reservation platform client/wrapper/proof source,
+not every current app screen and not a complete runnable frontend app slice. It
+classifies the reservation form component closure, the reservation platform
+client, public DTO types, admin reservation data helpers, and the admin
+reservation loader as `include`; backend platform, storage, route, migration,
+and provider areas as `exclude`; and route shells/navigation/admin UI, chat,
+content, analytics, broad admin, landing, and app scaffolding areas as
+`reference-only` until their app-owned API and navigation dependencies are
+separated or intentionally included in a later frontend repo proof. Root
+package dependencies are classified as `frontend-runtime`, `frontend-dev`,
+`sdk-consumer`, `backend-only-excluded`, or `current-monorepo-only`. The
+verifier is CI-safe and local-only: it validates inventory shape, listed
+path/package existence, the minimum browser-safe frontend env contract, and
+prevents backend-only packages or paths from being marked as frontend
+runtime/include. It also checks that included local source imports are closed
+over other `include` entries, and requires the existing browser-safe boundary
+commands to remain prerequisite checks:
+`current-frontend:verify-platform-boundary` and
+`current-frontend:verify-platform-secrets`.
+
+This is still readiness only. It does not create a new frontend repository,
+delete compatibility routes, install or publish packages, make network calls,
+or prove a standalone build/run from a separated repo.
+
 ## Acceptance Criteria
 
 - Current frontend reservation flows can use a standalone backend base URL.

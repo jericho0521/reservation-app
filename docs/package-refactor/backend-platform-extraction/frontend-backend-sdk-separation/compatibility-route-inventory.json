@@ -1,0 +1,848 @@
+{
+  "schemaVersion": 1,
+  "phase": "phase-9-compatibility-route-removal",
+  "generatedFrom": "current app/api route tree",
+  "lastUpdated": "2026-06-21",
+  "requiredRemovalGates": [
+    "standaloneEquivalent",
+    "frontendCutover",
+    "sdkDirectParity",
+    "authTenantIdempotencyProof",
+    "tests",
+    "rollbackDeprecationNotes"
+  ],
+  "statusLegend": {
+    "remove-later": "Reservation-platform compatibility route intended for removal only after every removal gate is true.",
+    "move-to-optional-module": "Compatibility route for an optional backend platform module; keep until the module has an owned standalone deployment path.",
+    "keep-app-owned": "Current frontend app route outside the reservation platform removal scope.",
+    "removable": "Route may be deleted only when every required removal gate is true."
+  },
+  "routes": [
+    {
+      "routePath": "/api/services",
+      "filePath": "app/api/services/route.ts",
+      "classification": "reservation-platform-compatibility",
+      "status": "remove-later",
+      "standaloneEquivalent": "/v1/services",
+      "frontendUsage": {
+        "state": "local-mode-compatibility",
+        "notes": "lib/reservation-platform-client.ts still calls this route when NEXT_PUBLIC_RESERVATION_API_MODE is local."
+      },
+      "removalGates": {
+        "standaloneEquivalent": true,
+        "frontendCutover": false,
+        "sdkDirectParity": false,
+        "authTenantIdempotencyProof": false,
+        "tests": false,
+        "rollbackDeprecationNotes": false
+      },
+      "removalBlockedBy": [
+        "current frontend local mode still targets /api/services",
+        "strict live /v1 catalog parity is not complete",
+        "rollback or deprecation notes are not written"
+      ]
+    },
+    {
+      "routePath": "/api/services/{id}",
+      "filePath": "app/api/services/[id]/route.ts",
+      "classification": "reservation-platform-compatibility",
+      "status": "remove-later",
+      "standaloneEquivalent": "/v1/services/{id}",
+      "frontendUsage": {
+        "state": "no-current-wrapper-usage",
+        "notes": "No current frontend wrapper call is known, but removal still waits for route-level parity and deprecation proof."
+      },
+      "removalGates": {
+        "standaloneEquivalent": true,
+        "frontendCutover": false,
+        "sdkDirectParity": false,
+        "authTenantIdempotencyProof": false,
+        "tests": false,
+        "rollbackDeprecationNotes": false
+      },
+      "removalBlockedBy": [
+        "strict live /v1 catalog read parity is not complete",
+        "source scan for direct frontend usage is not yet recorded",
+        "rollback or deprecation notes are not written"
+      ]
+    },
+    {
+      "routePath": "/api/venues",
+      "filePath": "app/api/venues/route.ts",
+      "classification": "reservation-platform-compatibility",
+      "status": "remove-later",
+      "standaloneEquivalent": "/v1/venues",
+      "frontendUsage": {
+        "state": "no-current-wrapper-usage",
+        "notes": "No current frontend wrapper call is known, but removal still waits for route-level parity and deprecation proof."
+      },
+      "removalGates": {
+        "standaloneEquivalent": true,
+        "frontendCutover": false,
+        "sdkDirectParity": false,
+        "authTenantIdempotencyProof": false,
+        "tests": false,
+        "rollbackDeprecationNotes": false
+      },
+      "removalBlockedBy": [
+        "strict live /v1 catalog parity is not complete",
+        "source scan for direct frontend usage is not yet recorded",
+        "rollback or deprecation notes are not written"
+      ]
+    },
+    {
+      "routePath": "/api/venues/{id}",
+      "filePath": "app/api/venues/[id]/route.ts",
+      "classification": "reservation-platform-compatibility",
+      "status": "remove-later",
+      "standaloneEquivalent": "/v1/venues/{id}",
+      "frontendUsage": {
+        "state": "no-current-wrapper-usage",
+        "notes": "No current frontend wrapper call is known, but removal still waits for route-level parity and deprecation proof."
+      },
+      "removalGates": {
+        "standaloneEquivalent": true,
+        "frontendCutover": false,
+        "sdkDirectParity": false,
+        "authTenantIdempotencyProof": false,
+        "tests": false,
+        "rollbackDeprecationNotes": false
+      },
+      "removalBlockedBy": [
+        "strict live /v1 catalog read parity is not complete",
+        "source scan for direct frontend usage is not yet recorded",
+        "rollback or deprecation notes are not written"
+      ]
+    },
+    {
+      "routePath": "/api/availability",
+      "filePath": "app/api/availability/route.ts",
+      "classification": "reservation-platform-compatibility",
+      "status": "remove-later",
+      "standaloneEquivalent": "/v1/availability",
+      "frontendUsage": {
+        "state": "local-mode-compatibility",
+        "notes": "lib/reservation-platform-client.ts still calls this route when NEXT_PUBLIC_RESERVATION_API_MODE is local."
+      },
+      "removalGates": {
+        "standaloneEquivalent": true,
+        "frontendCutover": false,
+        "sdkDirectParity": false,
+        "authTenantIdempotencyProof": false,
+        "tests": false,
+        "rollbackDeprecationNotes": false
+      },
+      "removalBlockedBy": [
+        "current frontend local mode still targets /api/availability",
+        "strict live /v1 availability parity is not complete",
+        "rollback or deprecation notes are not written"
+      ]
+    },
+    {
+      "routePath": "/api/bookings",
+      "filePath": "app/api/bookings/route.ts",
+      "classification": "reservation-platform-compatibility",
+      "status": "remove-later",
+      "standaloneEquivalent": "/v1/reservations",
+      "frontendUsage": {
+        "state": "local-mode-compatibility",
+        "notes": "lib/reservation-platform-client.ts still calls this route for local create and admin list paths."
+      },
+      "removalGates": {
+        "standaloneEquivalent": true,
+        "frontendCutover": false,
+        "sdkDirectParity": false,
+        "authTenantIdempotencyProof": false,
+        "tests": false,
+        "rollbackDeprecationNotes": false
+      },
+      "removalBlockedBy": [
+        "current frontend local mode still targets /api/bookings",
+        "strict live /v1 reservation create/list parity is not complete",
+        "auth, tenant, and durable idempotency proof is not complete",
+        "rollback or deprecation notes are not written"
+      ]
+    },
+    {
+      "routePath": "/api/bookings/{id}",
+      "filePath": "app/api/bookings/[id]/route.ts",
+      "classification": "reservation-platform-compatibility",
+      "status": "remove-later",
+      "standaloneEquivalent": "/v1/reservations/{id}",
+      "frontendUsage": {
+        "state": "local-mode-compatibility",
+        "notes": "lib/reservation-platform-client.ts still calls this route for local admin status updates."
+      },
+      "removalGates": {
+        "standaloneEquivalent": true,
+        "frontendCutover": false,
+        "sdkDirectParity": false,
+        "authTenantIdempotencyProof": false,
+        "tests": false,
+        "rollbackDeprecationNotes": false
+      },
+      "removalBlockedBy": [
+        "current frontend local mode still targets /api/bookings/{id}",
+        "strict live /v1 reservation read/update parity is not complete",
+        "auth, tenant, and durable idempotency proof is not complete",
+        "rollback or deprecation notes are not written"
+      ]
+    },
+    {
+      "routePath": "/api/seat-maintenance",
+      "filePath": "app/api/seat-maintenance/route.ts",
+      "classification": "reservation-platform-compatibility",
+      "status": "remove-later",
+      "standaloneEquivalent": "/v1/resource-maintenance",
+      "frontendUsage": {
+        "state": "local-mode-compatibility",
+        "notes": "lib/reservation-platform-client.ts still calls this route for local maintenance list/save paths."
+      },
+      "removalGates": {
+        "standaloneEquivalent": true,
+        "frontendCutover": false,
+        "sdkDirectParity": false,
+        "authTenantIdempotencyProof": false,
+        "tests": false,
+        "rollbackDeprecationNotes": false
+      },
+      "removalBlockedBy": [
+        "current frontend local mode still targets /api/seat-maintenance",
+        "strict live /v1 resource-maintenance parity is not complete",
+        "auth, tenant, and durable idempotency proof is not complete",
+        "rollback or deprecation notes are not written"
+      ]
+    },
+    {
+      "routePath": "/api/v1/metadata",
+      "filePath": "app/api/v1/metadata/route.ts",
+      "classification": "reservation-platform-compatibility",
+      "status": "remove-later",
+      "standaloneEquivalent": "/v1/metadata",
+      "frontendUsage": {
+        "state": "platform-compatibility",
+        "notes": "Current platform compatibility mode may target /api/v1 when no standalone base URL is configured."
+      },
+      "removalGates": {
+        "standaloneEquivalent": true,
+        "frontendCutover": false,
+        "sdkDirectParity": false,
+        "authTenantIdempotencyProof": true,
+        "tests": false,
+        "rollbackDeprecationNotes": false
+      },
+      "removalBlockedBy": [
+        "current platform compatibility mode still supports /api/v1 fallback",
+        "strict live /v1 metadata parity is not complete",
+        "rollback or deprecation notes are not written"
+      ]
+    },
+    {
+      "routePath": "/api/v1/services",
+      "filePath": "app/api/v1/services/route.ts",
+      "classification": "reservation-platform-compatibility",
+      "status": "remove-later",
+      "standaloneEquivalent": "/v1/services",
+      "frontendUsage": {
+        "state": "platform-compatibility",
+        "notes": "Platform mode uses /api/v1/services when NEXT_PUBLIC_RESERVATION_PLATFORM_BASE_URL is empty."
+      },
+      "removalGates": {
+        "standaloneEquivalent": true,
+        "frontendCutover": false,
+        "sdkDirectParity": false,
+        "authTenantIdempotencyProof": false,
+        "tests": false,
+        "rollbackDeprecationNotes": false
+      },
+      "removalBlockedBy": [
+        "current platform compatibility mode still supports /api/v1 fallback",
+        "strict live /v1 catalog parity is not complete",
+        "rollback or deprecation notes are not written"
+      ]
+    },
+    {
+      "routePath": "/api/v1/services/{id}",
+      "filePath": "app/api/v1/services/[id]/route.ts",
+      "classification": "reservation-platform-compatibility",
+      "status": "remove-later",
+      "standaloneEquivalent": "/v1/services/{id}",
+      "frontendUsage": {
+        "state": "platform-compatibility",
+        "notes": "Current app keeps this compatibility route for direct /api/v1 catalog reads."
+      },
+      "removalGates": {
+        "standaloneEquivalent": true,
+        "frontendCutover": false,
+        "sdkDirectParity": false,
+        "authTenantIdempotencyProof": false,
+        "tests": false,
+        "rollbackDeprecationNotes": false
+      },
+      "removalBlockedBy": [
+        "current platform compatibility mode still supports /api/v1 fallback",
+        "strict live /v1 catalog read parity is not complete",
+        "rollback or deprecation notes are not written"
+      ]
+    },
+    {
+      "routePath": "/api/v1/venues",
+      "filePath": "app/api/v1/venues/route.ts",
+      "classification": "reservation-platform-compatibility",
+      "status": "remove-later",
+      "standaloneEquivalent": "/v1/venues",
+      "frontendUsage": {
+        "state": "platform-compatibility",
+        "notes": "Current app keeps this compatibility route for direct /api/v1 catalog reads."
+      },
+      "removalGates": {
+        "standaloneEquivalent": true,
+        "frontendCutover": false,
+        "sdkDirectParity": false,
+        "authTenantIdempotencyProof": false,
+        "tests": false,
+        "rollbackDeprecationNotes": false
+      },
+      "removalBlockedBy": [
+        "current platform compatibility mode still supports /api/v1 fallback",
+        "strict live /v1 catalog parity is not complete",
+        "rollback or deprecation notes are not written"
+      ]
+    },
+    {
+      "routePath": "/api/v1/venues/{id}",
+      "filePath": "app/api/v1/venues/[id]/route.ts",
+      "classification": "reservation-platform-compatibility",
+      "status": "remove-later",
+      "standaloneEquivalent": "/v1/venues/{id}",
+      "frontendUsage": {
+        "state": "platform-compatibility",
+        "notes": "Current app keeps this compatibility route for direct /api/v1 catalog reads."
+      },
+      "removalGates": {
+        "standaloneEquivalent": true,
+        "frontendCutover": false,
+        "sdkDirectParity": false,
+        "authTenantIdempotencyProof": false,
+        "tests": false,
+        "rollbackDeprecationNotes": false
+      },
+      "removalBlockedBy": [
+        "current platform compatibility mode still supports /api/v1 fallback",
+        "strict live /v1 catalog read parity is not complete",
+        "rollback or deprecation notes are not written"
+      ]
+    },
+    {
+      "routePath": "/api/v1/resources",
+      "filePath": "app/api/v1/resources/route.ts",
+      "classification": "reservation-platform-compatibility",
+      "status": "remove-later",
+      "standaloneEquivalent": "/v1/resources",
+      "frontendUsage": {
+        "state": "platform-compatibility",
+        "notes": "Current app keeps this compatibility route for direct /api/v1 resource reads."
+      },
+      "removalGates": {
+        "standaloneEquivalent": true,
+        "frontendCutover": false,
+        "sdkDirectParity": false,
+        "authTenantIdempotencyProof": false,
+        "tests": false,
+        "rollbackDeprecationNotes": false
+      },
+      "removalBlockedBy": [
+        "current platform compatibility mode still supports /api/v1 fallback",
+        "strict live /v1 resource parity is not complete",
+        "rollback or deprecation notes are not written"
+      ]
+    },
+    {
+      "routePath": "/api/v1/resources/{id}",
+      "filePath": "app/api/v1/resources/[id]/route.ts",
+      "classification": "reservation-platform-compatibility",
+      "status": "remove-later",
+      "standaloneEquivalent": "/v1/resources/{id}",
+      "frontendUsage": {
+        "state": "platform-compatibility",
+        "notes": "Current app keeps this compatibility route for direct /api/v1 resource reads."
+      },
+      "removalGates": {
+        "standaloneEquivalent": true,
+        "frontendCutover": false,
+        "sdkDirectParity": false,
+        "authTenantIdempotencyProof": false,
+        "tests": false,
+        "rollbackDeprecationNotes": false
+      },
+      "removalBlockedBy": [
+        "current platform compatibility mode still supports /api/v1 fallback",
+        "strict live /v1 resource read parity is not complete",
+        "rollback or deprecation notes are not written"
+      ]
+    },
+    {
+      "routePath": "/api/v1/resource-layouts/{id}",
+      "filePath": "app/api/v1/resource-layouts/[id]/route.ts",
+      "classification": "reservation-platform-compatibility",
+      "status": "remove-later",
+      "standaloneEquivalent": "/v1/resource-layouts/{id}",
+      "frontendUsage": {
+        "state": "platform-compatibility",
+        "notes": "Current app keeps this compatibility route for direct /api/v1 resource layout reads."
+      },
+      "removalGates": {
+        "standaloneEquivalent": true,
+        "frontendCutover": false,
+        "sdkDirectParity": false,
+        "authTenantIdempotencyProof": false,
+        "tests": false,
+        "rollbackDeprecationNotes": false
+      },
+      "removalBlockedBy": [
+        "current platform compatibility mode still supports /api/v1 fallback",
+        "strict live /v1 resource layout parity is not complete",
+        "rollback or deprecation notes are not written"
+      ]
+    },
+    {
+      "routePath": "/api/v1/availability",
+      "filePath": "app/api/v1/availability/route.ts",
+      "classification": "reservation-platform-compatibility",
+      "status": "remove-later",
+      "standaloneEquivalent": "/v1/availability",
+      "frontendUsage": {
+        "state": "platform-compatibility",
+        "notes": "Platform mode uses /api/v1/availability when NEXT_PUBLIC_RESERVATION_PLATFORM_BASE_URL is empty."
+      },
+      "removalGates": {
+        "standaloneEquivalent": true,
+        "frontendCutover": false,
+        "sdkDirectParity": false,
+        "authTenantIdempotencyProof": false,
+        "tests": false,
+        "rollbackDeprecationNotes": false
+      },
+      "removalBlockedBy": [
+        "current platform compatibility mode still supports /api/v1 fallback",
+        "strict live /v1 availability parity is not complete",
+        "rollback or deprecation notes are not written"
+      ]
+    },
+    {
+      "routePath": "/api/v1/reservations",
+      "filePath": "app/api/v1/reservations/route.ts",
+      "classification": "reservation-platform-compatibility",
+      "status": "remove-later",
+      "standaloneEquivalent": "/v1/reservations",
+      "frontendUsage": {
+        "state": "platform-compatibility",
+        "notes": "Platform mode and admin compatibility loading may use /api/v1/reservations when no standalone base URL is configured."
+      },
+      "removalGates": {
+        "standaloneEquivalent": true,
+        "frontendCutover": false,
+        "sdkDirectParity": false,
+        "authTenantIdempotencyProof": false,
+        "tests": false,
+        "rollbackDeprecationNotes": false
+      },
+      "removalBlockedBy": [
+        "current platform compatibility mode still supports /api/v1 fallback",
+        "strict live /v1 reservation create/list parity is not complete",
+        "auth, tenant, and durable idempotency proof is not complete",
+        "rollback or deprecation notes are not written"
+      ]
+    },
+    {
+      "routePath": "/api/v1/reservations/{id}",
+      "filePath": "app/api/v1/reservations/[id]/route.ts",
+      "classification": "reservation-platform-compatibility",
+      "status": "remove-later",
+      "standaloneEquivalent": "/v1/reservations/{id}",
+      "frontendUsage": {
+        "state": "platform-compatibility",
+        "notes": "Platform mode may use this compatibility route for reservation read/update when no standalone base URL is configured."
+      },
+      "removalGates": {
+        "standaloneEquivalent": true,
+        "frontendCutover": false,
+        "sdkDirectParity": false,
+        "authTenantIdempotencyProof": false,
+        "tests": false,
+        "rollbackDeprecationNotes": false
+      },
+      "removalBlockedBy": [
+        "current platform compatibility mode still supports /api/v1 fallback",
+        "strict live /v1 reservation read/update parity is not complete",
+        "auth, tenant, and durable idempotency proof is not complete",
+        "rollback or deprecation notes are not written"
+      ]
+    },
+    {
+      "routePath": "/api/v1/reservations/{id}/cancel",
+      "filePath": "app/api/v1/reservations/[id]/cancel/route.ts",
+      "classification": "reservation-platform-compatibility",
+      "status": "remove-later",
+      "standaloneEquivalent": "/v1/reservations/{id}/cancel",
+      "frontendUsage": {
+        "state": "platform-compatibility",
+        "notes": "Current app keeps this compatibility route for direct /api/v1 reservation lifecycle calls."
+      },
+      "removalGates": {
+        "standaloneEquivalent": true,
+        "frontendCutover": false,
+        "sdkDirectParity": false,
+        "authTenantIdempotencyProof": false,
+        "tests": false,
+        "rollbackDeprecationNotes": false
+      },
+      "removalBlockedBy": [
+        "current platform compatibility mode still supports /api/v1 fallback",
+        "strict live /v1 cancel parity is not complete",
+        "auth, tenant, and durable idempotency proof is not complete",
+        "rollback or deprecation notes are not written"
+      ]
+    },
+    {
+      "routePath": "/api/v1/reservations/{id}/reschedule",
+      "filePath": "app/api/v1/reservations/[id]/reschedule/route.ts",
+      "classification": "reservation-platform-compatibility",
+      "status": "remove-later",
+      "standaloneEquivalent": "/v1/reservations/{id}/reschedule",
+      "frontendUsage": {
+        "state": "platform-compatibility",
+        "notes": "Current app keeps this compatibility route for direct /api/v1 reservation lifecycle calls."
+      },
+      "removalGates": {
+        "standaloneEquivalent": true,
+        "frontendCutover": false,
+        "sdkDirectParity": false,
+        "authTenantIdempotencyProof": false,
+        "tests": false,
+        "rollbackDeprecationNotes": false
+      },
+      "removalBlockedBy": [
+        "current platform compatibility mode still supports /api/v1 fallback",
+        "strict live /v1 reschedule parity is not complete",
+        "auth, tenant, and durable idempotency proof is not complete",
+        "rollback or deprecation notes are not written"
+      ]
+    },
+    {
+      "routePath": "/api/v1/resource-maintenance",
+      "filePath": "app/api/v1/resource-maintenance/route.ts",
+      "classification": "reservation-platform-compatibility",
+      "status": "remove-later",
+      "standaloneEquivalent": "/v1/resource-maintenance",
+      "frontendUsage": {
+        "state": "platform-compatibility",
+        "notes": "Platform mode uses /api/v1/resource-maintenance when NEXT_PUBLIC_RESERVATION_PLATFORM_BASE_URL is empty."
+      },
+      "removalGates": {
+        "standaloneEquivalent": true,
+        "frontendCutover": false,
+        "sdkDirectParity": false,
+        "authTenantIdempotencyProof": false,
+        "tests": false,
+        "rollbackDeprecationNotes": false
+      },
+      "removalBlockedBy": [
+        "current platform compatibility mode still supports /api/v1 fallback",
+        "strict live /v1 resource-maintenance parity is not complete",
+        "auth, tenant, and durable idempotency proof is not complete",
+        "rollback or deprecation notes are not written"
+      ]
+    },
+    {
+      "routePath": "/api/v1/resource-maintenance/{id}/end",
+      "filePath": "app/api/v1/resource-maintenance/[id]/end/route.ts",
+      "classification": "reservation-platform-compatibility",
+      "status": "remove-later",
+      "standaloneEquivalent": "/v1/resource-maintenance/{id}/end",
+      "frontendUsage": {
+        "state": "platform-compatibility",
+        "notes": "Platform mode uses /api/v1/resource-maintenance/{id}/end when NEXT_PUBLIC_RESERVATION_PLATFORM_BASE_URL is empty."
+      },
+      "removalGates": {
+        "standaloneEquivalent": true,
+        "frontendCutover": false,
+        "sdkDirectParity": false,
+        "authTenantIdempotencyProof": false,
+        "tests": false,
+        "rollbackDeprecationNotes": false
+      },
+      "removalBlockedBy": [
+        "current platform compatibility mode still supports /api/v1 fallback",
+        "strict live /v1 resource-maintenance end parity is not complete",
+        "auth, tenant, and durable idempotency proof is not complete",
+        "rollback or deprecation notes are not written"
+      ]
+    },
+    {
+      "routePath": "/api/v1/chat/reservation-sessions",
+      "filePath": "app/api/v1/chat/reservation-sessions/route.ts",
+      "classification": "optional-platform-module-compatibility",
+      "status": "move-to-optional-module",
+      "standaloneEquivalent": "/v1/chat/reservation-sessions",
+      "frontendUsage": {
+        "state": "optional-chat-compatibility",
+        "notes": "Optional chat platform compatibility route; enabled provider workflow and live module proof remain incomplete."
+      },
+      "removalGates": {
+        "standaloneEquivalent": true,
+        "frontendCutover": false,
+        "sdkDirectParity": false,
+        "authTenantIdempotencyProof": false,
+        "tests": false,
+        "rollbackDeprecationNotes": false
+      },
+      "removalBlockedBy": [
+        "optional chat module has no live enabled provider proof",
+        "frontend chat cutover is not complete",
+        "rollback or disabled-module deprecation notes are not written"
+      ]
+    },
+    {
+      "routePath": "/api/v1/chat/reservation-sessions/{id}/messages",
+      "filePath": "app/api/v1/chat/reservation-sessions/[id]/messages/route.ts",
+      "classification": "optional-platform-module-compatibility",
+      "status": "move-to-optional-module",
+      "standaloneEquivalent": "/v1/chat/reservation-sessions/{id}/messages",
+      "frontendUsage": {
+        "state": "optional-chat-compatibility",
+        "notes": "Optional chat platform compatibility route; enabled provider workflow and live module proof remain incomplete."
+      },
+      "removalGates": {
+        "standaloneEquivalent": true,
+        "frontendCutover": false,
+        "sdkDirectParity": false,
+        "authTenantIdempotencyProof": false,
+        "tests": false,
+        "rollbackDeprecationNotes": false
+      },
+      "removalBlockedBy": [
+        "optional chat module has no live enabled provider proof",
+        "frontend chat cutover is not complete",
+        "rollback or disabled-module deprecation notes are not written"
+      ]
+    },
+    {
+      "routePath": "/api/v1/chat/reservation-sessions/{id}/messages:stream",
+      "filePath": "app/api/v1/chat/reservation-sessions/[id]/[operation]/route.ts",
+      "classification": "optional-platform-module-compatibility",
+      "status": "move-to-optional-module",
+      "standaloneEquivalent": "/v1/chat/reservation-sessions/{id}/messages:stream",
+      "frontendUsage": {
+        "state": "optional-chat-compatibility",
+        "notes": "Optional chat stream compatibility route; enabled provider workflow and live module proof remain incomplete."
+      },
+      "removalGates": {
+        "standaloneEquivalent": true,
+        "frontendCutover": false,
+        "sdkDirectParity": false,
+        "authTenantIdempotencyProof": false,
+        "tests": false,
+        "rollbackDeprecationNotes": false
+      },
+      "removalBlockedBy": [
+        "optional chat module has no live enabled provider proof",
+        "frontend chat cutover is not complete",
+        "rollback or disabled-module deprecation notes are not written"
+      ]
+    },
+    {
+      "routePath": "/api/v1/chat/reservation-sessions/{id}/confirm",
+      "filePath": "app/api/v1/chat/reservation-sessions/[id]/confirm/route.ts",
+      "classification": "optional-platform-module-compatibility",
+      "status": "move-to-optional-module",
+      "standaloneEquivalent": "/v1/chat/reservation-sessions/{id}/confirm",
+      "frontendUsage": {
+        "state": "optional-chat-compatibility",
+        "notes": "Optional chat platform compatibility route; enabled provider workflow and live module proof remain incomplete."
+      },
+      "removalGates": {
+        "standaloneEquivalent": true,
+        "frontendCutover": false,
+        "sdkDirectParity": false,
+        "authTenantIdempotencyProof": false,
+        "tests": false,
+        "rollbackDeprecationNotes": false
+      },
+      "removalBlockedBy": [
+        "optional chat module has no live enabled provider proof",
+        "frontend chat cutover is not complete",
+        "rollback or disabled-module deprecation notes are not written"
+      ]
+    },
+    {
+      "routePath": "/api/analytics-chat",
+      "filePath": "app/api/analytics-chat/route.ts",
+      "classification": "app-owned-current-app",
+      "status": "keep-app-owned",
+      "standaloneEquivalent": null,
+      "frontendUsage": {
+        "state": "app-owned",
+        "notes": "Analytics chat is a current app workflow, not part of reservation-platform route removal."
+      },
+      "removalGates": {},
+      "removalBlockedBy": []
+    },
+    {
+      "routePath": "/api/analytics-reports",
+      "filePath": "app/api/analytics-reports/route.ts",
+      "classification": "app-owned-current-app",
+      "status": "keep-app-owned",
+      "standaloneEquivalent": null,
+      "frontendUsage": {
+        "state": "app-owned",
+        "notes": "Analytics reporting remains current app owned."
+      },
+      "removalGates": {},
+      "removalBlockedBy": []
+    },
+    {
+      "routePath": "/api/analytics-reports/batch",
+      "filePath": "app/api/analytics-reports/batch/route.ts",
+      "classification": "app-owned-current-app",
+      "status": "keep-app-owned",
+      "standaloneEquivalent": null,
+      "frontendUsage": {
+        "state": "app-owned",
+        "notes": "Analytics reporting remains current app owned."
+      },
+      "removalGates": {},
+      "removalBlockedBy": []
+    },
+    {
+      "routePath": "/api/analytics-reports/batch-process",
+      "filePath": "app/api/analytics-reports/batch-process/route.ts",
+      "classification": "app-owned-current-app",
+      "status": "keep-app-owned",
+      "standaloneEquivalent": null,
+      "frontendUsage": {
+        "state": "app-owned",
+        "notes": "Analytics reporting remains current app owned."
+      },
+      "removalGates": {},
+      "removalBlockedBy": []
+    },
+    {
+      "routePath": "/api/analytics-reports/summary",
+      "filePath": "app/api/analytics-reports/summary/route.ts",
+      "classification": "app-owned-current-app",
+      "status": "keep-app-owned",
+      "standaloneEquivalent": null,
+      "frontendUsage": {
+        "state": "app-owned",
+        "notes": "Analytics reporting remains current app owned."
+      },
+      "removalGates": {},
+      "removalBlockedBy": []
+    },
+    {
+      "routePath": "/api/analytics-reports/{id}",
+      "filePath": "app/api/analytics-reports/[id]/route.ts",
+      "classification": "app-owned-current-app",
+      "status": "keep-app-owned",
+      "standaloneEquivalent": null,
+      "frontendUsage": {
+        "state": "app-owned",
+        "notes": "Analytics reporting remains current app owned."
+      },
+      "removalGates": {},
+      "removalBlockedBy": []
+    },
+    {
+      "routePath": "/api/analytics-reports/{id}/process",
+      "filePath": "app/api/analytics-reports/[id]/process/route.ts",
+      "classification": "app-owned-current-app",
+      "status": "keep-app-owned",
+      "standaloneEquivalent": null,
+      "frontendUsage": {
+        "state": "app-owned",
+        "notes": "Analytics reporting remains current app owned."
+      },
+      "removalGates": {},
+      "removalBlockedBy": []
+    },
+    {
+      "routePath": "/api/blogs",
+      "filePath": "app/api/blogs/route.ts",
+      "classification": "app-owned-current-app",
+      "status": "keep-app-owned",
+      "standaloneEquivalent": null,
+      "frontendUsage": {
+        "state": "app-owned",
+        "notes": "Blog/content routes remain current app owned."
+      },
+      "removalGates": {},
+      "removalBlockedBy": []
+    },
+    {
+      "routePath": "/api/blogs/{id}",
+      "filePath": "app/api/blogs/[id]/route.ts",
+      "classification": "app-owned-current-app",
+      "status": "keep-app-owned",
+      "standaloneEquivalent": null,
+      "frontendUsage": {
+        "state": "app-owned",
+        "notes": "Blog/content routes remain current app owned."
+      },
+      "removalGates": {},
+      "removalBlockedBy": []
+    },
+    {
+      "routePath": "/api/updates",
+      "filePath": "app/api/updates/route.ts",
+      "classification": "app-owned-current-app",
+      "status": "keep-app-owned",
+      "standaloneEquivalent": null,
+      "frontendUsage": {
+        "state": "app-owned",
+        "notes": "Update/content routes remain current app owned."
+      },
+      "removalGates": {},
+      "removalBlockedBy": []
+    },
+    {
+      "routePath": "/api/updates/{id}",
+      "filePath": "app/api/updates/[id]/route.ts",
+      "classification": "app-owned-current-app",
+      "status": "keep-app-owned",
+      "standaloneEquivalent": null,
+      "frontendUsage": {
+        "state": "app-owned",
+        "notes": "Update/content routes remain current app owned."
+      },
+      "removalGates": {},
+      "removalBlockedBy": []
+    },
+    {
+      "routePath": "/api/chat",
+      "filePath": "app/api/chat/route.ts",
+      "classification": "optional-platform-module-compatibility",
+      "status": "move-to-optional-module",
+      "standaloneEquivalent": "/v1/chat/reservation-sessions/**",
+      "frontendUsage": {
+        "state": "legacy-chat-compatibility",
+        "notes": "Legacy current-app chat POST endpoint still imports LangChain/chat orchestration and can create bookings; it belongs behind the optional /v1/chat module surface."
+      },
+      "removalGates": {
+        "standaloneEquivalent": true,
+        "frontendCutover": false,
+        "sdkDirectParity": false,
+        "authTenantIdempotencyProof": false,
+        "tests": false,
+        "rollbackDeprecationNotes": false
+      },
+      "removalBlockedBy": [
+        "enabled provider-backed /v1/chat module proof is not complete",
+        "current frontend chat cutover from /api/chat to /v1/chat is not complete",
+        "SDK/direct parity for chat session, message, stream, and confirm flows is not complete against the real module",
+        "tenant, auth, and idempotency proof for booking-creating chat confirmation is not complete",
+        "rollback or deprecation notes are not written"
+      ]
+    }
+  ]
+}

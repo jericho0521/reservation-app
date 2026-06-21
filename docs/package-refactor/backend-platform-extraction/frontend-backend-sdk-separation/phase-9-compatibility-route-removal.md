@@ -47,6 +47,32 @@ Each compatibility route needs this checklist:
 | Tests | Unit/smoke tests cover the replacement path. |
 | Rollback path | Deprecation or feature flag is documented if immediate deletion is risky. |
 
+## Current Readiness Status
+
+Partial Phase 9 readiness now exists, but no compatibility route has been
+removed or marked safe to remove.
+
+- Machine-readable inventory:
+  `docs/package-refactor/backend-platform-extraction/frontend-backend-sdk-separation/compatibility-route-inventory.json`
+- CI-safe verifier:
+  `corepack pnpm run backend-platform:verify-compatibility-route-removal-gate`
+- Unit tests:
+  `node --test scripts/verify-compatibility-route-removal-gate.test.mjs`
+
+The inventory separates reservation-platform compatibility routes from
+app-owned current-app routes. Reservation catalog, availability, bookings,
+resource-maintenance, `/api/v1`, legacy `/api/chat`, and optional `/api/v1/chat/**` compatibility
+routes remain blocked by one or more removal gates. Current app-owned analytics,
+blog/update routes are explicitly marked `keep-app-owned` and must not be
+removed as part of reservation-platform cleanup.
+
+The verifier is local-only. It reads the inventory, checks that listed route
+files exist, requires removal/deprecation candidates to have `/v1` standalone
+equivalents, requires blocked routes to name blockers, prevents app-owned routes
+from being marked for reservation-platform removal, and rejects `removable`
+status unless every required gate boolean is true. It does not make network,
+deployment, or live backend calls.
+
 ## Implementation Steps
 
 1. Create a route inventory for all current reservation-related `app/api/**`
@@ -64,9 +90,10 @@ Each compatibility route needs this checklist:
 
 - Compatibility route inventory.
 - Route-by-route removal checklist.
-- Deleted/deprecated route list.
-- Frontend fallback cleanup proof.
+- Deleted/deprecated route list. Not started in this readiness slice.
+- Frontend fallback cleanup proof. Not started in this readiness slice.
 - Source scans proving current frontend no longer depends on removed routes.
+  Not started because no routes were deleted or marked `removable`.
 
 ## Acceptance Criteria
 

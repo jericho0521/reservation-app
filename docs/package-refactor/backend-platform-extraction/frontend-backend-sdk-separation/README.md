@@ -72,6 +72,10 @@ flowchart LR
 - [Phase 9: Compatibility Route Removal](phase-9-compatibility-route-removal.md)
 - [Phase 10: Live Platform Proof](phase-10-live-platform-proof.md)
 - [Phase 11: Backend Repository Extraction](phase-11-backend-repo-extraction.md)
+- [Phase 12: Frontend Repository Consumer Proof](phase-12-frontend-repo-consumer-proof.md)
+- [Phase 13: Backend Platform Product Repository](phase-13-backend-platform-product-repo.md)
+- [Phase 14: SDK Release and Consumer Contract](phase-14-sdk-release-consumer-contract.md)
+- [Phase 15: Operations, Deprecation, and Release Readiness](phase-15-operations-deprecation-release.md)
 - [Remaining Modularity Gaps Index](remaining-modularity-gaps.md)
 
 ## Separation Rules
@@ -100,7 +104,12 @@ Every phase after Phase 1 must also read
 `phase-1-backend-module-boundary-results.md` before deciding what can be
 imported by frontend code, SDK code, backend services, or optional chat modules.
 
-Phases 7 through 11 are the final separation plan. They should be executed in
+Phases 7 through 11 are the core separation plan. They should be executed in
 order: make the standalone backend target real, cut the current frontend over
 as a normal consumer, remove compatibility routes, prove the platform against
 live disposable infrastructure, then extract or release the backend repository.
+
+Phases 12 through 15 are the productization plan. They prove the frontend can
+live as a separate consumer repo, define the backend platform as the product
+repo, make the SDK installable by unrelated frontends, and document release,
+deprecation, rollback, and support rules.

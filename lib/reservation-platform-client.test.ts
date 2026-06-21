@@ -4,6 +4,7 @@ import {
   createReservationFromBookingForm,
   getReservationApiBasePath,
   getReservationApiMode,
+  getReservationPlatformBaseUrl,
   getReservationPlatformContext,
   getReservationAvailability,
   legacyBookingToPlatformInput,
@@ -18,12 +19,21 @@ import {
 } from "./reservation-platform-client";
 
 const originalFetch = globalThis.fetch;
+const originalPlatformBaseUrl = process.env.NEXT_PUBLIC_RESERVATION_PLATFORM_BASE_URL;
 const originalTenantId = process.env.NEXT_PUBLIC_RESERVATION_TENANT_ID;
 const originalVenueId = process.env.NEXT_PUBLIC_RESERVATION_VENUE_ID;
 
+test.beforeEach(() => {
+  globalThis.fetch = originalFetch;
+  clearReservationEnv();
+});
+
 test.afterEach(() => {
   globalThis.fetch = originalFetch;
-  restorePlatformContextEnv();
+});
+
+test.after(() => {
+  restoreReservationEnv();
 });
 
 test("getReservationApiMode defaults local and opts into platform", () => {
@@ -31,6 +41,18 @@ test("getReservationApiMode defaults local and opts into platform", () => {
   assert.equal(getReservationApiMode({ NEXT_PUBLIC_RESERVATION_API_MODE: "platform" }), "platform");
   assert.equal(getReservationApiBasePath("local"), "/api");
   assert.equal(getReservationApiBasePath("platform"), "/api/v1");
+});
+
+test("getReservationPlatformBaseUrl defaults empty and trims trailing slashes", () => {
+  assert.equal(getReservationPlatformBaseUrl({
+    NEXT_PUBLIC_RESERVATION_PLATFORM_BASE_URL: undefined,
+  }), "");
+  assert.equal(getReservationPlatformBaseUrl({
+    NEXT_PUBLIC_RESERVATION_PLATFORM_BASE_URL: " https://reservations.example.test/// ",
+  }), "https://reservations.example.test");
+
+  process.env.NEXT_PUBLIC_RESERVATION_PLATFORM_BASE_URL = "https://reservations.example.test/";
+  assert.equal(getReservationApiBasePath("platform"), "https://reservations.example.test/v1");
 });
 
 test("getReservationPlatformContext reads browser-safe tenant and venue env", () => {
@@ -49,6 +71,161 @@ test("getReservationPlatformContext reads browser-safe tenant and venue env", ()
     tenantId: undefined,
     venueId: undefined,
   });
+});
+
+test("platform mode prefixes configured base URL across reservation API paths", async () => {
+  setPlatformContextEnv();
+  process.env.NEXT_PUBLIC_RESERVATION_PLATFORM_BASE_URL = "https://reservations.example.test/";
+  const calls: string[] = [];
+
+  globalThis.fetch = async (url) => {
+    const requestUrl = String(url);
+    calls.push(requestUrl);
+
+    if (requestUrl.endsWith("/services")) {
+      return jsonResponse({ services: [] });
+    }
+    if (requestUrl.includes("/availability?")) {
+      return jsonResponse({ slots: [] });
+    }
+    if (requestUrl.includes("/resource-maintenance?")) {
+      return jsonResponse({
+        maintenance: [{
+          maintenance_id: "maint_1",
+          service_id: "svc_123",
+          reason: "Old",
+          metadata: { resource_label: "A1" },
+        }],
+      });
+    }
+    if (requestUrl.includes("/reservations?")) {
+      return jsonResponse({ reservations: [] });
+    }
+    return jsonResponse({});
+  };
+
+  await listReservationServices("platform");
+  await getReservationAvailability("svc_123", "2026-01-02", "platform");
+  await listResourceMaintenanceSeats("svc_123", "platform");
+  await saveResourceMaintenanceSeats({
+    serviceId: "svc_123",
+    seatLabels: ["A2"],
+    reason: "Repair",
+  }, "platform");
+  await createReservationFromBookingForm({
+    service_id: "svc_123",
+    booking_date: "2026-01-02",
+    start_time: "12:00",
+    end_time: "13:00",
+    seats_booked: 1,
+    user_name: "Ada",
+    user_email: "ada@example.com",
+  }, "platform");
+  await updateReservationStatus("res_123", "completed", "platform");
+  await listAdminReservations({ search: "Ada" }, "platform");
+
+  assert.deepEqual(calls, [
+    "https://reservations.example.test/v1/services",
+    "https://reservations.example.test/v1/availability?service_id=svc_123&date=2026-01-02",
+    "https://reservations.example.test/v1/resource-maintenance?service_id=svc_123",
+    "https://reservations.example.test/v1/resource-maintenance?service_id=svc_123",
+    "https://reservations.example.test/v1/resource-maintenance",
+    "https://reservations.example.test/v1/resource-maintenance/maint_1/end",
+    "https://reservations.example.test/v1/reservations",
+    "https://reservations.example.test/v1/reservations/res_123",
+    "https://reservations.example.test/v1/reservations?search=Ada",
+  ]);
+});
+
+test("listAdminReservations platform base URL overrides explicit SSR baseUrl", async () => {
+  process.env.NEXT_PUBLIC_RESERVATION_PLATFORM_BASE_URL = "https://configured.example.test";
+  const calls: string[] = [];
+  globalThis.fetch = async (url) => {
+    calls.push(String(url));
+    return jsonResponse({ reservations: [] });
+  };
+
+  await listAdminReservations({
+    baseUrl: "https://explicit.example.test",
+  }, "platform");
+
+  assert.deepEqual(calls, [
+    "https://configured.example.test/v1/reservations",
+  ]);
+});
+
+test("listAdminReservations keeps explicit baseUrl on compatibility /api/v1 when env is absent", async () => {
+  const calls: string[] = [];
+  globalThis.fetch = async (url) => {
+    calls.push(String(url));
+    return jsonResponse({ reservations: [] });
+  };
+
+  await listAdminReservations({
+    baseUrl: "https://explicit.example.test",
+  }, "platform");
+
+  assert.deepEqual(calls, [
+    "https://explicit.example.test/api/v1/reservations",
+  ]);
+});
+
+test("listAdminReservations uses explicit standalone platformBaseUrl when env is absent", async () => {
+  const calls: string[] = [];
+  globalThis.fetch = async (url) => {
+    calls.push(String(url));
+    return jsonResponse({ reservations: [] });
+  };
+
+  await listAdminReservations({
+    platformBaseUrl: "https://standalone.example.test",
+  }, "platform");
+
+  assert.deepEqual(calls, [
+    "https://standalone.example.test/v1/reservations",
+  ]);
+});
+
+test("local mode ignores configured platform base URL and keeps local API paths", async () => {
+  process.env.NEXT_PUBLIC_RESERVATION_PLATFORM_BASE_URL = "https://reservations.example.test";
+  const calls: string[] = [];
+  globalThis.fetch = async (url) => {
+    const requestUrl = String(url);
+    calls.push(requestUrl);
+
+    if (requestUrl === "/api/services") {
+      return jsonResponse([]);
+    }
+    if (requestUrl.startsWith("/api/availability?")) {
+      return jsonResponse({ timeSlots: [] });
+    }
+    if (requestUrl === "/api/bookings") {
+      return jsonResponse([]);
+    }
+    return jsonResponse({});
+  };
+
+  await listReservationServices("local");
+  await getReservationAvailability("svc_123", "2026-01-02", "local");
+  await createReservationFromBookingForm({
+    service_id: "svc_123",
+    booking_date: "2026-01-02",
+    start_time: "12:00",
+    end_time: "13:00",
+    seats_booked: 1,
+    user_name: "Ada",
+    user_email: "ada@example.com",
+  }, "local");
+  await updateReservationStatus("res_123", "completed", "local");
+  await listAdminReservations({}, "local");
+
+  assert.deepEqual(calls, [
+    "/api/services",
+    "/api/availability?service_id=svc_123&date=2026-01-02",
+    "/api/bookings",
+    "/api/bookings/res_123",
+    "/api/bookings",
+  ]);
 });
 
 test("listReservationServices maps platform service envelope to legacy UI services", async () => {
@@ -569,12 +746,25 @@ function setPlatformContextEnv() {
   process.env.NEXT_PUBLIC_RESERVATION_VENUE_ID = "venue_456";
 }
 
-function restorePlatformContextEnv() {
+function clearReservationEnv() {
+  delete process.env.NEXT_PUBLIC_RESERVATION_PLATFORM_BASE_URL;
+  delete process.env.NEXT_PUBLIC_RESERVATION_TENANT_ID;
+  delete process.env.NEXT_PUBLIC_RESERVATION_VENUE_ID;
+}
+
+function restoreReservationEnv() {
+  restoreEnvValue("NEXT_PUBLIC_RESERVATION_PLATFORM_BASE_URL", originalPlatformBaseUrl);
   restoreEnvValue("NEXT_PUBLIC_RESERVATION_TENANT_ID", originalTenantId);
   restoreEnvValue("NEXT_PUBLIC_RESERVATION_VENUE_ID", originalVenueId);
 }
 
-function restoreEnvValue(key: "NEXT_PUBLIC_RESERVATION_TENANT_ID" | "NEXT_PUBLIC_RESERVATION_VENUE_ID", value: string | undefined) {
+function restoreEnvValue(
+  key:
+    | "NEXT_PUBLIC_RESERVATION_PLATFORM_BASE_URL"
+    | "NEXT_PUBLIC_RESERVATION_TENANT_ID"
+    | "NEXT_PUBLIC_RESERVATION_VENUE_ID",
+  value: string | undefined,
+) {
   if (value === undefined) {
     delete process.env[key];
     return;

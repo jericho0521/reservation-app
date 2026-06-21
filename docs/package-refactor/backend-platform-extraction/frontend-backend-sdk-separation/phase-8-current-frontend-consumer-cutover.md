@@ -79,6 +79,27 @@ The frontend must not own:
 - Current frontend smoke test against `/v1`.
 - List of compatibility routes still required after cutover.
 
+## Partial Implementation Result
+
+The current frontend reservation client can now target a configured platform
+origin through the browser-safe
+`NEXT_PUBLIC_RESERVATION_PLATFORM_BASE_URL` setting. Platform-mode service,
+availability, reservation, admin reservation, and resource-maintenance calls
+use standalone `/v1` paths when that normalized base URL is configured; an
+empty value preserves the previous relative `/api/v1` compatibility behavior.
+Local mode remains on the temporary `/api/*` compatibility routes and ignores
+the platform base URL. Server-side admin loading and smoke tests can still pass
+an explicit current-frontend `baseUrl` to `listAdminReservations` for
+`${baseUrl}/api/v1` compatibility when the public platform base URL is absent.
+In platform mode, the public env setting takes precedence because the SSR
+`baseUrl` is the current frontend origin during compatibility loading. Explicit
+standalone admin callers can pass `platformBaseUrl` to target `/v1` when the env
+setting is absent.
+
+This is partial Phase 8 readiness only. It does not remove `app/api`
+compatibility routes, complete a full `/v1` standalone backend cutover, or close
+Phase 9 removal gates.
+
 ## Acceptance Criteria
 
 - Current frontend reservation flows can use a standalone backend base URL.

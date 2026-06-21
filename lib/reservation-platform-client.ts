@@ -69,8 +69,32 @@ export function getReservationPlatformContext(
   };
 }
 
+export function getReservationPlatformBaseUrl(
+  env?: Pick<NodeJS.ProcessEnv, "NEXT_PUBLIC_RESERVATION_PLATFORM_BASE_URL">,
+) {
+  const configuredBaseUrl = env
+    ? env.NEXT_PUBLIC_RESERVATION_PLATFORM_BASE_URL
+    : process.env.NEXT_PUBLIC_RESERVATION_PLATFORM_BASE_URL;
+
+  return normalizeBaseUrl(configuredBaseUrl);
+}
+
 export function getReservationApiBasePath(mode: ReservationApiMode = getReservationApiMode()) {
-  return mode === "platform" ? "/api/v1" : "/api";
+  return mode === "platform" ? getReservationPlatformApiBasePath() : "/api";
+}
+
+function normalizeBaseUrl(baseUrl?: string) {
+  return baseUrl?.trim().replace(/\/+$/, "") ?? "";
+}
+
+function getReservationPlatformApiBasePath(baseUrl = getReservationPlatformBaseUrl()) {
+  const normalizedBaseUrl = normalizeBaseUrl(baseUrl);
+  return normalizedBaseUrl ? `${normalizedBaseUrl}/v1` : "/api/v1";
+}
+
+function getReservationPlatformCompatibilityApiBasePath(baseUrl?: string) {
+  const normalizedBaseUrl = normalizeBaseUrl(baseUrl);
+  return normalizedBaseUrl ? `${normalizedBaseUrl}/api/v1` : "/api/v1";
 }
 
 async function readJson(response: Response) {
@@ -318,7 +342,7 @@ export async function listReservationServices(mode: ReservationApiMode = getRese
   }
 
   const response = await fetchJson<ListServicesResponse>(
-    "/api/v1/services",
+    `${getReservationPlatformApiBasePath()}/services`,
     withPlatformContext(),
     "Failed to load services",
   );
@@ -339,7 +363,7 @@ export async function listResourceMaintenanceSeats(
   }
 
   const response = await fetchJson<ListResourceMaintenanceResponse>(
-    `/api/v1/resource-maintenance?service_id=${encodeURIComponent(serviceId)}`,
+    `${getReservationPlatformApiBasePath()}/resource-maintenance?service_id=${encodeURIComponent(serviceId)}`,
     withPlatformContext(),
     "Failed to load maintenance resources",
   );
@@ -395,7 +419,7 @@ export async function saveResourceMaintenanceSeats(
 
   await Promise.all([
     ...labelsToCreate.map((label) => fetchJson(
-      "/api/v1/resource-maintenance",
+      `${getReservationPlatformApiBasePath()}/resource-maintenance`,
       withPlatformContext({
         method: "POST",
         headers: {
@@ -413,7 +437,7 @@ export async function saveResourceMaintenanceSeats(
       "Failed to create resource maintenance",
     )),
     ...maintenanceToEnd.map((item) => fetchJson(
-      `/api/v1/resource-maintenance/${encodeURIComponent(item.maintenance_id ?? "")}/end`,
+      `${getReservationPlatformApiBasePath()}/resource-maintenance/${encodeURIComponent(item.maintenance_id ?? "")}/end`,
       withPlatformContext({
         method: "POST",
         headers: {
@@ -471,7 +495,7 @@ export async function createReservationFromBookingForm(
     }, "Booking failed. Please try again.");
   }
 
-  return fetchJson("/api/v1/reservations", withPlatformContext({
+  return fetchJson(`${getReservationPlatformApiBasePath()}/reservations`, withPlatformContext({
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -494,7 +518,7 @@ export async function updateReservationStatus(
     }, "Failed to update booking status");
   }
 
-  return fetchJson(`/api/v1/reservations/${encodeURIComponent(reservationId)}`, withPlatformContext({
+  return fetchJson(`${getReservationPlatformApiBasePath()}/reservations/${encodeURIComponent(reservationId)}`, withPlatformContext({
     method: "PATCH",
     headers: {
       "Content-Type": "application/json",
@@ -505,14 +529,20 @@ export async function updateReservationStatus(
 }
 
 export async function listAdminReservations(
-  input: { search?: string; signal?: AbortSignal; baseUrl?: string; headers?: HeadersInit } = {},
+  input: {
+    search?: string;
+    signal?: AbortSignal;
+    baseUrl?: string;
+    platformBaseUrl?: string;
+    headers?: HeadersInit;
+  } = {},
   mode: ReservationApiMode = getReservationApiMode(),
 ) {
   const search = input.search?.trim();
   const query = search ? `?search=${encodeURIComponent(search)}` : "";
-  const baseUrl = input.baseUrl ?? "";
 
   if (mode === "local") {
+    const baseUrl = input.baseUrl ?? "";
     const bookings = await fetchJson<AdminBooking[]>(
       `${baseUrl}/api/bookings${query}`,
       input.signal || input.headers
@@ -523,8 +553,13 @@ export async function listAdminReservations(
     return adminReservationsList(bookings);
   }
 
+  const configuredBaseUrl = getReservationPlatformBaseUrl();
+  const platformBaseUrl = configuredBaseUrl || input.platformBaseUrl;
+  const basePath = platformBaseUrl
+    ? getReservationPlatformApiBasePath(platformBaseUrl)
+    : getReservationPlatformCompatibilityApiBasePath(input.baseUrl);
   const response = await fetchJson<ListReservationsResponse>(
-    `${baseUrl}/api/v1/reservations${query}`,
+    `${basePath}/reservations${query}`,
     withPlatformContext(
       input.signal || input.headers
         ? { signal: input.signal, headers: input.headers }

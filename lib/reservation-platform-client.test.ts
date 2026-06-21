@@ -53,6 +53,9 @@ test("getReservationPlatformBaseUrl defaults empty and trims trailing slashes", 
 
   process.env.NEXT_PUBLIC_RESERVATION_PLATFORM_BASE_URL = "https://reservations.example.test/";
   assert.equal(getReservationApiBasePath("platform"), "https://reservations.example.test/v1");
+
+  process.env.NEXT_PUBLIC_RESERVATION_PLATFORM_BASE_URL = "/platform";
+  assert.equal(getReservationApiBasePath("platform"), "/api/v1");
 });
 
 test("getReservationPlatformContext reads browser-safe tenant and venue env", () => {
@@ -77,6 +80,7 @@ test("configured platform mode uses standalone /v1 URLs and forbids compatibilit
   setPlatformContextEnv();
   process.env.NEXT_PUBLIC_RESERVATION_PLATFORM_BASE_URL = "https://reservations.example.test/";
   const frontendBaseUrl = "https://frontend.example.test";
+  const serviceId = "svc 123";
   const calls: string[] = [];
 
   globalThis.fetch = async (url) => {
@@ -106,15 +110,15 @@ test("configured platform mode uses standalone /v1 URLs and forbids compatibilit
   };
 
   await listReservationServices("platform");
-  await getReservationAvailability("svc_123", "2026-01-02", "platform");
-  await listResourceMaintenanceSeats("svc_123", "platform");
+  await getReservationAvailability(serviceId, "2026-01-02", "platform");
+  await listResourceMaintenanceSeats(serviceId, "platform");
   await saveResourceMaintenanceSeats({
-    serviceId: "svc_123",
+    serviceId,
     seatLabels: ["A2"],
     reason: "Repair",
   }, "platform");
   await createReservationFromBookingForm({
-    service_id: "svc_123",
+    service_id: serviceId,
     booking_date: "2026-01-02",
     start_time: "12:00",
     end_time: "13:00",
@@ -123,18 +127,18 @@ test("configured platform mode uses standalone /v1 URLs and forbids compatibilit
     user_email: "ada@example.com",
   }, "platform");
   await updateReservationStatus("res_123", "completed", "platform");
-  await listAdminReservations({ search: "Ada", baseUrl: frontendBaseUrl }, "platform");
+  await listAdminReservations({ search: "Ada Lovelace", baseUrl: frontendBaseUrl }, "platform");
 
   assert.deepEqual(calls, [
     "https://reservations.example.test/v1/services",
-    "https://reservations.example.test/v1/availability?service_id=svc_123&date=2026-01-02",
-    "https://reservations.example.test/v1/resource-maintenance?service_id=svc_123",
-    "https://reservations.example.test/v1/resource-maintenance?service_id=svc_123",
+    "https://reservations.example.test/v1/availability?service_id=svc+123&date=2026-01-02",
+    "https://reservations.example.test/v1/resource-maintenance?service_id=svc+123",
+    "https://reservations.example.test/v1/resource-maintenance?service_id=svc+123",
     "https://reservations.example.test/v1/resource-maintenance",
     "https://reservations.example.test/v1/resource-maintenance/maint_1/end",
     "https://reservations.example.test/v1/reservations",
     "https://reservations.example.test/v1/reservations/res_123",
-    "https://reservations.example.test/v1/reservations?search=Ada",
+    "https://reservations.example.test/v1/reservations?search=Ada+Lovelace",
   ]);
   assertNoConfiguredPlatformCompatibilityFallbacks(calls, frontendBaseUrl);
 });
@@ -169,6 +173,38 @@ test("listAdminReservations keeps explicit baseUrl on compatibility /api/v1 when
 
   assert.deepEqual(calls, [
     "https://explicit.example.test/api/v1/reservations",
+  ]);
+});
+
+test("non-absolute platform env keeps normal platform calls on compatibility /api/v1 fallback", async () => {
+  process.env.NEXT_PUBLIC_RESERVATION_PLATFORM_BASE_URL = "/platform";
+  const calls: string[] = [];
+  globalThis.fetch = async (url) => {
+    calls.push(String(url));
+    return jsonResponse({ services: [] });
+  };
+
+  await listReservationServices("platform");
+
+  assert.deepEqual(calls, [
+    "/api/v1/services",
+  ]);
+});
+
+test("listAdminReservations ignores non-absolute platform env and keeps SSR compatibility baseUrl", async () => {
+  process.env.NEXT_PUBLIC_RESERVATION_PLATFORM_BASE_URL = "api";
+  const calls: string[] = [];
+  globalThis.fetch = async (url) => {
+    calls.push(String(url));
+    return jsonResponse({ reservations: [] });
+  };
+
+  await listAdminReservations({
+    baseUrl: "https://frontend.example.test",
+  }, "platform");
+
+  assert.deepEqual(calls, [
+    "https://frontend.example.test/api/v1/reservations",
   ]);
 });
 

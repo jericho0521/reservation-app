@@ -12,6 +12,10 @@ import type {
   ResourceResponse,
   ServiceResponse,
 } from "@reservation-platform/contract-types";
+import {
+  createReservationPlatformClient,
+  type RequestOptions as ReservationPlatformRequestOptions,
+} from "@reservation-platform/sdk";
 import type { AdminBooking } from "@/app/admin/dashboard-data";
 import type {
   AvailabilityResponse,
@@ -89,12 +93,30 @@ function normalizeBaseUrl(baseUrl?: string) {
 
 function getReservationPlatformApiBasePath(baseUrl = getReservationPlatformBaseUrl()) {
   const normalizedBaseUrl = normalizeBaseUrl(baseUrl);
-  return normalizedBaseUrl ? `${normalizedBaseUrl}/v1` : "/api/v1";
+  return normalizedBaseUrl && isAbsoluteBaseUrl(normalizedBaseUrl) ? `${normalizedBaseUrl}/v1` : "/api/v1";
 }
 
 function getReservationPlatformCompatibilityApiBasePath(baseUrl?: string) {
   const normalizedBaseUrl = normalizeBaseUrl(baseUrl);
   return normalizedBaseUrl ? `${normalizedBaseUrl}/api/v1` : "/api/v1";
+}
+
+function isAbsoluteBaseUrl(baseUrl: string) {
+  try {
+    const url = new URL(baseUrl);
+    return url.protocol === "http:" || url.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
+function createConfiguredReservationPlatformClient(baseUrl = getReservationPlatformBaseUrl()) {
+  const normalizedBaseUrl = normalizeBaseUrl(baseUrl);
+  if (!normalizedBaseUrl || !isAbsoluteBaseUrl(normalizedBaseUrl)) {
+    return undefined;
+  }
+
+  return createReservationPlatformClient({ baseUrl: normalizedBaseUrl });
 }
 
 async function readJson(response: Response) {
@@ -164,6 +186,25 @@ function withPlatformContext(init?: RequestInit, context?: ReservationPlatformCo
   return {
     ...init,
     headers: mergeHeaders(init?.headers, platformContextHeaders(context)),
+  };
+}
+
+function createPlatformRequestOptions(
+  input: {
+    context?: ReservationPlatformContext;
+    headers?: HeadersInit;
+    signal?: AbortSignal;
+    idempotencyKey?: string;
+  } = {},
+): ReservationPlatformRequestOptions {
+  const context = input.context ?? getReservationPlatformContext();
+  return {
+    tenantId: context.tenantId,
+    venueId: context.venueId,
+    correlationId: context.correlationId ?? createCorrelationId(),
+    idempotencyKey: input.idempotencyKey,
+    headers: input.headers,
+    signal: input.signal,
   };
 }
 
@@ -341,6 +382,12 @@ export async function listReservationServices(mode: ReservationApiMode = getRese
     return fetchJson<Service[]>("/api/services", undefined, "Failed to load services");
   }
 
+  const client = createConfiguredReservationPlatformClient();
+  if (client) {
+    const response = await client.listServices(undefined, createPlatformRequestOptions());
+    return response.services.map(platformServiceToLegacyService);
+  }
+
   const response = await fetchJson<ListServicesResponse>(
     `${getReservationPlatformApiBasePath()}/services`,
     withPlatformContext(),
@@ -362,11 +409,14 @@ export async function listResourceMaintenanceSeats(
     return response.seats ?? [];
   }
 
-  const response = await fetchJson<ListResourceMaintenanceResponse>(
-    `${getReservationPlatformApiBasePath()}/resource-maintenance?service_id=${encodeURIComponent(serviceId)}`,
-    withPlatformContext(),
-    "Failed to load maintenance resources",
-  );
+  const client = createConfiguredReservationPlatformClient();
+  const response = client
+    ? await client.listResourceMaintenance({ service_id: serviceId }, createPlatformRequestOptions())
+    : await fetchJson<ListResourceMaintenanceResponse>(
+      `${getReservationPlatformApiBasePath()}/resource-maintenance?service_id=${encodeURIComponent(serviceId)}`,
+      withPlatformContext(),
+      "Failed to load maintenance resources",
+    );
 
   return response.maintenance
     .map((item): LegacyMaintenanceSeatRow | null => {
@@ -417,40 +467,60 @@ export async function saveResourceMaintenanceSeats(
     item.maintenance_id && !nextLabels.has(item.seat_label)
   );
 
-  await Promise.all([
-    ...labelsToCreate.map((label) => fetchJson(
-      `${getReservationPlatformApiBasePath()}/resource-maintenance`,
-      withPlatformContext({
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Idempotency-Key": createIdempotencyKey(`resource-maintenance-create-${input.serviceId}-${label}`),
+  const client = createConfiguredReservationPlatformClient();
+  if (client) {
+    await Promise.all([
+      ...labelsToCreate.map((label) => client.createResourceMaintenance({
+        service_id: input.serviceId,
+        reason: input.reason,
+        metadata: {
+          resource_label: label,
         },
-        body: JSON.stringify({
-          service_id: input.serviceId,
-          reason: input.reason,
-          metadata: {
-            resource_label: label,
+      }, createPlatformRequestOptions({
+        idempotencyKey: createIdempotencyKey(`resource-maintenance-create-${input.serviceId}-${label}`),
+      }))),
+      ...maintenanceToEnd.map((item) => client.endResourceMaintenance(item.maintenance_id ?? "", {
+        reason: input.reason,
+      }, createPlatformRequestOptions({
+        idempotencyKey: createIdempotencyKey(`resource-maintenance-end-${item.maintenance_id}`),
+      }))),
+    ]);
+  } else {
+    await Promise.all([
+      ...labelsToCreate.map((label) => fetchJson(
+        `${getReservationPlatformApiBasePath()}/resource-maintenance`,
+        withPlatformContext({
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Idempotency-Key": createIdempotencyKey(`resource-maintenance-create-${input.serviceId}-${label}`),
           },
+          body: JSON.stringify({
+            service_id: input.serviceId,
+            reason: input.reason,
+            metadata: {
+              resource_label: label,
+            },
+          }),
         }),
-      }),
-      "Failed to create resource maintenance",
-    )),
-    ...maintenanceToEnd.map((item) => fetchJson(
-      `${getReservationPlatformApiBasePath()}/resource-maintenance/${encodeURIComponent(item.maintenance_id ?? "")}/end`,
-      withPlatformContext({
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Idempotency-Key": createIdempotencyKey(`resource-maintenance-end-${item.maintenance_id}`),
-        },
-        body: JSON.stringify({
-          reason: input.reason,
+        "Failed to create resource maintenance",
+      )),
+      ...maintenanceToEnd.map((item) => fetchJson(
+        `${getReservationPlatformApiBasePath()}/resource-maintenance/${encodeURIComponent(item.maintenance_id ?? "")}/end`,
+        withPlatformContext({
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Idempotency-Key": createIdempotencyKey(`resource-maintenance-end-${item.maintenance_id}`),
+          },
+          body: JSON.stringify({
+            reason: input.reason,
+          }),
         }),
-      }),
-      "Failed to end resource maintenance",
-    )),
-  ]);
+        "Failed to end resource maintenance",
+      )),
+    ]);
+  }
 
   return sortedLabels;
 }
@@ -460,6 +530,15 @@ export async function getReservationAvailability(
   date: string,
   mode: ReservationApiMode = getReservationApiMode(),
 ) {
+  const client = mode === "platform" ? createConfiguredReservationPlatformClient() : undefined;
+  if (client) {
+    const response = await client.listAvailability({
+      service_id: serviceId,
+      date,
+    }, createPlatformRequestOptions());
+    return platformAvailabilityToLegacyAvailability(response);
+  }
+
   const basePath = getReservationApiBasePath(mode);
   const response = await fetchJson<AvailabilityResponse | PlatformAvailabilityResponse>(
     `${basePath}/availability?service_id=${encodeURIComponent(serviceId)}&date=${encodeURIComponent(date)}`,
@@ -495,6 +574,13 @@ export async function createReservationFromBookingForm(
     }, "Booking failed. Please try again.");
   }
 
+  const client = createConfiguredReservationPlatformClient();
+  if (client) {
+    return client.createReservation(legacyBookingToPlatformInput(booking), createPlatformRequestOptions({
+      idempotencyKey: createIdempotencyKey("reservation-create"),
+    }));
+  }
+
   return fetchJson(`${getReservationPlatformApiBasePath()}/reservations`, withPlatformContext({
     method: "POST",
     headers: {
@@ -516,6 +602,13 @@ export async function updateReservationStatus(
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ status }),
     }, "Failed to update booking status");
+  }
+
+  const client = createConfiguredReservationPlatformClient();
+  if (client) {
+    return client.updateReservation(reservationId, { status }, createPlatformRequestOptions({
+      idempotencyKey: createIdempotencyKey(`reservation-update-${reservationId}`),
+    }));
   }
 
   return fetchJson(`${getReservationPlatformApiBasePath()}/reservations/${encodeURIComponent(reservationId)}`, withPlatformContext({
@@ -554,7 +647,28 @@ export async function listAdminReservations(
   }
 
   const configuredBaseUrl = getReservationPlatformBaseUrl();
-  const platformBaseUrl = configuredBaseUrl || input.platformBaseUrl;
+  let platformBaseUrl = "";
+  if (isAbsoluteBaseUrl(configuredBaseUrl)) {
+    platformBaseUrl = configuredBaseUrl;
+  } else if (input.platformBaseUrl && isAbsoluteBaseUrl(input.platformBaseUrl)) {
+    platformBaseUrl = input.platformBaseUrl;
+  }
+
+  const client = createConfiguredReservationPlatformClient(platformBaseUrl);
+  if (client) {
+    const response = await client.listReservations(
+      search ? { search } : undefined,
+      createPlatformRequestOptions({
+        headers: input.headers,
+        signal: input.signal,
+      }),
+    );
+    return adminReservationsList(
+      response.reservations.map(platformReservationToAdminBooking),
+      response.summary,
+    );
+  }
+
   const basePath = platformBaseUrl
     ? getReservationPlatformApiBasePath(platformBaseUrl)
     : getReservationPlatformCompatibilityApiBasePath(input.baseUrl);

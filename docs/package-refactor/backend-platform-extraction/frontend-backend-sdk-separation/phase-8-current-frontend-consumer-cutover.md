@@ -85,26 +85,32 @@ The current frontend reservation client can now target a configured platform
 origin through the browser-safe
 `NEXT_PUBLIC_RESERVATION_PLATFORM_BASE_URL` setting. Platform-mode service,
 availability, reservation, admin reservation, and resource-maintenance calls
-use standalone `/v1` paths when that normalized base URL is configured; an
-empty value preserves the previous relative `/api/v1` compatibility behavior.
+now use `@reservation-platform/sdk` when that normalized base URL is configured
+as an absolute standalone backend origin. An empty value preserves the previous
+relative `/api/v1` compatibility behavior through the direct HTTP fallback.
+Non-absolute values are not treated as standalone platform origins and also
+preserve the compatibility fallback.
 Local mode remains on the temporary `/api/*` compatibility routes and ignores
 the platform base URL. Server-side admin loading and smoke tests can still pass
 an explicit current-frontend `baseUrl` to `listAdminReservations` for
 `${baseUrl}/api/v1` compatibility when the public platform base URL is absent.
 In platform mode, the public env setting takes precedence because the SSR
 `baseUrl` is the current frontend origin during compatibility loading. Explicit
-standalone admin callers can pass `platformBaseUrl` to target `/v1` when the env
-setting is absent. A CI-safe local proof now covers configured platform mode in
+standalone admin callers can pass an absolute `platformBaseUrl` to use the SDK
+against `/v1` when the env setting is absent. A CI-safe local proof now covers
+configured platform mode in
 `lib/reservation-platform-client.test.ts`: services, availability, reservation
 create, admin reservation list, resource-maintenance list/save, and reservation
 status update are mocked through `fetch`, and the test fails if any configured
 platform-mode reservation-platform call uses relative `/api` routes or the
-current frontend origin's `/api/v1` compatibility routes. The same test file
+current frontend origin's `/api/v1` compatibility routes. The configured proof
+also covers SDK query serialization for standalone calls so it fails if those
+paths regress to the older hand-built direct URL branch. The same test file
 continues to prove local mode may use `/api` while compatibility routes remain.
 
 This is partial Phase 8 readiness only. It does not remove `app/api`
-compatibility routes, complete a full `/v1` standalone backend cutover, or close
-Phase 9 removal gates.
+compatibility routes, complete a full `/v1` standalone backend cutover, provide
+live standalone backend proof, or close Phase 9 removal gates.
 
 An additional local frontend consumer repository readiness proof now exists:
 

@@ -134,12 +134,16 @@ Implemented artifacts:
   claims used by bootstrap and release gates, frontend/current-app source
   exclusion, and SDK consumer-safety.
 - `backend-platform:verify-extraction-dry-run` now materializes the planned
-  move/copy entries into an OS temporary backend target tree candidate, validates
-  that the materialized files stay under backend-allowed prefixes, blocks
+  move/copy entries into an OS temporary backend target tree candidate, generates
+  backend-root workspace metadata there only (`package.json`,
+  `pnpm-workspace.yaml`, and a minimal `tsconfig.json`), validates that the
+  materialized files stay under backend-allowed prefixes, blocks
   frontend/current-app target areas such as `app`, `components`, `lib`,
   `public`, `types`, `supabase`, `.next`, `node_modules`, and
-  `dist-packages`, verifies expected package manifests exist in applicable
-  target package roots, and deletes the temporary tree by default.
+  `dist-packages`, verifies the generated root metadata is backend-only and not
+  a verbatim copy of the current frontend/root manifest, verifies expected
+  package manifests exist in applicable target package roots, and deletes the
+  temporary tree by default.
 - This phase file now references the actual manifest and verifier script names
   instead of stale `extraction-manifest.json` and
   `extraction-dry-run-plan.json` inputs.
@@ -170,9 +174,16 @@ CI-safe planning, including manifest target-path alignment and local workspace
 dependency closure.
 `backend-platform:verify-extraction-dry-run` now copies only manifest
 move/copy candidate files into an OS temporary materialized target tree,
-validates that candidate, and removes it automatically. It does not mutate
-source files, git-tracked paths, or create a real repository, and it does not
-copy compatibility-shim or excluded entries. For local inspection only,
+generates backend-root workspace metadata inside that temporary candidate, and
+validates that candidate. The generated root `package.json` is backend-only: it
+uses the backend repository name, stays private, carries a stable package
+manager field, exposes Phase 11 extraction/readiness/package checks, and blocks
+frontend-only scripts or dependencies such as Next, React, browser smoke
+commands, or current-frontend checks. The generated `pnpm-workspace.yaml`
+covers `apps/*` and `packages/*`. This is still only a local OS-temp generated
+metadata proof; it removes the whole temporary tree automatically. It does not
+mutate source files, git-tracked paths, or create a real repository, and it does
+not copy compatibility-shim or excluded entries. For local inspection only,
 `STANDALONE_BACKEND_EXTRACTION_KEEP_MATERIALIZED_TREE=1` keeps the generated
 OS temp directory after the run; this is a boolean debug option, not a custom
 path, so it cannot point inside the repository. The verifier still does not
@@ -194,7 +205,7 @@ Still not complete:
 - final backend package renaming and visibility decisions
 - actual extracted-repository install/build/test execution outside the current
   Next.js app workspace; the dry-run now materializes and validates a temporary
-  target tree candidate only
+  target tree candidate with generated backend-root workspace metadata only
 - live deployed `/v1` backend proof
 - disposable database migration/RLS/idempotency proof
 - strict SDK/direct HTTP live parity proof

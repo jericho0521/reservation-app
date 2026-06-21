@@ -3,6 +3,7 @@ import {
   access,
   mkdir,
   mkdtemp,
+  readFile,
   rm,
   writeFile,
 } from "node:fs/promises";
@@ -89,6 +90,19 @@ async function createFixtureRepo(options = {}) {
   await writeFixtureFile(repoRoot, "packages/shim/package.json", JSON.stringify({ name: "@fixture/shim" }));
   await writeFixtureFile(repoRoot, "packages/shim/src/route.ts", "export const shim = true;\n");
   await writeFixtureFile(repoRoot, "app/page.tsx", "export default function Page() { return null; }\n");
+  await writeFixtureFile(repoRoot, "package.json", JSON.stringify({
+    name: "fixture-current-frontend",
+    private: true,
+    packageManager: "pnpm@10.33.2",
+    scripts: {
+      dev: "next dev",
+      build: "next build",
+    },
+    dependencies: {
+      next: "16.1.1",
+      react: "19.2.3",
+    },
+  }));
 
   const manifestPath = path.join(repoRoot, "manifest.json");
   await writeFixtureFile(
@@ -115,6 +129,10 @@ async function pathExists(filePath) {
   }
 }
 
+async function readJson(filePath) {
+  return JSON.parse(await readFile(filePath, "utf8"));
+}
+
 function isPathInside(parentPath, childPath) {
   const relativePath = path.relative(parentPath, childPath);
   return relativePath === "" || (!relativePath.startsWith("..") && !path.isAbsolute(relativePath));
@@ -138,12 +156,52 @@ test("standalone backend dry-run materializes only move/copy candidates and boun
     assert.equal(await pathExists(path.join(result.materializedRoot, "packages/domain/package.json")), true);
     assert.equal(await pathExists(path.join(result.materializedRoot, "packages/domain/src/index.ts")), true);
     assert.equal(await pathExists(path.join(result.materializedRoot, "apps/api/package.json")), true);
+    assert.deepEqual(result.generatedMetadataFiles, [
+      "package.json",
+      "pnpm-workspace.yaml",
+      "tsconfig.json",
+    ]);
+    assert.equal(await pathExists(path.join(result.materializedRoot, "package.json")), true);
+    assert.equal(await pathExists(path.join(result.materializedRoot, "pnpm-workspace.yaml")), true);
+    assert.equal(await pathExists(path.join(result.materializedRoot, "tsconfig.json")), true);
 
     assert.equal(await pathExists(path.join(result.materializedRoot, "packages/domain/src/index.js.map")), false);
     assert.equal(await pathExists(path.join(result.materializedRoot, "packages/domain/dist/index.js")), false);
     assert.equal(await pathExists(path.join(result.materializedRoot, "packages/domain/node_modules/ignored/index.js")), false);
     assert.equal(await pathExists(path.join(result.materializedRoot, "packages/domain/shim/package.json")), false);
     assert.equal(await pathExists(path.join(result.materializedRoot, "app/page.tsx")), false);
+  } finally {
+    await rm(result.materializedRoot, { recursive: true, force: true });
+    await rm(repoRoot, { recursive: true, force: true });
+  }
+});
+
+test("standalone backend dry-run generates backend-only root metadata instead of copying the current root manifest", async () => {
+  const { repoRoot, manifestPath } = await createFixtureRepo();
+  const result = await verifyStandaloneBackendExtractionDryRun({
+    repoRoot,
+    manifestPath,
+    expectedPackages,
+    keepMaterializedTree: true,
+  });
+
+  try {
+    assert.equal(result.ok, true);
+
+    const sourceRootPackage = await readJson(path.join(repoRoot, "package.json"));
+    const generatedRootPackage = await readJson(path.join(result.materializedRoot, "package.json"));
+    const generatedWorkspace = await readFile(path.join(result.materializedRoot, "pnpm-workspace.yaml"), "utf8");
+
+    assert.notDeepEqual(generatedRootPackage, sourceRootPackage);
+    assert.equal(generatedRootPackage.name, "reservation-platform-backend");
+    assert.equal(generatedRootPackage.private, true);
+    assert.equal(generatedRootPackage.packageManager, "pnpm@10.33.2");
+    assert.equal(generatedRootPackage.scripts.dev, undefined);
+    assert.equal(generatedRootPackage.scripts.start, undefined);
+    assert.equal(generatedRootPackage.dependencies, undefined);
+    assert.equal(generatedRootPackage.devDependencies, undefined);
+    assert.match(generatedWorkspace, /-\s+apps\/\*/);
+    assert.match(generatedWorkspace, /-\s+packages\/\*/);
   } finally {
     await rm(result.materializedRoot, { recursive: true, force: true });
     await rm(repoRoot, { recursive: true, force: true });
@@ -161,8 +219,54 @@ test("standalone backend dry-run cleans up the materialized tree by default", as
   assert.equal(result.ok, true);
   assert.equal(result.materializedTreeKept, false);
   assert.equal(result.materializedTreeCleanedUp, true);
+  assert.deepEqual(result.generatedMetadataFiles, [
+    "package.json",
+    "pnpm-workspace.yaml",
+    "tsconfig.json",
+  ]);
   assert.equal(await pathExists(result.materializedRoot), false);
 
+  await rm(repoRoot, { recursive: true, force: true });
+});
+
+test("standalone backend dry-run fails invalid generated backend workspace metadata", async () => {
+  const { repoRoot, manifestPath } = await createFixtureRepo();
+
+  const result = await verifyStandaloneBackendExtractionDryRun({
+    repoRoot,
+    manifestPath,
+    expectedPackages,
+    keepMaterializedTree: true,
+    createGeneratedWorkspaceMetadata: () => ({
+      rootPackageJson: {
+        name: "reservation-platform-backend",
+        private: true,
+        packageManager: "pnpm@10.33.2",
+        scripts: {
+          dev: "next dev",
+          "backend-platform:verify-extraction-manifest": "node scripts/verify-standalone-backend-extraction-manifest.mjs",
+        },
+        dependencies: {
+          react: "19.2.3",
+        },
+      },
+      pnpmWorkspaceYaml: "packages:\n  - packages/*\n",
+      tsconfigJson: {
+        compilerOptions: {
+          jsx: "react-jsx",
+        },
+      },
+    }),
+  });
+
+  assert.equal(result.ok, false);
+  assert.match(result.failures.join("\n"), /generated backend root script backend-platform:verify-extraction-dry-run is required/);
+  assert.match(result.failures.join("\n"), /generated workspace packages glob apps\/\*/);
+  assert.match(result.failures.join("\n"), /script dev is frontend-only/);
+  assert.match(result.failures.join("\n"), /dependencies\.react is frontend-only/);
+  assert.match(result.failures.join("\n"), /tsconfig must not include frontend\/Next\.js JSX settings/);
+
+  await rm(result.materializedRoot, { recursive: true, force: true });
   await rm(repoRoot, { recursive: true, force: true });
 });
 

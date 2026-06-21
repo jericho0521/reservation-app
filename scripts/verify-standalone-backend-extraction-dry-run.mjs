@@ -8,6 +8,7 @@ import {
   readFile,
   readdir,
   rm,
+  writeFile,
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -20,6 +21,9 @@ const shimClassifications = new Set(["compatibility-shim"]);
 const excludeClassifications = new Set(["exclude"]);
 
 const backendTargetPrefixes = [
+  "package.json",
+  "pnpm-workspace.yaml",
+  "tsconfig.json",
   ".github",
   "apps/api",
   "packages",
@@ -71,6 +75,73 @@ const generatedFileExtensions = new Set([
   ".tsbuildinfo",
 ]);
 
+const generatedBackendRootMetadataFiles = [
+  "package.json",
+  "pnpm-workspace.yaml",
+  "tsconfig.json",
+];
+
+const requiredGeneratedRootScripts = [
+  "backend-platform:verify-extraction-manifest",
+  "backend-platform:verify-extraction-dry-run",
+  "backend-platform:verify-package-graph-boundary",
+  "backend-platform:verify-extracted-workspace-readiness",
+  "backend-platform:verify-standalone-api-skeleton",
+  "database:verify-migration-bundle",
+  "packages:build",
+  "packages:test",
+];
+
+const forbiddenGeneratedRootScriptNames = new Set([
+  "dev",
+  "start",
+  "current-frontend:platform-smoke",
+  "current-frontend:admin-platform-smoke",
+  "current-frontend:consumer-repo-readiness",
+  "current-frontend:verify-platform-boundary",
+  "current-frontend:verify-platform-secrets",
+]);
+
+const forbiddenGeneratedRootScriptNamePrefixes = [
+  "current-frontend:",
+];
+
+const forbiddenGeneratedRootScriptCommandPatterns = [
+  [/(^|\s)next(\s|$)/, "Next.js frontend command"],
+  [/(^|\s)playwright(\s|$)/, "browser/frontend smoke command"],
+  [/\bcurrent-frontend:/, "current frontend verification command"],
+  [/\bsdk:smoke:(?:next|vite)\b/, "frontend SDK smoke command"],
+  [/\bexamples\/sdk-(?:next|vite-react)-external-smoke\b/, "frontend SDK smoke fixture"],
+  [/\b(?:app|components|public)\//, "current frontend source path"],
+  [/\blib\/reservation-platform-client\b/, "current frontend platform client"],
+];
+
+const forbiddenGeneratedRootDependencyNames = new Map([
+  ["next", "Next.js frontend framework"],
+  ["react", "React UI runtime"],
+  ["react-dom", "React DOM UI runtime"],
+  ["lucide-react", "frontend icon UI package"],
+  ["recharts", "frontend chart UI package"],
+  ["swr", "browser/client data hook package"],
+  ["zustand", "frontend state-store package"],
+  ["@ai-sdk/react", "React AI UI package"],
+  ["@types/react", "React UI type package"],
+  ["@types/react-dom", "React DOM UI type package"],
+  ["eslint-config-next", "Next.js frontend lint preset"],
+  ["playwright", "browser smoke test dependency"],
+]);
+
+const forbiddenGeneratedRootDependencyPrefixes = [
+  ["@dnd-kit/", "frontend drag-and-drop UI package"],
+];
+
+const packageDependencySections = [
+  "dependencies",
+  "devDependencies",
+  "optionalDependencies",
+  "peerDependencies",
+];
+
 export async function verifyStandaloneBackendExtractionDryRun(options = {}) {
   const repoRoot = path.resolve(options.repoRoot ?? process.cwd());
   const manifestPath = options.manifestPath
@@ -86,9 +157,11 @@ export async function verifyStandaloneBackendExtractionDryRun(options = {}) {
   const expectedPackages = options.expectedPackages ?? expectedExtractedBackendPackages;
   const context = {
     repoRoot,
+    manifestBackendRepositoryName: null,
     failures: [],
     plannedBySource: new Map(),
     plannedByTarget: new Map(),
+    generatedMetadataTargets: new Set(),
     shimEntries: [],
     planEntryCount: 0,
     excludedEntryCount: 0,
@@ -99,6 +172,9 @@ export async function verifyStandaloneBackendExtractionDryRun(options = {}) {
   };
 
   const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
+  context.manifestBackendRepositoryName = isNonBlankString(manifest?.backendRepositoryName)
+    ? manifest.backendRepositoryName
+    : "reservation-platform-backend";
   const entries = Array.isArray(manifest.entries) ? manifest.entries : [];
 
   for (const [index, entry] of entries.entries()) {
@@ -130,7 +206,12 @@ export async function verifyStandaloneBackendExtractionDryRun(options = {}) {
   }
 
   if (context.failures.length === 0) {
-    await materializeAndValidateBackendTargetTree(context, expectedPackages, keepMaterializedTree);
+    await materializeAndValidateBackendTargetTree(
+      context,
+      expectedPackages,
+      keepMaterializedTree,
+      options.createGeneratedWorkspaceMetadata ?? createGeneratedBackendWorkspaceMetadata,
+    );
   }
 
   return {
@@ -142,6 +223,7 @@ export async function verifyStandaloneBackendExtractionDryRun(options = {}) {
     excludedEntryCount: context.excludedEntryCount,
     materializedRoot: context.materializedRoot,
     materializedFileCount: context.materializedFileCount,
+    generatedMetadataFiles: [...context.generatedMetadataTargets].sort(comparePaths),
     materializedTreeCleanedUp: context.materializedTreeCleanedUp,
     materializedTreeKept: context.materializedTreeKept,
     plannedTargets: [...context.plannedByTarget.keys()].sort(comparePaths),
@@ -211,7 +293,12 @@ async function planMoveOrCopyEntry(context, entry, label) {
   }
 }
 
-async function materializeAndValidateBackendTargetTree(context, expectedPackages, keepMaterializedTree) {
+async function materializeAndValidateBackendTargetTree(
+  context,
+  expectedPackages,
+  keepMaterializedTree,
+  createWorkspaceMetadata,
+) {
   const materializedRoot = await mkdtemp(path.join(tmpdir(), "standalone-backend-extraction-"));
   context.materializedRoot = materializedRoot;
 
@@ -240,6 +327,7 @@ async function materializeAndValidateBackendTargetTree(context, expectedPackages
       context.materializedFileCount += 1;
     }
 
+    await writeGeneratedBackendWorkspaceMetadata(context, expectedPackages, createWorkspaceMetadata);
     await validateMaterializedTargetTree(context, expectedPackages);
   } finally {
     if (keepMaterializedTree) {
@@ -251,12 +339,138 @@ async function materializeAndValidateBackendTargetTree(context, expectedPackages
   }
 }
 
+async function writeGeneratedBackendWorkspaceMetadata(context, expectedPackages, createWorkspaceMetadata) {
+  const metadata = await createWorkspaceMetadata({
+    repoRoot: context.repoRoot,
+    backendRepositoryName: context.manifestBackendRepositoryName,
+    expectedPackages,
+  });
+
+  const rootPackageJson = metadata?.rootPackageJson;
+  const pnpmWorkspaceYaml = metadata?.pnpmWorkspaceYaml;
+  const tsconfigJson = metadata?.tsconfigJson;
+
+  if (rootPackageJson !== undefined) {
+    await writeMaterializedMetadataFile(
+      context,
+      "package.json",
+      `${JSON.stringify(rootPackageJson, null, 2)}\n`,
+    );
+  }
+
+  if (pnpmWorkspaceYaml !== undefined) {
+    await writeMaterializedMetadataFile(context, "pnpm-workspace.yaml", String(pnpmWorkspaceYaml));
+  }
+
+  if (tsconfigJson !== undefined) {
+    await writeMaterializedMetadataFile(
+      context,
+      "tsconfig.json",
+      `${JSON.stringify(tsconfigJson, null, 2)}\n`,
+    );
+  }
+}
+
+async function writeMaterializedMetadataFile(context, targetFile, contents) {
+  if (!generatedBackendRootMetadataFiles.includes(targetFile)) {
+    context.failures.push(`${targetFile}: generated backend root metadata target is not allowed`);
+    return;
+  }
+
+  const targetPath = path.join(context.materializedRoot, targetFile);
+  const relativeTargetPath = path.relative(context.materializedRoot, targetPath);
+  if (relativeTargetPath.startsWith("..") || path.isAbsolute(relativeTargetPath)) {
+    context.failures.push(`${targetFile}: generated backend root metadata target escapes the materialized target tree`);
+    return;
+  }
+
+  await writeFile(targetPath, contents);
+  context.generatedMetadataTargets.add(targetFile);
+  context.materializedFileCount += 1;
+}
+
+async function createGeneratedBackendWorkspaceMetadata({
+  repoRoot,
+  backendRepositoryName,
+  expectedPackages,
+}) {
+  const sourceRootPackage = await readOptionalJson(path.join(repoRoot, "package.json"));
+  const packageManager = isNonBlankString(sourceRootPackage?.packageManager)
+    ? sourceRootPackage.packageManager
+    : "pnpm@10.33.2";
+
+  const buildPackages = expectedPackages.filter((expectedPackage) =>
+    expectedPackage.requiredScripts?.includes("build")
+  );
+  const testPackages = expectedPackages.filter((expectedPackage) =>
+    expectedPackage.requiredScripts?.includes("test")
+  );
+
+  return {
+    rootPackageJson: {
+      name: backendRepositoryName,
+      version: "0.0.0",
+      private: true,
+      packageManager,
+      type: "module",
+      scripts: {
+        "packages:build": createFilteredPackageScript(buildPackages, "build"),
+        "packages:test": createFilteredPackageScript(testPackages, "test"),
+        "backend-platform:verify-extraction-manifest": "node scripts/verify-standalone-backend-extraction-manifest.mjs",
+        "backend-platform:verify-extraction-dry-run": "node scripts/verify-standalone-backend-extraction-dry-run.mjs",
+        "backend-platform:verify-package-graph-boundary": "node scripts/verify-backend-package-graph-boundary.mjs",
+        "backend-platform:verify-extracted-workspace-readiness": "node scripts/verify-extracted-backend-workspace-readiness.mjs",
+        "backend-platform:verify-standalone-api-skeleton": "corepack pnpm --filter @reservation-platform/api run build && corepack pnpm --filter @reservation-platform/contract-types run build && corepack pnpm --filter @reservation-platform/standalone-api-skeleton run test",
+        "database:verify-migration-bundle": "node scripts/verify-database-migration-bundle.mjs",
+        "phase-11:verify-generated-backend-workspace": "corepack pnpm run backend-platform:verify-extraction-manifest && corepack pnpm run backend-platform:verify-extraction-dry-run && corepack pnpm run backend-platform:verify-package-graph-boundary && corepack pnpm run backend-platform:verify-extracted-workspace-readiness && corepack pnpm run backend-platform:verify-standalone-api-skeleton && corepack pnpm run database:verify-migration-bundle",
+      },
+    },
+    pnpmWorkspaceYaml: "packages:\n  - apps/*\n  - packages/*\n",
+    tsconfigJson: {
+      compilerOptions: {
+        target: "ES2022",
+        module: "NodeNext",
+        moduleResolution: "NodeNext",
+        strict: true,
+        skipLibCheck: true,
+        resolveJsonModule: true,
+        noEmit: true,
+      },
+      include: [
+        "apps/**/*.ts",
+        "packages/**/*.ts",
+        "scripts/**/*.mjs",
+      ],
+      exclude: [
+        "node_modules",
+        "dist",
+        "coverage",
+      ],
+    },
+  };
+}
+
+function createFilteredPackageScript(expectedPackages, scriptName) {
+  const packageNames = expectedPackages
+    .map((expectedPackage) => expectedPackage.packageName)
+    .filter(isNonBlankString);
+
+  if (packageNames.length === 0) {
+    return `corepack pnpm --filter './apps/*' --filter './packages/*' run ${scriptName}`;
+  }
+
+  return packageNames
+    .map((packageName) => `corepack pnpm --filter ${packageName} run ${scriptName}`)
+    .join(" && ");
+}
+
 async function validateMaterializedTargetTree(context, expectedPackages) {
   const materializedFiles = await enumerateMaterializedFiles(context.materializedRoot);
 
-  if (materializedFiles.length !== context.plannedByTarget.size) {
+  const expectedMaterializedFileCount = context.plannedByTarget.size + context.generatedMetadataTargets.size;
+  if (materializedFiles.length !== expectedMaterializedFileCount) {
     context.failures.push(
-      `materialized target tree: expected ${context.plannedByTarget.size} copied files, found ${materializedFiles.length}`,
+      `materialized target tree: expected ${expectedMaterializedFileCount} copied/generated files, found ${materializedFiles.length}`,
     );
   }
 
@@ -272,7 +486,144 @@ async function validateMaterializedTargetTree(context, expectedPackages) {
     validateNotGeneratedArtifact(context, filePath, `materialized target ${filePath}`);
   }
 
+  await validateGeneratedBackendWorkspaceMetadata(context, materializedFiles);
   validateExpectedMaterializedPackageManifests(context, expectedPackages);
+}
+
+async function validateGeneratedBackendWorkspaceMetadata(context, materializedFiles) {
+  for (const metadataFile of generatedBackendRootMetadataFiles) {
+    if (!materializedFiles.includes(metadataFile)) {
+      context.failures.push(`${metadataFile}: expected generated backend root workspace metadata file`);
+    }
+  }
+
+  const rootPackage = await readMaterializedJson(context, "package.json", "generated backend root package.json");
+  if (rootPackage) {
+    await validateGeneratedRootPackage(context, rootPackage);
+  }
+
+  const workspaceYaml = await readMaterializedText(context, "pnpm-workspace.yaml", "generated pnpm-workspace.yaml");
+  if (workspaceYaml !== null) {
+    validateGeneratedWorkspaceGlobs(context, workspaceYaml);
+  }
+
+  const tsconfig = await readMaterializedJson(context, "tsconfig.json", "generated backend root tsconfig.json");
+  if (tsconfig) {
+    validateGeneratedTsconfig(context, tsconfig);
+  }
+}
+
+async function validateGeneratedRootPackage(context, rootPackage) {
+  if (!rootPackage || typeof rootPackage !== "object" || Array.isArray(rootPackage)) {
+    context.failures.push("package.json: generated backend root package metadata must be a JSON object");
+    return;
+  }
+
+  if (rootPackage.name !== context.manifestBackendRepositoryName) {
+    context.failures.push(
+      `package.json: expected generated backend root package name ${context.manifestBackendRepositoryName}, found ${JSON.stringify(rootPackage.name)}`,
+    );
+  }
+
+  if (rootPackage.private !== true) {
+    context.failures.push("package.json: generated backend root package must be private");
+  }
+
+  if (!isNonBlankString(rootPackage.packageManager)) {
+    context.failures.push("package.json: generated backend root package must include packageManager");
+  }
+
+  const scripts = rootPackage.scripts;
+  for (const scriptName of requiredGeneratedRootScripts) {
+    if (!scripts || typeof scripts !== "object" || typeof scripts[scriptName] !== "string" || scripts[scriptName].trim() === "") {
+      context.failures.push(`package.json: generated backend root script ${scriptName} is required`);
+    }
+  }
+
+  validateGeneratedRootScriptsAreBackendOnly(context, scripts);
+  validateGeneratedRootDependenciesAreBackendOnly(context, rootPackage);
+  await validateGeneratedRootPackageIsNotCurrentRootManifest(context, rootPackage);
+}
+
+function validateGeneratedRootScriptsAreBackendOnly(context, scripts) {
+  if (!scripts || typeof scripts !== "object" || Array.isArray(scripts)) {
+    return;
+  }
+
+  for (const [scriptName, command] of Object.entries(scripts)) {
+    if (
+      forbiddenGeneratedRootScriptNames.has(scriptName) ||
+      forbiddenGeneratedRootScriptNamePrefixes.some((prefix) => scriptName.startsWith(prefix))
+    ) {
+      context.failures.push(`package.json: generated backend root script ${scriptName} is frontend-only`);
+    }
+
+    if (typeof command !== "string") {
+      continue;
+    }
+
+    for (const [pattern, reason] of forbiddenGeneratedRootScriptCommandPatterns) {
+      if (pattern.test(command)) {
+        context.failures.push(
+          `package.json: generated backend root script ${scriptName} includes frontend-only command (${reason})`,
+        );
+      }
+    }
+  }
+}
+
+function validateGeneratedRootDependenciesAreBackendOnly(context, rootPackage) {
+  for (const sectionName of packageDependencySections) {
+    const dependencies = rootPackage[sectionName];
+    if (!dependencies || typeof dependencies !== "object" || Array.isArray(dependencies)) {
+      continue;
+    }
+
+    for (const dependencyName of Object.keys(dependencies)) {
+      const reason = getForbiddenGeneratedRootDependencyReason(dependencyName);
+      if (reason) {
+        context.failures.push(
+          `package.json: generated backend root ${sectionName}.${dependencyName} is frontend-only (${reason})`,
+        );
+      }
+    }
+  }
+}
+
+async function validateGeneratedRootPackageIsNotCurrentRootManifest(context, rootPackage) {
+  const currentRootPackage = await readOptionalJson(path.join(context.repoRoot, "package.json"));
+  if (!currentRootPackage) {
+    return;
+  }
+
+  if (JSON.stringify(sortJsonKeys(rootPackage)) === JSON.stringify(sortJsonKeys(currentRootPackage))) {
+    context.failures.push("package.json: generated backend root package metadata must not copy the current root package manifest verbatim");
+  }
+
+  if (rootPackage.name === currentRootPackage.name) {
+    context.failures.push("package.json: generated backend root package name must not reuse the current frontend/root package name");
+  }
+}
+
+function validateGeneratedWorkspaceGlobs(context, workspaceYaml) {
+  const workspacePackages = parsePnpmWorkspacePackages(workspaceYaml);
+  for (const requiredGlob of ["apps/*", "packages/*"]) {
+    if (!workspacePackages.includes(requiredGlob)) {
+      context.failures.push(`pnpm-workspace.yaml: expected generated workspace packages glob ${requiredGlob}`);
+    }
+  }
+}
+
+function validateGeneratedTsconfig(context, tsconfig) {
+  const compilerOptions = tsconfig?.compilerOptions;
+  if (!compilerOptions || typeof compilerOptions !== "object" || Array.isArray(compilerOptions)) {
+    context.failures.push("tsconfig.json: generated backend root tsconfig must include compilerOptions");
+    return;
+  }
+
+  if (compilerOptions.jsx || JSON.stringify(tsconfig).includes("next")) {
+    context.failures.push("tsconfig.json: generated backend root tsconfig must not include frontend/Next.js JSX settings");
+  }
 }
 
 async function enumerateMaterializedFiles(root) {
@@ -521,6 +872,98 @@ function isGeneratedArtifactPath(repoPath) {
 
 function isGeneratedDirectoryName(name) {
   return generatedDirectoryNames.has(name);
+}
+
+async function readMaterializedJson(context, repoPath, label) {
+  const contents = await readMaterializedText(context, repoPath, label);
+  if (contents === null) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(contents);
+  } catch (error) {
+    context.failures.push(`${repoPath}: expected valid JSON for ${label} (${error instanceof Error ? error.message : error})`);
+    return null;
+  }
+}
+
+async function readMaterializedText(context, repoPath, label) {
+  const resolvedPath = path.resolve(context.materializedRoot, repoPath);
+  if (!isPathInside(context.materializedRoot, resolvedPath)) {
+    context.failures.push(`${repoPath}: ${label} escapes the materialized target tree`);
+    return null;
+  }
+
+  try {
+    return await readFile(resolvedPath, "utf8");
+  } catch {
+    context.failures.push(`${repoPath}: expected ${label}`);
+    return null;
+  }
+}
+
+async function readOptionalJson(filePath) {
+  try {
+    return JSON.parse(await readFile(filePath, "utf8"));
+  } catch {
+    return null;
+  }
+}
+
+function parsePnpmWorkspacePackages(workspaceYaml) {
+  const packages = [];
+  let inPackagesBlock = false;
+
+  for (const line of workspaceYaml.split(/\r?\n/)) {
+    if (/^\s*packages:\s*$/.test(line)) {
+      inPackagesBlock = true;
+      continue;
+    }
+
+    if (inPackagesBlock && /^\S/.test(line)) {
+      break;
+    }
+
+    if (!inPackagesBlock) {
+      continue;
+    }
+
+    const match = line.match(/^\s*-\s*["']?([^"'\s#]+)["']?\s*(?:#.*)?$/);
+    if (match) {
+      packages.push(match[1]);
+    }
+  }
+
+  return packages;
+}
+
+function getForbiddenGeneratedRootDependencyReason(name) {
+  if (forbiddenGeneratedRootDependencyNames.has(name)) {
+    return forbiddenGeneratedRootDependencyNames.get(name);
+  }
+
+  return forbiddenGeneratedRootDependencyPrefixes.find(([prefix]) => name.startsWith(prefix))?.[1] ?? null;
+}
+
+function sortJsonKeys(value) {
+  if (Array.isArray(value)) {
+    return value.map(sortJsonKeys);
+  }
+
+  if (!value || typeof value !== "object") {
+    return value;
+  }
+
+  return Object.fromEntries(
+    Object.entries(value)
+      .sort(([left], [right]) => comparePaths(left, right))
+      .map(([key, entryValue]) => [key, sortJsonKeys(entryValue)]),
+  );
+}
+
+function isNonBlankString(value) {
+  return typeof value === "string" && value.trim().length > 0;
 }
 
 function isDirectoryLikeTarget(repoPath) {

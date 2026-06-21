@@ -93,6 +93,7 @@ flowchart LR
 - [Remaining Modularity Gaps Index](remaining-modularity-gaps.md)
 - [Focused Backend Platform, SDK, and Frontend Split Execution Plan](plugin-platform-split/README.md)
 - [Repo Product Split Plan](repo-product-split-plan/README.md)
+- [Frontend and Backend Hard Separation Plan](frontend-backend-hard-separation-plan/README.md)
 
 ## Separation Rules
 
@@ -146,3 +147,10 @@ repository is the product, the SDK is the only package a new frontend installs,
 the current frontend becomes a replaceable consumer, live proof must use a real
 standalone backend target, and subagents must update downstream phases whenever
 shared assumptions change.
+
+The frontend/backend hard separation plan is the focused continuation for the
+practical proof question: whether the current refactor has crossed from
+monorepo modularity into real product separation. It adds audit, boundary,
+backend runtime, frontend detachment, SDK install, cross-repo proof, and
+compatibility cleanup phases that subagents can execute without relying on chat
+history.

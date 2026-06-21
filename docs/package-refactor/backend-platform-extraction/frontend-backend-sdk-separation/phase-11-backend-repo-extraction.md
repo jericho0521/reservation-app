@@ -141,12 +141,15 @@ Implemented artifacts:
   frontend/current-app target areas such as `app`, `components`, `lib`,
   `public`, `types`, `supabase`, `.next`, `node_modules`, and
   `dist-packages`, verifies the generated root metadata is backend-only and not
-  a verbatim copy of the current frontend/root manifest, verifies generated
-  root scripts do not point at absent materialized `scripts/*.mjs` verifier
-  files, verifies those generated `node scripts/*.mjs` commands do not point at
-  verifier scripts whose default repo-relative input docs/manifests are absent
-  from the materialized candidate, verifies expected package manifests exist in
-  applicable target package roots, and deletes the temporary tree by default.
+  a verbatim copy of the current frontend/root manifest, verifies the generated
+  root uses pinned pnpm workspace metadata and declares only backend-safe
+  candidate-local build/test dev tools (`@types/node`, `tsx`, and
+  `typescript`), verifies generated root scripts do not point at absent
+  materialized `scripts/*.mjs` verifier files, verifies those generated
+  `node scripts/*.mjs` commands do not point at verifier scripts whose default
+  repo-relative input docs/manifests are absent from the materialized
+  candidate, verifies expected package manifests exist in applicable target
+  package roots, and deletes the temporary tree by default.
 - The standalone extraction manifest now includes the backend-owned verifier
   script and default input manifest needed by the generated backend root
   database migration-index check. Monorepo-to-candidate extraction,
@@ -186,7 +189,9 @@ move/copy candidate files into an OS temporary materialized target tree,
 generates backend-root workspace metadata inside that temporary candidate, and
 validates that candidate. The generated root `package.json` is backend-only: it
 uses the backend repository name, stays private, carries a stable package
-manager field, exposes candidate-local package build/test, standalone API
+manager field, declares the backend-safe root dev tools needed by
+candidate-local package build/test scripts (`@types/node`, `tsx`, and
+`typescript`), exposes candidate-local package build/test, standalone API
 skeleton, and database migration-index checks, and blocks frontend-only scripts
 or dependencies such as Next, React, browser smoke commands, current-frontend
 checks, and monorepo-only extraction/readiness/package-graph guardrails. The

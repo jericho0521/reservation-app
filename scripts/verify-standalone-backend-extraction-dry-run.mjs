@@ -132,6 +132,13 @@ const forbiddenGeneratedRootDependencyPrefixes = [
   ["@dnd-kit/", "frontend drag-and-drop UI package"],
 ];
 
+const requiredGeneratedRootDevDependencies = [
+  "@types/node",
+  "tsx",
+  "typescript",
+];
+const allowedGeneratedRootDevDependencies = new Set(requiredGeneratedRootDevDependencies);
+
 const packageDependencySections = [
   "dependencies",
   "devDependencies",
@@ -444,6 +451,7 @@ async function createGeneratedBackendWorkspaceMetadata({
       private: true,
       packageManager,
       type: "module",
+      devDependencies: createGeneratedRootDevDependencies(sourceRootPackage),
       scripts: {
         "packages:build": createFilteredPackageScript(buildPackages, "build"),
         "packages:test": createFilteredPackageScript(testPackages, "test"),
@@ -475,6 +483,43 @@ async function createGeneratedBackendWorkspaceMetadata({
       ],
     },
   };
+}
+
+function createGeneratedRootDevDependencies(sourceRootPackage) {
+  const sourceDevDependencies = sourceRootPackage?.devDependencies &&
+    typeof sourceRootPackage.devDependencies === "object" &&
+    !Array.isArray(sourceRootPackage.devDependencies)
+    ? sourceRootPackage.devDependencies
+    : {};
+
+  const sourceDependencies = sourceRootPackage?.dependencies &&
+    typeof sourceRootPackage.dependencies === "object" &&
+    !Array.isArray(sourceRootPackage.dependencies)
+    ? sourceRootPackage.dependencies
+    : {};
+
+  return Object.fromEntries(
+    requiredGeneratedRootDevDependencies.map((dependencyName) => [
+      dependencyName,
+      sourceDevDependencies[dependencyName] ?? sourceDependencies[dependencyName] ?? getGeneratedRootDevDependencyFallback(dependencyName),
+    ]),
+  );
+}
+
+function getGeneratedRootDevDependencyFallback(dependencyName) {
+  if (dependencyName === "@types/node") {
+    return "^20";
+  }
+
+  if (dependencyName === "typescript") {
+    return "^5";
+  }
+
+  if (dependencyName === "tsx") {
+    return "^4";
+  }
+
+  return "*";
 }
 
 function createFilteredPackageScript(expectedPackages, scriptName) {
@@ -558,6 +603,8 @@ async function validateGeneratedRootPackage(context, rootPackage, materializedFi
 
   if (!isNonBlankString(rootPackage.packageManager)) {
     context.failures.push("package.json: generated backend root package must include packageManager");
+  } else if (!isExactPnpmPackageManager(rootPackage.packageManager)) {
+    context.failures.push("package.json: generated backend root packageManager must pin an exact pnpm version for the extracted workspace");
   }
 
   const scripts = rootPackage.scripts;
@@ -569,8 +616,34 @@ async function validateGeneratedRootPackage(context, rootPackage, materializedFi
 
   validateGeneratedRootScriptsAreBackendOnly(context, scripts);
   validateGeneratedRootScriptFileReferences(context, scripts, materializedFiles);
+  validateGeneratedRootInstallBuildTooling(context, rootPackage);
   validateGeneratedRootDependenciesAreBackendOnly(context, rootPackage);
   await validateGeneratedRootPackageIsNotCurrentRootManifest(context, rootPackage);
+}
+
+function validateGeneratedRootInstallBuildTooling(context, rootPackage) {
+  const devDependencies = rootPackage.devDependencies;
+  if (!devDependencies || typeof devDependencies !== "object" || Array.isArray(devDependencies)) {
+    context.failures.push("package.json: generated backend root package must include devDependencies for candidate-local build/test tooling");
+    return;
+  }
+
+  for (const dependencyName of requiredGeneratedRootDevDependencies) {
+    const dependencyVersion = devDependencies[dependencyName];
+    if (!isNonBlankString(dependencyVersion)) {
+      context.failures.push(
+        `package.json: generated backend root devDependencies.${dependencyName} is required for candidate-local build/test tooling`,
+      );
+    }
+  }
+
+  for (const dependencyName of Object.keys(devDependencies)) {
+    if (!allowedGeneratedRootDevDependencies.has(dependencyName)) {
+      context.failures.push(
+        `package.json: generated backend root devDependencies.${dependencyName} is not allowed; only candidate-local build/test tooling may be listed`,
+      );
+    }
+  }
 }
 
 function validateGeneratedRootScriptsAreBackendOnly(context, scripts) {
@@ -1027,6 +1100,10 @@ function sortJsonKeys(value) {
 
 function isNonBlankString(value) {
   return typeof value === "string" && value.trim().length > 0;
+}
+
+function isExactPnpmPackageManager(value) {
+  return /^pnpm@\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(value);
 }
 
 function isDirectoryLikeTarget(repoPath) {

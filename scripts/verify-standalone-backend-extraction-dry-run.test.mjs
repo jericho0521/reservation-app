@@ -248,7 +248,9 @@ test("standalone backend dry-run generates backend-only root metadata instead of
     assert.equal(generatedRootPackage.scripts["database:verify-migration-bundle"], undefined);
     assert.match(generatedRootPackage.scripts["phase-11:verify-generated-backend-workspace"], /database:migration-index:check/);
     assert.equal(generatedRootPackage.dependencies, undefined);
-    assert.equal(generatedRootPackage.devDependencies, undefined);
+    assert.equal(generatedRootPackage.devDependencies["@types/node"], "^20");
+    assert.equal(generatedRootPackage.devDependencies.tsx, "^4");
+    assert.equal(generatedRootPackage.devDependencies.typescript, "^5");
     assert.match(generatedWorkspace, /-\s+apps\/\*/);
     assert.match(generatedWorkspace, /-\s+packages\/\*/);
   } finally {
@@ -313,10 +315,158 @@ test("standalone backend dry-run fails invalid generated backend workspace metad
   assert.match(result.failures.join("\n"), /generated workspace packages glob apps\/\*/);
   assert.match(result.failures.join("\n"), /script dev is frontend-only/);
   assert.match(result.failures.join("\n"), /dependencies\.react is frontend-only/);
+  assert.match(result.failures.join("\n"), /must include devDependencies for candidate-local build\/test tooling/);
   assert.match(result.failures.join("\n"), /tsconfig must not include frontend\/Next\.js JSX settings/);
 
   await rm(result.materializedRoot, { recursive: true, force: true });
   await rm(repoRoot, { recursive: true, force: true });
+});
+
+test("standalone backend dry-run fails when generated root build tooling metadata is incomplete", async () => {
+  const { repoRoot, manifestPath } = await createFixtureRepo();
+
+  const result = await verifyStandaloneBackendExtractionDryRun({
+    repoRoot,
+    manifestPath,
+    expectedPackages,
+    keepMaterializedTree: true,
+    createGeneratedWorkspaceMetadata: () => ({
+      rootPackageJson: {
+        name: "reservation-platform-backend",
+        private: true,
+        packageManager: "pnpm@10.33.2",
+        devDependencies: {
+          typescript: "^5",
+        },
+        scripts: {
+          "packages:build": "echo ok",
+          "packages:test": "echo ok",
+          "backend-platform:verify-standalone-api-skeleton": "echo ok",
+          "database:migration-index:check": "node scripts/generate-database-migration-index.mjs --check",
+          "phase-11:verify-generated-backend-workspace": "echo ok",
+        },
+      },
+      pnpmWorkspaceYaml: "packages:\n  - apps/*\n  - packages/*\n",
+      tsconfigJson: {
+        compilerOptions: {
+          module: "NodeNext",
+        },
+      },
+    }),
+  });
+
+  try {
+    assert.equal(result.ok, false);
+    assert.match(
+      result.failures.join("\n"),
+      /devDependencies\.@types\/node is required for candidate-local build\/test tooling/,
+    );
+    assert.match(
+      result.failures.join("\n"),
+      /devDependencies\.tsx is required for candidate-local build\/test tooling/,
+    );
+  } finally {
+    await rm(result.materializedRoot, { recursive: true, force: true });
+    await rm(repoRoot, { recursive: true, force: true });
+  }
+});
+
+test("standalone backend dry-run rejects extra generated root devDependencies", async () => {
+  const { repoRoot, manifestPath } = await createFixtureRepo();
+
+  const result = await verifyStandaloneBackendExtractionDryRun({
+    repoRoot,
+    manifestPath,
+    expectedPackages,
+    keepMaterializedTree: true,
+    createGeneratedWorkspaceMetadata: () => ({
+      rootPackageJson: {
+        name: "reservation-platform-backend",
+        private: true,
+        packageManager: "pnpm@10.33.2",
+        devDependencies: {
+          "@types/node": "^20",
+          tailwindcss: "^4",
+          tsx: "^4",
+          typescript: "^5",
+        },
+        scripts: {
+          "packages:build": "echo ok",
+          "packages:test": "echo ok",
+          "backend-platform:verify-standalone-api-skeleton": "echo ok",
+          "database:migration-index:check": "node scripts/generate-database-migration-index.mjs --check",
+          "phase-11:verify-generated-backend-workspace": "echo ok",
+        },
+      },
+      pnpmWorkspaceYaml: "packages:\n  - apps/*\n  - packages/*\n",
+      tsconfigJson: {
+        compilerOptions: {
+          module: "NodeNext",
+        },
+      },
+    }),
+  });
+
+  try {
+    assert.equal(result.ok, false);
+    assert.match(
+      result.failures.join("\n"),
+      /devDependencies\.tailwindcss is not allowed/,
+    );
+  } finally {
+    await rm(result.materializedRoot, { recursive: true, force: true });
+    await rm(repoRoot, { recursive: true, force: true });
+  }
+});
+
+test("standalone backend dry-run rejects unpinned generated root pnpm packageManager values", async () => {
+  for (const packageManager of ["pnpm@latest", "pnpm@^10", "pnpm@workspace:*", " pnpm@10.33.2 "]) {
+    const { repoRoot, manifestPath } = await createFixtureRepo();
+
+    const result = await verifyStandaloneBackendExtractionDryRun({
+      repoRoot,
+      manifestPath,
+      expectedPackages,
+      keepMaterializedTree: true,
+      createGeneratedWorkspaceMetadata: () => ({
+        rootPackageJson: {
+          name: "reservation-platform-backend",
+          private: true,
+          packageManager,
+          devDependencies: {
+            "@types/node": "^20",
+            tsx: "^4",
+            typescript: "^5",
+          },
+          scripts: {
+            "packages:build": "echo ok",
+            "packages:test": "echo ok",
+            "backend-platform:verify-standalone-api-skeleton": "echo ok",
+            "database:migration-index:check": "node scripts/generate-database-migration-index.mjs --check",
+            "phase-11:verify-generated-backend-workspace": "echo ok",
+          },
+        },
+        pnpmWorkspaceYaml: "packages:\n  - apps/*\n  - packages/*\n",
+        tsconfigJson: {
+          compilerOptions: {
+            module: "NodeNext",
+          },
+        },
+      }),
+    });
+
+    try {
+      assert.equal(result.ok, false, packageManager);
+      assert.match(
+        result.failures.join("\n"),
+        /packageManager must pin an exact pnpm version/,
+        packageManager,
+      );
+    } finally {
+      await rm(result.materializedRoot, { recursive: true, force: true });
+      await rm(repoRoot, { recursive: true, force: true });
+    }
+  }
 });
 
 test("standalone backend dry-run fails when a generated root script references a script that was not materialized", async () => {

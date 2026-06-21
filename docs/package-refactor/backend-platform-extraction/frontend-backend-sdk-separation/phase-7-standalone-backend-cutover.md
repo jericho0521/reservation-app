@@ -94,6 +94,14 @@ flowchart LR
   complete-or-absent `RESERVATION_PLATFORM_AUTH_*` JWT/JWKS config, valid auth
   numeric settings, backend-only AI/chat provider env when present, and rejects
   `NEXT_PUBLIC_*` backend secret-style names.
+- The same verifier now includes a local runtime/deployment env-name drift
+  guard against `apps/api/src/runtime.ts`. It proves the deployment verifier's
+  backend runtime env-name set covers the runtime-owned Supabase env,
+  `RESERVATION_PLATFORM_SERVICE_API_KEY`, and
+  `RESERVATION_PLATFORM_AUTH_*` JWT/JWKS env names, and fails if either side
+  adds a runtime-required name the other side does not recognize. AI/chat
+  provider env names are encoded as deployment-readiness-only names because
+  `apps/api/src/runtime.ts` does not read them yet.
 - `corepack pnpm run backend-platform:verify-compatibility-route-removal-gate`
   now also proves that every reservation-platform or optional-module
   compatibility inventory entry with a non-null `/v1` standalone equivalent is
@@ -104,12 +112,13 @@ flowchart LR
   proof that must cover session creation, messages, stream, and confirmation in
   `apps/api` source/tests.
 - This is readiness only. It proves that deployment config can be checked in CI
-  without live infrastructure and that strict environments fail closed on
-  missing or malformed config, and that the claimed standalone route paths are
-  locally present in dispatcher/test coverage rather than only auth preflight
-  helpers. It does not prove live route parity, a live deployment, live Supabase
-  connectivity, database migrations, RLS/tenant isolation, provider chat
-  configuration, durable idempotency, or seeded reservation parity.
+  without live infrastructure, that strict environments fail closed on missing
+  or malformed config, that runtime/deployment env names do not drift locally,
+  and that the claimed standalone route paths are locally present in
+  dispatcher/test coverage rather than only auth preflight helpers. It does not
+  prove live route parity, a live deployment, live Supabase connectivity,
+  database migrations, RLS/tenant isolation, provider chat configuration,
+  durable idempotency, final standalone cutover, or seeded reservation parity.
 
 ## Acceptance Criteria
 

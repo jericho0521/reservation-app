@@ -1,7 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { readStandaloneApiDeploymentConfig } from "./verify-standalone-api-deployment-config.mjs";
+import {
+  readStandaloneApiDeploymentConfig,
+  standaloneApiAiChatEnvNames,
+  standaloneApiRuntimeEnvNames,
+  verifyStandaloneRuntimeEnvNameContract,
+} from "./verify-standalone-api-deployment-config.mjs";
 
 function validDeploymentEnv(overrides = {}) {
   return {
@@ -21,6 +26,99 @@ function validDeploymentEnv(overrides = {}) {
     ...overrides,
   };
 }
+
+function runtimeSourceForEnvNames(names) {
+  return names.map((name) => `env.${name};`).join("\n");
+}
+
+test("standalone runtime and deployment verifier env-name contract currently matches", () => {
+  const contract = verifyStandaloneRuntimeEnvNameContract();
+
+  assert.equal(contract.ok, true);
+  assert.deepEqual(contract.errors, []);
+  assert.deepEqual(contract.runtimeMissingFromVerifier, []);
+  assert.deepEqual(contract.verifierMissingFromRuntime, []);
+});
+
+test("standalone runtime env-name contract fails when runtime adds an env unknown to verifier", () => {
+  const contract = verifyStandaloneRuntimeEnvNameContract({
+    runtimeSource: [
+      runtimeSourceForEnvNames(standaloneApiRuntimeEnvNames),
+      "env.RESERVATION_PLATFORM_AUTH_REQUIRED_EXTRA_CLAIM;",
+    ].join("\n"),
+  });
+
+  assert.equal(contract.ok, false);
+  assert.deepEqual(contract.runtimeMissingFromVerifier, [
+    "RESERVATION_PLATFORM_AUTH_REQUIRED_EXTRA_CLAIM",
+  ]);
+  assert.match(contract.errors.join(" "), /missing from the deployment verifier/);
+});
+
+test("standalone runtime env-name contract fails when verifier requires runtime env absent from runtime", () => {
+  const contract = verifyStandaloneRuntimeEnvNameContract({
+    runtimeSource: runtimeSourceForEnvNames(standaloneApiRuntimeEnvNames),
+    verifierRuntimeEnvNames: [
+      ...standaloneApiRuntimeEnvNames,
+      "RESERVATION_PLATFORM_AUTH_REQUIRED_EXTRA_CLAIM",
+    ],
+  });
+
+  assert.equal(contract.ok, false);
+  assert.deepEqual(contract.verifierMissingFromRuntime, [
+    "RESERVATION_PLATFORM_AUTH_REQUIRED_EXTRA_CLAIM",
+  ]);
+  assert.match(contract.errors.join(" "), /absent from apps\/api\/src\/runtime\.ts/);
+});
+
+test("standalone runtime env-name contract ignores env names that are not read from env", () => {
+  const contract = verifyStandaloneRuntimeEnvNameContract({
+    runtimeSource: `
+      export const STANDALONE_SUPABASE_ENV_NAMES = {
+        url: "RESERVATION_SUPABASE_URL",
+        serviceApiKey: "RESERVATION_PLATFORM_SERVICE_API_KEY",
+      } as const;
+
+      export interface StandaloneSupabaseEnv {
+        RESERVATION_SUPABASE_URL?: string;
+        RESERVATION_PLATFORM_SERVICE_API_KEY?: string;
+      }
+
+      // env.RESERVATION_PLATFORM_SERVICE_API_KEY is documented here but not read.
+      const docs = "env.RESERVATION_PLATFORM_AUTH_ISSUER";
+
+      export function fromEnv(env) {
+        return {
+          supabaseUrl: env.RESERVATION_SUPABASE_URL,
+        };
+      }
+    `,
+    verifierRuntimeEnvNames: [
+      "RESERVATION_SUPABASE_URL",
+      "RESERVATION_PLATFORM_SERVICE_API_KEY",
+      "RESERVATION_PLATFORM_AUTH_ISSUER",
+    ],
+  });
+
+  assert.equal(contract.ok, false);
+  assert.deepEqual(contract.runtimeEnvNames, ["RESERVATION_SUPABASE_URL"]);
+  assert.deepEqual(contract.verifierMissingFromRuntime, [
+    "RESERVATION_PLATFORM_AUTH_ISSUER",
+    "RESERVATION_PLATFORM_SERVICE_API_KEY",
+  ]);
+  assert.match(contract.errors.join(" "), /absent from apps\/api\/src\/runtime\.ts/);
+});
+
+test("standalone runtime env-name contract allows AI chat env as verifier-only readiness names", () => {
+  const contract = verifyStandaloneRuntimeEnvNameContract({
+    runtimeSource: runtimeSourceForEnvNames(standaloneApiRuntimeEnvNames),
+    deploymentReadinessOnlyEnvNames: standaloneApiAiChatEnvNames,
+  });
+
+  assert.equal(contract.ok, true);
+  assert.deepEqual(contract.errors, []);
+  assert.deepEqual(contract.deploymentReadinessOnlyEnvNames, standaloneApiAiChatEnvNames);
+});
 
 test("standalone API deployment config safely skips when env is absent", () => {
   const parsed = readStandaloneApiDeploymentConfig({}, { argv: [] });
@@ -166,6 +264,7 @@ test("standalone API deployment config rejects NEXT_PUBLIC backend secret-style 
   const parsed = readStandaloneApiDeploymentConfig(
     validDeploymentEnv({
       NEXT_PUBLIC_ANALYTICS_API_KEY: "public-analytics-token",
+      NEXT_PUBLIC_RESERVATION_PLATFORM_SERVICE_API_KEY: "do-not-expose",
       NEXT_PUBLIC_RESERVATION_SUPABASE_SERVICE_ROLE_KEY: "do-not-expose",
       NEXT_PUBLIC_OPENROUTER_API_KEY: "do-not-expose",
     }),
@@ -176,6 +275,7 @@ test("standalone API deployment config rejects NEXT_PUBLIC backend secret-style 
   assert.equal(parsed.ready, false);
   assert.deepEqual(parsed.nextPublicBackendSecrets, [
     "NEXT_PUBLIC_OPENROUTER_API_KEY",
+    "NEXT_PUBLIC_RESERVATION_PLATFORM_SERVICE_API_KEY",
     "NEXT_PUBLIC_RESERVATION_SUPABASE_SERVICE_ROLE_KEY",
   ]);
   assert.match(parsed.message, /must not use NEXT_PUBLIC_\* names/);

@@ -20,6 +20,14 @@ function baseInventory(route) {
   };
 }
 
+function inventoryWithRoutes(routes) {
+  return {
+    schemaVersion: 1,
+    requiredRemovalGates: defaultRequiredRemovalGates,
+    routes,
+  };
+}
+
 function routeFixture(overrides = {}) {
   return {
     routePath: "/api/services",
@@ -44,12 +52,16 @@ async function createFixtureRepo(files = ["app/api/services/route.ts"]) {
   const repoRoot = await mkdtemp(path.join(tmpdir(), "compat-route-gate-"));
 
   for (const filePath of files) {
-    const absolutePath = path.join(repoRoot, filePath);
-    await mkdir(path.dirname(absolutePath), { recursive: true });
-    await writeFile(absolutePath, "export async function GET() {}\n");
+    await writeFixtureFile(repoRoot, filePath, "export async function GET() {}\n");
   }
 
   return repoRoot;
+}
+
+async function writeFixtureFile(repoRoot, filePath, content) {
+  const absolutePath = path.join(repoRoot, filePath);
+  await mkdir(path.dirname(absolutePath), { recursive: true });
+  await writeFile(absolutePath, content);
 }
 
 test("compatibility route gate accepts the current route inventory", async () => {
@@ -161,4 +173,142 @@ test("compatibility route gate accepts a removable route only when every gate is
 
   assert.equal(result.ok, true);
   assert.deepEqual(result.failures, []);
+});
+
+test("compatibility route gate allows reservation compatibility route literals only in the wrapper", async () => {
+  const repoRoot = await createFixtureRepo([
+    "app/api/services/route.ts",
+    "app/api/v1/reservations/route.ts",
+  ]);
+  await writeFixtureFile(
+    repoRoot,
+    "lib/reservation-platform-client.ts",
+    [
+      "export function localServicesPath() {",
+      "  return \"/api/services\";",
+      "}",
+      "export function platformReservationsPath() {",
+      "  return \"/api/v1/reservations\";",
+      "}",
+      "",
+    ].join("\n"),
+  );
+  await writeFixtureFile(
+    repoRoot,
+    "app/form-booking/page.tsx",
+    [
+      "import { localServicesPath } from \"@/lib/reservation-platform-client\";",
+      "export default function Page() {",
+      "  return localServicesPath();",
+      "}",
+      "",
+    ].join("\n"),
+  );
+
+  const result = await verifyCompatibilityRouteInventory(
+    inventoryWithRoutes([
+      routeFixture(),
+      routeFixture({
+        routePath: "/api/v1/reservations",
+        filePath: "app/api/v1/reservations/route.ts",
+        standaloneEquivalent: "/v1/reservations",
+      }),
+    ]),
+    { repoRoot },
+  );
+
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.failures, []);
+  assert.ok(result.sourceUsageProof.scannedFileCount >= 2);
+});
+
+test("compatibility route gate rejects direct migrated frontend compatibility route usage", async () => {
+  const repoRoot = await createFixtureRepo([
+    "app/api/services/route.ts",
+    "app/api/v1/reservations/route.ts",
+  ]);
+  await writeFixtureFile(
+    repoRoot,
+    "lib/reservation-platform-client.ts",
+    "export const wrapperPath = \"/api/services\";\n",
+  );
+  await writeFixtureFile(
+    repoRoot,
+    "app/form-booking/page.tsx",
+    [
+      "export default function Page() {",
+      "  return fetch(\"/api/v1/reservations\");",
+      "}",
+      "",
+    ].join("\n"),
+  );
+
+  const result = await verifyCompatibilityRouteInventory(
+    inventoryWithRoutes([
+      routeFixture(),
+      routeFixture({
+        routePath: "/api/v1/reservations",
+        filePath: "app/api/v1/reservations/route.ts",
+        standaloneEquivalent: "/v1/reservations",
+      }),
+    ]),
+    { repoRoot },
+  );
+
+  assert.equal(result.ok, false);
+  assert.match(
+    result.failures.join("\n"),
+    /app\/form-booking\/page\.tsx: directly references reservation compatibility route \/api\/v1\/reservations/,
+  );
+});
+
+test("compatibility route gate rejects compatibility route usage reached through the admin page import closure", async () => {
+  const repoRoot = await createFixtureRepo([
+    "app/api/services/route.ts",
+    "app/api/v1/reservations/route.ts",
+  ]);
+  await writeFixtureFile(
+    repoRoot,
+    "lib/reservation-platform-client.ts",
+    "export const wrapperPath = \"/api/services\";\n",
+  );
+  await writeFixtureFile(
+    repoRoot,
+    "app/admin/page.tsx",
+    [
+      "import { loadReservations } from \"@/lib/admin-reservations-loader\";",
+      "export default async function Page() {",
+      "  return loadReservations();",
+      "}",
+      "",
+    ].join("\n"),
+  );
+  await writeFixtureFile(
+    repoRoot,
+    "lib/admin-reservations-loader.ts",
+    [
+      "export async function loadReservations() {",
+      "  return fetch(\"/api/v1/reservations\");",
+      "}",
+      "",
+    ].join("\n"),
+  );
+
+  const result = await verifyCompatibilityRouteInventory(
+    inventoryWithRoutes([
+      routeFixture(),
+      routeFixture({
+        routePath: "/api/v1/reservations",
+        filePath: "app/api/v1/reservations/route.ts",
+        standaloneEquivalent: "/v1/reservations",
+      }),
+    ]),
+    { repoRoot },
+  );
+
+  assert.equal(result.ok, false);
+  assert.match(
+    result.failures.join("\n"),
+    /lib\/admin-reservations-loader\.ts: directly references reservation compatibility route \/api\/v1\/reservations/,
+  );
 });

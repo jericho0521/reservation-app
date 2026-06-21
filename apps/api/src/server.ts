@@ -7,7 +7,15 @@ import {
   handleStandaloneApiRequest,
   type StandaloneApiHandler,
 } from "./routes.js";
-import { createStandaloneSupabaseDependenciesFromEnv } from "./runtime.js";
+import {
+  createStandaloneSupabaseDependenciesFromEnv,
+  type StandaloneSupabaseEnv,
+  type StandaloneSupabaseRuntimeOptions,
+} from "./runtime.js";
+
+export interface StandaloneNodeServerEnvBootstrapOptions extends StandaloneSupabaseRuntimeOptions {
+  env?: StandaloneSupabaseEnv;
+}
 
 export function createStandaloneNodeServer(handler: StandaloneApiHandler = handleStandaloneApiRequest) {
   return createServer(async (request, response) => {
@@ -47,10 +55,18 @@ export function createStandaloneNodeServer(handler: StandaloneApiHandler = handl
   });
 }
 
+export function createStandaloneNodeServerFromEnv(
+  options: StandaloneNodeServerEnvBootstrapOptions = {},
+) {
+  const { env = process.env, ...runtimeOptions } = options;
+  const dependencies = createStandaloneSupabaseDependenciesFromEnv(env, runtimeOptions);
+
+  return createStandaloneNodeServer(createStandaloneApiHandler(dependencies));
+}
+
 if (isDirectRun()) {
   const port = Number.parseInt(process.env.PORT ?? "4100", 10);
-  const dependencies = createStandaloneSupabaseDependenciesFromEnv();
-  const server = createStandaloneNodeServer(createStandaloneApiHandler(dependencies));
+  const server = createStandaloneNodeServerFromEnv();
 
   server.listen(port, () => {
     console.log(`Standalone reservation API skeleton listening on http://localhost:${port}`);

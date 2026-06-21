@@ -102,6 +102,13 @@ flowchart LR
   adds a runtime-required name the other side does not recognize. AI/chat
   provider env names are encoded as deployment-readiness-only names because
   `apps/api/src/runtime.ts` does not read them yet.
+- `apps/api/src/server.ts` now exports a small testable standalone Node server
+  env bootstrap helper that composes only backend env-derived dependencies and
+  the standalone `/v1` handler. Local tests prove it serves `/v1/health`
+  without Supabase env or client creation, enforces service-token-only auth on
+  protected routes before repository work, and fails closed with
+  `StandaloneSupabaseConfigError` before exposing a server when Supabase env is
+  partial.
 - `corepack pnpm run backend-platform:verify-compatibility-route-removal-gate`
   now also proves that every reservation-platform or optional-module
   compatibility inventory entry with a non-null `/v1` standalone equivalent is
@@ -114,7 +121,8 @@ flowchart LR
 - This is readiness only. It proves that deployment config can be checked in CI
   without live infrastructure, that strict environments fail closed on missing
   or malformed config, that runtime/deployment env names do not drift locally,
-  and that the claimed standalone route paths are locally present in
+  that the standalone server env bootstrap is backend-only and fails closed
+  locally, and that the claimed standalone route paths are locally present in
   dispatcher/test coverage rather than only auth preflight helpers. It does not
   prove live route parity, a live deployment, live Supabase connectivity,
   database migrations, RLS/tenant isolation, provider chat configuration,

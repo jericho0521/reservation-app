@@ -81,6 +81,20 @@ test("compatibility route gate reports missing listed route files", async () => 
   assert.match(result.failures.join("\n"), /listed route file does not exist/);
 });
 
+test("compatibility route gate reports current app api route files missing from inventory", async () => {
+  const repoRoot = await createFixtureRepo([
+    "app/api/services/route.ts",
+    "app/api/venues/route.ts",
+  ]);
+  const result = await verifyCompatibilityRouteInventory(baseInventory(routeFixture()), { repoRoot });
+
+  assert.equal(result.ok, false);
+  assert.match(
+    result.failures.join("\n"),
+    /app\/api\/venues\/route\.ts: current app\/api route file is missing from the compatibility route inventory/,
+  );
+});
+
 test("compatibility route gate requires standalone /v1 equivalents for remove-later routes", async () => {
   const repoRoot = await createFixtureRepo();
   const result = await verifyCompatibilityRouteInventory(

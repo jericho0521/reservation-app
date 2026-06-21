@@ -67,11 +67,12 @@ blog/update routes are explicitly marked `keep-app-owned` and must not be
 removed as part of reservation-platform cleanup.
 
 The verifier is local-only. It reads the inventory, checks that listed route
-files exist, requires removal/deprecation candidates to have `/v1` standalone
-equivalents, requires blocked routes to name blockers, prevents app-owned routes
-from being marked for reservation-platform removal, and rejects `removable`
-status unless every required gate boolean is true. It does not make network,
-deployment, or live backend calls.
+files exist, enumerates current `app/api/**/route.ts` files to enforce full
+inventory coverage, requires removal/deprecation candidates to have `/v1`
+standalone equivalents, requires blocked routes to name blockers, prevents
+app-owned routes from being marked for reservation-platform removal, and rejects
+`removable` status unless every required gate boolean is true. It does not make
+network, deployment, or live backend calls.
 
 ## Implementation Steps
 

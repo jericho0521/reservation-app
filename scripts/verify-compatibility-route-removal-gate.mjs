@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { access, readFile } from "node:fs/promises";
+import { access, readFile, readdir } from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
@@ -53,7 +53,7 @@ export async function verifyCompatibilityRouteRemovalGate(options = {}) {
 }
 
 export async function verifyCompatibilityRouteInventory(inventory, options = {}) {
-  const repoRoot = options.repoRoot ?? process.cwd();
+  const repoRoot = path.resolve(options.repoRoot ?? process.cwd());
   const failures = [];
   const requiredRemovalGates = Array.isArray(inventory?.requiredRemovalGates)
     && inventory.requiredRemovalGates.length > 0
@@ -68,6 +68,8 @@ export async function verifyCompatibilityRouteInventory(inventory, options = {})
     return failResult(["Inventory must include a non-empty routes array."]);
   }
 
+  const currentRouteFilePaths = await listCurrentAppApiRouteFiles(repoRoot);
+  const inventoryFilePaths = new Set();
   const routeKeys = new Set();
 
   for (const route of inventory.routes) {
@@ -78,11 +80,13 @@ export async function verifyCompatibilityRouteInventory(inventory, options = {})
       continue;
     }
 
-    const routeKey = `${route.routePath} -> ${route.filePath}`;
+    const normalizedFilePath = normalizeRelativeFilePath(route.filePath);
+    const routeKey = `${route.routePath} -> ${normalizedFilePath}`;
     if (routeKeys.has(routeKey)) {
       failures.push(`${routeLabel}: duplicate routePath/filePath inventory entry.`);
     }
     routeKeys.add(routeKey);
+    inventoryFilePaths.add(normalizedFilePath);
 
     await validateRouteFileExists(route, repoRoot, routeLabel, failures);
     validateRouteStatus(route, routeLabel, failures);
@@ -91,12 +95,55 @@ export async function verifyCompatibilityRouteInventory(inventory, options = {})
     validateAppOwnedRoute(route, routeLabel, failures);
   }
 
+  validateCurrentRouteInventoryCoverage(currentRouteFilePaths, inventoryFilePaths, failures);
+
   return {
     ok: failures.length === 0,
     failures,
     routeCount: inventory.routes.length,
     requiredRemovalGates,
   };
+}
+
+async function listCurrentAppApiRouteFiles(repoRoot) {
+  const routeFiles = [];
+  await collectRouteFiles(path.join(repoRoot, "app", "api"), repoRoot, routeFiles);
+  return routeFiles.sort((left, right) => left.localeCompare(right));
+}
+
+async function collectRouteFiles(directoryPath, repoRoot, routeFiles) {
+  let entries;
+  try {
+    entries = await readdir(directoryPath, { withFileTypes: true });
+  } catch (error) {
+    if (error?.code === "ENOENT") {
+      return;
+    }
+    throw error;
+  }
+
+  for (const entry of entries) {
+    const absoluteEntryPath = path.join(directoryPath, entry.name);
+
+    if (entry.isDirectory()) {
+      await collectRouteFiles(absoluteEntryPath, repoRoot, routeFiles);
+      continue;
+    }
+
+    if (entry.isFile() && entry.name === "route.ts") {
+      routeFiles.push(normalizeRelativeFilePath(path.relative(repoRoot, absoluteEntryPath)));
+    }
+  }
+}
+
+function validateCurrentRouteInventoryCoverage(currentRouteFilePaths, inventoryFilePaths, failures) {
+  const missingFromInventory = currentRouteFilePaths.filter((routeFilePath) =>
+    !inventoryFilePaths.has(routeFilePath)
+  );
+
+  for (const routeFilePath of missingFromInventory) {
+    failures.push(`${routeFilePath}: current app/api route file is missing from the compatibility route inventory.`);
+  }
 }
 
 function validateRouteShape(route, routeLabel, failures) {
@@ -225,6 +272,10 @@ function getRouteLabel(route) {
 
 function isNonBlankString(value) {
   return typeof value === "string" && value.trim().length > 0;
+}
+
+function normalizeRelativeFilePath(filePath) {
+  return filePath.replaceAll("\\", "/");
 }
 
 function isPathInsideRepo(repoRoot, absoluteFilePath) {

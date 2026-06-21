@@ -19,12 +19,11 @@ const expectedPackages = [
 ];
 
 const generatedRootVerifierScripts = [
-  "scripts/verify-standalone-backend-extraction-manifest.mjs",
-  "scripts/verify-standalone-backend-extraction-dry-run.mjs",
-  "scripts/verify-backend-package-graph-boundary.mjs",
-  "scripts/verify-extracted-backend-workspace-readiness.mjs",
   "scripts/generate-database-migration-index.mjs",
-  "scripts/verify-database-migration-bundle.mjs",
+];
+
+const generatedRootVerifierInputManifests = [
+  "docs/package-refactor/backend-platform-extraction/database-migration-bundle-manifest.json",
 ];
 
 function manifestFixture(entries = defaultEntries()) {
@@ -62,7 +61,16 @@ function defaultEntries() {
       targetBackendPaths: ["scripts"],
       ownershipCategory: "operations",
       status: "ready-for-extraction-planning",
-      rationale: "Fixture backend root verifier scripts.",
+      rationale: "Fixture backend root verifier scripts for candidate commands.",
+    },
+    {
+      id: "fixture-backend-verifier-input-manifests",
+      classification: "copy-candidate",
+      currentPaths: generatedRootVerifierInputManifests,
+      targetBackendPaths: ["docs/package-refactor/backend-platform-extraction"],
+      ownershipCategory: "operations",
+      status: "ready-for-extraction-planning",
+      rationale: "Fixture backend root verifier input manifests for candidate commands.",
     },
     {
       id: "fixture-shim",
@@ -111,6 +119,10 @@ async function createFixtureRepo(options = {}) {
 
   for (const scriptPath of generatedRootVerifierScripts) {
     await writeFixtureFile(repoRoot, scriptPath, "#!/usr/bin/env node\n");
+  }
+
+  for (const manifestPath of generatedRootVerifierInputManifests) {
+    await writeFixtureFile(repoRoot, manifestPath, "{}\n");
   }
 
   await writeFixtureFile(repoRoot, "package.json", JSON.stringify({
@@ -187,8 +199,14 @@ test("standalone backend dry-run materializes only move/copy candidates and boun
     assert.equal(await pathExists(path.join(result.materializedRoot, "package.json")), true);
     assert.equal(await pathExists(path.join(result.materializedRoot, "pnpm-workspace.yaml")), true);
     assert.equal(await pathExists(path.join(result.materializedRoot, "tsconfig.json")), true);
-    assert.equal(await pathExists(path.join(result.materializedRoot, "scripts/verify-standalone-backend-extraction-dry-run.mjs")), true);
-    assert.equal(await pathExists(path.join(result.materializedRoot, "scripts/verify-database-migration-bundle.mjs")), true);
+    assert.equal(await pathExists(path.join(result.materializedRoot, "scripts/generate-database-migration-index.mjs")), true);
+    assert.equal(
+      await pathExists(path.join(
+        result.materializedRoot,
+        "docs/package-refactor/backend-platform-extraction/database-migration-bundle-manifest.json",
+      )),
+      true,
+    );
 
     assert.equal(await pathExists(path.join(result.materializedRoot, "packages/domain/src/index.js.map")), false);
     assert.equal(await pathExists(path.join(result.materializedRoot, "packages/domain/dist/index.js")), false);
@@ -223,6 +241,12 @@ test("standalone backend dry-run generates backend-only root metadata instead of
     assert.equal(generatedRootPackage.packageManager, "pnpm@10.33.2");
     assert.equal(generatedRootPackage.scripts.dev, undefined);
     assert.equal(generatedRootPackage.scripts.start, undefined);
+    assert.equal(generatedRootPackage.scripts["backend-platform:verify-extraction-manifest"], undefined);
+    assert.equal(generatedRootPackage.scripts["backend-platform:verify-extraction-dry-run"], undefined);
+    assert.equal(generatedRootPackage.scripts["backend-platform:verify-package-graph-boundary"], undefined);
+    assert.equal(generatedRootPackage.scripts["backend-platform:verify-extracted-workspace-readiness"], undefined);
+    assert.equal(generatedRootPackage.scripts["database:verify-migration-bundle"], undefined);
+    assert.match(generatedRootPackage.scripts["phase-11:verify-generated-backend-workspace"], /database:migration-index:check/);
     assert.equal(generatedRootPackage.dependencies, undefined);
     assert.equal(generatedRootPackage.devDependencies, undefined);
     assert.match(generatedWorkspace, /-\s+apps\/\*/);
@@ -269,7 +293,7 @@ test("standalone backend dry-run fails invalid generated backend workspace metad
         packageManager: "pnpm@10.33.2",
         scripts: {
           dev: "next dev",
-          "backend-platform:verify-extraction-manifest": "node scripts/verify-standalone-backend-extraction-manifest.mjs",
+          "database:migration-index:check": "node scripts/generate-database-migration-index.mjs --check",
         },
         dependencies: {
           react: "19.2.3",
@@ -285,7 +309,7 @@ test("standalone backend dry-run fails invalid generated backend workspace metad
   });
 
   assert.equal(result.ok, false);
-  assert.match(result.failures.join("\n"), /generated backend root script backend-platform:verify-extraction-dry-run is required/);
+  assert.match(result.failures.join("\n"), /generated backend root script backend-platform:verify-standalone-api-skeleton is required/);
   assert.match(result.failures.join("\n"), /generated workspace packages glob apps\/\*/);
   assert.match(result.failures.join("\n"), /script dev is frontend-only/);
   assert.match(result.failures.join("\n"), /dependencies\.react is frontend-only/);
@@ -310,11 +334,87 @@ test("standalone backend dry-run fails when a generated root script references a
     assert.equal(result.ok, false);
     assert.match(
       result.failures.join("\n"),
-      /generated backend root script backend-platform:verify-extraction-manifest references scripts\/verify-standalone-backend-extraction-manifest\.mjs, but that file was not materialized/,
+      /generated backend root script database:migration-index:check references scripts\/generate-database-migration-index\.mjs, but that file was not materialized/,
     );
+  } finally {
+    await rm(result.materializedRoot, { recursive: true, force: true });
+    await rm(repoRoot, { recursive: true, force: true });
+  }
+});
+
+test("standalone backend dry-run fails when generated root script default input manifests are absent", async () => {
+  const entries = defaultEntries().filter((entry) => entry.id !== "fixture-backend-verifier-input-manifests");
+  const { repoRoot, manifestPath } = await createFixtureRepo({ entries });
+
+  const result = await verifyStandaloneBackendExtractionDryRun({
+    repoRoot,
+    manifestPath,
+    expectedPackages,
+    keepMaterializedTree: true,
+  });
+
+  try {
+    assert.equal(result.ok, false);
     assert.match(
       result.failures.join("\n"),
-      /generated backend root script database:migration-index:check references scripts\/generate-database-migration-index\.mjs, but that file was not materialized/,
+      /generated backend root script database:migration-index:check references scripts\/generate-database-migration-index\.mjs, whose default input docs\/package-refactor\/backend-platform-extraction\/database-migration-bundle-manifest\.json was not materialized/,
+    );
+  } finally {
+    await rm(result.materializedRoot, { recursive: true, force: true });
+    await rm(repoRoot, { recursive: true, force: true });
+  }
+});
+
+test("standalone backend dry-run checks extraction manifest input when a generated root script references that verifier", async () => {
+  const extractionManifestScript = "scripts/verify-standalone-backend-extraction-manifest.mjs";
+  const entries = [
+    ...defaultEntries(),
+    {
+      id: "fixture-extraction-manifest-script-only",
+      classification: "copy-candidate",
+      currentPaths: [extractionManifestScript],
+      targetBackendPaths: ["scripts"],
+      ownershipCategory: "operations",
+      status: "ready-for-extraction-planning",
+      rationale: "Fixture extraction manifest script without its default input manifest.",
+    },
+  ];
+  const { repoRoot, manifestPath } = await createFixtureRepo({ entries });
+  await writeFixtureFile(repoRoot, extractionManifestScript, "#!/usr/bin/env node\n");
+
+  const result = await verifyStandaloneBackendExtractionDryRun({
+    repoRoot,
+    manifestPath,
+    expectedPackages,
+    keepMaterializedTree: true,
+    createGeneratedWorkspaceMetadata: () => ({
+      rootPackageJson: {
+        name: "reservation-platform-backend",
+        private: true,
+        packageManager: "pnpm@10.33.2",
+        scripts: {
+          "packages:build": "echo ok",
+          "packages:test": "echo ok",
+          "backend-platform:verify-standalone-api-skeleton": "echo ok",
+          "database:migration-index:check": "node scripts/generate-database-migration-index.mjs --check",
+          "phase-11:verify-generated-backend-workspace": "echo ok",
+          "backend-platform:verify-extraction-manifest": "node scripts/verify-standalone-backend-extraction-manifest.mjs",
+        },
+      },
+      pnpmWorkspaceYaml: "packages:\n  - apps/*\n  - packages/*\n",
+      tsconfigJson: {
+        compilerOptions: {
+          module: "NodeNext",
+        },
+      },
+    }),
+  });
+
+  try {
+    assert.equal(result.ok, false);
+    assert.match(
+      result.failures.join("\n"),
+      /generated backend root script backend-platform:verify-extraction-manifest references scripts\/verify-standalone-backend-extraction-manifest\.mjs, whose default input docs\/package-refactor\/backend-platform-extraction\/standalone-backend-extraction-manifest\.json was not materialized/,
     );
   } finally {
     await rm(result.materializedRoot, { recursive: true, force: true });

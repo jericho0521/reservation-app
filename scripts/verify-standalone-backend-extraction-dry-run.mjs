@@ -82,15 +82,11 @@ const generatedBackendRootMetadataFiles = [
 ];
 
 const requiredGeneratedRootScripts = [
-  "backend-platform:verify-extraction-manifest",
-  "backend-platform:verify-extraction-dry-run",
-  "backend-platform:verify-package-graph-boundary",
-  "backend-platform:verify-extracted-workspace-readiness",
   "backend-platform:verify-standalone-api-skeleton",
   "database:migration-index:check",
-  "database:verify-migration-bundle",
   "packages:build",
   "packages:test",
+  "phase-11:verify-generated-backend-workspace",
 ];
 
 const forbiddenGeneratedRootScriptNames = new Set([
@@ -142,6 +138,40 @@ const packageDependencySections = [
   "optionalDependencies",
   "peerDependencies",
 ];
+
+const generatedRootScriptDefaultInputFiles = new Map([
+  [
+    "scripts/verify-standalone-backend-extraction-manifest.mjs",
+    [
+      "docs/package-refactor/backend-platform-extraction/standalone-backend-extraction-manifest.json",
+    ],
+  ],
+  [
+    "scripts/verify-standalone-backend-extraction-dry-run.mjs",
+    [
+      "docs/package-refactor/backend-platform-extraction/standalone-backend-extraction-manifest.json",
+    ],
+  ],
+  [
+    "scripts/verify-extracted-backend-workspace-readiness.mjs",
+    [
+      "docs/package-refactor/backend-platform-extraction/standalone-backend-extraction-manifest.json",
+    ],
+  ],
+  [
+    "scripts/generate-database-migration-index.mjs",
+    [
+      "docs/package-refactor/backend-platform-extraction/database-migration-bundle-manifest.json",
+    ],
+  ],
+  [
+    "scripts/verify-database-migration-bundle.mjs",
+    [
+      "docs/package-refactor/backend-platform-extraction/database-sql-ownership-inventory.json",
+      "docs/package-refactor/backend-platform-extraction/database-migration-bundle-manifest.json",
+    ],
+  ],
+]);
 
 export async function verifyStandaloneBackendExtractionDryRun(options = {}) {
   const repoRoot = path.resolve(options.repoRoot ?? process.cwd());
@@ -417,14 +447,9 @@ async function createGeneratedBackendWorkspaceMetadata({
       scripts: {
         "packages:build": createFilteredPackageScript(buildPackages, "build"),
         "packages:test": createFilteredPackageScript(testPackages, "test"),
-        "backend-platform:verify-extraction-manifest": "node scripts/verify-standalone-backend-extraction-manifest.mjs",
-        "backend-platform:verify-extraction-dry-run": "node scripts/verify-standalone-backend-extraction-dry-run.mjs",
-        "backend-platform:verify-package-graph-boundary": "node scripts/verify-backend-package-graph-boundary.mjs",
-        "backend-platform:verify-extracted-workspace-readiness": "node scripts/verify-extracted-backend-workspace-readiness.mjs",
         "backend-platform:verify-standalone-api-skeleton": "corepack pnpm --filter @reservation-platform/api run build && corepack pnpm --filter @reservation-platform/contract-types run build && corepack pnpm --filter @reservation-platform/standalone-api-skeleton run test",
         "database:migration-index:check": "node scripts/generate-database-migration-index.mjs --check",
-        "database:verify-migration-bundle": "corepack pnpm run database:migration-index:check && node scripts/verify-database-migration-bundle.mjs",
-        "phase-11:verify-generated-backend-workspace": "corepack pnpm run backend-platform:verify-extraction-manifest && corepack pnpm run backend-platform:verify-extraction-dry-run && corepack pnpm run backend-platform:verify-package-graph-boundary && corepack pnpm run backend-platform:verify-extracted-workspace-readiness && corepack pnpm run backend-platform:verify-standalone-api-skeleton && corepack pnpm run database:verify-migration-bundle",
+        "phase-11:verify-generated-backend-workspace": "corepack pnpm run packages:build && corepack pnpm run packages:test && corepack pnpm run backend-platform:verify-standalone-api-skeleton && corepack pnpm run database:migration-index:check",
       },
     },
     pnpmWorkspaceYaml: "packages:\n  - apps/*\n  - packages/*\n",
@@ -592,6 +617,14 @@ function validateGeneratedRootScriptFileReferences(context, scripts, materialize
         context.failures.push(
           `package.json: generated backend root script ${scriptName} references ${referencedScript}, but that file was not materialized into the backend target tree`,
         );
+      }
+
+      for (const requiredInputFile of generatedRootScriptDefaultInputFiles.get(referencedScript) ?? []) {
+        if (!materializedFileSet.has(requiredInputFile)) {
+          context.failures.push(
+            `package.json: generated backend root script ${scriptName} references ${referencedScript}, whose default input ${requiredInputFile} was not materialized into the backend target tree`,
+          );
+        }
       }
     }
   }

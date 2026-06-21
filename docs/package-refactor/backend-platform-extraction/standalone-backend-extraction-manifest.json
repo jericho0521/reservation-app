@@ -187,17 +187,23 @@
       "id": "backend-root-verifier-scripts",
       "classification": "copy-candidate",
       "currentPaths": [
-        "scripts/verify-standalone-backend-extraction-manifest.mjs",
-        "scripts/verify-standalone-backend-extraction-dry-run.mjs",
-        "scripts/verify-backend-package-graph-boundary.mjs",
-        "scripts/verify-extracted-backend-workspace-readiness.mjs",
-        "scripts/generate-database-migration-index.mjs",
-        "scripts/verify-database-migration-bundle.mjs"
+        "scripts/generate-database-migration-index.mjs"
       ],
       "targetBackendPaths": ["scripts"],
       "ownershipCategory": "operations",
       "status": "ready-for-extraction-planning",
-      "rationale": "Generated backend root extraction, package-graph, readiness, and database verification scripts invoke these backend-owned verifier files via node scripts/*.mjs. They must be materialized into the standalone backend candidate so generated root scripts do not point at absent current-repo files."
+      "rationale": "Generated backend root database migration-index checks invoke this backend-owned script via node scripts/*.mjs. Monorepo-to-candidate extraction, package-graph, readiness, and migration-bundle reconciliation guardrails stay in the current repository instead of becoming post-extraction backend root scripts."
+    },
+    {
+      "id": "backend-root-verifier-input-manifests",
+      "classification": "copy-candidate",
+      "currentPaths": [
+        "docs/package-refactor/backend-platform-extraction/database-migration-bundle-manifest.json"
+      ],
+      "targetBackendPaths": ["docs/package-refactor/backend-platform-extraction"],
+      "ownershipCategory": "operations",
+      "status": "ready-for-extraction-planning",
+      "rationale": "The generated backend root database migration-index check reads this repo-relative manifest by default. It must be materialized with the script so the candidate root command does not fail immediately on a missing default input file."
     },
     {
       "id": "frontend-pages-and-booking-ui",

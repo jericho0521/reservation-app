@@ -85,6 +85,11 @@ flowchart LR
 - [Phase 22: Frontend Repo Materialization](phase-22-frontend-repo-materialization.md)
 - [Phase 23: SDK Package Materialization](phase-23-sdk-package-materialization.md)
 - [Phase 24: Cross-Repo Adoption Proof](phase-24-cross-repo-adoption-proof.md)
+- [Phase 25: Backend Product Repository Contract](phase-25-backend-product-repo-contract.md)
+- [Phase 26: Frontend Consumer Detachment](phase-26-frontend-consumer-detachment.md)
+- [Phase 27: SDK Public Release Surface](phase-27-sdk-public-release-surface.md)
+- [Phase 28: Live Backend and External Consumer Proof](phase-28-live-backend-and-external-consumer-proof.md)
+- [Phase 29: Subagent Execution Matrix](phase-29-subagent-execution-matrix.md)
 - [Remaining Modularity Gaps Index](remaining-modularity-gaps.md)
 - [Focused Backend Platform, SDK, and Frontend Split Execution Plan](plugin-platform-split/README.md)
 
@@ -133,3 +138,10 @@ Phases 20 through 24 are the separation completion plan. They make the repo
 ownership source of truth explicit, materialize backend and frontend repository
 candidates, prove the SDK as the installable contract, and finish with a
 cross-repo adoption proof for a frontend that starts outside this monorepo.
+
+Phases 25 through 29 are the repo-first plug-and-play product plan. They restate
+the intended ownership model in execution-ready terms: the backend GitHub
+repository is the product, the SDK is the only package a new frontend installs,
+the current frontend becomes a replaceable consumer, live proof must use a real
+standalone backend target, and subagents must update downstream phases whenever
+shared assumptions change.

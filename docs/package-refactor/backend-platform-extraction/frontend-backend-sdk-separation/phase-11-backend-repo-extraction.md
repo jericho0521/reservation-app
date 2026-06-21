@@ -117,6 +117,10 @@ Implemented artifacts:
   maps `apps/api` and backend-owned package candidates to planned backend
   paths, readiness status, visibility intent, consumer-safety, and excluded
   frontend concerns.
+- `backend-platform:verify-package-graph-boundary` now locally checks the
+  Phase 11 backend package/app manifest inventory, blocks frontend-only
+  dependencies from backend-owned package manifests, and keeps the SDK manifest
+  limited to consumer-safe HTTP-only dependencies.
 - This phase file now references the actual manifest and verifier script names
   instead of stale `extraction-manifest.json` and
   `extraction-dry-run-plan.json` inputs.
@@ -126,6 +130,7 @@ Exact local command list:
 ```powershell
 corepack pnpm run backend-platform:verify-extraction-manifest
 corepack pnpm run backend-platform:verify-extraction-dry-run
+corepack pnpm run backend-platform:verify-package-graph-boundary
 corepack pnpm run backend-platform:verify-standalone-api-skeleton
 corepack pnpm run backend-platform:verify-standalone-deployment-config
 corepack pnpm run database:verify-migration-bundle
@@ -135,9 +140,12 @@ git diff --check
 ```
 
 These commands are safe in the current repository. They are local build, test,
-type-check, manifest, dry-run, migration-bundle, and readiness checks, except
-for `database:live-proof`. `database:verify-migration-bundle` is the read-only
-database bundle check. `database:live-proof` skips when
+type-check, manifest, package-graph, dry-run, migration-bundle, and readiness
+checks, except for `database:live-proof`.
+`backend-platform:verify-package-graph-boundary` reads package manifests only;
+it does not install, publish, copy files, or create a repository.
+`database:verify-migration-bundle` is the read-only database bundle check.
+`database:live-proof` skips when
 `RESERVATION_DATABASE_LIVE_URL` or `psql` is not configured, but when they are
 configured, even without `--strict`, it connects to the target PostgreSQL
 database and applies the package migration plan through `psql`. The strict
@@ -150,6 +158,8 @@ Still not complete:
 
 - actual standalone repository creation
 - final backend package renaming and visibility decisions
+- actual extracted-repository build/test execution outside the current Next.js
+  app workspace
 - live deployed `/v1` backend proof
 - disposable database migration/RLS/idempotency proof
 - strict SDK/direct HTTP live parity proof

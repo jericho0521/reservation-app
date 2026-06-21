@@ -76,6 +76,10 @@ flowchart LR
 - [Phase 13: Backend Platform Product Repository](phase-13-backend-platform-product-repo.md)
 - [Phase 14: SDK Release and Consumer Contract](phase-14-sdk-release-consumer-contract.md)
 - [Phase 15: Operations, Deprecation, and Release Readiness](phase-15-operations-deprecation-release.md)
+- [Phase 16: Physical Backend Repository Split](phase-16-physical-backend-repo-split.md)
+- [Phase 17: Physical Frontend Repository Split](phase-17-physical-frontend-repo-split.md)
+- [Phase 18: SDK Distribution and Contract](phase-18-sdk-distribution-and-contract.md)
+- [Phase 19: Cross-Repo Release Proof](phase-19-cross-repo-release-proof.md)
 - [Remaining Modularity Gaps Index](remaining-modularity-gaps.md)
 
 ## Separation Rules
@@ -113,3 +117,8 @@ Phases 12 through 15 are the productization plan. They prove the frontend can
 live as a separate consumer repo, define the backend platform as the product
 repo, make the SDK installable by unrelated frontends, and document release,
 deprecation, rollback, and support rules.
+
+Phases 16 through 19 are the physical repository split plan. They turn the
+monorepo readiness work into separate backend, frontend, and SDK adoption
+proofs, then require a cross-repo release chain before the platform is treated
+as plug-and-play infrastructure.

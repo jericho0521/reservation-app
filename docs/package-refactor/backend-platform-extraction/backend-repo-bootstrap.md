@@ -48,12 +48,14 @@ corepack pnpm run backend-platform:verify-standalone-api-skeleton
 corepack pnpm run database:verify-migration-bundle
 corepack pnpm run backend-platform:verify-extraction-manifest
 corepack pnpm run backend-platform:verify-extraction-dry-run
+corepack pnpm run backend-platform:verify-package-graph-boundary
 ```
 
 These commands are safe in the current repository. They are local build, test,
-type-check, manifest, and dry-run checks. They do not create a new repository,
-copy files, publish packages, deploy a service, or run live network/database
-proofs.
+type-check, manifest, dry-run, and package-graph checks. The package-graph
+boundary command reads backend-owned package/app `package.json` files only. It
+does not create a new repository, copy files, publish packages, deploy a
+service, install dependencies, or run live network/database proofs.
 
 The standalone deployment config parser can be checked without live services:
 
@@ -190,7 +192,8 @@ these exclusions:
 ```powershell
 corepack pnpm run backend-platform:verify-extraction-manifest
 corepack pnpm run backend-platform:verify-extraction-dry-run
+corepack pnpm run backend-platform:verify-package-graph-boundary
 ```
 
-Both commands are safe to run locally. They are read-only checks over the
-manifest and current file tree.
+These commands are safe to run locally. They are read-only checks over the
+manifest, current file tree, and backend package manifests.

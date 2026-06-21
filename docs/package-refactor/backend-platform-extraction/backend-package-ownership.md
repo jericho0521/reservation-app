@@ -54,9 +54,15 @@ Run these read-only guardrails from the current repository root:
 ```powershell
 corepack pnpm run backend-platform:verify-extraction-manifest
 corepack pnpm run backend-platform:verify-extraction-dry-run
+corepack pnpm run backend-platform:verify-package-graph-boundary
 ```
 
-Both commands are safe locally. They validate manifest shape, source existence,
+These commands are safe locally. The manifest and dry-run checks validate
+manifest shape, source existence,
 target backend paths, frontend exclusions, compatibility-shim treatment, target
 collisions, and generated artifact exclusion. They do not copy files or create
-a backend repository.
+a backend repository. The package-graph boundary command is also safe locally:
+it reads backend-owned package/app `package.json` files, confirms the expected
+Phase 11 manifests exist, rejects frontend-only dependencies in backend
+packages, and keeps `@reservation-platform/sdk` free of backend-only runtime
+dependencies.

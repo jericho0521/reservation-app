@@ -2,6 +2,8 @@
 
 import { pathToFileURL } from "node:url";
 
+import { verifyCompatibilityRouteRemovalGate } from "./verify-compatibility-route-removal-gate.mjs";
+import { verifyCurrentFrontendConsumerRepoReadiness } from "./verify-current-frontend-consumer-repo-readiness.mjs";
 import { readLiveDatabaseConfig } from "./verify-database-live-proof.mjs";
 import { readLiveBackendParityConfig } from "./verify-live-backend-parity.mjs";
 import { readSdkRegistryInstallConfig } from "./verify-sdk-registry-install.mjs";
@@ -48,6 +50,25 @@ const proofSurfaces = [
     safeCommand: "corepack pnpm run sdk:registry-install-proof",
     strictCommand: "corepack pnpm run sdk:registry-install-proof:strict",
     read: (env, argv) => fromStatusParser(readSdkRegistryInstallConfig(env, { argv })),
+  },
+];
+
+const localPrerequisiteSurfaces = [
+  {
+    id: "current_frontend_consumer_repo_readiness",
+    label: "Current frontend consumer repo readiness",
+    safeCommand: "corepack pnpm run current-frontend:consumer-repo-readiness",
+    strictCommand: "corepack pnpm run current-frontend:consumer-repo-readiness",
+    verifierName: "currentFrontendConsumerRepoReadiness",
+    verify: verifyCurrentFrontendConsumerRepoReadiness,
+  },
+  {
+    id: "compatibility_route_removal_gate",
+    label: "Compatibility route removal gate readiness",
+    safeCommand: "corepack pnpm run backend-platform:verify-compatibility-route-removal-gate",
+    strictCommand: "corepack pnpm run backend-platform:verify-compatibility-route-removal-gate",
+    verifierName: "compatibilityRouteRemovalGate",
+    verify: verifyCompatibilityRouteRemovalGate,
   },
 ];
 
@@ -136,6 +157,69 @@ function readSurface(surface, env) {
   };
 }
 
+function localPrerequisiteStateFromResult(result) {
+  const failures = Array.isArray(result?.failures) ? result.failures : [];
+  const ready = result?.ok === true && failures.length === 0;
+
+  return {
+    status: ready ? "ready" : "fail",
+    ready,
+    shouldSkip: false,
+    shouldFail: !ready,
+    message: ready
+      ? "local prerequisite gate passed."
+      : failures.length > 0
+        ? failures.join(" ")
+        : "local prerequisite gate failed.",
+    missing: [],
+    configured: [],
+    errors: failures,
+  };
+}
+
+function localPrerequisiteStateFromError(error) {
+  const message = error instanceof Error ? error.message : String(error);
+
+  return {
+    status: "fail",
+    ready: false,
+    shouldSkip: false,
+    shouldFail: true,
+    message,
+    missing: [],
+    configured: [],
+    errors: [message],
+  };
+}
+
+async function readLocalPrerequisiteSurface(surface, options = {}) {
+  const verifier = options.localPrerequisiteVerifiers?.[surface.verifierName] ?? surface.verify;
+  const verifierOptions = {
+    ...(options.localPrerequisiteOptions?.[surface.verifierName] ?? {}),
+  };
+
+  if (options.repoRoot && !Object.hasOwn(verifierOptions, "repoRoot")) {
+    verifierOptions.repoRoot = options.repoRoot;
+  }
+
+  let state;
+  try {
+    state = localPrerequisiteStateFromResult(await verifier(verifierOptions));
+  } catch (error) {
+    state = localPrerequisiteStateFromError(error);
+  }
+
+  return {
+    id: surface.id,
+    label: surface.label,
+    kind: "local_prerequisite",
+    safeCommand: surface.safeCommand,
+    strictCommand: surface.strictCommand,
+    safe: state,
+    strict: state,
+  };
+}
+
 export function readLivePlatformProofReadiness(env, options = {}) {
   const argv = options.argv ?? [];
   const strict =
@@ -151,6 +235,32 @@ export function readLivePlatformProofReadiness(env, options = {}) {
     strictReady,
     status,
     shouldFail: strict && !strictReady,
+    surfaces,
+    strictFailures,
+  };
+}
+
+export async function verifyLivePlatformProofReadiness(env, options = {}) {
+  const parsed = readLivePlatformProofReadiness(env, options);
+  const localSurfaces = await Promise.all(
+    localPrerequisiteSurfaces.map((surface) => readLocalPrerequisiteSurface(surface, options)),
+  );
+  const surfaces = [
+    ...localSurfaces,
+    ...parsed.surfaces.map((surface) => ({
+      ...surface,
+      kind: "live_proof_readiness",
+    })),
+  ];
+  const strictFailures = surfaces.filter((surface) => surface.strict.status !== "ready");
+  const strictReady = strictFailures.length === 0;
+  const status = strictReady ? "ready" : (parsed.strict ? "fail" : "skip");
+
+  return {
+    ...parsed,
+    strictReady,
+    status,
+    shouldFail: parsed.strict && !strictReady,
     surfaces,
     strictFailures,
   };
@@ -178,8 +288,8 @@ function formatSurfaceState(state) {
   return parts.join(" | ");
 }
 
-function main() {
-  const parsed = readLivePlatformProofReadiness(process.env, { argv: process.argv.slice(2) });
+async function main() {
+  const parsed = await verifyLivePlatformProofReadiness(process.env, { argv: process.argv.slice(2) });
   console.log("Phase 10 live platform proof readiness checked.");
   console.log("No network, database, registry, install, publish, or live mutation calls were made.");
 
@@ -189,20 +299,24 @@ function main() {
 
   if (parsed.shouldFail) {
     console.error(
-      `FAILED Phase 10 live platform proof readiness: ${parsed.strictFailures.length} strict proof surface(s) are not ready to run.`,
+      `FAILED Phase 10 live platform proof readiness: ${parsed.strictFailures.length} strict readiness surface(s) are not ready to run.`,
     );
     process.exitCode = 1;
     return;
   }
 
   if (parsed.strictReady) {
-    console.log("PASS all existing strict live proof commands are configured enough to run. This is not live proof execution.");
+    console.log("PASS all strict readiness surfaces are ready. This is not live proof execution.");
     return;
   }
 
-  console.log("SKIPPED strict live platform proof readiness. Safe mode reported missing or skipped strict proof requirements only.");
+  console.log("SKIPPED strict live platform proof readiness. Safe mode reported readiness surfaces that are not strict-ready.");
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
-  main();
+  main().catch((error) => {
+    console.error("Phase 10 live platform proof readiness failed unexpectedly:");
+    console.error(error instanceof Error ? error.message : error);
+    process.exitCode = 1;
+  });
 }

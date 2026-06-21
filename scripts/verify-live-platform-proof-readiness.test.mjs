@@ -3,7 +3,7 @@ import test from "node:test";
 
 import {
   livePlatformProofReadinessStrictEnvName,
-  readLivePlatformProofReadiness,
+  verifyLivePlatformProofReadiness,
 } from "./verify-live-platform-proof-readiness.mjs";
 
 function validReadinessEnv(overrides = {}) {
@@ -34,14 +34,35 @@ function byId(parsed, id) {
   return parsed.surfaces.find((surface) => surface.id === id);
 }
 
-test("live platform proof readiness safely skips when env is absent", () => {
-  const parsed = readLivePlatformProofReadiness({}, { argv: [] });
+function passingLocalPrerequisiteVerifiers() {
+  return {
+    currentFrontendConsumerRepoReadiness: async () => ({ ok: true, failures: [] }),
+    compatibilityRouteRemovalGate: async () => ({ ok: true, failures: [] }),
+  };
+}
+
+test("live platform proof readiness includes passing local prerequisite surfaces in the current repo", async () => {
+  const parsed = await verifyLivePlatformProofReadiness({}, { argv: [] });
+
+  assert.equal(byId(parsed, "current_frontend_consumer_repo_readiness").safe.status, "ready");
+  assert.equal(byId(parsed, "current_frontend_consumer_repo_readiness").strict.status, "ready");
+  assert.equal(byId(parsed, "compatibility_route_removal_gate").safe.status, "ready");
+  assert.equal(byId(parsed, "compatibility_route_removal_gate").strict.status, "ready");
+});
+
+test("live platform proof readiness safely skips live proof env surfaces when env is absent", async () => {
+  const parsed = await verifyLivePlatformProofReadiness({}, {
+    argv: [],
+    localPrerequisiteVerifiers: passingLocalPrerequisiteVerifiers(),
+  });
 
   assert.equal(parsed.strict, false);
   assert.equal(parsed.status, "skip");
   assert.equal(parsed.shouldFail, false);
   assert.equal(parsed.strictReady, false);
-  assert.equal(parsed.surfaces.length, 4);
+  assert.equal(parsed.surfaces.length, 6);
+  assert.equal(byId(parsed, "current_frontend_consumer_repo_readiness").safe.status, "ready");
+  assert.equal(byId(parsed, "compatibility_route_removal_gate").safe.status, "ready");
   assert.equal(byId(parsed, "standalone_api_deployment_config").safe.status, "skip");
   assert.equal(byId(parsed, "database_live_migration_proof").safe.status, "skip");
   assert.equal(byId(parsed, "sdk_direct_live_parity").safe.status, "skip");
@@ -52,8 +73,11 @@ test("live platform proof readiness safely skips when env is absent", () => {
   assert.equal(byId(parsed, "sdk_registry_install_proof").strict.status, "fail");
 });
 
-test("live platform proof readiness fails strict mode when proof surfaces are unconfigured", () => {
-  const parsed = readLivePlatformProofReadiness({}, { argv: ["--strict"] });
+test("live platform proof readiness fails strict mode when proof surfaces are unconfigured", async () => {
+  const parsed = await verifyLivePlatformProofReadiness({}, {
+    argv: ["--strict"],
+    localPrerequisiteVerifiers: passingLocalPrerequisiteVerifiers(),
+  });
 
   assert.equal(parsed.strict, true);
   assert.equal(parsed.status, "fail");
@@ -70,8 +94,47 @@ test("live platform proof readiness fails strict mode when proof surfaces are un
   );
 });
 
-test("live platform proof readiness accepts fully configured strict command prerequisites", () => {
-  const parsed = readLivePlatformProofReadiness(validReadinessEnv(), { argv: ["--strict"] });
+test("live platform proof readiness includes local prerequisite failures in strict failure list", async () => {
+  const parsed = await verifyLivePlatformProofReadiness(validReadinessEnv(), {
+    argv: ["--strict"],
+    localPrerequisiteVerifiers: {
+      currentFrontendConsumerRepoReadiness: async () => ({
+        ok: false,
+        failures: ["frontend consumer inventory drifted"],
+      }),
+      compatibilityRouteRemovalGate: async () => ({
+        ok: false,
+        failures: ["compatibility route inventory drifted"],
+      }),
+    },
+  });
+
+  assert.equal(parsed.strict, true);
+  assert.equal(parsed.status, "fail");
+  assert.equal(parsed.shouldFail, true);
+  assert.equal(parsed.strictReady, false);
+  assert.deepEqual(
+    parsed.strictFailures.map((surface) => surface.id),
+    [
+      "current_frontend_consumer_repo_readiness",
+      "compatibility_route_removal_gate",
+    ],
+  );
+  assert.match(
+    byId(parsed, "current_frontend_consumer_repo_readiness").strict.message,
+    /frontend consumer inventory drifted/,
+  );
+  assert.match(
+    byId(parsed, "compatibility_route_removal_gate").strict.message,
+    /compatibility route inventory drifted/,
+  );
+});
+
+test("live platform proof readiness accepts fully configured strict command prerequisites", async () => {
+  const parsed = await verifyLivePlatformProofReadiness(validReadinessEnv(), {
+    argv: ["--strict"],
+    localPrerequisiteVerifiers: passingLocalPrerequisiteVerifiers(),
+  });
 
   assert.equal(parsed.strict, true);
   assert.equal(parsed.status, "ready");
@@ -81,13 +144,16 @@ test("live platform proof readiness accepts fully configured strict command prer
   assert.ok(parsed.surfaces.every((surface) => surface.strict.status === "ready"));
 });
 
-test("live platform proof readiness strict mode requires mutation and registry install opt-ins", () => {
-  const parsed = readLivePlatformProofReadiness(
+test("live platform proof readiness strict mode requires mutation and registry install opt-ins", async () => {
+  const parsed = await verifyLivePlatformProofReadiness(
     validReadinessEnv({
       RESERVATION_PLATFORM_LIVE_ALLOW_MUTATIONS: undefined,
       RESERVATION_SDK_REGISTRY_ALLOW_INSTALL: undefined,
     }),
-    { argv: ["--strict"] },
+    {
+      argv: ["--strict"],
+      localPrerequisiteVerifiers: passingLocalPrerequisiteVerifiers(),
+    },
   );
 
   assert.equal(parsed.status, "fail");
@@ -99,12 +165,15 @@ test("live platform proof readiness strict mode requires mutation and registry i
   assert.match(byId(parsed, "sdk_registry_install_proof").strict.message, /RESERVATION_SDK_REGISTRY_ALLOW_INSTALL=1/);
 });
 
-test("live platform proof readiness can enter strict mode through its env flag", () => {
-  const parsed = readLivePlatformProofReadiness(
+test("live platform proof readiness can enter strict mode through its env flag", async () => {
+  const parsed = await verifyLivePlatformProofReadiness(
     {
       [livePlatformProofReadinessStrictEnvName]: "1",
     },
-    { argv: [] },
+    {
+      argv: [],
+      localPrerequisiteVerifiers: passingLocalPrerequisiteVerifiers(),
+    },
   );
 
   assert.equal(parsed.strict, true);
@@ -112,15 +181,18 @@ test("live platform proof readiness can enter strict mode through its env flag",
   assert.equal(parsed.shouldFail, true);
 });
 
-test("safe readiness ignores individual proof strict flags and remains non-failing", () => {
-  const parsed = readLivePlatformProofReadiness(
+test("safe readiness ignores individual proof strict flags and remains non-failing", async () => {
+  const parsed = await verifyLivePlatformProofReadiness(
     {
       RESERVATION_DATABASE_LIVE_STRICT: "1",
       RESERVATION_PLATFORM_LIVE_STRICT: "1",
       RESERVATION_SDK_REGISTRY_STRICT: "1",
       RESERVATION_STANDALONE_API_DEPLOYMENT_CONFIG_STRICT: "1",
     },
-    { argv: [] },
+    {
+      argv: [],
+      localPrerequisiteVerifiers: passingLocalPrerequisiteVerifiers(),
+    },
   );
 
   assert.equal(parsed.strict, false);
@@ -132,8 +204,11 @@ test("safe readiness ignores individual proof strict flags and remains non-faili
   assert.equal(byId(parsed, "sdk_registry_install_proof").safe.status, "skip");
 });
 
-test("safe readiness reports strict readiness when all strict prerequisites are configured", () => {
-  const parsed = readLivePlatformProofReadiness(validReadinessEnv(), { argv: [] });
+test("safe readiness reports strict readiness when all strict prerequisites are configured", async () => {
+  const parsed = await verifyLivePlatformProofReadiness(validReadinessEnv(), {
+    argv: [],
+    localPrerequisiteVerifiers: passingLocalPrerequisiteVerifiers(),
+  });
 
   assert.equal(parsed.strict, false);
   assert.equal(parsed.status, "ready");

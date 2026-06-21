@@ -79,8 +79,23 @@ Phase 10 now has a CI-safe readiness orchestrator:
   `node --import tsx --test scripts\verify-live-platform-proof-readiness.test.mjs`
 
 The readiness orchestrator is implemented in
-`scripts/verify-live-platform-proof-readiness.mjs`. It imports the existing env
-parsers from:
+`scripts/verify-live-platform-proof-readiness.mjs`. It now combines local
+frontend/backend separation prerequisite gates with the existing live proof env
+parsers.
+
+The local prerequisite gates are:
+
+- `corepack pnpm run current-frontend:consumer-repo-readiness`
+- `corepack pnpm run backend-platform:verify-compatibility-route-removal-gate`
+
+These prerequisite surfaces are local-only checks. They validate current
+frontend consumer repository readiness and compatibility route removal gate
+readiness before Phase 10 reports strict live-proof readiness. They do not
+create a frontend repository, delete compatibility routes, install packages,
+publish packages, deploy a backend, open a browser, call a live backend, or
+mutate live data.
+
+The live proof readiness surfaces still import the existing env parsers from:
 
 - `scripts/verify-standalone-api-deployment-config.mjs`
 - `scripts/verify-database-live-proof.mjs`
@@ -89,9 +104,12 @@ parsers from:
 
 It does not run the strict proof commands and does not make network, database,
 registry, install, publish, or live mutation calls. Safe mode reports which
-existing proof surfaces are skipped, ready, or malformed. Strict readiness mode
-fails unless the existing strict proof commands are configured enough to run:
+readiness surfaces are skipped, ready, malformed, or locally failing. Strict
+readiness mode fails unless the local prerequisite gates pass and the existing
+strict proof commands are configured enough to run:
 
+- `corepack pnpm run current-frontend:consumer-repo-readiness`
+- `corepack pnpm run backend-platform:verify-compatibility-route-removal-gate`
 - `corepack pnpm run backend-platform:verify-standalone-deployment-config:strict`
 - `corepack pnpm run database:live-proof:strict`
 - `corepack pnpm run sdk:live-parity:strict`
@@ -103,11 +121,14 @@ readiness orchestrator before the existing strict proof commands, then still
 runs those strict commands unchanged.
 
 This is readiness infrastructure only. It proves that the strict live proof
-environment contract can be checked locally and in CI without touching live
-systems. It does not prove deployed backend health, disposable database
-migration application, RLS/tenant isolation, durable idempotency, SDK/direct
-parity, registry package install, or optional chat behavior until the strict
-commands themselves pass against disposable live infrastructure.
+environment contract and local separation prerequisites can be checked locally
+and in CI without touching live systems. It does not prove deployed backend
+health, disposable database migration application, RLS/tenant isolation, durable
+idempotency, SDK/direct parity, registry package install, optional chat
+behavior, route deletion, frontend repository creation, or package publishing
+until the strict commands themselves pass against disposable live
+infrastructure and the later removal/repository phases explicitly perform
+their own actions.
 
 ## Acceptance Criteria
 

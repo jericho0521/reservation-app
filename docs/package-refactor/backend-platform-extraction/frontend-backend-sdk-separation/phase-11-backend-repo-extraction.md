@@ -75,7 +75,7 @@ the backend platform repository.
 - Updated standalone backend extraction manifest, when package ownership changes.
 - Read-only extraction manifest verifier command:
   `corepack pnpm run backend-platform:verify-extraction-manifest`.
-- Read-only extraction dry-run verifier command:
+- CI-safe extraction dry-run verifier command:
   `corepack pnpm run backend-platform:verify-extraction-dry-run`.
 - Read-only extracted workspace metadata/readiness verifier command:
   `corepack pnpm run backend-platform:verify-extracted-workspace-readiness`.
@@ -105,9 +105,11 @@ proof requirement.
 
 ## Partial Implementation Result
 
-Phase 11 is partially implemented as readiness documentation and existing
-read-only guardrails only. No source files were moved, copied, deleted, or
-published, and no separate backend repository was created.
+Phase 11 is partially implemented as readiness documentation and CI-safe
+guardrails. No source files were moved, deleted, or published, no git-tracked
+target files were created, and no separate backend repository was created. The
+extraction dry-run does create a disposable OS temporary target tree candidate
+and removes it by default.
 
 Implemented artifacts:
 
@@ -131,6 +133,13 @@ Implemented artifacts:
   workspace dependency resolution among extracted packages, root/package script
   claims used by bootstrap and release gates, frontend/current-app source
   exclusion, and SDK consumer-safety.
+- `backend-platform:verify-extraction-dry-run` now materializes the planned
+  move/copy entries into an OS temporary backend target tree candidate, validates
+  that the materialized files stay under backend-allowed prefixes, blocks
+  frontend/current-app target areas such as `app`, `components`, `lib`,
+  `public`, `types`, `supabase`, `.next`, `node_modules`, and
+  `dist-packages`, verifies expected package manifests exist in applicable
+  target package roots, and deletes the temporary tree by default.
 - This phase file now references the actual manifest and verifier script names
   instead of stale `extraction-manifest.json` and
   `extraction-dry-run-plan.json` inputs.
@@ -158,7 +167,15 @@ it does not install, publish, copy files, or create a repository.
 `backend-platform:verify-extracted-workspace-readiness` is also read-only. It
 proves the extracted workspace/package metadata model is coherent enough for
 CI-safe planning, including manifest target-path alignment and local workspace
-dependency closure. It does not create or populate the backend repository,
+dependency closure.
+`backend-platform:verify-extraction-dry-run` now copies only manifest
+move/copy candidate files into an OS temporary materialized target tree,
+validates that candidate, and removes it automatically. It does not mutate
+source files, git-tracked paths, or create a real repository, and it does not
+copy compatibility-shim or excluded entries. For local inspection only,
+`STANDALONE_BACKEND_EXTRACTION_KEEP_MATERIALIZED_TREE=1` keeps the generated
+OS temp directory after the run; this is a boolean debug option, not a custom
+path, so it cannot point inside the repository. The verifier still does not
 install dependencies, run a clean extracted-repository build/test, publish
 packages, deploy a backend, call the network, or connect to a database.
 `database:verify-migration-bundle` is the read-only database bundle check.
@@ -176,8 +193,8 @@ Still not complete:
 - actual standalone repository creation
 - final backend package renaming and visibility decisions
 - actual extracted-repository install/build/test execution outside the current
-  Next.js app workspace; the new verifier is metadata/readiness model proof
-  only
+  Next.js app workspace; the dry-run now materializes and validates a temporary
+  target tree candidate only
 - live deployed `/v1` backend proof
 - disposable database migration/RLS/idempotency proof
 - strict SDK/direct HTTP live parity proof

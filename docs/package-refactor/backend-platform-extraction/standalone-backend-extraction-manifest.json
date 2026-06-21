@@ -40,6 +40,15 @@
       "rationale": "The current Supabase adapter README should inform backend adapter documentation but needs platform-owned wording."
     },
     {
+      "id": "adapter-reservations-supabase-package-manifest",
+      "classification": "copy-candidate",
+      "currentPaths": ["packages/reservations-supabase/package.json"],
+      "targetBackendPaths": ["packages/adapter-supabase/package.json"],
+      "ownershipCategory": "adapter-supabase",
+      "status": "requires-reconciliation",
+      "rationale": "The existing Supabase adapter package manifest is copied into the materialized backend target candidate so the expected adapter package root has a concrete package.json placeholder until final package naming and visibility are reconciled."
+    },
+    {
       "id": "adapter-reservations-supabase-package-sql",
       "classification": "compatibility-shim",
       "currentPaths": ["packages/reservations-supabase/sql"],

@@ -1,13 +1,19 @@
-import { lstat, readFile, readdir } from "node:fs/promises";
-import path from "node:path";
+#!/usr/bin/env node
 
-const repoRoot = process.cwd();
-const manifestPath = process.env.STANDALONE_BACKEND_EXTRACTION_MANIFEST_PATH
-  ? path.resolve(process.env.STANDALONE_BACKEND_EXTRACTION_MANIFEST_PATH)
-  : path.join(
-    repoRoot,
-    "docs/package-refactor/backend-platform-extraction/standalone-backend-extraction-manifest.json",
-  );
+import {
+  copyFile,
+  lstat,
+  mkdir,
+  mkdtemp,
+  readFile,
+  readdir,
+  rm,
+} from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
+import { pathToFileURL } from "node:url";
+
+import { expectedExtractedBackendPackages } from "./verify-extracted-backend-workspace-readiness.mjs";
 
 const planClassifications = new Set(["move-candidate", "copy-candidate"]);
 const shimClassifications = new Set(["compatibility-shim"]);
@@ -31,6 +37,13 @@ const frontendTargetPrefixes = [
   "public",
   "types",
   "supabase",
+];
+
+const forbiddenMaterializedTargetPrefixes = [
+  ...frontendTargetPrefixes,
+  ".next",
+  "node_modules",
+  "dist-packages",
 ];
 
 const generatedDirectoryNames = new Set([
@@ -58,90 +71,113 @@ const generatedFileExtensions = new Set([
   ".tsbuildinfo",
 ]);
 
-const failures = [];
-const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
-const entries = Array.isArray(manifest.entries) ? manifest.entries : [];
-const plannedBySource = new Map();
-const plannedByTarget = new Map();
-const shimEntries = [];
-let planEntryCount = 0;
-let excludedEntryCount = 0;
+export async function verifyStandaloneBackendExtractionDryRun(options = {}) {
+  const repoRoot = path.resolve(options.repoRoot ?? process.cwd());
+  const manifestPath = options.manifestPath
+    ? path.resolve(options.manifestPath)
+    : process.env.STANDALONE_BACKEND_EXTRACTION_MANIFEST_PATH
+      ? path.resolve(process.env.STANDALONE_BACKEND_EXTRACTION_MANIFEST_PATH)
+      : path.join(
+        repoRoot,
+        "docs/package-refactor/backend-platform-extraction/standalone-backend-extraction-manifest.json",
+      );
+  const keepMaterializedTree = options.keepMaterializedTree ??
+    process.env.STANDALONE_BACKEND_EXTRACTION_KEEP_MATERIALIZED_TREE === "1";
+  const expectedPackages = options.expectedPackages ?? expectedExtractedBackendPackages;
+  const context = {
+    repoRoot,
+    failures: [],
+    plannedBySource: new Map(),
+    plannedByTarget: new Map(),
+    shimEntries: [],
+    planEntryCount: 0,
+    excludedEntryCount: 0,
+    materializedRoot: null,
+    materializedFileCount: 0,
+    materializedTreeCleanedUp: false,
+    materializedTreeKept: false,
+  };
 
-for (const [index, entry] of entries.entries()) {
-  const label = getEntryLabel(entry, index);
+  const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
+  const entries = Array.isArray(manifest.entries) ? manifest.entries : [];
 
-  if (planClassifications.has(entry?.classification)) {
-    planEntryCount += 1;
-    await planMoveOrCopyEntry(entry, label);
-    continue;
+  for (const [index, entry] of entries.entries()) {
+    const label = getEntryLabel(entry, index);
+
+    if (planClassifications.has(entry?.classification)) {
+      context.planEntryCount += 1;
+      await planMoveOrCopyEntry(context, entry, label);
+      continue;
+    }
+
+    if (shimClassifications.has(entry?.classification)) {
+      context.shimEntries.push({ entry, label });
+    }
   }
 
-  if (shimClassifications.has(entry?.classification)) {
-    shimEntries.push({ entry, label });
-    continue;
-  }
-}
-
-for (const { entry, label } of shimEntries) {
-  await validateShimEntry(entry, label);
-}
-
-for (const [index, entry] of entries.entries()) {
-  if (!excludeClassifications.has(entry?.classification)) {
-    continue;
+  for (const { entry, label } of context.shimEntries) {
+    await validateShimEntry(context, entry, label);
   }
 
-  const label = getEntryLabel(entry, index);
-  excludedEntryCount += 1;
-  await validateExcludedPathsAreNotPlanned(entry, label);
-}
+  for (const [index, entry] of entries.entries()) {
+    if (!excludeClassifications.has(entry?.classification)) {
+      continue;
+    }
 
-if (failures.length > 0) {
-  console.error("Standalone backend extraction dry-run failed:");
-  for (const failure of failures) {
-    console.error(`- ${failure}`);
+    const label = getEntryLabel(entry, index);
+    context.excludedEntryCount += 1;
+    await validateExcludedPathsAreNotPlanned(context, entry, label);
   }
-  process.exitCode = 1;
-} else {
-  console.log(
-    [
-      "Standalone backend extraction dry-run verified.",
-      `Planned files: ${plannedByTarget.size}.`,
-      `Move/copy entries: ${planEntryCount}.`,
-      `Compatibility shims: ${shimEntries.length}.`,
-      `Excluded entries: ${excludedEntryCount}.`,
-    ].join(" "),
-  );
+
+  if (context.failures.length === 0) {
+    await materializeAndValidateBackendTargetTree(context, expectedPackages, keepMaterializedTree);
+  }
+
+  return {
+    ok: context.failures.length === 0,
+    failures: context.failures,
+    plannedFileCount: context.plannedByTarget.size,
+    planEntryCount: context.planEntryCount,
+    shimEntryCount: context.shimEntries.length,
+    excludedEntryCount: context.excludedEntryCount,
+    materializedRoot: context.materializedRoot,
+    materializedFileCount: context.materializedFileCount,
+    materializedTreeCleanedUp: context.materializedTreeCleanedUp,
+    materializedTreeKept: context.materializedTreeKept,
+    plannedTargets: [...context.plannedByTarget.keys()].sort(comparePaths),
+  };
 }
 
-async function planMoveOrCopyEntry(entry, label) {
+async function planMoveOrCopyEntry(context, entry, label) {
   const currentPaths = entry.currentPaths ?? [];
   const targetPaths = entry.targetBackendPaths ?? [];
 
   if (currentPaths.length === 0 || targetPaths.length !== 1) {
-    failures.push(
+    context.failures.push(
       `${label}: dry-run mapping is ambiguous with ${currentPaths.length} currentPaths and ${targetPaths.length} targetBackendPaths; split the manifest entry or define exactly one target backend path`,
     );
     return;
   }
 
   const targetRoot = targetPaths[0];
-  validateBackendTargetPath(targetRoot, `${label}.targetBackendPaths[0]`);
+  validateBackendTargetPath(context, targetRoot, `${label}.targetBackendPaths[0]`);
 
   for (const [sourceIndex, sourceRoot] of currentPaths.entries()) {
-    validateRepoRelativePath(sourceRoot, `${label}.currentPaths[${sourceIndex}]`);
+    if (!validateRepoRelativePath(context, sourceRoot, `${label}.currentPaths[${sourceIndex}]`)) {
+      continue;
+    }
 
-    const sourceStat = await safeLstat(sourceRoot, `${label}.currentPaths[${sourceIndex}]`);
+    const sourceStat = await safeLstat(context, sourceRoot, `${label}.currentPaths[${sourceIndex}]`);
     if (!sourceStat) {
       continue;
     }
 
     const sourceFiles = sourceStat.isDirectory()
-      ? await enumerateSourceFiles(sourceRoot)
+      ? await enumerateSourceFiles(context, sourceRoot)
       : [sourceRoot];
 
     for (const sourceFile of sourceFiles.sort(comparePaths)) {
-      validateNotGeneratedArtifact(sourceFile, `${label}: ${sourceFile}`);
+      validateNotGeneratedArtifact(context, sourceFile, `${label}: ${sourceFile}`);
 
       const targetFile = mapTargetPath({
         sourceRoot,
@@ -151,37 +187,161 @@ async function planMoveOrCopyEntry(entry, label) {
         hasMultipleSourceRoots: currentPaths.length > 1,
       });
 
-      validateBackendTargetPath(targetFile, `${label}: target ${targetFile}`);
-      validateNotGeneratedArtifact(targetFile, `${label}: target ${targetFile}`);
+      validateBackendTargetPath(context, targetFile, `${label}: target ${targetFile}`);
+      validateNotGeneratedArtifact(context, targetFile, `${label}: target ${targetFile}`);
 
-      const priorSource = plannedBySource.get(sourceFile);
+      const priorSource = context.plannedBySource.get(sourceFile);
       if (priorSource) {
-        failures.push(
+        context.failures.push(
           `${label}: source ${sourceFile} is already planned by ${priorSource}; split or exclude overlapping manifest entries`,
         );
       } else {
-        plannedBySource.set(sourceFile, label);
+        context.plannedBySource.set(sourceFile, label);
       }
 
-      const priorTarget = plannedByTarget.get(targetFile);
+      const priorTarget = context.plannedByTarget.get(targetFile);
       if (priorTarget) {
-        failures.push(
+        context.failures.push(
           `${label}: target collision at ${targetFile}; already planned from ${priorTarget.sourceFile} by ${priorTarget.label}`,
         );
       } else {
-        plannedByTarget.set(targetFile, { sourceFile, label });
+        context.plannedByTarget.set(targetFile, { sourceFile, label });
       }
     }
   }
 }
 
-async function enumerateSourceFiles(sourceRoot) {
+async function materializeAndValidateBackendTargetTree(context, expectedPackages, keepMaterializedTree) {
+  const materializedRoot = await mkdtemp(path.join(tmpdir(), "standalone-backend-extraction-"));
+  context.materializedRoot = materializedRoot;
+
+  if (isPathInside(context.repoRoot, materializedRoot)) {
+    context.failures.push(
+      `materialized target tree: OS temp directory ${materializedRoot} unexpectedly resolved inside the repository root`,
+    );
+    await rm(materializedRoot, { recursive: true, force: true });
+    context.materializedTreeCleanedUp = true;
+    return;
+  }
+
+  try {
+    for (const [targetFile, planned] of [...context.plannedByTarget.entries()].sort(([left], [right]) => comparePaths(left, right))) {
+      const sourcePath = path.join(context.repoRoot, planned.sourceFile);
+      const targetPath = path.join(materializedRoot, targetFile);
+      const relativeTargetPath = path.relative(materializedRoot, targetPath);
+
+      if (relativeTargetPath.startsWith("..") || path.isAbsolute(relativeTargetPath)) {
+        context.failures.push(`${planned.label}: target ${targetFile} escapes the materialized target tree`);
+        continue;
+      }
+
+      await mkdir(path.dirname(targetPath), { recursive: true });
+      await copyFile(sourcePath, targetPath);
+      context.materializedFileCount += 1;
+    }
+
+    await validateMaterializedTargetTree(context, expectedPackages);
+  } finally {
+    if (keepMaterializedTree) {
+      context.materializedTreeKept = true;
+    } else {
+      await rm(materializedRoot, { recursive: true, force: true });
+      context.materializedTreeCleanedUp = true;
+    }
+  }
+}
+
+async function validateMaterializedTargetTree(context, expectedPackages) {
+  const materializedFiles = await enumerateMaterializedFiles(context.materializedRoot);
+
+  if (materializedFiles.length !== context.plannedByTarget.size) {
+    context.failures.push(
+      `materialized target tree: expected ${context.plannedByTarget.size} copied files, found ${materializedFiles.length}`,
+    );
+  }
+
+  for (const filePath of materializedFiles) {
+    if (!hasAllowedPrefix(filePath, backendTargetPrefixes)) {
+      context.failures.push(`${filePath}: materialized file is outside allowed backend repo areas`);
+    }
+
+    if (hasAllowedPrefix(filePath, forbiddenMaterializedTargetPrefixes)) {
+      context.failures.push(`${filePath}: materialized file is under a forbidden current frontend/current-app target`);
+    }
+
+    validateNotGeneratedArtifact(context, filePath, `materialized target ${filePath}`);
+  }
+
+  validateExpectedMaterializedPackageManifests(context, expectedPackages);
+}
+
+async function enumerateMaterializedFiles(root) {
+  const files = [];
+  await walk("");
+  return files.sort(comparePaths);
+
+  async function walk(relativeRoot) {
+    const absoluteRoot = path.join(root, relativeRoot);
+    const entriesInDirectory = await readdir(absoluteRoot, { withFileTypes: true });
+
+    for (const directoryEntry of entriesInDirectory) {
+      const childPath = joinRepoPath(relativeRoot, directoryEntry.name);
+
+      if (directoryEntry.isDirectory()) {
+        await walk(childPath);
+        continue;
+      }
+
+      if (directoryEntry.isFile()) {
+        files.push(childPath);
+      }
+    }
+  }
+}
+
+function validateExpectedMaterializedPackageManifests(context, expectedPackages) {
+  const requiredPackageManifestTargets = new Set(["apps/api/package.json"]);
+
+  for (const expectedPackage of expectedPackages) {
+    const targetPackageRoot = expectedPackage?.targetPackageRoot;
+    if (typeof targetPackageRoot !== "string" || targetPackageRoot.trim() === "") {
+      continue;
+    }
+
+    if (isPackageTargetApplicable(context, targetPackageRoot)) {
+      requiredPackageManifestTargets.add(joinRepoPath(targetPackageRoot, "package.json"));
+    }
+  }
+
+  for (const manifestTarget of [...requiredPackageManifestTargets].sort(comparePaths)) {
+    if (!context.plannedByTarget.has(manifestTarget)) {
+      context.failures.push(
+        `${manifestTarget}: expected package manifest in materialized backend target tree`,
+      );
+    }
+  }
+}
+
+function isPackageTargetApplicable(context, targetPackageRoot) {
+  for (const targetPath of context.plannedByTarget.keys()) {
+    if (
+      isSameOrChildPath(targetPath, targetPackageRoot) ||
+      isSameOrChildPath(targetPackageRoot, targetPath)
+    ) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+async function enumerateSourceFiles(context, sourceRoot) {
   const files = [];
   await walk(sourceRoot);
   return files;
 
   async function walk(repoPath) {
-    const entriesInDirectory = await readdir(path.join(repoRoot, repoPath), {
+    const entriesInDirectory = await readdir(path.join(context.repoRoot, repoPath), {
       withFileTypes: true,
     });
 
@@ -228,22 +388,25 @@ function mapTargetPath({
   return targetRoot;
 }
 
-async function validateShimEntry(entry, label) {
+async function validateShimEntry(context, entry, label) {
   if ((entry.currentPaths ?? []).length === 0) {
-    failures.push(`${label}: compatibility shims must list currentPaths as reimplementation references`);
+    context.failures.push(`${label}: compatibility shims must list currentPaths as reimplementation references`);
   }
 
   for (const sourcePath of entry.currentPaths ?? []) {
-    validateRepoRelativePath(sourcePath, `${label}.currentPaths`);
-    const sourceStat = await safeLstat(sourcePath, `${label}.currentPaths`);
+    if (!validateRepoRelativePath(context, sourcePath, `${label}.currentPaths`)) {
+      continue;
+    }
+
+    const sourceStat = await safeLstat(context, sourcePath, `${label}.currentPaths`);
     if (!sourceStat) {
       continue;
     }
 
     if (sourceStat.isDirectory()) {
-      for (const plannedSource of plannedBySource.keys()) {
+      for (const plannedSource of context.plannedBySource.keys()) {
         if (isSameOrChildPath(plannedSource, sourcePath)) {
-          failures.push(
+          context.failures.push(
             `${label}: compatibility shim directory ${sourcePath} must not contain planned extraction source ${plannedSource}`,
           );
         }
@@ -251,31 +414,31 @@ async function validateShimEntry(entry, label) {
       continue;
     }
 
-    if (plannedBySource.has(sourcePath)) {
-      failures.push(`${label}: compatibility shim ${sourcePath} must not be planned as copied verbatim`);
+    if (context.plannedBySource.has(sourcePath)) {
+      context.failures.push(`${label}: compatibility shim ${sourcePath} must not be planned as copied verbatim`);
     }
   }
 
   for (const targetPath of entry.targetBackendPaths ?? []) {
-    validateBackendTargetPath(targetPath, `${label}.targetBackendPaths`);
+    validateBackendTargetPath(context, targetPath, `${label}.targetBackendPaths`);
   }
 }
 
-async function validateExcludedPathsAreNotPlanned(entry, label) {
+async function validateExcludedPathsAreNotPlanned(context, entry, label) {
   for (const excludedPath of entry.currentPaths ?? []) {
-    if (!validateRepoRelativePath(excludedPath, `${label}.currentPaths`)) {
+    if (!validateRepoRelativePath(context, excludedPath, `${label}.currentPaths`)) {
       continue;
     }
 
-    const excludedStat = await safeLstat(excludedPath, `${label}.currentPaths`);
+    const excludedStat = await safeLstat(context, excludedPath, `${label}.currentPaths`);
     if (!excludedStat) {
       continue;
     }
 
     if (excludedStat.isDirectory()) {
-      for (const sourceFile of plannedBySource.keys()) {
+      for (const sourceFile of context.plannedBySource.keys()) {
         if (isSameOrChildPath(sourceFile, excludedPath)) {
-          failures.push(
+          context.failures.push(
             `${label}: excluded path ${excludedPath} contains planned extraction source ${sourceFile}`,
           );
         }
@@ -283,61 +446,67 @@ async function validateExcludedPathsAreNotPlanned(entry, label) {
       continue;
     }
 
-    if (plannedBySource.has(excludedPath)) {
-      failures.push(`${label}: excluded file ${excludedPath} is planned for extraction`);
+    if (context.plannedBySource.has(excludedPath)) {
+      context.failures.push(`${label}: excluded file ${excludedPath} is planned for extraction`);
     }
   }
 }
 
-function validateBackendTargetPath(repoPath, label) {
-  validateRepoRelativePath(repoPath, label);
+function validateBackendTargetPath(context, repoPath, label) {
+  validateRepoRelativePath(context, repoPath, label);
 
   if (!hasAllowedPrefix(repoPath, backendTargetPrefixes)) {
-    failures.push(`${label}: target is outside allowed backend repo areas`);
+    context.failures.push(`${label}: target is outside allowed backend repo areas`);
   }
 
-  if (hasAllowedPrefix(repoPath, frontendTargetPrefixes)) {
-    failures.push(`${label}: target points at a current frontend/current-app area`);
+  if (hasAllowedPrefix(repoPath, forbiddenMaterializedTargetPrefixes)) {
+    context.failures.push(`${label}: target points at a current frontend/current-app area`);
   }
 }
 
-function validateRepoRelativePath(repoPath, label) {
-  const failureCountBefore = failures.length;
+function validateRepoRelativePath(context, repoPath, label) {
+  const failureCountBefore = context.failures.length;
 
   if (typeof repoPath !== "string" || repoPath.trim() === "") {
-    failures.push(`${label}: expected non-empty repo-relative path`);
+    context.failures.push(`${label}: expected non-empty repo-relative path`);
     return false;
   }
 
   if (path.isAbsolute(repoPath) || repoPath.includes("\\")) {
-    failures.push(`${label}: expected POSIX-style repo-relative path`);
+    context.failures.push(`${label}: expected POSIX-style repo-relative path`);
   }
 
   const segments = repoPath.split("/");
   if (segments.some((segment) => segment === "" || segment === "." || segment === "..")) {
-    failures.push(`${label}: expected normalized path without empty, . or .. segments`);
+    context.failures.push(`${label}: expected normalized path without empty, . or .. segments`);
   }
 
-  const resolvedPath = path.resolve(repoRoot, repoPath);
-  const relativePath = path.relative(repoRoot, resolvedPath);
+  const resolvedPath = path.resolve(context.repoRoot, repoPath);
+  const relativePath = path.relative(context.repoRoot, resolvedPath);
   if (relativePath === "" || relativePath.startsWith("..") || path.isAbsolute(relativePath)) {
-    failures.push(`${label}: path escapes the repository root`);
+    context.failures.push(`${label}: path escapes the repository root`);
   }
 
-  return failures.length === failureCountBefore;
+  return context.failures.length === failureCountBefore;
 }
 
-function validateNotGeneratedArtifact(repoPath, label) {
+function validateNotGeneratedArtifact(context, repoPath, label) {
   if (isGeneratedArtifactPath(repoPath)) {
-    failures.push(`${label}: generated/install/cache artifact must not be included in extraction plan`);
+    context.failures.push(`${label}: generated/install/cache artifact must not be included in extraction plan`);
   }
 }
 
-async function safeLstat(repoPath, label) {
+async function safeLstat(context, repoPath, label) {
+  const resolvedPath = path.resolve(context.repoRoot, repoPath);
+  if (!isPathInside(context.repoRoot, resolvedPath)) {
+    context.failures.push(`${label}: resolved path escapes the repository root`);
+    return null;
+  }
+
   try {
-    return await lstat(path.join(repoRoot, repoPath));
+    return await lstat(resolvedPath);
   } catch {
-    failures.push(`${label}: ${repoPath} does not exist`);
+    context.failures.push(`${label}: ${repoPath} does not exist`);
     return null;
   }
 }
@@ -370,6 +539,11 @@ function isSameOrChildPath(candidatePath, parentPath) {
   return candidatePath === parentPath || candidatePath.startsWith(`${parentPath}/`);
 }
 
+function isPathInside(parentPath, childPath) {
+  const relativePath = path.relative(parentPath, childPath);
+  return relativePath === "" || (!relativePath.startsWith("..") && !path.isAbsolute(relativePath));
+}
+
 function comparePaths(left, right) {
   return left.localeCompare(right, "en");
 }
@@ -378,4 +552,44 @@ function getEntryLabel(entry, index) {
   return typeof entry?.id === "string" && entry.id.trim() !== ""
     ? `entries.${entry.id}`
     : `entries[${index}]`;
+}
+
+function main() {
+  verifyStandaloneBackendExtractionDryRun()
+    .then((result) => {
+      if (!result.ok) {
+        console.error("Standalone backend extraction dry-run failed:");
+        for (const failure of result.failures) {
+          console.error(`- ${failure}`);
+        }
+        process.exitCode = 1;
+        return;
+      }
+
+      const details = [
+        "Standalone backend extraction dry-run verified.",
+        `Planned files: ${result.plannedFileCount}.`,
+        `Move/copy entries: ${result.planEntryCount}.`,
+        `Compatibility shims: ${result.shimEntryCount}.`,
+        `Excluded entries: ${result.excludedEntryCount}.`,
+        `Materialized files: ${result.materializedFileCount}.`,
+      ];
+
+      if (result.materializedTreeKept) {
+        details.push(`Materialized tree kept for debugging: ${result.materializedRoot}.`);
+      } else {
+        details.push("Materialized tree cleaned up.");
+      }
+
+      console.log(details.join(" "));
+    })
+    .catch((error) => {
+      console.error("Standalone backend extraction dry-run failed:");
+      console.error(error instanceof Error ? error.message : error);
+      process.exitCode = 1;
+    });
+}
+
+if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
+  main();
 }

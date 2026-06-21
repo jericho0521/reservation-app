@@ -8,8 +8,11 @@ deployable service, while the current frontend remains only one consumer.
 ## Inputs To Read
 
 - `docs/package-refactor/backend-platform-extraction/README.md`
-- `docs/package-refactor/backend-platform-extraction/extraction-manifest.json`
-- `docs/package-refactor/backend-platform-extraction/extraction-dry-run-plan.json`
+- `docs/package-refactor/backend-platform-extraction/standalone-backend-extraction-manifest.json`
+- `scripts/verify-standalone-backend-extraction-manifest.mjs`
+- `scripts/verify-standalone-backend-extraction-dry-run.mjs`
+- `docs/package-refactor/backend-platform-extraction/backend-repo-bootstrap.md`
+- `docs/package-refactor/backend-platform-extraction/backend-package-ownership.md`
 - `docs/package-refactor/backend-platform-extraction/frontend-backend-sdk-separation/phase-7-standalone-backend-cutover.md`
 - `docs/package-refactor/backend-platform-extraction/frontend-backend-sdk-separation/phase-10-live-platform-proof.md`
 - `apps/api/**`
@@ -42,8 +45,8 @@ reservation-platform-backend/
   packages/api/
   packages/contract-types/
   packages/database/
-  packages/reservations-core/
-  packages/reservations-supabase/
+  packages/domain/
+  packages/adapter-supabase/
   packages/ai-chat/
   packages/sdk/
   docs/
@@ -69,8 +72,11 @@ the backend platform repository.
 
 ## Deliverables
 
-- Updated extraction manifest.
-- Updated extraction dry-run plan.
+- Updated standalone backend extraction manifest, when package ownership changes.
+- Read-only extraction manifest verifier command:
+  `corepack pnpm run backend-platform:verify-extraction-manifest`.
+- Read-only extraction dry-run verifier command:
+  `corepack pnpm run backend-platform:verify-extraction-dry-run`.
 - Backend repo bootstrap guide.
 - Backend-only package ownership table.
 - Post-extraction verification command list.
@@ -88,6 +94,63 @@ the backend platform repository.
 
 ## Subagent Handoff Notes
 
-Give the worker this file plus the extraction manifest and dry-run plan. The
-worker must update Phase 7, Phase 8, and Phase 10 if repo extraction exposes a
-missing runtime, consumer, or live proof requirement.
+Give the worker this file plus
+`standalone-backend-extraction-manifest.json`,
+`backend-repo-bootstrap.md`, `backend-package-ownership.md`, and the two
+standalone extraction verifier scripts. The worker must update Phase 7, Phase
+8, and Phase 10 if repo extraction exposes a missing runtime, consumer, or live
+proof requirement.
+
+## Partial Implementation Result
+
+Phase 11 is partially implemented as readiness documentation and existing
+read-only guardrails only. No source files were moved, copied, deleted, or
+published, and no separate backend repository was created.
+
+Implemented artifacts:
+
+- `docs/package-refactor/backend-platform-extraction/backend-repo-bootstrap.md`
+  documents backend repository install, build/test, runtime env, database
+  proof, live proof, SDK consumer integration, and excluded current-frontend
+  source areas.
+- `docs/package-refactor/backend-platform-extraction/backend-package-ownership.md`
+  maps `apps/api` and backend-owned package candidates to planned backend
+  paths, readiness status, visibility intent, consumer-safety, and excluded
+  frontend concerns.
+- This phase file now references the actual manifest and verifier script names
+  instead of stale `extraction-manifest.json` and
+  `extraction-dry-run-plan.json` inputs.
+
+Exact local command list:
+
+```powershell
+corepack pnpm run backend-platform:verify-extraction-manifest
+corepack pnpm run backend-platform:verify-extraction-dry-run
+corepack pnpm run backend-platform:verify-standalone-api-skeleton
+corepack pnpm run backend-platform:verify-standalone-deployment-config
+corepack pnpm run database:verify-migration-bundle
+corepack pnpm run database:live-proof
+corepack pnpm run backend-platform:live-proof-readiness
+git diff --check
+```
+
+These commands are safe in the current repository. They are local build, test,
+type-check, manifest, dry-run, migration-bundle, and readiness checks, except
+for `database:live-proof`. `database:verify-migration-bundle` is the read-only
+database bundle check. `database:live-proof` skips when
+`RESERVATION_DATABASE_LIVE_URL` or `psql` is not configured, but when they are
+configured, even without `--strict`, it connects to the target PostgreSQL
+database and applies the package migration plan through `psql`. The strict
+variant remains the required CI/live-proof form, but both strict and non-strict
+database live-proof commands must point only at disposable infrastructure. None
+of these commands create a repository, copy files, publish packages, or deploy
+a service.
+
+Still not complete:
+
+- actual standalone repository creation
+- final backend package renaming and visibility decisions
+- live deployed `/v1` backend proof
+- disposable database migration/RLS/idempotency proof
+- strict SDK/direct HTTP live parity proof
+- package publication or registry installation proof

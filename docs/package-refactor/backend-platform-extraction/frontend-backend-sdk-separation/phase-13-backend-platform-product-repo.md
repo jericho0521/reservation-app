@@ -15,6 +15,8 @@ owns after separation and what consumers are allowed to depend on.
 - `docs/package-refactor/backend-platform-extraction/frontend-backend-sdk-separation/phase-11-backend-repo-extraction.md`
 - `docs/package-refactor/backend-platform-extraction/frontend-backend-sdk-separation/phase-12-frontend-repo-consumer-proof.md`
 - `docs/package-refactor/backend-platform-extraction/standalone-backend-extraction-manifest.json`
+- `docs/package-refactor/backend-platform-extraction/backend-repo-bootstrap.md`
+- `docs/package-refactor/backend-platform-extraction/backend-package-ownership.md`
 - `apps/api/**`
 - backend-owned `packages/**`
 - backend platform scripts under `scripts/**`
@@ -60,9 +62,10 @@ It does not own:
 
 ## Implementation Steps
 
-1. Convert the extraction manifest into a backend product ownership manifest.
-2. Add a backend repository bootstrap guide with install, test, database,
-   runtime, and deployment steps.
+1. Convert the extraction manifest and Phase 11 package ownership table into a
+   backend product ownership manifest.
+2. Promote the Phase 11 backend repository bootstrap guide into product-level
+   install, test, database, runtime, and deployment steps.
 3. Add backend-only CI gates for package build, boundary scans, migration
    bundle verification, standalone API tests, and strict live proof hooks.
 4. Define which packages are private backend internals versus public consumer

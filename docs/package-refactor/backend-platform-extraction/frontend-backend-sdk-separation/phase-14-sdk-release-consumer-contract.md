@@ -15,6 +15,8 @@ service clients, or AI provider internals.
 - `docs/package-refactor/backend-platform-extraction/frontend-backend-sdk-separation/phase-6-external-frontend-proof-removal-gate-results.md`
 - `docs/package-refactor/backend-platform-extraction/frontend-backend-sdk-separation/phase-12-frontend-repo-consumer-proof.md`
 - `docs/package-refactor/backend-platform-extraction/frontend-backend-sdk-separation/phase-13-backend-platform-product-repo.md`
+- `docs/package-refactor/backend-platform-extraction/backend-repo-bootstrap.md`
+- `docs/package-refactor/backend-platform-extraction/backend-package-ownership.md`
 - `docs/package-refactor/backend-platform-extraction/sdk-readiness/README.md`
 - SDK package source and package metadata
 - SDK release and package proof scripts
@@ -38,6 +40,13 @@ service clients, or AI provider internals.
 - Do not hide breaking API changes behind undocumented behavior.
 
 ## Public Consumer Contract
+
+Phase 11 currently treats `packages/sdk` as a public consumer package candidate
+that may live in the backend repository release model. Phase 14 must preserve
+the ownership rule from `backend-package-ownership.md`: the SDK is
+consumer-safe only while it remains HTTP-only and excludes backend route
+handlers, storage adapters, migration helpers, Supabase service clients,
+LangChain/provider SDKs, and frontend UI components.
 
 The SDK must provide:
 

@@ -46,6 +46,8 @@ The frontend should not need to copy booking logic, database queries, Supabase R
 - [Frontend, Backend Modules, and SDK Separation Plan](frontend-backend-sdk-separation/README.md)
 - [Subagent Handoff Template](subagent-handoff-template.md)
 - [Standalone Backend Extraction Manifest](standalone-backend-extraction-manifest.json)
+- [Backend Repository Bootstrap Guide](backend-repo-bootstrap.md)
+- [Backend Package Ownership](backend-package-ownership.md)
 
 ## Change Propagation Rule
 

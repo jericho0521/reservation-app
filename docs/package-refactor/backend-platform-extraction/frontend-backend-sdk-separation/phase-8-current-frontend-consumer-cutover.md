@@ -94,7 +94,13 @@ an explicit current-frontend `baseUrl` to `listAdminReservations` for
 In platform mode, the public env setting takes precedence because the SSR
 `baseUrl` is the current frontend origin during compatibility loading. Explicit
 standalone admin callers can pass `platformBaseUrl` to target `/v1` when the env
-setting is absent.
+setting is absent. A CI-safe local proof now covers configured platform mode in
+`lib/reservation-platform-client.test.ts`: services, availability, reservation
+create, admin reservation list, resource-maintenance list/save, and reservation
+status update are mocked through `fetch`, and the test fails if any configured
+platform-mode reservation-platform call uses relative `/api` routes or the
+current frontend origin's `/api/v1` compatibility routes. The same test file
+continues to prove local mode may use `/api` while compatibility routes remain.
 
 This is partial Phase 8 readiness only. It does not remove `app/api`
 compatibility routes, complete a full `/v1` standalone backend cutover, or close

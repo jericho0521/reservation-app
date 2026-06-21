@@ -73,9 +73,10 @@ test("getReservationPlatformContext reads browser-safe tenant and venue env", ()
   });
 });
 
-test("platform mode prefixes configured base URL across reservation API paths", async () => {
+test("configured platform mode uses standalone /v1 URLs and forbids compatibility fallbacks", async () => {
   setPlatformContextEnv();
   process.env.NEXT_PUBLIC_RESERVATION_PLATFORM_BASE_URL = "https://reservations.example.test/";
+  const frontendBaseUrl = "https://frontend.example.test";
   const calls: string[] = [];
 
   globalThis.fetch = async (url) => {
@@ -122,7 +123,7 @@ test("platform mode prefixes configured base URL across reservation API paths", 
     user_email: "ada@example.com",
   }, "platform");
   await updateReservationStatus("res_123", "completed", "platform");
-  await listAdminReservations({ search: "Ada" }, "platform");
+  await listAdminReservations({ search: "Ada", baseUrl: frontendBaseUrl }, "platform");
 
   assert.deepEqual(calls, [
     "https://reservations.example.test/v1/services",
@@ -135,6 +136,7 @@ test("platform mode prefixes configured base URL across reservation API paths", 
     "https://reservations.example.test/v1/reservations/res_123",
     "https://reservations.example.test/v1/reservations?search=Ada",
   ]);
+  assertNoConfiguredPlatformCompatibilityFallbacks(calls, frontendBaseUrl);
 });
 
 test("listAdminReservations platform base URL overrides explicit SSR baseUrl", async () => {
@@ -777,4 +779,23 @@ function assertPlatformContextHeaders(headers: Headers | undefined) {
   assert.equal(headers.get("X-Reservation-Tenant-Id"), "tenant_123");
   assert.equal(headers.get("X-Reservation-Venue-Id"), "venue_456");
   assert.match(headers.get("X-Correlation-Id") ?? "", /^frontend-/);
+}
+
+function assertNoConfiguredPlatformCompatibilityFallbacks(calls: string[], frontendBaseUrl: string) {
+  assert.ok(calls.length > 0);
+
+  for (const requestUrl of calls) {
+    assert.ok(
+      requestUrl.startsWith("https://reservations.example.test/v1/"),
+      `Expected configured platform URL to use standalone backend /v1 origin: ${requestUrl}`,
+    );
+    assert.ok(
+      !requestUrl.startsWith("/api"),
+      `Configured platform mode must not fall back to local compatibility routes: ${requestUrl}`,
+    );
+    assert.ok(
+      !requestUrl.startsWith(`${frontendBaseUrl}/api/v1`),
+      `Configured platform mode must not fall back to current-frontend /api/v1 routes: ${requestUrl}`,
+    );
+  }
 }

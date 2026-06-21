@@ -74,6 +74,17 @@ app-owned routes from being marked for reservation-platform removal, and rejects
 `removable` status unless every required gate boolean is true. It does not make
 network, deployment, or live backend calls.
 
+A bounded frontend fallback cleanup proof now exists in
+`lib/reservation-platform-client.test.ts`. With
+`NEXT_PUBLIC_RESERVATION_PLATFORM_BASE_URL` configured, mocked current-frontend
+reservation-platform calls for services, availability, create reservation, admin
+reservation list, resource-maintenance list/save, and reservation status update
+must use the standalone backend origin's `/v1` URLs. The proof fails if those
+configured platform-mode calls fall back to relative `/api` routes or to the
+current frontend origin's `${baseUrl}/api/v1` compatibility routes. It is
+local-only and does not delete routes, make network calls, or prove live
+standalone backend parity.
+
 ## Implementation Steps
 
 1. Create a route inventory for all current reservation-related `app/api/**`
@@ -92,7 +103,8 @@ network, deployment, or live backend calls.
 - Compatibility route inventory.
 - Route-by-route removal checklist.
 - Deleted/deprecated route list. Not started in this readiness slice.
-- Frontend fallback cleanup proof. Not started in this readiness slice.
+- Frontend fallback cleanup proof. Started as a bounded local client proof for
+  configured platform mode only; full removal remains blocked.
 - Source scans proving current frontend no longer depends on removed routes.
   Not started because no routes were deleted or marked `removable`.
 

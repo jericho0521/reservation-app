@@ -119,6 +119,20 @@ These are standalone backend secrets/config values. They are not frontend SDK
 configuration and must not be exposed through `NEXT_PUBLIC_*` or browser
 bundles.
 
+The standalone deployment config contract is checked by
+`corepack pnpm run backend-platform:verify-standalone-deployment-config`.
+The default command is CI-safe: it parses env only, performs no network calls,
+does not deploy, and exits successfully with a `SKIPPED` message when the
+standalone deployment env is absent. The strict variant,
+`corepack pnpm run backend-platform:verify-standalone-deployment-config:strict`,
+fails closed when required deployment config is absent or malformed. A strict
+standalone deployment config requires complete backend-only Supabase env plus
+at least one auth mechanism: `RESERVATION_PLATFORM_SERVICE_API_KEY` or complete
+`RESERVATION_PLATFORM_AUTH_JWKS_URL`, `RESERVATION_PLATFORM_AUTH_ISSUER`, and
+`RESERVATION_PLATFORM_AUTH_AUDIENCE`. Optional `PORT`, auth numeric settings,
+service token, and backend AI/chat provider env are validated when present, and
+`NEXT_PUBLIC_*` backend secret-style names are rejected.
+
 It is not live backend parity. The health endpoints are deployability/readiness
 hygiene only: they prove that a deployed host process can answer a cheap public
 request, not that the service has been deployed, connected to Supabase, applied
@@ -129,8 +143,7 @@ JWT/JWKS bearer-token verification, bounded JWKS cache/unknown-`kid` refresh
 behavior, and claim-to-principal mapping, but it does not prove live provider
 configuration, provider operational key rotation, live database migrations,
 durable database-backed idempotency, RLS/tenant isolation, seeded data parity,
-provider-backed chat, deployment configuration, or a separate repository
-extraction.
+provider-backed chat, a live deployment, or a separate repository extraction.
 
 ## Commands
 
@@ -143,6 +156,18 @@ corepack pnpm run backend-platform:verify-standalone-api-skeleton
 This is safe to run in the current repo. It builds the platform package types
 needed by the skeleton, type-checks this app, runs its route tests, and checks
 the source-boundary assertions.
+
+```powershell
+corepack pnpm run backend-platform:verify-standalone-deployment-config
+```
+
+This is also safe to run in the current repo. It validates the standalone
+backend deployment/runtime env contract only. It performs no network calls,
+does not deploy, and skips when unconfigured. Use
+`corepack pnpm run backend-platform:verify-standalone-deployment-config:strict`
+only in environments where the required standalone backend deployment env is
+expected to be present; it intentionally fails when that config is missing or
+malformed.
 
 To start the optional local Node server after the package has been built:
 

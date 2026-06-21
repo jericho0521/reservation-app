@@ -67,6 +67,11 @@ flowchart LR
 - [Phase 5 AI Chat Split Results](phase-5-ai-chat-workflow-split-results.md)
 - [Phase 6: External Frontend Proof and Removal Gate](phase-6-external-frontend-proof-removal-gate.md)
 - [Phase 6 Proof and Removal Gate Results](phase-6-external-frontend-proof-removal-gate-results.md)
+- [Phase 7: Standalone Backend Cutover](phase-7-standalone-backend-cutover.md)
+- [Phase 8: Current Frontend Consumer Cutover](phase-8-current-frontend-consumer-cutover.md)
+- [Phase 9: Compatibility Route Removal](phase-9-compatibility-route-removal.md)
+- [Phase 10: Live Platform Proof](phase-10-live-platform-proof.md)
+- [Phase 11: Backend Repository Extraction](phase-11-backend-repo-extraction.md)
 - [Remaining Modularity Gaps Index](remaining-modularity-gaps.md)
 
 ## Separation Rules
@@ -94,3 +99,8 @@ phase assignments from its migration table.
 Every phase after Phase 1 must also read
 `phase-1-backend-module-boundary-results.md` before deciding what can be
 imported by frontend code, SDK code, backend services, or optional chat modules.
+
+Phases 7 through 11 are the final separation plan. They should be executed in
+order: make the standalone backend target real, cut the current frontend over
+as a normal consumer, remove compatibility routes, prove the platform against
+live disposable infrastructure, then extract or release the backend repository.

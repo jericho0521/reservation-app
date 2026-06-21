@@ -184,6 +184,22 @@
       "rationale": "Database bootstrap and smoke helpers are backend operations candidates once environment names and current-app assumptions are generalized."
     },
     {
+      "id": "backend-root-verifier-scripts",
+      "classification": "copy-candidate",
+      "currentPaths": [
+        "scripts/verify-standalone-backend-extraction-manifest.mjs",
+        "scripts/verify-standalone-backend-extraction-dry-run.mjs",
+        "scripts/verify-backend-package-graph-boundary.mjs",
+        "scripts/verify-extracted-backend-workspace-readiness.mjs",
+        "scripts/generate-database-migration-index.mjs",
+        "scripts/verify-database-migration-bundle.mjs"
+      ],
+      "targetBackendPaths": ["scripts"],
+      "ownershipCategory": "operations",
+      "status": "ready-for-extraction-planning",
+      "rationale": "Generated backend root extraction, package-graph, readiness, and database verification scripts invoke these backend-owned verifier files via node scripts/*.mjs. They must be materialized into the standalone backend candidate so generated root scripts do not point at absent current-repo files."
+    },
+    {
       "id": "frontend-pages-and-booking-ui",
       "classification": "exclude",
       "currentPaths": ["app/page.tsx", "app/form-booking", "app/chat-booking", "components/form", "components/chat"],

@@ -141,9 +141,15 @@ Implemented artifacts:
   frontend/current-app target areas such as `app`, `components`, `lib`,
   `public`, `types`, `supabase`, `.next`, `node_modules`, and
   `dist-packages`, verifies the generated root metadata is backend-only and not
-  a verbatim copy of the current frontend/root manifest, verifies expected
-  package manifests exist in applicable target package roots, and deletes the
-  temporary tree by default.
+  a verbatim copy of the current frontend/root manifest, verifies generated
+  root scripts do not point at absent materialized `scripts/*.mjs` verifier
+  files, verifies expected package manifests exist in applicable target package
+  roots, and deletes the temporary tree by default.
+- The standalone extraction manifest now includes the backend-owned verifier
+  scripts used by generated backend root extraction, readiness, package-graph,
+  and database verification scripts. This makes those generated commands point
+  at files present in the temporary backend repo candidate instead of relying on
+  the current monorepo `scripts/` directory.
 - This phase file now references the actual manifest and verifier script names
   instead of stale `extraction-manifest.json` and
   `extraction-dry-run-plan.json` inputs.
@@ -180,7 +186,10 @@ uses the backend repository name, stays private, carries a stable package
 manager field, exposes Phase 11 extraction/readiness/package checks, and blocks
 frontend-only scripts or dependencies such as Next, React, browser smoke
 commands, or current-frontend checks. The generated `pnpm-workspace.yaml`
-covers `apps/*` and `packages/*`. This is still only a local OS-temp generated
+covers `apps/*` and `packages/*`. The dry run also validates every direct
+`node scripts/*.mjs` reference in generated backend root scripts against the
+materialized target tree, including the database migration-index check and
+database migration bundle verifier. This is still only a local OS-temp generated
 metadata proof; it removes the whole temporary tree automatically. It does not
 mutate source files, git-tracked paths, or create a real repository, and it does
 not copy compatibility-shim or excluded entries. For local inspection only,

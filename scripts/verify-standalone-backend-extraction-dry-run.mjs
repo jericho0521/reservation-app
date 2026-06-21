@@ -87,6 +87,7 @@ const requiredGeneratedRootScripts = [
   "backend-platform:verify-package-graph-boundary",
   "backend-platform:verify-extracted-workspace-readiness",
   "backend-platform:verify-standalone-api-skeleton",
+  "database:migration-index:check",
   "database:verify-migration-bundle",
   "packages:build",
   "packages:test",
@@ -421,7 +422,8 @@ async function createGeneratedBackendWorkspaceMetadata({
         "backend-platform:verify-package-graph-boundary": "node scripts/verify-backend-package-graph-boundary.mjs",
         "backend-platform:verify-extracted-workspace-readiness": "node scripts/verify-extracted-backend-workspace-readiness.mjs",
         "backend-platform:verify-standalone-api-skeleton": "corepack pnpm --filter @reservation-platform/api run build && corepack pnpm --filter @reservation-platform/contract-types run build && corepack pnpm --filter @reservation-platform/standalone-api-skeleton run test",
-        "database:verify-migration-bundle": "node scripts/verify-database-migration-bundle.mjs",
+        "database:migration-index:check": "node scripts/generate-database-migration-index.mjs --check",
+        "database:verify-migration-bundle": "corepack pnpm run database:migration-index:check && node scripts/verify-database-migration-bundle.mjs",
         "phase-11:verify-generated-backend-workspace": "corepack pnpm run backend-platform:verify-extraction-manifest && corepack pnpm run backend-platform:verify-extraction-dry-run && corepack pnpm run backend-platform:verify-package-graph-boundary && corepack pnpm run backend-platform:verify-extracted-workspace-readiness && corepack pnpm run backend-platform:verify-standalone-api-skeleton && corepack pnpm run database:verify-migration-bundle",
       },
     },
@@ -499,7 +501,7 @@ async function validateGeneratedBackendWorkspaceMetadata(context, materializedFi
 
   const rootPackage = await readMaterializedJson(context, "package.json", "generated backend root package.json");
   if (rootPackage) {
-    await validateGeneratedRootPackage(context, rootPackage);
+    await validateGeneratedRootPackage(context, rootPackage, materializedFiles);
   }
 
   const workspaceYaml = await readMaterializedText(context, "pnpm-workspace.yaml", "generated pnpm-workspace.yaml");
@@ -513,7 +515,7 @@ async function validateGeneratedBackendWorkspaceMetadata(context, materializedFi
   }
 }
 
-async function validateGeneratedRootPackage(context, rootPackage) {
+async function validateGeneratedRootPackage(context, rootPackage, materializedFiles) {
   if (!rootPackage || typeof rootPackage !== "object" || Array.isArray(rootPackage)) {
     context.failures.push("package.json: generated backend root package metadata must be a JSON object");
     return;
@@ -541,6 +543,7 @@ async function validateGeneratedRootPackage(context, rootPackage) {
   }
 
   validateGeneratedRootScriptsAreBackendOnly(context, scripts);
+  validateGeneratedRootScriptFileReferences(context, scripts, materializedFiles);
   validateGeneratedRootDependenciesAreBackendOnly(context, rootPackage);
   await validateGeneratedRootPackageIsNotCurrentRootManifest(context, rootPackage);
 }
@@ -570,6 +573,33 @@ function validateGeneratedRootScriptsAreBackendOnly(context, scripts) {
       }
     }
   }
+}
+
+function validateGeneratedRootScriptFileReferences(context, scripts, materializedFiles) {
+  if (!scripts || typeof scripts !== "object" || Array.isArray(scripts)) {
+    return;
+  }
+
+  const materializedFileSet = new Set(materializedFiles);
+
+  for (const [scriptName, command] of Object.entries(scripts)) {
+    if (typeof command !== "string") {
+      continue;
+    }
+
+    for (const referencedScript of getNodeScriptReferences(command)) {
+      if (!materializedFileSet.has(referencedScript)) {
+        context.failures.push(
+          `package.json: generated backend root script ${scriptName} references ${referencedScript}, but that file was not materialized into the backend target tree`,
+        );
+      }
+    }
+  }
+}
+
+function getNodeScriptReferences(command) {
+  return [...command.matchAll(/(?:^|[\s;&|])node\s+(scripts\/[A-Za-z0-9._/-]+\.mjs)(?=$|[\s;&|])/g)]
+    .map((match) => match[1]);
 }
 
 function validateGeneratedRootDependenciesAreBackendOnly(context, rootPackage) {

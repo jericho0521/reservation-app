@@ -77,6 +77,8 @@ the backend platform repository.
   `corepack pnpm run backend-platform:verify-extraction-manifest`.
 - Read-only extraction dry-run verifier command:
   `corepack pnpm run backend-platform:verify-extraction-dry-run`.
+- Read-only extracted workspace metadata/readiness verifier command:
+  `corepack pnpm run backend-platform:verify-extracted-workspace-readiness`.
 - Backend repo bootstrap guide.
 - Backend-only package ownership table.
 - Post-extraction verification command list.
@@ -121,6 +123,14 @@ Implemented artifacts:
   Phase 11 backend package/app manifest inventory, blocks frontend-only
   dependencies from backend-owned package manifests, and keeps the SDK manifest
   limited to consumer-safe HTTP-only dependencies.
+- `backend-platform:verify-extracted-workspace-readiness` now locally models
+  the extracted backend repository workspace from the extraction manifest and
+  current package manifests. It validates expected extracted package manifests,
+  planned package-root renames such as `packages/reservation-platform-api` to
+  `packages/api` and `packages/reservations-core` to `packages/domain`, local
+  workspace dependency resolution among extracted packages, root/package script
+  claims used by bootstrap and release gates, frontend/current-app source
+  exclusion, and SDK consumer-safety.
 - This phase file now references the actual manifest and verifier script names
   instead of stale `extraction-manifest.json` and
   `extraction-dry-run-plan.json` inputs.
@@ -131,6 +141,7 @@ Exact local command list:
 corepack pnpm run backend-platform:verify-extraction-manifest
 corepack pnpm run backend-platform:verify-extraction-dry-run
 corepack pnpm run backend-platform:verify-package-graph-boundary
+corepack pnpm run backend-platform:verify-extracted-workspace-readiness
 corepack pnpm run backend-platform:verify-standalone-api-skeleton
 corepack pnpm run backend-platform:verify-standalone-deployment-config
 corepack pnpm run database:verify-migration-bundle
@@ -144,6 +155,12 @@ type-check, manifest, package-graph, dry-run, migration-bundle, and readiness
 checks, except for `database:live-proof`.
 `backend-platform:verify-package-graph-boundary` reads package manifests only;
 it does not install, publish, copy files, or create a repository.
+`backend-platform:verify-extracted-workspace-readiness` is also read-only. It
+proves the extracted workspace/package metadata model is coherent enough for
+CI-safe planning, including manifest target-path alignment and local workspace
+dependency closure. It does not create or populate the backend repository,
+install dependencies, run a clean extracted-repository build/test, publish
+packages, deploy a backend, call the network, or connect to a database.
 `database:verify-migration-bundle` is the read-only database bundle check.
 `database:live-proof` skips when
 `RESERVATION_DATABASE_LIVE_URL` or `psql` is not configured, but when they are
@@ -158,8 +175,9 @@ Still not complete:
 
 - actual standalone repository creation
 - final backend package renaming and visibility decisions
-- actual extracted-repository build/test execution outside the current Next.js
-  app workspace
+- actual extracted-repository install/build/test execution outside the current
+  Next.js app workspace; the new verifier is metadata/readiness model proof
+  only
 - live deployed `/v1` backend proof
 - disposable database migration/RLS/idempotency proof
 - strict SDK/direct HTTP live parity proof

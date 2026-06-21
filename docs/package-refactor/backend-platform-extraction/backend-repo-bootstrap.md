@@ -49,6 +49,7 @@ corepack pnpm run database:verify-migration-bundle
 corepack pnpm run backend-platform:verify-extraction-manifest
 corepack pnpm run backend-platform:verify-extraction-dry-run
 corepack pnpm run backend-platform:verify-package-graph-boundary
+corepack pnpm run backend-platform:verify-extracted-workspace-readiness
 ```
 
 These commands are safe in the current repository. They are local build, test,
@@ -56,6 +57,12 @@ type-check, manifest, dry-run, and package-graph checks. The package-graph
 boundary command reads backend-owned package/app `package.json` files only. It
 does not create a new repository, copy files, publish packages, deploy a
 service, install dependencies, or run live network/database proofs.
+The extracted-workspace readiness command is also read-only. It models the
+future backend workspace metadata from the extraction manifest and current
+package manifests, including target package path renames, required scripts,
+workspace dependency closure, frontend/current-app exclusions, and SDK
+consumer-safety. It does not create a repository, install dependencies, run an
+extracted build/test, publish packages, deploy, or connect to live services.
 
 The standalone deployment config parser can be checked without live services:
 
@@ -193,6 +200,7 @@ these exclusions:
 corepack pnpm run backend-platform:verify-extraction-manifest
 corepack pnpm run backend-platform:verify-extraction-dry-run
 corepack pnpm run backend-platform:verify-package-graph-boundary
+corepack pnpm run backend-platform:verify-extracted-workspace-readiness
 ```
 
 These commands are safe to run locally. They are read-only checks over the

@@ -55,6 +55,7 @@ Run these read-only guardrails from the current repository root:
 corepack pnpm run backend-platform:verify-extraction-manifest
 corepack pnpm run backend-platform:verify-extraction-dry-run
 corepack pnpm run backend-platform:verify-package-graph-boundary
+corepack pnpm run backend-platform:verify-extracted-workspace-readiness
 ```
 
 These commands are safe locally. The manifest and dry-run checks validate
@@ -66,3 +67,10 @@ it reads backend-owned package/app `package.json` files, confirms the expected
 Phase 11 manifests exist, rejects frontend-only dependencies in backend
 packages, and keeps `@reservation-platform/sdk` free of backend-only runtime
 dependencies.
+The extracted-workspace readiness command is read-only too: it validates the
+future backend workspace metadata model against the manifest and current
+package manifests, including planned target path renames, required package/root
+scripts, extracted workspace dependency closure, frontend/current-app source
+exclusions, and SDK consumer-safety. It does not create a repository, copy
+files, install dependencies, run an extracted build/test, publish packages,
+deploy, or call live services.

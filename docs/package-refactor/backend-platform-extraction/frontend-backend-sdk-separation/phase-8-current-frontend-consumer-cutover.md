@@ -162,6 +162,22 @@ frontend repository, delete compatibility routes, install or publish packages,
 make network calls, run browser checks, or prove a complete standalone
 frontend app build/run from a separated repo.
 
+The form-booking browser smoke now provides a bounded local external-origin
+proof for the current frontend. `current-frontend:platform-smoke` starts a
+mock standalone reservation platform backend on a separate `127.0.0.1` origin,
+starts the Next.js dev server with
+`NEXT_PUBLIC_RESERVATION_PLATFORM_BASE_URL` pointing at that mock backend, and
+drives the existing `/form-booking` flow in Chromium. The mock backend serves
+only `/v1/services`, `/v1/availability`, and `POST /v1/reservations`, handles
+CORS preflight for the browser's custom platform headers, and asserts tenant,
+venue, correlation, idempotency, query, and reservation payload details. The
+smoke fails if browser reservation-platform calls hit relative `/api`,
+current-frontend `/api/v1`, or mock-backend `/api` compatibility paths.
+
+This remains a local mock proof only. It does not call a live standalone
+backend, Supabase, deployment, durable idempotency store, or seeded platform
+data, and it does not remove any current compatibility routes.
+
 ## Acceptance Criteria
 
 - Current frontend reservation flows can use a standalone backend base URL.

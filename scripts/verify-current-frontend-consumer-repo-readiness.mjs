@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
-import { access, readdir, readFile, stat } from "node:fs/promises";
+import { access, cp, mkdir, mkdtemp, readdir, readFile, rm, stat } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
@@ -11,6 +12,7 @@ export const requiredPrerequisiteCommands = [
   "current-frontend:verify-platform-boundary",
   "current-frontend:verify-platform-secrets",
 ];
+export const keepMaterializedTreeEnv = "CURRENT_FRONTEND_CONSUMER_KEEP_MATERIALIZED_TREE";
 
 const allowedSourceClassifications = new Set(["include", "exclude", "reference-only"]);
 const allowedDependencyClassifications = new Set([
@@ -58,6 +60,40 @@ const forbiddenIncludePathExact = new Set([
   "lib/supabase-admin.ts",
 ]);
 
+const generatedArtifactDirectoryNames = new Set([
+  ".next",
+  ".turbo",
+  ".vercel",
+  "coverage",
+  "dist",
+  "dist-packages",
+  "node_modules",
+  "out",
+]);
+
+const generatedArtifactFileExtensions = new Set([
+  ".map",
+  ".tsbuildinfo",
+]);
+
+const forbiddenMaterializedPathPrefixes = [
+  ".next",
+  "app/api",
+  "apps",
+  "coverage",
+  "dist",
+  "dist-packages",
+  "lib/langchain",
+  "lib/reservations",
+  "node_modules",
+  "packages",
+  "supabase",
+];
+
+const forbiddenMaterializedPathExact = new Set([
+  "lib/supabase-admin.ts",
+]);
+
 const importSpecifierPattern =
   /\b(?:import\s*(?:["']([^"']+)["']|[^"'()]+?\s*from\s*["']([^"']+)["'])|export\s*[^"'()]+?\s*from\s*["']([^"']+)["']|require\s*\(\s*["']([^"']+)["']|import\s*\(\s*["']([^"']+)["'])/g;
 
@@ -88,6 +124,7 @@ export async function verifyCurrentFrontendConsumerRepoReadiness(options = {}) {
 export async function verifyFrontendConsumerRepoInventory(inventory, packageJson, options = {}) {
   const repoRoot = options.repoRoot ?? process.cwd();
   const failures = [];
+  const materializationOptions = resolveMaterializationOptions(options, failures);
 
   validateInventoryShape(inventory, failures);
   validatePackageJsonShape(packageJson, failures);
@@ -101,6 +138,12 @@ export async function verifyFrontendConsumerRepoInventory(inventory, packageJson
   validateMinimumFrontendEnvironment(inventory, failures);
   await validateSourceAreas(inventory.sourceAreas, repoRoot, failures);
   await validateIncludedImportClosure(inventory.sourceAreas, repoRoot, failures);
+  const materializedTree = await validateMaterializedFrontendConsumerTargetTree(
+    inventory.sourceAreas,
+    repoRoot,
+    materializationOptions,
+    failures,
+  );
   validateDependencies(inventory.dependencies, packageJson, failures);
 
   return {
@@ -109,6 +152,7 @@ export async function verifyFrontendConsumerRepoInventory(inventory, packageJson
     sourceAreaCount: Array.isArray(inventory.sourceAreas) ? inventory.sourceAreas.length : 0,
     dependencyCount: Array.isArray(inventory.dependencies) ? inventory.dependencies.length : 0,
     prerequisiteCommands: requiredPrerequisiteCommands,
+    materializedTree,
   };
 }
 
@@ -291,6 +335,173 @@ async function collectIncludeRoots(sourceAreas, repoRoot) {
   return includeRoots;
 }
 
+async function validateMaterializedFrontendConsumerTargetTree(sourceAreas, repoRoot, options, failures) {
+  const materializedTree = {
+    created: false,
+    path: null,
+    kept: false,
+    cleanedUp: false,
+  };
+  let tempRoot = null;
+  let forceCleanupTempRoot = false;
+
+  try {
+    tempRoot = await mkdtemp(path.join(tmpdir(), "current-frontend-consumer-tree-"));
+    const resolvedTempRoot = path.resolve(tempRoot);
+
+    if (isPathInsideRepo(repoRoot, resolvedTempRoot)) {
+      forceCleanupTempRoot = true;
+      failures.push("Materialized frontend consumer temp root must resolve outside the repository.");
+      return materializedTree;
+    }
+
+    const materializedRoot = path.join(resolvedTempRoot, "frontend-consumer");
+    materializedTree.created = true;
+    materializedTree.path = materializedRoot;
+    materializedTree.kept = options.keepMaterializedTree;
+
+    await mkdir(materializedRoot, { recursive: true });
+
+    const includeTargets = await collectMaterializedIncludeTargets(sourceAreas, repoRoot);
+    for (const includeTarget of includeTargets) {
+      await copyIncludeTarget(includeTarget, repoRoot, materializedRoot);
+    }
+
+    await validateMaterializedAllowedPaths(materializedRoot, includeTargets, failures);
+    await validateMaterializedImportClosure(materializedRoot, failures);
+
+    return materializedTree;
+  } finally {
+    if (tempRoot && (forceCleanupTempRoot || !options.keepMaterializedTree)) {
+      await rm(tempRoot, { recursive: true, force: true });
+      materializedTree.cleanedUp = true;
+    }
+  }
+}
+
+async function collectMaterializedIncludeTargets(sourceAreas, repoRoot) {
+  const includeTargets = [];
+
+  for (const sourceArea of sourceAreas) {
+    if (sourceArea?.classification !== "include" || !isNonBlankString(sourceArea.path)) {
+      continue;
+    }
+
+    const absolutePath = path.resolve(repoRoot, sourceArea.path);
+    if (!isPathInsideRepo(repoRoot, absolutePath)) {
+      continue;
+    }
+
+    const normalizedPath = normalizeRepoPath(path.relative(repoRoot, absolutePath));
+    if (isGeneratedArtifactPath(normalizedPath)) {
+      continue;
+    }
+
+    try {
+      const rootStat = await stat(absolutePath);
+      includeTargets.push({
+        sourcePath: absolutePath,
+        repoPath: normalizedPath,
+        isDirectory: rootStat.isDirectory(),
+      });
+    } catch {
+      // validateSourceAreas reports missing include roots; materialization skips them.
+    }
+  }
+
+  return includeTargets;
+}
+
+async function copyIncludeTarget(includeTarget, repoRoot, materializedRoot) {
+  const destinationPath = path.join(materializedRoot, ...includeTarget.repoPath.split("/"));
+  if (!isPathInsideRepo(materializedRoot, destinationPath)) {
+    throw new Error(`Materialized destination escaped target tree: ${includeTarget.repoPath}`);
+  }
+
+  await mkdir(path.dirname(destinationPath), { recursive: true });
+  await cp(includeTarget.sourcePath, destinationPath, {
+    recursive: true,
+    force: true,
+    filter: (sourcePath) => {
+      const normalizedPath = normalizeRepoPath(path.relative(repoRoot, sourcePath));
+      return isPathInsideRepo(repoRoot, sourcePath) && !isGeneratedArtifactPath(normalizedPath);
+    },
+  });
+}
+
+async function validateMaterializedAllowedPaths(materializedRoot, includeTargets, failures) {
+  const materializedPaths = await collectMaterializedPaths(materializedRoot);
+
+  for (const absolutePath of materializedPaths) {
+    const relativePath = normalizeRepoPath(path.relative(materializedRoot, absolutePath));
+
+    if (isGeneratedArtifactPath(relativePath)) {
+      failures.push(`${relativePath}: generated/install/cache artifact must not be materialized.`);
+    }
+    if (isForbiddenMaterializedPath(relativePath)) {
+      failures.push(`${relativePath}: backend/current-app server path must not be materialized.`);
+    }
+    if (!isAllowedMaterializedPath(relativePath, includeTargets)) {
+      failures.push(`${relativePath}: materialized path is not covered by an include inventory entry.`);
+    }
+  }
+}
+
+async function collectMaterializedPaths(absolutePath) {
+  const paths = [];
+
+  try {
+    const entries = await readdir(absolutePath, { withFileTypes: true });
+    for (const entry of entries) {
+      const entryPath = path.join(absolutePath, entry.name);
+      paths.push(entryPath);
+      if (entry.isDirectory()) {
+        const childPaths = await collectMaterializedPaths(entryPath);
+        paths.push(...childPaths);
+      }
+    }
+  } catch {
+    return paths;
+  }
+
+  return paths;
+}
+
+async function validateMaterializedImportClosure(materializedRoot, failures) {
+  const sourceFiles = [];
+  await collectSourceFiles(materializedRoot, sourceFiles);
+
+  for (const filePath of sourceFiles) {
+    const content = await readFile(filePath, "utf8");
+    const relativePath = normalizeRepoPath(path.relative(materializedRoot, filePath));
+
+    for (const specifier of extractImportSpecifiers(content)) {
+      if (!specifier.startsWith(".") && !specifier.startsWith("@/")) {
+        continue;
+      }
+
+      const importedFile = await resolveMaterializedLocalImport(specifier, filePath, materializedRoot);
+      if (!importedFile || !isPathInsideRepo(materializedRoot, importedFile)) {
+        failures.push(
+          `${relativePath}: local import ${specifier} does not resolve inside the materialized frontend consumer tree.`,
+        );
+      }
+    }
+  }
+}
+
+async function resolveMaterializedLocalImport(specifier, importerPath, materializedRoot) {
+  const importPath = specifier.startsWith("@/")
+    ? path.join(materializedRoot, specifier.slice(2))
+    : path.resolve(path.dirname(importerPath), specifier);
+
+  if (!isPathInsideRepo(materializedRoot, importPath)) {
+    return null;
+  }
+
+  return resolveSourceFile(importPath);
+}
+
 async function collectIncludedSourceFiles(includeRoots) {
   const files = [];
 
@@ -339,6 +550,10 @@ async function resolveRepoLocalImport(specifier, importerPath, repoRoot) {
   const importPath = specifier.startsWith("@/")
     ? path.join(repoRoot, specifier.slice(2))
     : path.resolve(path.dirname(importerPath), specifier);
+
+  if (!isPathInsideRepo(repoRoot, importPath)) {
+    return null;
+  }
 
   return resolveSourceFile(importPath);
 }
@@ -458,6 +673,66 @@ function isForbiddenIncludePath(normalizedPath) {
     );
 }
 
+function isForbiddenMaterializedPath(normalizedPath) {
+  return forbiddenMaterializedPathExact.has(normalizedPath) ||
+    forbiddenMaterializedPathPrefixes.some((prefix) =>
+      normalizedPath === prefix || normalizedPath.startsWith(`${prefix}/`)
+    );
+}
+
+function isAllowedMaterializedPath(normalizedPath, includeTargets) {
+  return includeTargets.some((includeTarget) => {
+    if (normalizedPath === includeTarget.repoPath) {
+      return true;
+    }
+
+    if (includeTarget.repoPath.startsWith(`${normalizedPath}/`)) {
+      return true;
+    }
+
+    return includeTarget.isDirectory && normalizedPath.startsWith(`${includeTarget.repoPath}/`);
+  });
+}
+
+function isGeneratedArtifactPath(normalizedPath) {
+  const pathSegments = normalizedPath.split("/");
+  if (pathSegments.some((segment) => generatedArtifactDirectoryNames.has(segment))) {
+    return true;
+  }
+
+  const fileName = pathSegments.at(-1) ?? "";
+  return generatedArtifactFileExtensions.has(path.extname(fileName));
+}
+
+function resolveMaterializationOptions(options, failures) {
+  for (const optionName of ["materializedTreePath", "materializedTreeRoot", "materializedTreeOutputPath"]) {
+    if (Object.hasOwn(options, optionName)) {
+      failures.push("Custom materialized frontend consumer output paths are not supported.");
+    }
+  }
+
+  if (Object.hasOwn(options, "keepMaterializedTree")) {
+    if (typeof options.keepMaterializedTree !== "boolean") {
+      failures.push("keepMaterializedTree must be a boolean when provided.");
+      return { keepMaterializedTree: false };
+    }
+
+    return { keepMaterializedTree: options.keepMaterializedTree };
+  }
+
+  const env = options.env ?? process.env;
+  const envValue = env[keepMaterializedTreeEnv];
+  if (envValue === undefined || envValue === "" || envValue === "0") {
+    return { keepMaterializedTree: false };
+  }
+  if (envValue === "1") {
+    return { keepMaterializedTree: true };
+  }
+
+  failures.push(`${keepMaterializedTreeEnv} must be 1, 0, or unset.`);
+  return { keepMaterializedTree: false };
+}
+
 function failResult(failures) {
   return {
     ok: false,
@@ -465,6 +740,12 @@ function failResult(failures) {
     sourceAreaCount: 0,
     dependencyCount: 0,
     prerequisiteCommands: requiredPrerequisiteCommands,
+    materializedTree: {
+      created: false,
+      path: null,
+      kept: false,
+      cleanedUp: false,
+    },
   };
 }
 
@@ -511,6 +792,11 @@ function main() {
       console.log(
         `Prerequisite boundary checks remain required: ${result.prerequisiteCommands.join(", ")}.`,
       );
+      if (result.materializedTree?.kept) {
+        console.log(`Materialized frontend consumer target tree kept for debugging: ${result.materializedTree.path}`);
+      } else {
+        console.log("Materialized frontend consumer target tree proof completed and cleaned up.");
+      }
       console.log(
         "Readiness only: no frontend repository was created, no compatibility routes were deleted, and no SDK was published.",
       );

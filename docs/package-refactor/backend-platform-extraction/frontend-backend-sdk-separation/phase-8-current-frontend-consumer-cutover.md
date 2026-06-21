@@ -135,9 +135,22 @@ commands to remain prerequisite checks:
 `current-frontend:verify-platform-boundary` and
 `current-frontend:verify-platform-secrets`.
 
-This is still readiness only. It does not create a new frontend repository,
-delete compatibility routes, install or publish packages, make network calls,
-or prove a standalone build/run from a separated repo.
+The same safe verifier now also materializes a temporary frontend consumer
+target-tree candidate in the OS temp directory from `include` source areas
+only. It excludes generated/install/cache artifacts such as `node_modules`,
+`.next`, `dist`, `coverage`, source maps, and TypeScript build info, validates
+that the copied tree contains only allowed frontend-consumer paths, blocks
+backend/current-app server paths such as `app/api`, `apps`, `packages`,
+`lib/langchain`, `lib/reservations`, `lib/supabase-admin.ts`, `supabase`, and
+`dist-packages`, and rechecks local import closure with `@/` imports remapped
+inside the materialized tree. The temp tree is removed by default; setting
+`CURRENT_FRONTEND_CONSUMER_KEEP_MATERIALIZED_TREE=1` keeps the OS-temp copy for
+debugging without accepting a custom output path.
+
+This is still temporary target-tree readiness only. It does not create a new
+frontend repository, delete compatibility routes, install or publish packages,
+make network calls, run browser checks, or prove a complete standalone
+frontend app build/run from a separated repo.
 
 ## Acceptance Criteria
 

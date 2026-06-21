@@ -92,6 +92,7 @@ flowchart LR
 - [Phase 29: Subagent Execution Matrix](phase-29-subagent-execution-matrix.md)
 - [Remaining Modularity Gaps Index](remaining-modularity-gaps.md)
 - [Focused Backend Platform, SDK, and Frontend Split Execution Plan](plugin-platform-split/README.md)
+- [Repo Product Split Plan](repo-product-split-plan/README.md)
 
 ## Separation Rules
 

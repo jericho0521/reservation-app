@@ -136,7 +136,11 @@ verifier is CI-safe and local-only: it validates inventory shape, listed
 path/package existence, the minimum browser-safe frontend env contract, and
 prevents backend-only packages or paths from being marked as frontend
 runtime/include. It also checks that included local source imports are closed
-over other `include` entries, and requires the existing browser-safe boundary
+over other `include` entries. The existing browser-safe boundary and secret
+scans now derive scan roots from every `include` source area in this inventory
+while preserving their broader explicit migrated/admin/platform-smoke reference
+targets, so newly included consumer source cannot bypass those checks by only
+editing the inventory. The readiness verifier still requires those boundary
 commands to remain prerequisite checks:
 `current-frontend:verify-platform-boundary` and
 `current-frontend:verify-platform-secrets`.

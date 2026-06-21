@@ -1,18 +1,11 @@
 import { statSync } from "node:fs";
 import { readdir, readFile, stat } from "node:fs/promises";
 import path from "node:path";
+import { resolveCurrentFrontendPlatformScanTargets } from "./current-frontend-platform-scan-targets.mjs";
 
 const repoRoot = process.cwd();
 
-const scanTargets = [
-  "lib/reservation-platform-client.ts",
-  "components/form",
-  "components/admin",
-  "app/admin/AdminDashboard.tsx",
-  "app/admin/login/page.tsx",
-  "app/admin/platform-smoke",
-  "app/form-booking/page.tsx",
-];
+const scanTargets = await resolveCurrentFrontendPlatformScanTargets({ repoRoot });
 
 const sourceExtensions = new Set([".js", ".jsx", ".mjs", ".ts", ".tsx"]);
 const browserAuthFacadeFile = "lib/admin-auth-client.ts";

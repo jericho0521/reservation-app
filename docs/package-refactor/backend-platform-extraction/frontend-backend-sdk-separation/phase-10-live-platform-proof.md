@@ -69,6 +69,46 @@ frontend can safely depend on this backend platform."
 - Registry install proof result.
 - Optional chat live or disabled proof result.
 
+## Partial Implementation Result
+
+Phase 10 now has a CI-safe readiness orchestrator:
+
+- `corepack pnpm run backend-platform:live-proof-readiness`
+- `corepack pnpm run backend-platform:live-proof-readiness:strict`
+- Unit test:
+  `node --import tsx --test scripts\verify-live-platform-proof-readiness.test.mjs`
+
+The readiness orchestrator is implemented in
+`scripts/verify-live-platform-proof-readiness.mjs`. It imports the existing env
+parsers from:
+
+- `scripts/verify-standalone-api-deployment-config.mjs`
+- `scripts/verify-database-live-proof.mjs`
+- `scripts/verify-live-backend-parity.mjs`
+- `scripts/verify-sdk-registry-install.mjs`
+
+It does not run the strict proof commands and does not make network, database,
+registry, install, publish, or live mutation calls. Safe mode reports which
+existing proof surfaces are skipped, ready, or malformed. Strict readiness mode
+fails unless the existing strict proof commands are configured enough to run:
+
+- `corepack pnpm run backend-platform:verify-standalone-deployment-config:strict`
+- `corepack pnpm run database:live-proof:strict`
+- `corepack pnpm run sdk:live-parity:strict`
+- `corepack pnpm run sdk:registry-install-proof:strict`
+
+`sdk:release-gate` now runs the safe readiness orchestrator alongside the
+existing safe proof checks. `sdk:release-gate:strict` now runs the strict
+readiness orchestrator before the existing strict proof commands, then still
+runs those strict commands unchanged.
+
+This is readiness infrastructure only. It proves that the strict live proof
+environment contract can be checked locally and in CI without touching live
+systems. It does not prove deployed backend health, disposable database
+migration application, RLS/tenant isolation, durable idempotency, SDK/direct
+parity, registry package install, or optional chat behavior until the strict
+commands themselves pass against disposable live infrastructure.
+
 ## Acceptance Criteria
 
 - Strict live proof commands pass against disposable infrastructure.

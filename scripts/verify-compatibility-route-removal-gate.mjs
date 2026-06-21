@@ -8,6 +8,8 @@ import ts from "typescript";
 
 export const defaultCompatibilityRouteInventoryPath =
   "docs/package-refactor/backend-platform-extraction/frontend-backend-sdk-separation/compatibility-route-inventory.json";
+export const defaultCompatibilityRouteRemovalDecisionLogPath =
+  "docs/package-refactor/backend-platform-extraction/frontend-backend-sdk-separation/compatibility-route-removal-decision-log.md";
 
 export const defaultRequiredRemovalGates = [
   "standaloneEquivalent",
@@ -78,6 +80,8 @@ export async function verifyCompatibilityRouteRemovalGate(options = {}) {
 
   return verifyCompatibilityRouteInventory(inventory, {
     repoRoot,
+    decisionLogPath: options.decisionLogPath,
+    decisionLogContent: options.decisionLogContent,
     frontendSourceScanTargets: options.frontendSourceScanTargets,
     compatibilityWrapperAllowlist: options.compatibilityWrapperAllowlist,
     standaloneRoutesPath: options.standaloneRoutesPath,
@@ -128,6 +132,12 @@ export async function verifyCompatibilityRouteInventory(inventory, options = {})
     validateAppOwnedRoute(route, routeLabel, failures);
   }
 
+  const decisionLogProof = await verifyCompatibilityRouteRemovalDecisionLogCoverage(inventory, {
+    repoRoot,
+    decisionLogPath: options.decisionLogPath,
+    decisionLogContent: options.decisionLogContent,
+  });
+  failures.push(...decisionLogProof.failures);
   validateCurrentRouteInventoryCoverage(currentRouteFilePaths, inventoryFilePaths, failures);
   const standaloneRouteSurfaceProof = await verifyStandaloneEquivalentRouteSurface(inventory, {
     repoRoot,
@@ -147,8 +157,84 @@ export async function verifyCompatibilityRouteInventory(inventory, options = {})
     failures,
     routeCount: inventory.routes.length,
     requiredRemovalGates,
+    decisionLogProof,
     standaloneRouteSurfaceProof,
     sourceUsageProof,
+  };
+}
+
+export async function verifyCompatibilityRouteRemovalDecisionLogCoverage(inventory, options = {}) {
+  const repoRoot = path.resolve(options.repoRoot ?? process.cwd());
+  const decisionLogPath = options.decisionLogPath ?? defaultCompatibilityRouteRemovalDecisionLogPath;
+  const failures = [];
+  const routes = inventory.routes ?? [];
+  const nonAppOwnedRoutes = routes.filter((route) =>
+    route?.classification !== appOwnedClassification
+  );
+  const routesRequiringCoverage = nonAppOwnedRoutes.filter((route) =>
+    route?.removalGates?.rollbackDeprecationNotes === true
+  );
+
+  for (const route of nonAppOwnedRoutes) {
+    if (route?.removalGates?.rollbackDeprecationNotes !== false) {
+      continue;
+    }
+
+    if (!hasRollbackDeprecationBlocker(route)) {
+      failures.push(
+        `${getRouteLabel(route)}: rollbackDeprecationNotes is false but removalBlockedBy does not include a rollback/deprecation-note blocker.`,
+      );
+    }
+  }
+
+  if (routesRequiringCoverage.length === 0) {
+    return {
+      ok: failures.length === 0,
+      failures,
+      decisionLogPath,
+      coveredRoutePaths: [],
+      routeLiterals: [],
+    };
+  }
+
+  let decisionLogContent;
+  try {
+    decisionLogContent = typeof options.decisionLogContent === "string"
+      ? options.decisionLogContent
+      : await readFile(path.resolve(repoRoot, decisionLogPath), "utf8");
+  } catch (error) {
+    return {
+      ok: false,
+      failures: [
+        ...failures,
+        `compatibility route removal decision log could not be read at ${decisionLogPath}: ${error instanceof Error ? error.message : error}`,
+      ],
+      decisionLogPath,
+      coveredRoutePaths: [],
+      routeLiterals: [],
+    };
+  }
+
+  const routeLiterals = collectDecisionLogRouteLiterals(decisionLogContent);
+  const coveredRoutePaths = [];
+
+  for (const route of routesRequiringCoverage) {
+    if (isRouteCoveredByDecisionLog(route.routePath, routeLiterals)) {
+      coveredRoutePaths.push(route.routePath);
+      continue;
+    }
+
+    failures.push(
+      `${getRouteLabel(route)}: rollbackDeprecationNotes is true but ${decisionLogPath} does not cover this route path or an explicit route-family entry.`,
+    );
+  }
+
+  return {
+    ok: failures.length === 0,
+    failures,
+    decisionLogPath,
+    coveredRoutePaths: coveredRoutePaths.sort(),
+    routeLiterals: [...routeLiterals].sort(),
   };
 }
 
@@ -882,6 +968,64 @@ function validateAppOwnedRoute(route, routeLabel, failures) {
   if (reservationRemovalStatuses.has(route.status)) {
     failures.push(`${routeLabel}: app-owned route must not be marked for reservation-platform removal.`);
   }
+}
+
+function hasRollbackDeprecationBlocker(route) {
+  if (!Array.isArray(route?.removalBlockedBy)) {
+    return false;
+  }
+
+  return route.removalBlockedBy.some((blocker) =>
+    typeof blocker === "string" && isRollbackDeprecationBlocker(blocker)
+  );
+}
+
+function isRollbackDeprecationBlocker(blocker) {
+  const normalizedBlocker = blocker.toLowerCase();
+  return (
+    normalizedBlocker.includes("rollback") &&
+    normalizedBlocker.includes("deprecation") &&
+    (
+      normalizedBlocker.includes("not written") ||
+      normalizedBlocker.includes("not documented") ||
+      normalizedBlocker.includes("missing") ||
+      normalizedBlocker.includes("incomplete")
+    )
+  );
+}
+
+function collectDecisionLogRouteLiterals(content) {
+  const routeLiterals = new Set();
+  const coverageLinePattern = /^Covered compatibility routes?:\s*(.+)$/gm;
+  const routeLiteralPattern = /`(\/api[^`\s]*)`/g;
+
+  for (const coverageLineMatch of content.matchAll(coverageLinePattern)) {
+    const coverageText = coverageLineMatch[1];
+    for (const routeLiteralMatch of coverageText.matchAll(routeLiteralPattern)) {
+      routeLiterals.add(routeLiteralMatch[1]);
+    }
+  }
+
+  return routeLiterals;
+}
+
+function isRouteCoveredByDecisionLog(routePath, routeLiterals) {
+  if (!isNonBlankString(routePath) || routeLiterals.has(routePath)) {
+    return routeLiterals.has(routePath);
+  }
+
+  for (const routeLiteral of routeLiterals) {
+    if (!routeLiteral.endsWith("/**")) {
+      continue;
+    }
+
+    const routeFamilyPrefix = routeLiteral.slice(0, -3);
+    if (routePath === routeFamilyPrefix || routePath.startsWith(`${routeFamilyPrefix}/`)) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 function failResult(failures) {

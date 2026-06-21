@@ -5,6 +5,7 @@ import path from "node:path";
 import test from "node:test";
 
 import {
+  defaultCompatibilityRouteRemovalDecisionLogPath,
   defaultRequiredRemovalGates,
   readCompatibilityRouteInventory,
   verifyCompatibilityRouteInventory,
@@ -43,7 +44,7 @@ function routeFixture(overrides = {}) {
       ...gateDefaults,
       standaloneEquivalent: true,
     },
-    removalBlockedBy: ["fixture gate"],
+    removalBlockedBy: ["fixture gate", "rollback or deprecation notes are not written"],
     ...overrides,
   };
 }
@@ -64,6 +65,11 @@ async function createFixtureRepo(files = ["app/api/services/route.ts"], options 
     repoRoot,
     "apps/api/src/routes.test.ts",
     options.standaloneRoutesTestSource ?? defaultStandaloneRoutesTestSource(),
+  );
+  await writeFixtureFile(
+    repoRoot,
+    defaultCompatibilityRouteRemovalDecisionLogPath,
+    options.decisionLogSource ?? defaultDecisionLogSource(),
   );
 
   return repoRoot;
@@ -110,6 +116,15 @@ function defaultStandaloneRoutesTestSource() {
   ].join("\n");
 }
 
+function defaultDecisionLogSource() {
+  return [
+    "# Compatibility Route Removal Decision Log",
+    "",
+    "Covered compatibility routes: `/api/services`, `/api/services/{id}`, `/api/chat`, `/api/v1/chat/**`.",
+    "",
+  ].join("\n");
+}
+
 test("compatibility route gate accepts the current route inventory", async () => {
   const inventory = await readCompatibilityRouteInventory();
   const result = await verifyCompatibilityRouteInventory(inventory);
@@ -129,6 +144,110 @@ test("current inventory treats legacy /api/chat as optional chat compatibility",
   assert.equal(chatRoute.standaloneEquivalent, "/v1/chat/reservation-sessions/**");
   assert.equal(chatRoute.removalGates.frontendCutover, false);
   assert.ok(chatRoute.removalBlockedBy.some((blocker) => blocker.includes("frontend chat cutover")));
+});
+
+test("compatibility route gate rejects rollback/deprecation true without decision log coverage", async () => {
+  const repoRoot = await createFixtureRepo(
+    ["app/api/services/route.ts"],
+    {
+      decisionLogSource: [
+        "# Compatibility Route Removal Decision Log",
+        "",
+        "Covered compatibility routes: `/api/venues`.",
+        "",
+      ].join("\n"),
+    },
+  );
+  const result = await verifyCompatibilityRouteInventory(
+    baseInventory(routeFixture({
+      removalGates: {
+        ...gateDefaults,
+        standaloneEquivalent: true,
+        rollbackDeprecationNotes: true,
+      },
+      removalBlockedBy: ["fixture gate"],
+    })),
+    { repoRoot },
+  );
+
+  assert.equal(result.ok, false);
+  assert.match(
+    result.failures.join("\n"),
+    /\/api\/services: rollbackDeprecationNotes is true but .*compatibility-route-removal-decision-log\.md does not cover this route path/,
+  );
+});
+
+test("compatibility route gate ignores incidental decision log route mentions outside coverage lines", async () => {
+  const repoRoot = await createFixtureRepo(
+    ["app/api/services/route.ts"],
+    {
+      decisionLogSource: [
+        "# Compatibility Route Removal Decision Log",
+        "",
+        "Current frontend fallback behavior: local mode still calls `/api/services`.",
+        "",
+        "Covered compatibility routes: `/api/venues`.",
+        "",
+      ].join("\n"),
+    },
+  );
+  const result = await verifyCompatibilityRouteInventory(
+    baseInventory(routeFixture({
+      removalGates: {
+        ...gateDefaults,
+        standaloneEquivalent: true,
+        rollbackDeprecationNotes: true,
+      },
+      removalBlockedBy: ["fixture gate"],
+    })),
+    { repoRoot },
+  );
+
+  assert.equal(result.ok, false);
+  assert.match(
+    result.failures.join("\n"),
+    /\/api\/services: rollbackDeprecationNotes is true but .*compatibility-route-removal-decision-log\.md does not cover this route path/,
+  );
+});
+
+test("compatibility route gate rejects rollback/deprecation false without a notes blocker", async () => {
+  const repoRoot = await createFixtureRepo();
+  const result = await verifyCompatibilityRouteInventory(
+    baseInventory(routeFixture({ removalBlockedBy: ["fixture gate"] })),
+    { repoRoot },
+  );
+
+  assert.equal(result.ok, false);
+  assert.match(
+    result.failures.join("\n"),
+    /\/api\/services: rollbackDeprecationNotes is false but removalBlockedBy does not include a rollback\/deprecation-note blocker/,
+  );
+});
+
+test("compatibility route gate does not require decision log coverage for app-owned routes", async () => {
+  const repoRoot = await createFixtureRepo(
+    ["app/api/analytics-chat/route.ts"],
+    { decisionLogSource: "# Compatibility Route Removal Decision Log\n" },
+  );
+  const result = await verifyCompatibilityRouteInventory(
+    baseInventory({
+      routePath: "/api/analytics-chat",
+      filePath: "app/api/analytics-chat/route.ts",
+      classification: "app-owned-current-app",
+      status: "keep-app-owned",
+      standaloneEquivalent: null,
+      frontendUsage: {
+        state: "fixture",
+        notes: "Fixture app-owned route.",
+      },
+      removalGates: {},
+      removalBlockedBy: [],
+    }),
+    { repoRoot },
+  );
+
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.failures, []);
 });
 
 test("compatibility route gate reports missing listed route files", async () => {

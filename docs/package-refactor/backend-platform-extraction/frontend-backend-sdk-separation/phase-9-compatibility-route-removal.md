@@ -54,6 +54,8 @@ removed or marked safe to remove.
 
 - Machine-readable inventory:
   `docs/package-refactor/backend-platform-extraction/frontend-backend-sdk-separation/compatibility-route-inventory.json`
+- Rollback/deprecation decision log:
+  `docs/package-refactor/backend-platform-extraction/frontend-backend-sdk-separation/compatibility-route-removal-decision-log.md`
 - CI-safe verifier:
   `corepack pnpm run backend-platform:verify-compatibility-route-removal-gate`
 - Unit tests:
@@ -62,9 +64,10 @@ removed or marked safe to remove.
 The inventory separates reservation-platform compatibility routes from
 app-owned current-app routes. Reservation catalog, availability, bookings,
 resource-maintenance, `/api/v1`, legacy `/api/chat`, and optional `/api/v1/chat/**` compatibility
-routes remain blocked by one or more removal gates. Current app-owned analytics,
-blog/update routes are explicitly marked `keep-app-owned` and must not be
-removed as part of reservation-platform cleanup.
+routes now have local rollback/deprecation decisions documented in the decision
+log, but remain blocked by one or more other removal gates. Current app-owned
+analytics, blog/update routes are explicitly marked `keep-app-owned` and must
+not be removed as part of reservation-platform cleanup.
 
 The verifier is local-only. It reads the inventory, checks that listed route
 files exist, enumerates current `app/api/**/route.ts` files to enforce full
@@ -96,6 +99,14 @@ does not make network, deployment, or live backend calls, and it proves only
 local dispatch/test route-surface coverage rather than live parity, auth/tenant
 behavior, idempotency behavior, deployability, or route removability.
 
+The verifier also checks the local rollback/deprecation decision log. Every
+non-app-owned route with `rollbackDeprecationNotes: true` must be represented by
+an explicit route path or bounded route-family entry in
+`compatibility-route-removal-decision-log.md`. Non-app-owned routes with
+`rollbackDeprecationNotes: false` must continue to list a rollback/deprecation
+blocker. App-owned analytics, blog, and update routes do not require decision
+log coverage.
+
 A bounded frontend fallback cleanup proof now exists in
 `lib/reservation-platform-client.test.ts`. With
 `NEXT_PUBLIC_RESERVATION_PLATFORM_BASE_URL` configured, mocked current-frontend
@@ -125,13 +136,18 @@ standalone backend parity.
 - Compatibility route inventory.
 - Route-by-route removal checklist.
 - Deleted/deprecated route list. Not started in this readiness slice.
+- Rollback/deprecation decision log. Started as a bounded local decision log:
+  current compatibility routes remain rollback fallback until live `/v1`
+  parity/auth/idempotency/frontend cutover pass; no route is deleted or
+  deprecated in this slice.
 - Frontend fallback cleanup proof. Started as a bounded local client proof for
   configured platform mode only; full removal remains blocked.
 - Source scans proving current frontend no longer depends on removed routes.
   Started as a bounded direct-frontend-usage scan inside
   `backend-platform:verify-compatibility-route-removal-gate`; full route
   deletion remains blocked because no routes have live parity/auth/idempotency,
-  tests, and rollback/deprecation gates complete.
+  tests, and frontend cutover complete. Rollback/deprecation notes are locally
+  documented but do not make any route removable.
 
 ## Acceptance Criteria
 

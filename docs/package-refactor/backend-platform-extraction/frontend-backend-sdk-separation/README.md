@@ -80,6 +80,11 @@ flowchart LR
 - [Phase 17: Physical Frontend Repository Split](phase-17-physical-frontend-repo-split.md)
 - [Phase 18: SDK Distribution and Contract](phase-18-sdk-distribution-and-contract.md)
 - [Phase 19: Cross-Repo Release Proof](phase-19-cross-repo-release-proof.md)
+- [Phase 20: Separation Source of Truth](phase-20-separation-source-of-truth.md)
+- [Phase 21: Backend Repo Materialization](phase-21-backend-repo-materialization.md)
+- [Phase 22: Frontend Repo Materialization](phase-22-frontend-repo-materialization.md)
+- [Phase 23: SDK Package Materialization](phase-23-sdk-package-materialization.md)
+- [Phase 24: Cross-Repo Adoption Proof](phase-24-cross-repo-adoption-proof.md)
 - [Remaining Modularity Gaps Index](remaining-modularity-gaps.md)
 
 ## Separation Rules
@@ -122,3 +127,8 @@ Phases 16 through 19 are the physical repository split plan. They turn the
 monorepo readiness work into separate backend, frontend, and SDK adoption
 proofs, then require a cross-repo release chain before the platform is treated
 as plug-and-play infrastructure.
+
+Phases 20 through 24 are the separation completion plan. They make the repo
+ownership source of truth explicit, materialize backend and frontend repository
+candidates, prove the SDK as the installable contract, and finish with a
+cross-repo adoption proof for a frontend that starts outside this monorepo.

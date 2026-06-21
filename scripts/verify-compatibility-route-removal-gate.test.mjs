@@ -48,12 +48,23 @@ function routeFixture(overrides = {}) {
   };
 }
 
-async function createFixtureRepo(files = ["app/api/services/route.ts"]) {
+async function createFixtureRepo(files = ["app/api/services/route.ts"], options = {}) {
   const repoRoot = await mkdtemp(path.join(tmpdir(), "compat-route-gate-"));
 
   for (const filePath of files) {
     await writeFixtureFile(repoRoot, filePath, "export async function GET() {}\n");
   }
+
+  await writeFixtureFile(
+    repoRoot,
+    "apps/api/src/routes.ts",
+    options.standaloneRoutesSource ?? defaultStandaloneRoutesSource(),
+  );
+  await writeFixtureFile(
+    repoRoot,
+    "apps/api/src/routes.test.ts",
+    options.standaloneRoutesTestSource ?? defaultStandaloneRoutesTestSource(),
+  );
 
   return repoRoot;
 }
@@ -62,6 +73,41 @@ async function writeFixtureFile(repoRoot, filePath, content) {
   const absolutePath = path.join(repoRoot, filePath);
   await mkdir(path.dirname(absolutePath), { recursive: true });
   await writeFile(absolutePath, content);
+}
+
+function defaultStandaloneRoutesSource() {
+  return [
+    "const servicePattern = /^\\/v1\\/services\\/([^/]+)$/;",
+    "const reservationPattern = /^\\/v1\\/reservations\\/([^/]+)$/;",
+    "const chatSessionMessagePattern = /^\\/v1\\/chat\\/reservation-sessions\\/([^/]+)\\/messages$/;",
+    "const chatSessionOperationPattern = /^\\/v1\\/chat\\/reservation-sessions\\/([^/]+)\\/([^/]+)$/;",
+    "export async function handleStandaloneApiRequest(request) {",
+    "  const path = request.path;",
+    "  if (path === \"/v1/services\") return handleServicesRequest();",
+    "  if (servicePattern.test(path)) return handleServiceReadRequest();",
+    "  if (path === \"/v1/reservations\") return handleReservationsRequest();",
+    "  if (reservationPattern.test(path)) return handleReservationReadRequest();",
+    "  if (path === \"/v1/chat/reservation-sessions\") return handleChatCreateReservationSessionRequest();",
+    "  if (chatSessionMessagePattern.test(path)) return handleChatSendMessageRequest();",
+    "  const operationMatch = chatSessionOperationPattern.exec(path);",
+    "  const operation = operationMatch?.[2];",
+    "  if (operation === \"messages:stream\") return handleChatStreamMessageRequest();",
+    "  if (operation === \"confirm\") return handleChatConfirmReservationRequest();",
+    "}",
+    "",
+  ].join("\n");
+}
+
+function defaultStandaloneRoutesTestSource() {
+  return [
+    "test(\"chat family\", async () => {",
+    "  await handleStandaloneApiRequest({ method: \"POST\", path: \"/v1/chat/reservation-sessions\" });",
+    "  await handleStandaloneApiRequest({ method: \"POST\", path: \"/v1/chat/reservation-sessions/session_123/messages\" });",
+    "  await handleStandaloneApiRequest({ method: \"POST\", path: \"/v1/chat/reservation-sessions/session_123/messages:stream\" });",
+    "  await handleStandaloneApiRequest({ method: \"POST\", path: \"/v1/chat/reservation-sessions/session_123/confirm\" });",
+    "});",
+    "",
+  ].join("\n");
 }
 
 test("compatibility route gate accepts the current route inventory", async () => {
@@ -116,6 +162,103 @@ test("compatibility route gate requires standalone /v1 equivalents for remove-la
 
   assert.equal(result.ok, false);
   assert.match(result.failures.join("\n"), /standaloneEquivalent must start with \/v1/);
+});
+
+test("compatibility route gate rejects claimed dynamic standalone equivalents absent from apps/api routes", async () => {
+  const repoRoot = await createFixtureRepo(
+    ["app/api/services/[id]/route.ts"],
+    {
+      standaloneRoutesSource: [
+        "export async function handleStandaloneApiRequest(request) {",
+        "  const path = request.path;",
+        "  if (path === \"/v1/services\") return {};",
+        "}",
+        "",
+      ].join("\n"),
+    },
+  );
+  const result = await verifyCompatibilityRouteInventory(
+    baseInventory(routeFixture({
+      routePath: "/api/services/{id}",
+      filePath: "app/api/services/[id]/route.ts",
+      standaloneEquivalent: "/v1/services/{id}",
+    })),
+    { repoRoot },
+  );
+
+  assert.equal(result.ok, false);
+  assert.match(
+    result.failures.join("\n"),
+    /\/api\/services\/\{id\}: standaloneEquivalent \/v1\/services\/\{id\} is not represented by actual dispatch/,
+  );
+});
+
+test("compatibility route gate ignores auth helper route references when standalone dispatch is missing", async () => {
+  const repoRoot = await createFixtureRepo(
+    ["app/api/services/route.ts"],
+    {
+      standaloneRoutesSource: [
+        "const servicePattern = /^\\/v1\\/services\\/([^/]+)$/;",
+        "export function isProtectedPlatformDataRoute(method, path) {",
+        "  return path === \"/v1/services\" || servicePattern.test(path);",
+        "}",
+        "export async function handleStandaloneApiRequest(request) {",
+        "  const path = request.path;",
+        "  if (path === \"/v1/metadata\") return {};",
+        "}",
+        "",
+      ].join("\n"),
+      standaloneRoutesTestSource: [
+        "test(\"metadata only\", async () => {",
+        "  await handleStandaloneApiRequest({ method: \"GET\", path: \"/v1/metadata\" });",
+        "});",
+        "",
+      ].join("\n"),
+    },
+  );
+  const result = await verifyCompatibilityRouteInventory(
+    baseInventory(routeFixture()),
+    { repoRoot },
+  );
+
+  assert.equal(result.ok, false);
+  assert.match(
+    result.failures.join("\n"),
+    /\/api\/services: standaloneEquivalent \/v1\/services is not represented by actual dispatch/,
+  );
+});
+
+test("compatibility route gate rejects legacy chat wildcard claims without full source and test family coverage", async () => {
+  const repoRoot = await createFixtureRepo(
+    ["app/api/chat/route.ts"],
+    {
+      standaloneRoutesTestSource: [
+        "test(\"chat family\", async () => {",
+        "  await handleStandaloneApiRequest({ method: \"POST\", path: \"/v1/chat/reservation-sessions\" });",
+        "  await handleStandaloneApiRequest({ method: \"POST\", path: \"/v1/chat/reservation-sessions/session_123/messages\" });",
+        "  await handleStandaloneApiRequest({ method: \"POST\", path: \"/v1/chat/reservation-sessions/session_123/messages:stream\" });",
+        "});",
+        "",
+      ].join("\n"),
+    },
+  );
+  const result = await verifyCompatibilityRouteInventory(
+    baseInventory(routeFixture({
+      routePath: "/api/chat",
+      filePath: "app/api/chat/route.ts",
+      classification: "optional-platform-module-compatibility",
+      status: "move-to-optional-module",
+      standaloneEquivalent: "/v1/chat/reservation-sessions/**",
+    })),
+    { repoRoot },
+  );
+
+  assert.equal(result.ok, false);
+  assert.match(
+    result.failures.join("\n"),
+    /\/api\/chat: standaloneEquivalent \/v1\/chat\/reservation-sessions\/\*\* claims the chat reservation-session route family/,
+  );
+  assert.match(result.failures.join("\n"), /confirm test/);
 });
 
 test("compatibility route gate requires blocked routes to list blockers", async () => {

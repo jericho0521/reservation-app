@@ -69,10 +69,18 @@ removed as part of reservation-platform cleanup.
 The verifier is local-only. It reads the inventory, checks that listed route
 files exist, enumerates current `app/api/**/route.ts` files to enforce full
 inventory coverage, requires removal/deprecation candidates to have `/v1`
-standalone equivalents, requires blocked routes to name blockers, prevents
-app-owned routes from being marked for reservation-platform removal, and rejects
-`removable` status unless every required gate boolean is true. It also now runs
-a bounded source-usage proof over migrated current-frontend/platform surfaces:
+standalone equivalents, and statically verifies that every non-null
+reservation-platform or optional-module standalone equivalent is represented by
+actual `handleStandaloneApiRequest` dispatch in `apps/api/src/routes.ts` or an
+explicit route invocation in `apps/api/src/routes.test.ts`. Dynamic placeholders
+such as `{id}` are normalized to the standalone regex/literal route shape. The
+legacy `/v1/chat/reservation-sessions/**` claim is handled as a bounded chat
+route family proof: dispatcher source plus route tests must cover session
+creation, messages, stream, and confirmation paths. The verifier also requires blocked routes to
+name blockers, prevents app-owned routes from being marked for
+reservation-platform removal, and rejects `removable` status unless every
+required gate boolean is true. It also now runs a bounded source-usage proof
+over migrated current-frontend/platform surfaces:
 `lib/reservation-platform-client.ts`, reservation form components, admin
 components, admin platform smoke surfaces, the real `app/admin/page.tsx` server
 entry and its loader import closure, and the form entry file plus its local
@@ -84,7 +92,9 @@ known compatibility wrapper
 gates are still blocked, but fails if migrated pages/components/admin source
 directly references routes such as `/api/bookings`, `/api/services`,
 `/api/availability`, `/api/seat-maintenance`, or `/api/v1/reservations`. It
-does not make network, deployment, or live backend calls.
+does not make network, deployment, or live backend calls, and it proves only
+local dispatch/test route-surface coverage rather than live parity, auth/tenant
+behavior, idempotency behavior, deployability, or route removability.
 
 A bounded frontend fallback cleanup proof now exists in
 `lib/reservation-platform-client.test.ts`. With

@@ -94,11 +94,22 @@ flowchart LR
   complete-or-absent `RESERVATION_PLATFORM_AUTH_*` JWT/JWKS config, valid auth
   numeric settings, backend-only AI/chat provider env when present, and rejects
   `NEXT_PUBLIC_*` backend secret-style names.
+- `corepack pnpm run backend-platform:verify-compatibility-route-removal-gate`
+  now also proves that every reservation-platform or optional-module
+  compatibility inventory entry with a non-null `/v1` standalone equivalent is
+  represented by actual `handleStandaloneApiRequest` dispatch or an explicit
+  route invocation in `apps/api/src/routes.test.ts`. The proof normalizes
+  dynamic placeholders such as `{id}` and treats the legacy
+  `/v1/chat/reservation-sessions/**` claim as a bounded chat session family
+  proof that must cover session creation, messages, stream, and confirmation in
+  `apps/api` source/tests.
 - This is readiness only. It proves that deployment config can be checked in CI
   without live infrastructure and that strict environments fail closed on
-  missing or malformed config. It does not prove a live deployment, live
-  Supabase connectivity, database migrations, RLS/tenant isolation, provider
-  chat configuration, or seeded reservation parity.
+  missing or malformed config, and that the claimed standalone route paths are
+  locally present in dispatcher/test coverage rather than only auth preflight
+  helpers. It does not prove live route parity, a live deployment, live Supabase
+  connectivity, database migrations, RLS/tenant isolation, provider chat
+  configuration, durable idempotency, or seeded reservation parity.
 
 ## Acceptance Criteria
 

@@ -35,6 +35,13 @@ const reservationRemovalStatuses = new Set([
   "removable",
 ]);
 const reservationPlatformClassification = "reservation-platform-compatibility";
+const optionalPlatformModuleClassification = "optional-platform-module-compatibility";
+const standaloneEquivalentClassifications = new Set([
+  reservationPlatformClassification,
+  optionalPlatformModuleClassification,
+]);
+const defaultStandaloneRoutesPath = "apps/api/src/routes.ts";
+const defaultStandaloneRoutesTestPath = "apps/api/src/routes.test.ts";
 const sourceExtensions = new Set([".js", ".jsx", ".mjs", ".ts", ".tsx"]);
 const defaultFrontendSourceScanTargets = [
   "lib/reservation-platform-client.ts",
@@ -73,6 +80,8 @@ export async function verifyCompatibilityRouteRemovalGate(options = {}) {
     repoRoot,
     frontendSourceScanTargets: options.frontendSourceScanTargets,
     compatibilityWrapperAllowlist: options.compatibilityWrapperAllowlist,
+    standaloneRoutesPath: options.standaloneRoutesPath,
+    standaloneRoutesTestPath: options.standaloneRoutesTestPath,
   });
 }
 
@@ -120,6 +129,12 @@ export async function verifyCompatibilityRouteInventory(inventory, options = {})
   }
 
   validateCurrentRouteInventoryCoverage(currentRouteFilePaths, inventoryFilePaths, failures);
+  const standaloneRouteSurfaceProof = await verifyStandaloneEquivalentRouteSurface(inventory, {
+    repoRoot,
+    routesPath: options.standaloneRoutesPath,
+    routesTestPath: options.standaloneRoutesTestPath,
+  });
+  failures.push(...standaloneRouteSurfaceProof.failures);
   const sourceUsageProof = await verifyFrontendCompatibilityRouteSourceUsage(inventory, {
     repoRoot,
     scanTargets: options.frontendSourceScanTargets,
@@ -132,7 +147,74 @@ export async function verifyCompatibilityRouteInventory(inventory, options = {})
     failures,
     routeCount: inventory.routes.length,
     requiredRemovalGates,
+    standaloneRouteSurfaceProof,
     sourceUsageProof,
+  };
+}
+
+export async function verifyStandaloneEquivalentRouteSurface(inventory, options = {}) {
+  const repoRoot = path.resolve(options.repoRoot ?? process.cwd());
+  const routesPath = options.routesPath ?? defaultStandaloneRoutesPath;
+  const routesTestPath = options.routesTestPath ?? defaultStandaloneRoutesTestPath;
+  const failures = [];
+
+  let surface;
+  try {
+    surface = await readStandaloneApiRouteSurface(repoRoot, routesPath, routesTestPath);
+  } catch (error) {
+    return {
+      ok: false,
+      failures: [
+        `standalone route surface proof could not read apps/api source: ${error instanceof Error ? error.message : error}`,
+      ],
+      coveredStandaloneEquivalents: [],
+      coveredRoutePatterns: [],
+      chatFamilyProof: emptyChatFamilyProof(),
+      routesPath,
+      routesTestPath,
+    };
+  }
+
+  const coveredStandaloneEquivalents = new Set();
+
+  for (const route of inventory.routes ?? []) {
+    if (
+      !standaloneEquivalentClassifications.has(route?.classification) ||
+      !isNonBlankString(route.standaloneEquivalent)
+    ) {
+      continue;
+    }
+
+    const normalizedEquivalent = normalizeStandaloneEquivalent(route.standaloneEquivalent);
+    if (normalizedEquivalent === "/v1/chat/reservation-sessions/**") {
+      if (surface.chatFamilyProof.ok) {
+        coveredStandaloneEquivalents.add(normalizedEquivalent);
+      } else {
+        failures.push(
+          `${getRouteLabel(route)}: standaloneEquivalent ${normalizedEquivalent} claims the chat reservation-session route family, but apps/api source/tests do not cover every required chat path (${surface.chatFamilyProof.missing.join(", ")}).`,
+        );
+      }
+      continue;
+    }
+
+    if (isStandaloneEquivalentCovered(normalizedEquivalent, surface)) {
+      coveredStandaloneEquivalents.add(normalizedEquivalent);
+      continue;
+    }
+
+    failures.push(
+      `${getRouteLabel(route)}: standaloneEquivalent ${normalizedEquivalent} is not represented by actual dispatch in ${routesPath} or a route invocation in ${routesTestPath}.`,
+    );
+  }
+
+  return {
+    ok: failures.length === 0,
+    failures,
+    coveredStandaloneEquivalents: [...coveredStandaloneEquivalents].sort(),
+    coveredRoutePatterns: [...surface.coveredRoutePatterns].sort(),
+    chatFamilyProof: surface.chatFamilyProof,
+    routesPath,
+    routesTestPath,
   };
 }
 
@@ -166,6 +248,316 @@ export async function verifyFrontendCompatibilityRouteSourceUsage(inventory, opt
     scannedFileCount: files.length,
     forbiddenRoutes,
     wrapperAllowlist: [...wrapperAllowlist].sort(),
+  };
+}
+
+async function readStandaloneApiRouteSurface(repoRoot, routesPath, routesTestPath) {
+  const [routesSource, routesTestSource] = await Promise.all([
+    readFile(path.resolve(repoRoot, routesPath), "utf8"),
+    readFile(path.resolve(repoRoot, routesTestPath), "utf8"),
+  ]);
+  const dispatchSurface = collectStandaloneDispatchRoutePatternsFromSource(routesSource);
+  const testRoutePatterns = collectStandaloneRoutePatternsFromTests(routesTestSource);
+  const chatFamilyProof = readChatRouteFamilyProof(dispatchSurface, testRoutePatterns);
+  const coveredRoutePatterns = new Set([
+    ...dispatchSurface.routePatterns,
+    ...testRoutePatterns,
+  ]);
+
+  if (chatFamilyProof.ok) {
+    for (const routePattern of chatFamilyProof.coveredPatterns) {
+      coveredRoutePatterns.add(routePattern);
+    }
+  }
+
+  return {
+    dispatchRoutePatterns: dispatchSurface.routePatterns,
+    dispatchSource: dispatchSurface.dispatchSource,
+    testRoutePatterns,
+    coveredRoutePatterns,
+    chatFamilyProof,
+  };
+}
+
+function collectStandaloneDispatchRoutePatternsFromSource(content) {
+  const routePatterns = new Set();
+  const sourceFile = parseSourceFile(content);
+  const regexRoutePatternsByName = new Map();
+  const dispatchBody = findFunctionBody(sourceFile, "handleStandaloneApiRequest");
+
+  visitAst(sourceFile, (node) => {
+    if (
+      ts.isVariableDeclaration(node) &&
+      ts.isIdentifier(node.name) &&
+      node.initializer &&
+      ts.isRegularExpressionLiteral(node.initializer)
+    ) {
+      const routePattern = routePatternFromRegexLiteral(node.initializer.text);
+      if (routePattern) {
+        regexRoutePatternsByName.set(node.name.text, routePattern);
+      }
+    }
+  });
+
+  if (!dispatchBody) {
+    return {
+      routePatterns,
+      dispatchSource: "",
+    };
+  }
+
+  visitAst(dispatchBody, (node) => {
+    const literalRoutePattern = routePatternFromPathComparison(node);
+    if (literalRoutePattern) {
+      routePatterns.add(literalRoutePattern);
+      return;
+    }
+
+    const regexRoutePattern = routePatternFromPathRegexUsage(node, regexRoutePatternsByName);
+    if (regexRoutePattern && countDynamicPlaceholders(regexRoutePattern) <= 1) {
+      routePatterns.add(regexRoutePattern);
+    }
+  });
+
+  return {
+    routePatterns,
+    dispatchSource: dispatchBody.getFullText(sourceFile),
+  };
+}
+
+function collectStandaloneRoutePatternsFromTests(content) {
+  const routePatterns = new Set();
+  const sourceFile = parseSourceFile(content);
+
+  visitAst(sourceFile, (node) => {
+    if (
+      ts.isPropertyAssignment(node) &&
+      isPropertyNameText(node.name, "path")
+    ) {
+      const routePattern = routePatternFromTestPathExpression(node.initializer);
+      if (routePattern) {
+        routePatterns.add(routePattern);
+      }
+      return;
+    }
+
+    if (
+      ts.isCallExpression(node) &&
+      ts.isIdentifier(node.expression) &&
+      node.expression.text === "fetch" &&
+      node.arguments.length > 0
+    ) {
+      const routePattern = routePatternFromTestPathExpression(node.arguments[0]);
+      if (routePattern) {
+        routePatterns.add(routePattern);
+      }
+    }
+  });
+
+  return routePatterns;
+}
+
+function findFunctionBody(sourceFile, functionName) {
+  let body = null;
+
+  visitAst(sourceFile, (node) => {
+    if (
+      body ||
+      !ts.isFunctionDeclaration(node) ||
+      !node.body ||
+      !node.name ||
+      node.name.text !== functionName
+    ) {
+      return;
+    }
+
+    body = node.body;
+  });
+
+  return body;
+}
+
+function isStandaloneEquivalentCovered(routePattern, surface) {
+  if (surface.dispatchRoutePatterns.has(routePattern) || surface.testRoutePatterns.has(routePattern)) {
+    return true;
+  }
+
+  return isRoutePatternCoveredByTests(routePattern, surface.testRoutePatterns);
+}
+
+function isRoutePatternCoveredByTests(routePattern, testRoutePatterns) {
+  if (testRoutePatterns.has(routePattern)) {
+    return true;
+  }
+
+  const routePatternRegex = routePatternToRegExp(routePattern);
+  return [...testRoutePatterns].some((testRoutePattern) =>
+    !testRoutePattern.includes("{id}") && routePatternRegex.test(testRoutePattern)
+  );
+}
+
+function routePatternToRegExp(routePattern) {
+  const escaped = escapeRegExp(routePattern).replaceAll("\\{id\\}", "[^/]+");
+  return new RegExp(`^${escaped}$`);
+}
+
+function routePatternFromPathComparison(node) {
+  if (
+    !ts.isBinaryExpression(node) ||
+    (
+      node.operatorToken.kind !== ts.SyntaxKind.EqualsEqualsEqualsToken &&
+      node.operatorToken.kind !== ts.SyntaxKind.EqualsEqualsToken
+    )
+  ) {
+    return null;
+  }
+
+  if (isIdentifierNamed(node.left, "path")) {
+    return routePatternFromStaticStringExpression(node.right);
+  }
+
+  if (isIdentifierNamed(node.right, "path")) {
+    return routePatternFromStaticStringExpression(node.left);
+  }
+
+  return null;
+}
+
+function routePatternFromTestPathExpression(expression) {
+  const value = testPathStringFromExpression(expression);
+  if (!isNonBlankString(value)) {
+    return null;
+  }
+
+  const pathStartIndex = value.indexOf("/v1");
+  if (pathStartIndex === -1) {
+    return null;
+  }
+
+  const pathWithQuery = value.slice(pathStartIndex);
+  const pathOnly = pathWithQuery.split("?")[0];
+  return normalizeStandaloneEquivalent(pathOnly);
+}
+
+function testPathStringFromExpression(expression) {
+  const unwrappedExpression = unwrapExpression(expression);
+
+  if (ts.isStringLiteral(unwrappedExpression) || ts.isNoSubstitutionTemplateLiteral(unwrappedExpression)) {
+    return unwrappedExpression.text;
+  }
+
+  if (ts.isTemplateExpression(unwrappedExpression)) {
+    let value = unwrappedExpression.head.text;
+    for (const span of unwrappedExpression.templateSpans) {
+      const spanValue = staticStringFromExpression(span.expression);
+      value += (spanValue ?? "{id}") + span.literal.text;
+    }
+    return value;
+  }
+
+  return staticStringFromExpression(unwrappedExpression);
+}
+
+function routePatternFromPathRegexUsage(node, regexRoutePatternsByName) {
+  if (
+    !ts.isCallExpression(node) ||
+    !ts.isPropertyAccessExpression(node.expression) ||
+    (node.expression.name.text !== "test" && node.expression.name.text !== "exec") ||
+    !isIdentifierNamed(node.arguments[0], "path") ||
+    !ts.isIdentifier(node.expression.expression)
+  ) {
+    return null;
+  }
+
+  return regexRoutePatternsByName.get(node.expression.expression.text) ?? null;
+}
+
+function routePatternFromStaticStringExpression(expression) {
+  const value = staticStringFromExpression(expression);
+  if (!isNonBlankString(value) || !value.startsWith("/v1")) {
+    return null;
+  }
+
+  return normalizeStandaloneEquivalent(value);
+}
+
+function routePatternFromRegexLiteral(regexLiteralText) {
+  const lastSlashIndex = regexLiteralText.lastIndexOf("/");
+  if (!regexLiteralText.startsWith("/") || lastSlashIndex <= 0) {
+    return null;
+  }
+
+  let body = regexLiteralText.slice(1, lastSlashIndex);
+  if (!body.startsWith("^") || !body.endsWith("$")) {
+    return null;
+  }
+
+  body = body.slice(1, -1)
+    .replaceAll("\\/", "/")
+    .replace(/\(\[\^\/\]\+\)/g, "{id}");
+
+  if (!body.startsWith("/v1") || /[()[\]|?*+]/.test(body)) {
+    return null;
+  }
+
+  return normalizeStandaloneEquivalent(body);
+}
+
+function readChatRouteFamilyProof(dispatchSurface, testRoutePatterns) {
+  const dispatchSource = dispatchSurface.dispatchSource;
+  const requirements = [
+    {
+      name: "session",
+      pattern: "/v1/chat/reservation-sessions",
+      source: dispatchSurface.routePatterns.has("/v1/chat/reservation-sessions") &&
+        dispatchSource.includes("handleChatCreateReservationSessionRequest"),
+      test: isRoutePatternCoveredByTests("/v1/chat/reservation-sessions", testRoutePatterns),
+    },
+    {
+      name: "messages",
+      pattern: "/v1/chat/reservation-sessions/{id}/messages",
+      source: dispatchSurface.routePatterns.has("/v1/chat/reservation-sessions/{id}/messages") &&
+        dispatchSource.includes("handleChatSendMessageRequest"),
+      test: isRoutePatternCoveredByTests("/v1/chat/reservation-sessions/{id}/messages", testRoutePatterns),
+    },
+    {
+      name: "stream",
+      pattern: "/v1/chat/reservation-sessions/{id}/messages:stream",
+      source: dispatchSource.includes('operation === "messages:stream"') &&
+        dispatchSource.includes("handleChatStreamMessageRequest"),
+      test: isRoutePatternCoveredByTests("/v1/chat/reservation-sessions/{id}/messages:stream", testRoutePatterns),
+    },
+    {
+      name: "confirm",
+      pattern: "/v1/chat/reservation-sessions/{id}/confirm",
+      source: dispatchSource.includes('operation === "confirm"') &&
+        dispatchSource.includes("handleChatConfirmReservationRequest"),
+      test: isRoutePatternCoveredByTests("/v1/chat/reservation-sessions/{id}/confirm", testRoutePatterns),
+    },
+  ];
+  const missing = requirements
+    .filter((requirement) => !requirement.source || !requirement.test)
+    .map((requirement) => {
+      if (!requirement.source && !requirement.test) {
+        return `${requirement.name} source+test`;
+      }
+      return `${requirement.name} ${requirement.source ? "test" : "source"}`;
+    });
+
+  return {
+    ok: missing.length === 0,
+    missing,
+    coveredPatterns: requirements
+      .filter((requirement) => requirement.source && requirement.test)
+      .map((requirement) => requirement.pattern),
+  };
+}
+
+function emptyChatFamilyProof() {
+  return {
+    ok: false,
+    missing: ["source+test"],
+    coveredPatterns: [],
   };
 }
 
@@ -516,6 +908,39 @@ function normalizeRelativeFilePath(filePath) {
   return filePath.replaceAll("\\", "/");
 }
 
+function normalizeStandaloneEquivalent(routePath) {
+  const normalized = routePath
+    .trim()
+    .replaceAll("\\", "/")
+    .replace(/\{[^/{}]+\}/g, "{id}")
+    .replace(/\/+$/, "");
+
+  return normalized === "" ? "/" : normalized;
+}
+
+function countDynamicPlaceholders(routePattern) {
+  return routePattern.match(/\{id\}/g)?.length ?? 0;
+}
+
+function isPropertyNameText(name, text) {
+  if (ts.isIdentifier(name) || ts.isStringLiteral(name) || ts.isNumericLiteral(name)) {
+    return name.text === text;
+  }
+  return false;
+}
+
+function isIdentifierNamed(node, name) {
+  if (!node) {
+    return false;
+  }
+  const expression = unwrapExpression(node);
+  return ts.isIdentifier(expression) && expression.text === name;
+}
+
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 function staticStringFromExpression(node) {
   const expression = unwrapExpression(node);
 
@@ -599,7 +1024,7 @@ function main() {
       }
 
       console.log(
-        `Verified compatibility route removal gate for ${result.routeCount} routes and ${result.sourceUsageProof.scannedFileCount} migrated frontend/platform source files. No network, deployment, or live backend calls were attempted.`,
+        `Verified compatibility route removal gate for ${result.routeCount} routes, ${result.standaloneRouteSurfaceProof.coveredStandaloneEquivalents.length} unique local standalone /v1 equivalents, and ${result.sourceUsageProof.scannedFileCount} migrated frontend/platform source files. No network, deployment, or live backend calls were attempted.`,
       );
     })
     .catch((error) => {

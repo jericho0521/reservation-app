@@ -123,6 +123,22 @@ current frontend origin's `${baseUrl}/api/v1` compatibility routes. It is
 local-only and does not delete routes, make network calls, or prove live
 standalone backend parity.
 
+A bounded chat fallback cleanup proof now also exists in
+`lib/reservation-chat-client.test.ts`. With
+`NEXT_PUBLIC_RESERVATION_PLATFORM_BASE_URL` configured as an absolute URL,
+platform chat session creation, message send, and confirmation calls must use
+the standalone backend `/v1/chat/...` URLs, including the case where the env
+value already ends in `/v1`. The proof fails if those configured chat calls use
+current-frontend `/api/v1` compatibility paths. Empty or non-absolute
+configuration still intentionally preserves `/api/v1/chat/...`, and local chat
+mode still intentionally preserves `/api/chat`.
+
+This improves Phase 9 readiness for the optional chat route family but does not
+make any chat compatibility route removable. Route deletion remains blocked by
+live standalone backend parity, enabled provider-backed chat proof,
+auth/tenant/idempotency proof, rollback/deprecation readiness, and broader
+frontend cutover gates.
+
 ## Implementation Steps
 
 1. Create a route inventory for all current reservation-related `app/api/**`

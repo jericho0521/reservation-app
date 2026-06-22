@@ -10,10 +10,16 @@ import {
 const originalFetch = globalThis.fetch;
 const originalTenantId = process.env.NEXT_PUBLIC_RESERVATION_TENANT_ID;
 const originalVenueId = process.env.NEXT_PUBLIC_RESERVATION_VENUE_ID;
+const originalPlatformBaseUrl = process.env.NEXT_PUBLIC_RESERVATION_PLATFORM_BASE_URL;
+
+test.beforeEach(() => {
+  delete process.env.NEXT_PUBLIC_RESERVATION_PLATFORM_BASE_URL;
+});
 
 test.afterEach(() => {
   globalThis.fetch = originalFetch;
   restoreChatContextEnv();
+  restoreEnvValue("NEXT_PUBLIC_RESERVATION_PLATFORM_BASE_URL", originalPlatformBaseUrl);
 });
 
 test("getReservationChatMode defaults local and opts into platform", () => {
@@ -176,6 +182,92 @@ test("sendChatMessage posts platform messages with session context and idempoten
   assert.equal(calls[1]?.method, "POST");
   assertPlatformChatHeaders(calls[1]?.headers);
   assert.match(calls[1]?.headers.get("Idempotency-Key") ?? "", /^chat-message-/);
+  assert.deepEqual(calls[1]?.body, {
+    message: "Two seats please",
+  });
+});
+
+test("sendChatMessage preserves platform compatibility routes for non-absolute platform base URLs", async () => {
+  process.env.NEXT_PUBLIC_RESERVATION_PLATFORM_BASE_URL = "/standalone-platform";
+  const calls: Array<{ url: string }> = [];
+  globalThis.fetch = async (url) => {
+    calls.push({ url: String(url) });
+
+    if (String(url) === "/api/v1/chat/reservation-sessions") {
+      return jsonResponse({
+        chat_session_id: "chat_123",
+        status: "active",
+      });
+    }
+
+    return jsonResponse({
+      data: {
+        content: "I can help with that.",
+        actions: [],
+      },
+    });
+  };
+
+  const response = await sendChatMessage({
+    messages: [{ role: "user", content: "Two seats please" }],
+  }, "platform");
+
+  assert.equal(response.threadId, "chat_123");
+  assert.deepEqual(calls.map((call) => call.url), [
+    "/api/v1/chat/reservation-sessions",
+    "/api/v1/chat/reservation-sessions/chat_123/messages",
+  ]);
+});
+
+test("sendChatMessage uses configured standalone platform chat /v1 URLs", async () => {
+  setChatContextEnv();
+  process.env.NEXT_PUBLIC_RESERVATION_PLATFORM_BASE_URL = "https://api.example.test";
+  const calls: Array<{ url: string; method?: string; headers: Headers; body: unknown }> = [];
+  globalThis.fetch = async (url, init) => {
+    calls.push({
+      url: String(url),
+      method: init?.method,
+      headers: new Headers(init?.headers),
+      body: typeof init?.body === "string" ? JSON.parse(init.body) as unknown : undefined,
+    });
+
+    if (String(url) === "https://api.example.test/v1/chat/reservation-sessions") {
+      return jsonResponse({
+        chat_session_id: "chat_123",
+        status: "active",
+      });
+    }
+
+    return jsonResponse({
+      data: {
+        content: "I can help with that.",
+        actions: [],
+      },
+    });
+  };
+
+  const response = await sendChatMessage({
+    messages: [{ role: "user", content: "Two seats please" }],
+  }, "platform");
+
+  assert.deepEqual(response, {
+    content: "I can help with that.",
+    threadId: "chat_123",
+    action: null,
+  });
+  assert.deepEqual(calls.map((call) => call.url), [
+    "https://api.example.test/v1/chat/reservation-sessions",
+    "https://api.example.test/v1/chat/reservation-sessions/chat_123/messages",
+  ]);
+  assert.ok(calls.every((call) => !call.url.includes("/api/v1")));
+  assertPlatformChatHeaders(calls[0]?.headers);
+  assertPlatformChatHeaders(calls[1]?.headers);
+  assert.match(calls[0]?.headers.get("Idempotency-Key") ?? "", /^chat-session-/);
+  assert.match(calls[1]?.headers.get("Idempotency-Key") ?? "", /^chat-message-/);
+  assert.deepEqual(calls[0]?.body, {
+    metadata: { source: "current-frontend" },
+    venue_id: "venue_456",
+  });
   assert.deepEqual(calls[1]?.body, {
     message: "Two seats please",
   });
@@ -829,6 +921,51 @@ test("confirmChatBooking posts platform reservation intent with idempotency", as
   assert.equal(response.confirmed, true);
 });
 
+test("confirmChatBooking uses configured standalone platform chat /v1 URL without doubling v1", async () => {
+  setChatContextEnv();
+  process.env.NEXT_PUBLIC_RESERVATION_PLATFORM_BASE_URL = "https://api.example.test/v1";
+  const calls: Array<{ url: string; headers: Headers; body: unknown }> = [];
+  const confirmBooking = {
+    service: "Racing Simulator",
+    date: "2026-01-02",
+    time: "12:00",
+    seats: 2,
+    name: "Ada",
+    email: "ada@example.com",
+    phone: "555",
+    reservation_intent_id: "intent_123",
+  };
+
+  globalThis.fetch = async (url, init) => {
+    calls.push({
+      url: String(url),
+      headers: new Headers(init?.headers),
+      body: typeof init?.body === "string" ? JSON.parse(init.body) as unknown : undefined,
+    });
+    return jsonResponse({
+      data: {
+        chat_session_id: "chat_123",
+        content: "Confirmed",
+        reservation: {
+          status: "confirmed",
+        },
+      },
+    });
+  };
+
+  const response = await confirmChatBooking({ confirmBooking, threadId: "chat_123" }, "platform");
+
+  assert.equal(calls[0]?.url, "https://api.example.test/v1/chat/reservation-sessions/chat_123/confirm");
+  assert.ok(calls.every((call) => !call.url.includes("/api/v1")));
+  assert.ok(calls.every((call) => !call.url.includes("/v1/v1/")));
+  assertPlatformChatHeaders(calls[0]?.headers);
+  assert.match(calls[0]?.headers.get("Idempotency-Key") ?? "", /^chat-confirm-/);
+  assert.deepEqual(calls[0]?.body, {
+    reservation_intent_id: "intent_123",
+  });
+  assert.equal(response.confirmed, true);
+});
+
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
@@ -846,7 +983,10 @@ function restoreChatContextEnv() {
   restoreEnvValue("NEXT_PUBLIC_RESERVATION_VENUE_ID", originalVenueId);
 }
 
-function restoreEnvValue(key: "NEXT_PUBLIC_RESERVATION_TENANT_ID" | "NEXT_PUBLIC_RESERVATION_VENUE_ID", value: string | undefined) {
+function restoreEnvValue(
+  key: "NEXT_PUBLIC_RESERVATION_TENANT_ID" | "NEXT_PUBLIC_RESERVATION_VENUE_ID" | "NEXT_PUBLIC_RESERVATION_PLATFORM_BASE_URL",
+  value: string | undefined,
+) {
   if (value === undefined) {
     delete process.env[key];
     return;

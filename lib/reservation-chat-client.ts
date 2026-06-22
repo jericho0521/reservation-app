@@ -107,6 +107,23 @@ export function getReservationChatContext(
   };
 }
 
+function getReservationPlatformChatApiBasePath(
+  env?: Pick<NodeJS.ProcessEnv, "NEXT_PUBLIC_RESERVATION_PLATFORM_BASE_URL">,
+) {
+  const configuredBaseUrl = env
+    ? env.NEXT_PUBLIC_RESERVATION_PLATFORM_BASE_URL
+    : process.env.NEXT_PUBLIC_RESERVATION_PLATFORM_BASE_URL;
+  const normalizedBaseUrl = normalizeBaseUrl(configuredBaseUrl);
+
+  if (!normalizedBaseUrl || !isAbsoluteBaseUrl(normalizedBaseUrl)) {
+    return "/api/v1";
+  }
+
+  return normalizedBaseUrl.endsWith("/v1")
+    ? normalizedBaseUrl
+    : `${normalizedBaseUrl}/v1`;
+}
+
 export async function sendChatMessage(
   input: SendChatMessageInput,
   mode: ReservationChatMode = getReservationChatMode(),
@@ -170,7 +187,7 @@ async function sendPlatformChatMessage(input: SendChatMessageInput): Promise<Leg
   const body: PlatformChatMessageInput = { message };
 
   const response = await fetch(
-    `/api/v1/chat/reservation-sessions/${encodeURIComponent(chatSessionId)}/messages`,
+    `${getReservationPlatformChatApiBasePath()}/chat/reservation-sessions/${encodeURIComponent(chatSessionId)}/messages`,
     withPlatformChatContext({
       method: "POST",
       headers: {
@@ -217,7 +234,7 @@ async function confirmPlatformChatBooking(input: ConfirmChatBookingInput): Promi
     reservation_intent_id: reservationIntentId,
   };
   const response = await fetch(
-    `/api/v1/chat/reservation-sessions/${encodeURIComponent(chatSessionId)}/confirm`,
+    `${getReservationPlatformChatApiBasePath()}/chat/reservation-sessions/${encodeURIComponent(chatSessionId)}/confirm`,
     withPlatformChatContext({
       method: "POST",
       headers: {
@@ -255,7 +272,7 @@ async function createPlatformChatSession(): Promise<PlatformChatSessionResult> {
     body.venue_id = context.venueId;
   }
 
-  const response = await fetch("/api/v1/chat/reservation-sessions", withPlatformChatContext({
+  const response = await fetch(`${getReservationPlatformChatApiBasePath()}/chat/reservation-sessions`, withPlatformChatContext({
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -502,6 +519,19 @@ function readString(value: unknown) {
 
 function readNumber(value: unknown) {
   return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+}
+
+function normalizeBaseUrl(baseUrl?: string) {
+  return baseUrl?.trim().replace(/\/+$/, "") ?? "";
+}
+
+function isAbsoluteBaseUrl(baseUrl: string) {
+  try {
+    const url = new URL(baseUrl);
+    return url.protocol === "http:" || url.protocol === "https:";
+  } catch {
+    return false;
+  }
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

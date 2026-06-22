@@ -192,6 +192,21 @@ This remains a local mock proof only. It does not call a live standalone
 backend, Supabase, deployment, durable idempotency store, or seeded platform
 data, and it does not remove any current compatibility routes.
 
+The current frontend chat client now has the same browser-safe standalone
+backend URL switch for platform chat mode. When
+`NEXT_PUBLIC_RESERVATION_PLATFORM_BASE_URL` is configured as an absolute URL,
+`lib/reservation-chat-client.ts` sends platform chat session creation, message,
+and confirmation requests to the standalone backend `/v1/chat/...` contract.
+The setting may be an origin such as `https://api.example.test` or may already
+include `/v1`; the resolver keeps either form on a single `/v1` path. Empty or
+non-absolute values preserve the current-app `/api/v1/chat/...` compatibility
+fallback, and local chat mode still uses `/api/chat`.
+
+This is a bounded local unit proof only. It does not prove live provider-backed
+enabled chat, live standalone backend parity, CORS in a deployed browser
+environment, durable idempotency persistence, route deletion, or optional chat
+module production configuration.
+
 ## Acceptance Criteria
 
 - Current frontend reservation flows can use a standalone backend base URL.

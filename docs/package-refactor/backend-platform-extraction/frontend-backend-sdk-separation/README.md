@@ -95,6 +95,7 @@ flowchart LR
 - [Repo Product Split Plan](repo-product-split-plan/README.md)
 - [Frontend and Backend Hard Separation Plan](frontend-backend-hard-separation-plan/README.md)
 - [Frontend and Backend Module Separation Plan](frontend-backend-module-separation-plan/README.md)
+- [Backend SDK Frontend Product Split Plan](backend-sdk-frontend-product-split-plan/README.md)
 
 ## Separation Rules
 
@@ -161,3 +162,9 @@ cleanup plan for keeping backend modules, the SDK, and the frontend consumer
 honest while the repo split work continues. Use it when assigning subagents to
 close boundary leaks before treating the backend as the product infrastructure
 repo and the frontend as a replaceable SDK consumer.
+
+The backend SDK frontend product split plan is the clearest plan for the final
+intended plug-and-play model: backend repository as the infrastructure product,
+SDK as the installable integration surface, and any frontend repository as a
+replaceable consumer. Use it when assigning subagents who need phase-by-phase
+instructions without relying on earlier chat history.

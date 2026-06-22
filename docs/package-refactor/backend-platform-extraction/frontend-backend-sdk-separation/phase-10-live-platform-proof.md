@@ -95,6 +95,13 @@ create a frontend repository, delete compatibility routes, install packages,
 publish packages, deploy a backend, open a browser, call a live backend, or
 mutate live data.
 
+Phase 7 local route tests now also prove configured standalone auth protects
+the optional disabled-chat and injected-chat `/v1/chat/reservation-sessions/**`
+family before disabled fallbacks or chat module calls. That remains a local
+readiness proof only; Phase 10 still needs live disabled/enabled chat behavior
+against disposable live backend configuration before optional chat can be
+called live-proven.
+
 The live proof readiness surfaces still import the existing env parsers from:
 
 - `scripts/verify-standalone-api-deployment-config.mjs`
@@ -125,10 +132,10 @@ environment contract and local separation prerequisites can be checked locally
 and in CI without touching live systems. It does not prove deployed backend
 health, disposable database migration application, RLS/tenant isolation, durable
 idempotency, SDK/direct parity, registry package install, optional chat
-behavior, route deletion, frontend repository creation, or package publishing
-until the strict commands themselves pass against disposable live
-infrastructure and the later removal/repository phases explicitly perform
-their own actions.
+behavior or provider configuration, route deletion, frontend repository
+creation, or package publishing until the strict commands themselves pass
+against disposable live infrastructure and the later removal/repository phases
+explicitly perform their own actions.
 
 ## Acceptance Criteria
 

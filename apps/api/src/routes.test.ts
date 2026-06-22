@@ -135,6 +135,196 @@ test("disabled chat reservation routes return the shared platform error body", a
   }
 });
 
+test("service-token auth protects disabled chat reservation routes before fallback", async () => {
+  const routes = [
+    "/v1/chat/reservation-sessions",
+    "/v1/chat/reservation-sessions/session_123/messages",
+    "/v1/chat/reservation-sessions/session_123/messages:stream",
+    "/v1/chat/reservation-sessions/session_123/confirm",
+  ];
+  const handler = createStandaloneApiHandler({
+    auth: { serviceApiKey: "platform-service-secret" },
+  });
+
+  for (const path of routes) {
+    const missingBearer = await handler({ method: "POST", path });
+    const wrongBearer = await handler({
+      method: "POST",
+      path,
+      headers: { Authorization: "Bearer wrong-secret" },
+    });
+    const correctBearer = await handler({
+      method: "POST",
+      path,
+      headers: { Authorization: "Bearer platform-service-secret" },
+    });
+
+    assert.equal(missingBearer.status, 401, path);
+    assert.deepEqual(missingBearer.body, {
+      error: {
+        code: "unauthorized",
+        message: "Missing bearer token.",
+        status: 401,
+      },
+    }, path);
+    assert.equal(wrongBearer.status, 403, path);
+    assert.deepEqual(wrongBearer.body, {
+      error: {
+        code: "forbidden",
+        message: "Invalid service bearer token.",
+        status: 403,
+      },
+    }, path);
+    assert.equal(correctBearer.status, 404, path);
+    assert.deepEqual(correctBearer.body, disabledChatBody, path);
+  }
+});
+
+test("bearer verifier auth protects disabled chat before fallback and tenant checks still apply", async () => {
+  const verifierTokens: string[] = [];
+  const handler = createStandaloneApiHandler({
+    auth: {
+      verifyBearerToken(input) {
+        verifierTokens.push(input.token);
+        if (input.token !== "valid-user-token") {
+          return rejectedAuthResult();
+        }
+
+        return {
+          ok: true,
+          principal: userPrincipal({ tenantIds: ["tenant_1"] }),
+        };
+      },
+      requireTenant: true,
+    },
+  });
+
+  const missingBearer = await handler({
+    method: "POST",
+    path: "/v1/chat/reservation-sessions",
+  });
+  const rejectedBearer = await handler({
+    method: "POST",
+    path: "/v1/chat/reservation-sessions",
+    headers: { Authorization: "Bearer rejected-user-token" },
+  });
+  const missingTenant = await handler({
+    method: "POST",
+    path: "/v1/chat/reservation-sessions",
+    headers: { Authorization: "Bearer valid-user-token" },
+  });
+  const valid = await handler({
+    method: "POST",
+    path: "/v1/chat/reservation-sessions",
+    headers: {
+      Authorization: "Bearer valid-user-token",
+      "X-Reservation-Tenant-Id": "tenant_1",
+    },
+  });
+
+  assert.equal(missingBearer.status, 401);
+  assert.deepEqual(missingBearer.body, {
+    error: {
+      code: "unauthorized",
+      message: "Missing bearer token.",
+      status: 401,
+    },
+  });
+  assert.equal(rejectedBearer.status, 401);
+  assert.deepEqual(rejectedBearer.body, rejectedAuthBody());
+  assert.equal(missingTenant.status, 400);
+  assert.deepEqual(missingTenant.body, {
+    error: {
+      code: "validation_failed",
+      message: "Missing tenant context.",
+      status: 400,
+      details: {
+        reason: "tenant_required",
+      },
+    },
+  });
+  assert.equal(valid.status, 404);
+  assert.deepEqual(valid.body, disabledChatBody);
+  assert.deepEqual(verifierTokens, ["rejected-user-token", "valid-user-token", "valid-user-token"]);
+});
+
+test("enabled chat module is invoked only after standalone auth succeeds", async () => {
+  const verifierTokens: string[] = [];
+  let calls = 0;
+  const chatModule: StandaloneApiChatModule = {
+    createReservationSession() {
+      calls += 1;
+      return {
+        status: 201,
+        body: {
+          chat_session_id: "session_123",
+          status: "active",
+        },
+      };
+    },
+    sendMessage() {
+      calls += 1;
+      return { body: {} };
+    },
+    streamMessage() {
+      calls += 1;
+      return { body: "" };
+    },
+    confirmReservation() {
+      calls += 1;
+      return { body: {} };
+    },
+  };
+  const handler = createStandaloneApiHandler({
+    auth: {
+      verifyBearerToken(input) {
+        verifierTokens.push(input.token);
+        if (input.token !== "valid-user-token") {
+          return rejectedAuthResult();
+        }
+
+        return {
+          ok: true,
+          principal: userPrincipal({ tenantIds: ["tenant_1"] }),
+        };
+      },
+      requireTenant: true,
+    },
+    chatModule,
+  });
+
+  const rejected = await handler({
+    method: "POST",
+    path: "/v1/chat/reservation-sessions",
+    headers: {
+      Authorization: "Bearer rejected-user-token",
+      "X-Reservation-Tenant-Id": "tenant_1",
+    },
+    body: { service_id: "svc_123" },
+  });
+  assert.equal(rejected.status, 401);
+  assert.deepEqual(rejected.body, rejectedAuthBody());
+  assert.equal(calls, 0);
+
+  const valid = await handler({
+    method: "POST",
+    path: "/v1/chat/reservation-sessions",
+    headers: {
+      Authorization: "Bearer valid-user-token",
+      "X-Reservation-Tenant-Id": "tenant_1",
+    },
+    body: { service_id: "svc_123" },
+  });
+
+  assert.equal(valid.status, 201);
+  assert.deepEqual(valid.body, {
+    chat_session_id: "session_123",
+    status: "active",
+  });
+  assert.equal(calls, 1);
+  assert.deepEqual(verifierTokens, ["rejected-user-token", "valid-user-token"]);
+});
+
 test("injected chat module receives request context and returns enabled responses", async () => {
   const calls: Array<{
     operation: string;
@@ -1380,17 +1570,14 @@ test("service-token auth protects each platform data route class before route de
   assert.equal(idempotencyRepository.records.size, 0);
 });
 
-test("service-token auth leaves metadata and disabled chat routes unprotected", async () => {
+test("service-token auth leaves metadata route unprotected", async () => {
   const handler = createStandaloneApiHandler({
     auth: { serviceApiKey: "platform-service-secret", requireTenant: true },
   });
 
   const metadata = await handler({ method: "GET", path: "/v1/metadata" });
-  const chat = await handler({ method: "POST", path: "/v1/chat/reservation-sessions" });
 
   assert.equal(metadata.status, 200);
-  assert.equal(chat.status, 404);
-  assert.deepEqual(chat.body, disabledChatBody);
 });
 
 test("service-token auth can require tenant context before repository work", async () => {

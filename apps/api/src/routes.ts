@@ -404,7 +404,8 @@ function isProtectedPlatformDataRoute(method: string, path: string) {
       || reservationCancelPattern.test(path)
       || reservationReschedulePattern.test(path)
       || path === "/v1/resource-maintenance"
-      || resourceMaintenanceEndPattern.test(path);
+      || resourceMaintenanceEndPattern.test(path)
+      || isChatReservationSessionRoute(path);
   }
 
   if (method === "PATCH") {
@@ -412,6 +413,17 @@ function isProtectedPlatformDataRoute(method: string, path: string) {
   }
 
   return false;
+}
+
+function isChatReservationSessionRoute(path: string) {
+  if (path === "/v1/chat/reservation-sessions") {
+    return true;
+  }
+
+  const operationMatch = chatSessionOperationPattern.exec(path);
+  return chatSessionMessagePattern.test(path)
+    || operationMatch?.[2] === "messages:stream"
+    || operationMatch?.[2] === "confirm";
 }
 
 async function handleAvailabilityRequest(

@@ -118,15 +118,25 @@ flowchart LR
   `/v1/chat/reservation-sessions/**` claim as a bounded chat session family
   proof that must cover session creation, messages, stream, and confirmation in
   `apps/api` source/tests.
+- `apps/api` now runs the same standalone service-token/JWT auth and
+  tenant/context enforcement for the optional
+  `/v1/chat/reservation-sessions/**` chat family before it can return the
+  disabled-chat fallback or invoke an injected chat module. Local route tests
+  prove missing/invalid service-token and verifier auth reject first, valid
+  auth can still reach the exact disabled `chat_module_disabled` 404 body, and
+  injected chat handlers are not called until auth succeeds. No-auth local
+  fixture behavior remains unchanged.
 - This is readiness only. It proves that deployment config can be checked in CI
   without live infrastructure, that strict environments fail closed on missing
   or malformed config, that runtime/deployment env names do not drift locally,
   that the standalone server env bootstrap is backend-only and fails closed
-  locally, and that the claimed standalone route paths are locally present in
-  dispatcher/test coverage rather than only auth preflight helpers. It does not
-  prove live route parity, a live deployment, live Supabase connectivity,
-  database migrations, RLS/tenant isolation, provider chat configuration,
-  durable idempotency, final standalone cutover, or seeded reservation parity.
+  locally, that the claimed standalone route paths are locally present in
+  dispatcher/test coverage rather than only auth preflight helpers, and that
+  configured standalone auth covers disabled and injected optional chat routes
+  locally. It does not prove live route parity, a live deployment, live Supabase
+  connectivity, database migrations, RLS/tenant isolation, provider chat
+  configuration, live chat behavior, durable idempotency, final standalone
+  cutover, or seeded reservation parity.
 
 ## Acceptance Criteria
 

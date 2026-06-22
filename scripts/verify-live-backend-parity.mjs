@@ -14,6 +14,8 @@ export const liveBackendParityRequiredEnvNames = [
   "RESERVATION_PLATFORM_LIVE_START_AT",
   "RESERVATION_PLATFORM_LIVE_END_AT",
 ];
+export const liveBackendParityChatModeEnvName = "RESERVATION_PLATFORM_LIVE_CHAT_MODE";
+export const liveBackendParityChatModes = ["", "disabled", "enabled"];
 
 export function buildReservationListQuery(config, reservation) {
   const status = reservation?.status ?? "confirmed";
@@ -59,6 +61,7 @@ function buildConfig(values) {
     startAt: values.RESERVATION_PLATFORM_LIVE_START_AT,
     endAt: values.RESERVATION_PLATFORM_LIVE_END_AT,
     quantity: Number.parseInt(values.RESERVATION_PLATFORM_LIVE_QUANTITY, 10),
+    chatMode: values.RESERVATION_PLATFORM_LIVE_CHAT_MODE,
   };
 }
 
@@ -72,8 +75,12 @@ export function readLiveBackendParityConfig(env, options = {}) {
   const values = Object.fromEntries(requiredEnvNames.map((name) => [name, trimEnvValue(env, name)]));
   values.RESERVATION_PLATFORM_LIVE_VENUE_ID = trimEnvValue(env, "RESERVATION_PLATFORM_LIVE_VENUE_ID");
   values.RESERVATION_PLATFORM_LIVE_QUANTITY = trimEnvValue(env, "RESERVATION_PLATFORM_LIVE_QUANTITY") || "1";
+  values.RESERVATION_PLATFORM_LIVE_CHAT_MODE = trimEnvValue(env, liveBackendParityChatModeEnvName).toLowerCase();
   const missing = requiredEnvNames.filter((name) => values[name].length === 0);
   const configured = requiredEnvNames.filter((name) => values[name].length > 0);
+  if (values.RESERVATION_PLATFORM_LIVE_CHAT_MODE) {
+    configured.push(liveBackendParityChatModeEnvName);
+  }
   const errors = validateRequiredEnvNames(requiredEnvNames);
 
   if (values.RESERVATION_PLATFORM_LIVE_BASE_URL) {
@@ -104,20 +111,32 @@ export function readLiveBackendParityConfig(env, options = {}) {
   if (!/^[1-9]\d*$/.test(values.RESERVATION_PLATFORM_LIVE_QUANTITY)) {
     errors.push("RESERVATION_PLATFORM_LIVE_QUANTITY must be a positive integer when set.");
   }
+  if (!liveBackendParityChatModes.includes(values.RESERVATION_PLATFORM_LIVE_CHAT_MODE)) {
+    errors.push("RESERVATION_PLATFORM_LIVE_CHAT_MODE must be empty, disabled, or enabled when set.");
+  }
 
-  const ready = missing.length === 0 && errors.length === 0;
+  const baseReady = missing.length === 0 && errors.length === 0;
+  const ready = baseReady && values.RESERVATION_PLATFORM_LIVE_CHAT_MODE === "disabled";
   let status = "ready";
   let message = "";
 
   if (errors.length > 0) {
     message = errors.join(" ");
     status = strict ? "fail" : "skip";
-  } else if (!ready) {
+  } else if (!baseReady) {
     const details = [
       `missing ${missing.join(", ")}`,
       configured.length > 0 ? `configured ${configured.join(", ")}` : "no live env configured",
     ].join("; ");
     message = `required live backend config is incomplete: ${details}.`;
+    status = strict ? "fail" : "skip";
+  } else if (values.RESERVATION_PLATFORM_LIVE_CHAT_MODE === "enabled") {
+    message = "RESERVATION_PLATFORM_LIVE_CHAT_MODE=enabled is configured, but enabled live chat proof remains unsupported/pending.";
+    status = "fail";
+  } else if (!values.RESERVATION_PLATFORM_LIVE_CHAT_MODE) {
+    message = strict
+      ? "strict live backend parity requires RESERVATION_PLATFORM_LIVE_CHAT_MODE=disabled or enabled so optional chat proof scope is explicit."
+      : "RESERVATION_PLATFORM_LIVE_CHAT_MODE is not configured; safe live backend parity skipped instead of silently ignoring optional chat.";
     status = strict ? "fail" : "skip";
   } else if (strict && !allowMutations) {
     message = "strict live backend parity requires RESERVATION_PLATFORM_LIVE_ALLOW_MUTATIONS=1 against a disposable seeded backend.";
@@ -134,6 +153,7 @@ export function readLiveBackendParityConfig(env, options = {}) {
     allowMutations,
     ready,
     mutationReady: ready && strict && allowMutations,
+    chatMode: values.RESERVATION_PLATFORM_LIVE_CHAT_MODE,
     status,
     shouldSkip: status === "skip",
     shouldFail: status === "fail",
@@ -239,6 +259,17 @@ async function readJson(response, label) {
   return body;
 }
 
+async function readJsonAllowingError(response, label) {
+  const text = await response.text();
+  let body;
+  try {
+    body = text ? JSON.parse(text) : null;
+  } catch {
+    throw new Error(`${label} returned non-JSON status ${response.status}: ${text.slice(0, 200)}`);
+  }
+  return { status: response.status, ok: response.ok, body };
+}
+
 async function directGet(config, pathName, query) {
   const url = buildUrl(config.baseUrl, pathName, query);
   const headers = buildDirectHeaders(config, {
@@ -260,6 +291,20 @@ async function directPost(config, pathName, body, extraHeaders = {}) {
     body: JSON.stringify(body),
   });
   return readJson(response, `POST ${url.pathname}`);
+}
+
+async function directPostAllowingError(config, pathName, body, extraHeaders = {}) {
+  const url = buildUrl(config.baseUrl, pathName);
+  const headers = buildDirectHeaders(config, {
+    ...extraHeaders,
+    "Content-Type": "application/json",
+  });
+  const response = await fetch(url, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(body),
+  });
+  return readJsonAllowingError(response, `POST ${url.pathname}`);
 }
 
 function buildDirectHeaders(config, extraHeaders = {}) {
@@ -291,6 +336,179 @@ async function importSdk() {
   }
 
   throw new Error("Could not import @reservation-platform/sdk. Run corepack pnpm run packages:build first.");
+}
+
+function disabledChatCases(client, config) {
+  const chatSessionId = "live_sdk_parity_disabled_chat_session";
+  const baseOptions = (name) => ({
+    correlationId: `live-sdk-parity-chat-disabled-${name}`,
+    idempotencyKey: `live-sdk-parity-chat-disabled-${name}`,
+  });
+  const createSessionBody = {
+    service_id: config.serviceId,
+    customer: {
+      name: "Live SDK Parity Disabled Chat",
+      email: "live-sdk-parity-disabled-chat@example.invalid",
+    },
+    metadata: {
+      proof: "sdk-direct-http-parity",
+      proof_surface: "disabled-chat",
+    },
+    ...(config.venueId ? { venue_id: config.venueId } : {}),
+  };
+
+  return [
+    {
+      label: "chat create reservation session disabled",
+      pathName: "/chat/reservation-sessions",
+      body: createSessionBody,
+      options: baseOptions("create-session"),
+      sdkCall: (options) => client.chat.createReservationSession(createSessionBody, options),
+    },
+    {
+      label: "chat send message disabled",
+      pathName: `/chat/reservation-sessions/${encodeURIComponent(chatSessionId)}/messages`,
+      body: {
+        message: "Disabled chat live parity message.",
+        metadata: {
+          proof: "sdk-direct-http-parity",
+          proof_surface: "disabled-chat",
+        },
+      },
+      options: baseOptions("send-message"),
+      sdkCall: (options) => client.chat.sendMessage(chatSessionId, {
+        message: "Disabled chat live parity message.",
+        metadata: {
+          proof: "sdk-direct-http-parity",
+          proof_surface: "disabled-chat",
+        },
+      }, options),
+    },
+    {
+      label: "chat stream message disabled",
+      pathName: `/chat/reservation-sessions/${encodeURIComponent(chatSessionId)}/messages:stream`,
+      body: {
+        message: "Disabled chat live parity stream message.",
+        metadata: {
+          proof: "sdk-direct-http-parity",
+          proof_surface: "disabled-chat",
+        },
+      },
+      options: baseOptions("stream-message"),
+      sdkCall: (options) => client.chat.streamMessage(chatSessionId, {
+        message: "Disabled chat live parity stream message.",
+        metadata: {
+          proof: "sdk-direct-http-parity",
+          proof_surface: "disabled-chat",
+        },
+      }, options),
+    },
+    {
+      label: "chat confirm reservation disabled",
+      pathName: `/chat/reservation-sessions/${encodeURIComponent(chatSessionId)}/confirm`,
+      body: {
+        reservation_intent_id: "live_sdk_parity_disabled_chat_intent",
+        metadata: {
+          proof: "sdk-direct-http-parity",
+          proof_surface: "disabled-chat",
+        },
+      },
+      options: baseOptions("confirm-reservation"),
+      sdkCall: (options) => client.chat.confirmReservation(chatSessionId, {
+        reservation_intent_id: "live_sdk_parity_disabled_chat_intent",
+        metadata: {
+          proof: "sdk-direct-http-parity",
+          proof_surface: "disabled-chat",
+        },
+      }, options),
+    },
+  ];
+}
+
+function readPlatformErrorBody(error) {
+  if (
+    error &&
+    typeof error === "object" &&
+    error.name === "PlatformError" &&
+    error.body &&
+    typeof error.body === "object"
+  ) {
+    return error.body;
+  }
+  return null;
+}
+
+async function expectSdkPlatformError(call, label) {
+  try {
+    await call();
+  } catch (error) {
+    const body = readPlatformErrorBody(error);
+    if (body) {
+      return body;
+    }
+    throw new Error(`${label} SDK call failed with a non-platform error: ${error instanceof Error ? error.message : String(error)}`);
+  }
+
+  throw new Error(`${label} SDK call unexpectedly succeeded; disabled chat should return chat_module_disabled.`);
+}
+
+function assertDisabledChatError(label, response) {
+  if (response.ok) {
+    throw new Error(`${label} direct HTTP call unexpectedly succeeded; disabled chat should return chat_module_disabled.`);
+  }
+  const error = response.body?.error;
+  if (!error || typeof error !== "object") {
+    throw new Error(`${label} direct HTTP response did not include a platform error body: ${JSON.stringify(response.body)}`);
+  }
+  if (error.code !== "chat_module_disabled") {
+    throw new Error(`${label} direct HTTP response used ${error.code ?? "no"} error code instead of chat_module_disabled.`);
+  }
+  if (error.status !== response.status) {
+    throw new Error(`${label} direct HTTP error status ${error.status} did not match HTTP status ${response.status}.`);
+  }
+  if (typeof error.message !== "string" || error.message.length === 0) {
+    throw new Error(`${label} direct HTTP disabled-chat error did not include a public message.`);
+  }
+  return error;
+}
+
+function comparableDisabledChatError(error) {
+  return {
+    code: error.code,
+    message: error.message,
+    status: error.status,
+    ...(typeof error.retryable === "boolean" ? { retryable: error.retryable } : {}),
+    ...(typeof error.documentation_url === "string" ? { documentation_url: error.documentation_url } : {}),
+    ...(typeof error.request_id === "string" ? { request_id: "present" } : {}),
+    ...(error.details === undefined ? {} : { details: normalize(error.details) }),
+    ...(error.idempotency === undefined
+      ? {}
+      : {
+          idempotency: {
+            ...(typeof error.idempotency.key === "string" ? { key: "present" } : {}),
+            ...(typeof error.idempotency.status === "string" ? { status: "present" } : {}),
+            ...(typeof error.idempotency.replayed === "boolean" ? { replayed: "present" } : {}),
+          },
+        }),
+  };
+}
+
+async function compareDisabledChatParity({ client, config }) {
+  for (const chatCase of disabledChatCases(client, config)) {
+    const headers = {
+      "X-Correlation-Id": chatCase.options.correlationId,
+      "Idempotency-Key": chatCase.options.idempotencyKey,
+    };
+    const directValue = await directPostAllowingError(config, chatCase.pathName, chatCase.body, headers);
+    const directError = assertDisabledChatError(chatCase.label, directValue);
+    const sdkError = await expectSdkPlatformError(() => chatCase.sdkCall(chatCase.options), chatCase.label);
+    assertDeepEqual(
+      chatCase.label,
+      comparableDisabledChatError(sdkError),
+      comparableDisabledChatError(directError),
+    );
+    console.log(`PASS ${chatCase.label} SDK/direct HTTP disabled-chat parity`);
+  }
 }
 
 async function main() {
@@ -347,6 +565,10 @@ async function main() {
     query: seededReservationListQuery,
     label: "reservation list/summary",
   });
+
+  if (config.chatMode === "disabled") {
+    await compareDisabledChatParity({ client, config });
+  }
 
   if (strict && allowMutations) {
     const idempotencyKey = `live-sdk-parity-${Date.now()}`;

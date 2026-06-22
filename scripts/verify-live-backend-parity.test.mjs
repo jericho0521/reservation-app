@@ -16,6 +16,7 @@ function validLiveEnv(overrides = {}) {
     RESERVATION_PLATFORM_LIVE_RESOURCE_ID: "resrc_123",
     RESERVATION_PLATFORM_LIVE_START_AT: "2026-06-13T10:00:00.000Z",
     RESERVATION_PLATFORM_LIVE_END_AT: "2026-06-13T11:00:00.000Z",
+    RESERVATION_PLATFORM_LIVE_CHAT_MODE: "disabled",
     ...overrides,
   };
 }
@@ -96,6 +97,7 @@ test("readLiveBackendParityConfig trims values and returns normalized ready conf
       RESERVATION_PLATFORM_LIVE_VENUE_ID: " venue_123 ",
       RESERVATION_PLATFORM_LIVE_API_KEY: " live_api_key ",
       RESERVATION_PLATFORM_LIVE_QUANTITY: " 2 ",
+      RESERVATION_PLATFORM_LIVE_CHAT_MODE: " DISABLED ",
       RESERVATION_PLATFORM_LIVE_ALLOW_MUTATIONS: " 1 ",
     }),
     { argv: ["--strict"] },
@@ -117,7 +119,71 @@ test("readLiveBackendParityConfig trims values and returns normalized ready conf
     startAt: "2026-06-13T10:00:00.000Z",
     endAt: "2026-06-13T11:00:00.000Z",
     quantity: 2,
+    chatMode: "disabled",
   });
+  assert.equal(parsed.chatMode, "disabled");
+  assert.equal(parsed.configured.includes("RESERVATION_PLATFORM_LIVE_CHAT_MODE"), true);
+});
+
+test("readLiveBackendParityConfig requires explicit chat mode in strict readiness", () => {
+  const parsed = readLiveBackendParityConfig(
+    validLiveEnv({
+      RESERVATION_PLATFORM_LIVE_CHAT_MODE: undefined,
+      RESERVATION_PLATFORM_LIVE_ALLOW_MUTATIONS: "1",
+    }),
+    { argv: ["--strict"] },
+  );
+
+  assert.equal(parsed.status, "fail");
+  assert.equal(parsed.ready, false);
+  assert.equal(parsed.mutationReady, false);
+  assert.equal(parsed.config, null);
+  assert.equal(parsed.chatMode, "");
+  assert.match(parsed.message, /RESERVATION_PLATFORM_LIVE_CHAT_MODE=disabled or enabled/);
+});
+
+test("readLiveBackendParityConfig safely skips when chat mode is absent outside strict mode", () => {
+  const parsed = readLiveBackendParityConfig(
+    validLiveEnv({
+      RESERVATION_PLATFORM_LIVE_CHAT_MODE: undefined,
+    }),
+  );
+
+  assert.equal(parsed.status, "skip");
+  assert.equal(parsed.shouldSkip, true);
+  assert.equal(parsed.shouldFail, false);
+  assert.equal(parsed.ready, false);
+  assert.match(parsed.message, /skipped instead of silently ignoring optional chat/);
+});
+
+test("readLiveBackendParityConfig rejects unknown chat modes", () => {
+  const parsed = readLiveBackendParityConfig(
+    validLiveEnv({
+      RESERVATION_PLATFORM_LIVE_CHAT_MODE: "sometimes",
+    }),
+    { argv: ["--strict"] },
+  );
+
+  assert.equal(parsed.status, "fail");
+  assert.equal(parsed.ready, false);
+  assert.equal(parsed.config, null);
+  assert.match(parsed.message, /RESERVATION_PLATFORM_LIVE_CHAT_MODE must be empty, disabled, or enabled/);
+});
+
+test("readLiveBackendParityConfig fails clearly when enabled chat proof is selected", () => {
+  const parsed = readLiveBackendParityConfig(
+    validLiveEnv({
+      RESERVATION_PLATFORM_LIVE_CHAT_MODE: "enabled",
+      RESERVATION_PLATFORM_LIVE_ALLOW_MUTATIONS: "1",
+    }),
+    { argv: ["--strict"] },
+  );
+
+  assert.equal(parsed.status, "fail");
+  assert.equal(parsed.ready, false);
+  assert.equal(parsed.config, null);
+  assert.equal(parsed.chatMode, "enabled");
+  assert.match(parsed.message, /enabled live chat proof remains unsupported\/pending/);
 });
 
 test("readLiveBackendParityConfig fails strict runs when mutation opt-in is absent", () => {
@@ -257,4 +323,28 @@ test("strict live parity script proves resource-maintenance SDK/direct HTTP repl
   assert.ok(maintenanceEndIndex < directEndReplayIndex, "direct end replay should follow SDK end");
   assert.ok(directEndReplayIndex < maintenancePostListIndex, "post-end list should follow end replay");
   assert.ok(maintenancePostListIndex < maintenanceInactiveAssertIndex, "inactive assertion should follow post-end list parity");
+});
+
+test("live parity script proves disabled chat SDK/direct HTTP error parity before strict mutations", async () => {
+  const source = await readFile(new URL("./verify-live-backend-parity.mjs", import.meta.url), "utf8");
+
+  assert.match(source, /RESERVATION_PLATFORM_LIVE_CHAT_MODE/);
+  assert.match(source, /compareDisabledChatParity/);
+  assert.match(source, /client\.chat\.createReservationSession/);
+  assert.match(source, /client\.chat\.sendMessage/);
+  assert.match(source, /client\.chat\.streamMessage/);
+  assert.match(source, /client\.chat\.confirmReservation/);
+  assert.match(source, /"\/chat\/reservation-sessions"/);
+  assert.match(source, /messages:stream/);
+  assert.match(source, /chat_module_disabled/);
+  assert.match(source, /directPostAllowingError/);
+  assert.match(source, /expectSdkPlatformError/);
+  assert.match(source, /comparableDisabledChatError\(sdkError\)/);
+  assert.match(source, /comparableDisabledChatError\(directError\)/);
+
+  const disabledChatIndex = source.indexOf("await compareDisabledChatParity({ client, config })");
+  const strictMutationGateIndex = source.indexOf("if (strict && allowMutations)");
+  assert.ok(disabledChatIndex >= 0, "disabled chat parity call is missing");
+  assert.ok(strictMutationGateIndex >= 0, "strict mutation branch is missing");
+  assert.ok(disabledChatIndex < strictMutationGateIndex, "disabled chat parity should run before strict mutation writes");
 });

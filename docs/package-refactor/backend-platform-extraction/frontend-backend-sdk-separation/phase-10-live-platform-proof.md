@@ -98,9 +98,14 @@ mutate live data.
 Phase 7 local route tests now also prove configured standalone auth protects
 the optional disabled-chat and injected-chat `/v1/chat/reservation-sessions/**`
 family before disabled fallbacks or chat module calls. That remains a local
-readiness proof only; Phase 10 still needs live disabled/enabled chat behavior
-against disposable live backend configuration before optional chat can be
-called live-proven.
+readiness proof only. Phase 10 live parity now makes optional chat explicit
+through `RESERVATION_PLATFORM_LIVE_CHAT_MODE`. Strict readiness fails when that
+mode is absent so optional chat cannot be silently ignored. `disabled` mode runs
+SDK/direct HTTP parity against all four contracted disabled-chat routes and
+expects the same public `chat_module_disabled` platform error status/body from
+both callers. `enabled` is accepted as an explicit mode name but still fails
+with a pending/unsupported message because provider-backed live chat proof has
+not been implemented.
 
 The live proof readiness surfaces still import the existing env parsers from:
 
@@ -122,6 +127,15 @@ strict proof commands are configured enough to run:
 - `corepack pnpm run sdk:live-parity:strict`
 - `corepack pnpm run sdk:registry-install-proof:strict`
 
+Strict SDK/direct live parity readiness now also requires
+`RESERVATION_PLATFORM_LIVE_CHAT_MODE=disabled` or `enabled`. Use `disabled`
+when the disposable live backend has no provider-backed chat module; the live
+parity command will prove create-session, send-message, stream-message, and
+confirm-reservation all return matching SDK/direct `chat_module_disabled`
+errors. Use of `enabled` is intentionally not green yet: it records the desired
+provider-backed proof scope but fails until the enabled live chat verifier is
+implemented.
+
 `sdk:release-gate` now runs the safe readiness orchestrator alongside the
 existing safe proof checks. `sdk:release-gate:strict` now runs the strict
 readiness orchestrator before the existing strict proof commands, then still
@@ -131,11 +145,14 @@ This is readiness infrastructure only. It proves that the strict live proof
 environment contract and local separation prerequisites can be checked locally
 and in CI without touching live systems. It does not prove deployed backend
 health, disposable database migration application, RLS/tenant isolation, durable
-idempotency, SDK/direct parity, registry package install, optional chat
+idempotency, SDK/direct parity, registry package install, enabled provider chat
 behavior or provider configuration, route deletion, frontend repository
 creation, or package publishing until the strict commands themselves pass
 against disposable live infrastructure and the later removal/repository phases
-explicitly perform their own actions.
+explicitly perform their own actions. Disabled-chat live parity is now part of
+the strict SDK/direct live parity command when the explicit disabled mode is
+configured, but it is not complete proof until that strict command passes
+against the disposable live backend.
 
 ## Acceptance Criteria
 

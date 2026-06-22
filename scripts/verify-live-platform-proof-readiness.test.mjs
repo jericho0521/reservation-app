@@ -21,6 +21,7 @@ function validReadinessEnv(overrides = {}) {
     RESERVATION_PLATFORM_LIVE_RESOURCE_ID: "resrc_123",
     RESERVATION_PLATFORM_LIVE_START_AT: "2026-06-13T10:00:00.000Z",
     RESERVATION_PLATFORM_LIVE_END_AT: "2026-06-13T11:00:00.000Z",
+    RESERVATION_PLATFORM_LIVE_CHAT_MODE: "disabled",
     RESERVATION_PLATFORM_LIVE_ALLOW_MUTATIONS: "1",
     RESERVATION_SDK_REGISTRY_PROOF_MODE: "public",
     RESERVATION_SDK_REGISTRY_PACKAGE_SPECS:
@@ -163,6 +164,50 @@ test("live platform proof readiness strict mode requires mutation and registry i
   );
   assert.match(byId(parsed, "sdk_direct_live_parity").strict.message, /RESERVATION_PLATFORM_LIVE_ALLOW_MUTATIONS=1/);
   assert.match(byId(parsed, "sdk_registry_install_proof").strict.message, /RESERVATION_SDK_REGISTRY_ALLOW_INSTALL=1/);
+});
+
+test("live platform proof readiness strict mode requires explicit live chat mode", async () => {
+  const parsed = await verifyLivePlatformProofReadiness(
+    validReadinessEnv({
+      RESERVATION_PLATFORM_LIVE_CHAT_MODE: undefined,
+    }),
+    {
+      argv: ["--strict"],
+      localPrerequisiteVerifiers: passingLocalPrerequisiteVerifiers(),
+    },
+  );
+
+  assert.equal(parsed.status, "fail");
+  assert.deepEqual(
+    parsed.strictFailures.map((surface) => surface.id),
+    ["sdk_direct_live_parity"],
+  );
+  assert.match(
+    byId(parsed, "sdk_direct_live_parity").strict.message,
+    /RESERVATION_PLATFORM_LIVE_CHAT_MODE=disabled or enabled/,
+  );
+});
+
+test("live platform proof readiness fails clearly for unsupported enabled live chat proof", async () => {
+  const parsed = await verifyLivePlatformProofReadiness(
+    validReadinessEnv({
+      RESERVATION_PLATFORM_LIVE_CHAT_MODE: "enabled",
+    }),
+    {
+      argv: ["--strict"],
+      localPrerequisiteVerifiers: passingLocalPrerequisiteVerifiers(),
+    },
+  );
+
+  assert.equal(parsed.status, "fail");
+  assert.deepEqual(
+    parsed.strictFailures.map((surface) => surface.id),
+    ["sdk_direct_live_parity"],
+  );
+  assert.match(
+    byId(parsed, "sdk_direct_live_parity").strict.message,
+    /enabled live chat proof remains unsupported\/pending/,
+  );
 });
 
 test("live platform proof readiness can enter strict mode through its env flag", async () => {

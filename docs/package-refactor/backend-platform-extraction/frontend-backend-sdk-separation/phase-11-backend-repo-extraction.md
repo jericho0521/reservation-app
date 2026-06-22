@@ -148,8 +148,11 @@ Implemented artifacts:
   materialized `scripts/*.mjs` verifier files, verifies those generated
   `node scripts/*.mjs` commands do not point at verifier scripts whose default
   repo-relative input docs/manifests are absent from the materialized
-  candidate, verifies expected package manifests exist in applicable target
-  package roots, and deletes the temporary tree by default.
+  candidate, verifies generated root `corepack pnpm --filter <package-name> run
+  <script>` commands match exactly one materialized `apps/*` or `packages/*`
+  package manifest and that the referenced package manifest declares the
+  requested script, verifies expected package manifests exist in applicable
+  target package roots, and deletes the temporary tree by default.
 - The standalone extraction manifest now includes the backend-owned verifier
   script and default input manifest needed by the generated backend root
   database migration-index check. Monorepo-to-candidate extraction,
@@ -198,14 +201,22 @@ checks, and monorepo-only extraction/readiness/package-graph guardrails. The
 generated `pnpm-workspace.yaml` covers `apps/*` and `packages/*`. The dry run
 also validates every direct `node scripts/*.mjs` reference in generated backend
 root scripts against the materialized target tree and validates known default
-input manifests for those generated commands. The default generated root now
-uses that validation for `database:migration-index:check` and its
+input manifests for those generated commands. It also validates generated root
+package-filter commands against the materialized candidate package manifests:
+each `corepack pnpm --filter <package-name> run <script>` reference must name
+exactly one materialized `apps/*` or `packages/*` package, and that package
+must declare the requested script. The default generated root now uses that
+validation for `packages:build`, `packages:test`,
+`backend-platform:verify-standalone-api-skeleton`, and the filtered commands
+reached through `phase-11:verify-generated-backend-workspace`, plus
+`database:migration-index:check` and its
 `database-migration-bundle-manifest.json` input; unit coverage also proves the
 same guard catches the standalone extraction manifest default path if an
-extraction verifier command is reintroduced. This is still only a local OS-temp generated
-metadata proof; it removes the whole temporary tree automatically. It does not
-mutate source files, git-tracked paths, or create a real repository, and it does
-not copy compatibility-shim or excluded entries. For local inspection only,
+extraction verifier command is reintroduced. This is still only a local OS-temp
+generated metadata proof; it removes the whole temporary tree automatically. It
+does not mutate source files, git-tracked paths, or create a real repository,
+and it does not copy compatibility-shim or excluded entries. For local
+inspection only,
 `STANDALONE_BACKEND_EXTRACTION_KEEP_MATERIALIZED_TREE=1` keeps the generated
 OS temp directory after the run; this is a boolean debug option, not a custom
 path, so it cannot point inside the repository. The verifier still does not
@@ -227,7 +238,8 @@ Still not complete:
 - final backend package renaming and visibility decisions
 - actual extracted-repository install/build/test execution outside the current
   Next.js app workspace; the dry-run now materializes and validates a temporary
-  target tree candidate with generated backend-root workspace metadata only
+  target tree candidate with generated backend-root workspace metadata and
+  candidate-local root-script/package-script coherence only
 - live deployed `/v1` backend proof
 - disposable database migration/RLS/idempotency proof
 - strict SDK/direct HTTP live parity proof

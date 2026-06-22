@@ -14,8 +14,26 @@ import test from "node:test";
 import { verifyStandaloneBackendExtractionDryRun } from "./verify-standalone-backend-extraction-dry-run.mjs";
 
 const expectedPackages = [
-  { targetPackageRoot: "apps/api" },
-  { targetPackageRoot: "packages/domain" },
+  {
+    targetPackageRoot: "apps/api",
+    packageName: "@reservation-platform/standalone-api-skeleton",
+    requiredScripts: ["build", "test"],
+  },
+  {
+    targetPackageRoot: "packages/api",
+    packageName: "@reservation-platform/api",
+    requiredScripts: ["build", "test"],
+  },
+  {
+    targetPackageRoot: "packages/contract-types",
+    packageName: "@reservation-platform/contract-types",
+    requiredScripts: ["build", "test"],
+  },
+  {
+    targetPackageRoot: "packages/domain",
+    packageName: "@fixture/domain",
+    requiredScripts: ["build", "test"],
+  },
 ];
 
 const generatedRootVerifierScripts = [
@@ -53,6 +71,24 @@ function defaultEntries() {
       ownershipCategory: "api",
       status: "ready-for-extraction-planning",
       rationale: "Fixture standalone API app.",
+    },
+    {
+      id: "fixture-backend-api-package",
+      classification: "move-candidate",
+      currentPaths: ["packages/api-source"],
+      targetBackendPaths: ["packages/api"],
+      ownershipCategory: "api",
+      status: "ready-for-extraction-planning",
+      rationale: "Fixture backend API package.",
+    },
+    {
+      id: "fixture-contract-types-package",
+      classification: "move-candidate",
+      currentPaths: ["packages/contract-types-source"],
+      targetBackendPaths: ["packages/contract-types"],
+      ownershipCategory: "contracts",
+      status: "ready-for-extraction-planning",
+      rationale: "Fixture backend contract package.",
     },
     {
       id: "fixture-backend-verifier-scripts",
@@ -98,7 +134,7 @@ async function createFixtureRepo(options = {}) {
 
   await writeFixtureFile(repoRoot, "packages/domain-source/package.json", JSON.stringify({
     name: "@fixture/domain",
-    scripts: { build: "echo ok" },
+    scripts: { build: "echo ok", test: "echo ok" },
   }));
   await writeFixtureFile(repoRoot, "packages/domain-source/src/index.ts", "export const domain = true;\n");
   await writeFixtureFile(repoRoot, "packages/domain-source/src/index.js.map", "{}\n");
@@ -107,11 +143,21 @@ async function createFixtureRepo(options = {}) {
 
   if (options.includeApiPackageJson !== false) {
     await writeFixtureFile(repoRoot, "apps/api/package.json", JSON.stringify({
-      name: "@fixture/api",
-      scripts: { test: "echo ok" },
+      name: "@reservation-platform/standalone-api-skeleton",
+      scripts: { build: "echo ok", test: "echo ok" },
     }));
   }
   await writeFixtureFile(repoRoot, "apps/api/src/server.ts", "export const server = true;\n");
+  await writeFixtureFile(repoRoot, "packages/api-source/package.json", JSON.stringify({
+    name: "@reservation-platform/api",
+    scripts: { build: "echo ok", test: "echo ok" },
+  }));
+  await writeFixtureFile(repoRoot, "packages/api-source/src/index.ts", "export const api = true;\n");
+  await writeFixtureFile(repoRoot, "packages/contract-types-source/package.json", JSON.stringify({
+    name: "@reservation-platform/contract-types",
+    scripts: { build: "echo ok", test: "echo ok" },
+  }));
+  await writeFixtureFile(repoRoot, "packages/contract-types-source/src/index.ts", "export const contract = true;\n");
 
   await writeFixtureFile(repoRoot, "packages/shim/package.json", JSON.stringify({ name: "@fixture/shim" }));
   await writeFixtureFile(repoRoot, "packages/shim/src/route.ts", "export const shim = true;\n");
@@ -278,6 +324,59 @@ test("standalone backend dry-run cleans up the materialized tree by default", as
   assert.equal(await pathExists(result.materializedRoot), false);
 
   await rm(repoRoot, { recursive: true, force: true });
+});
+
+test("standalone backend dry-run validates generated root filter commands against materialized package scripts", async () => {
+  const { repoRoot, manifestPath } = await createFixtureRepo();
+  await writeFixtureFile(repoRoot, "packages/domain-source/package.json", JSON.stringify({
+    name: "@fixture/domain",
+    scripts: { build: "echo ok" },
+  }));
+
+  const result = await verifyStandaloneBackendExtractionDryRun({
+    repoRoot,
+    manifestPath,
+    expectedPackages,
+    keepMaterializedTree: true,
+  });
+
+  try {
+    assert.equal(result.ok, false);
+    assert.match(
+      result.failures.join("\n"),
+      /generated backend root script packages:test runs package filter @fixture\/domain script test, but materialized manifest packages\/domain\/package\.json does not define scripts\.test/,
+    );
+  } finally {
+    await rm(result.materializedRoot, { recursive: true, force: true });
+    await rm(repoRoot, { recursive: true, force: true });
+  }
+});
+
+test("standalone backend dry-run fails when generated root filter commands target absent materialized packages", async () => {
+  const entries = defaultEntries().filter((entry) => entry.id !== "fixture-contract-types-package");
+  const { repoRoot, manifestPath } = await createFixtureRepo({ entries });
+
+  const result = await verifyStandaloneBackendExtractionDryRun({
+    repoRoot,
+    manifestPath,
+    expectedPackages,
+    keepMaterializedTree: true,
+  });
+
+  try {
+    assert.equal(result.ok, false);
+    assert.match(
+      result.failures.join("\n"),
+      /generated backend root script packages:build runs package filter @reservation-platform\/contract-types script build, but no materialized apps\/\* or packages\/\* package\.json has that name/,
+    );
+    assert.match(
+      result.failures.join("\n"),
+      /generated backend root script backend-platform:verify-standalone-api-skeleton runs package filter @reservation-platform\/contract-types script build, but no materialized apps\/\* or packages\/\* package\.json has that name/,
+    );
+  } finally {
+    await rm(result.materializedRoot, { recursive: true, force: true });
+    await rm(repoRoot, { recursive: true, force: true });
+  }
 });
 
 test("standalone backend dry-run fails invalid generated backend workspace metadata", async () => {

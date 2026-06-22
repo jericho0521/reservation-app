@@ -616,6 +616,7 @@ async function validateGeneratedRootPackage(context, rootPackage, materializedFi
 
   validateGeneratedRootScriptsAreBackendOnly(context, scripts);
   validateGeneratedRootScriptFileReferences(context, scripts, materializedFiles);
+  await validateGeneratedRootFilteredPackageScripts(context, scripts, materializedFiles);
   validateGeneratedRootInstallBuildTooling(context, rootPackage);
   validateGeneratedRootDependenciesAreBackendOnly(context, rootPackage);
   await validateGeneratedRootPackageIsNotCurrentRootManifest(context, rootPackage);
@@ -706,6 +707,89 @@ function validateGeneratedRootScriptFileReferences(context, scripts, materialize
 function getNodeScriptReferences(command) {
   return [...command.matchAll(/(?:^|[\s;&|])node\s+(scripts\/[A-Za-z0-9._/-]+\.mjs)(?=$|[\s;&|])/g)]
     .map((match) => match[1]);
+}
+
+async function validateGeneratedRootFilteredPackageScripts(context, scripts, materializedFiles) {
+  if (!scripts || typeof scripts !== "object" || Array.isArray(scripts)) {
+    return;
+  }
+
+  const materializedPackagesByName = await readMaterializedWorkspacePackageManifestIndex(
+    context,
+    materializedFiles,
+  );
+
+  for (const [rootScriptName, command] of Object.entries(scripts)) {
+    if (typeof command !== "string") {
+      continue;
+    }
+
+    for (const packageScriptReference of getFilteredPackageScriptReferences(command)) {
+      const materializedPackages = materializedPackagesByName.get(packageScriptReference.packageFilter) ?? [];
+
+      if (materializedPackages.length === 0) {
+        context.failures.push(
+          `package.json: generated backend root script ${rootScriptName} runs package filter ${packageScriptReference.packageFilter} script ${packageScriptReference.scriptName}, but no materialized apps/* or packages/* package.json has that name`,
+        );
+        continue;
+      }
+
+      if (materializedPackages.length > 1) {
+        context.failures.push(
+          `package.json: generated backend root script ${rootScriptName} runs package filter ${packageScriptReference.packageFilter} script ${packageScriptReference.scriptName}, but that package name matched multiple materialized manifests: ${materializedPackages.map((materializedPackage) => materializedPackage.manifestPath).join(", ")}`,
+        );
+        continue;
+      }
+
+      const [materializedPackage] = materializedPackages;
+      const scriptsObject = materializedPackage.manifest.scripts;
+      if (
+        !scriptsObject ||
+        typeof scriptsObject !== "object" ||
+        Array.isArray(scriptsObject) ||
+        typeof scriptsObject[packageScriptReference.scriptName] !== "string" ||
+        scriptsObject[packageScriptReference.scriptName].trim() === ""
+      ) {
+        context.failures.push(
+          `package.json: generated backend root script ${rootScriptName} runs package filter ${packageScriptReference.packageFilter} script ${packageScriptReference.scriptName}, but materialized manifest ${materializedPackage.manifestPath} does not define scripts.${packageScriptReference.scriptName}`,
+        );
+      }
+    }
+  }
+}
+
+async function readMaterializedWorkspacePackageManifestIndex(context, materializedFiles) {
+  const packagesByName = new Map();
+  const packageManifestPaths = materializedFiles.filter(isMaterializedWorkspacePackageManifestPath);
+
+  for (const manifestPath of packageManifestPaths) {
+    const manifest = await readMaterializedJson(context, manifestPath, `materialized package manifest ${manifestPath}`);
+    if (!manifest || typeof manifest !== "object" || Array.isArray(manifest)) {
+      continue;
+    }
+
+    if (!isNonBlankString(manifest.name)) {
+      continue;
+    }
+
+    const packages = packagesByName.get(manifest.name) ?? [];
+    packages.push({ manifestPath, manifest });
+    packagesByName.set(manifest.name, packages);
+  }
+
+  return packagesByName;
+}
+
+function isMaterializedWorkspacePackageManifestPath(repoPath) {
+  return /^(?:apps|packages)\/[^/]+\/package\.json$/.test(repoPath);
+}
+
+function getFilteredPackageScriptReferences(command) {
+  return [...command.matchAll(/(?:^|[\s;&|])corepack\s+pnpm\s+--filter\s+(?:"([^"]+)"|'([^']+)'|([^\s;&|]+))\s+run\s+([A-Za-z0-9:_-]+)(?=$|[\s;&|])/g)]
+    .map((match) => ({
+      packageFilter: match[1] ?? match[2] ?? match[3],
+      scriptName: match[4],
+    }));
 }
 
 function validateGeneratedRootDependenciesAreBackendOnly(context, rootPackage) {

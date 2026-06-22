@@ -94,6 +94,7 @@ flowchart LR
 - [Focused Backend Platform, SDK, and Frontend Split Execution Plan](plugin-platform-split/README.md)
 - [Repo Product Split Plan](repo-product-split-plan/README.md)
 - [Frontend and Backend Hard Separation Plan](frontend-backend-hard-separation-plan/README.md)
+- [Frontend and Backend Module Separation Plan](frontend-backend-module-separation-plan/README.md)
 
 ## Separation Rules
 
@@ -154,3 +155,9 @@ monorepo modularity into real product separation. It adds audit, boundary,
 backend runtime, frontend detachment, SDK install, cross-repo proof, and
 compatibility cleanup phases that subagents can execute without relying on chat
 history.
+
+The frontend/backend module separation plan is the narrower current-state
+cleanup plan for keeping backend modules, the SDK, and the frontend consumer
+honest while the repo split work continues. Use it when assigning subagents to
+close boundary leaks before treating the backend as the product infrastructure
+repo and the frontend as a replaceable SDK consumer.

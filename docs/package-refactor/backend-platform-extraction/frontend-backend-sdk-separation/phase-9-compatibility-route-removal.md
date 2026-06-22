@@ -59,7 +59,7 @@ removed or marked safe to remove.
 - CI-safe verifier:
   `corepack pnpm run backend-platform:verify-compatibility-route-removal-gate`
 - Unit tests:
-  `node --test scripts/verify-compatibility-route-removal-gate.test.mjs`
+  `node --import tsx --test scripts/verify-compatibility-route-removal-gate.test.mjs`
 
 The inventory separates reservation-platform compatibility routes from
 app-owned current-app routes. Reservation catalog, availability, bookings,
@@ -95,9 +95,14 @@ known compatibility wrapper
 gates are still blocked, but fails if migrated pages/components/admin source
 directly references routes such as `/api/bookings`, `/api/services`,
 `/api/availability`, `/api/seat-maintenance`, or `/api/v1/reservations`. It
-does not make network, deployment, or live backend calls, and it proves only
-local dispatch/test route-surface coverage rather than live parity, auth/tenant
-behavior, idempotency behavior, deployability, or route removability.
+also rejects stale inventory blockers that still claim this direct frontend
+source-usage scan is not recorded; the scan is now recorded by the gate and is
+currently passing for direct usage on the affected catalog read routes. It does
+not make network, deployment, or live backend calls, and it proves only local
+dispatch/test route-surface coverage and bounded direct source usage rather
+than live parity, SDK/direct parity, full frontend cutover, auth/tenant
+behavior, idempotency behavior, deployability, route-level test completion, or
+route removability.
 
 The verifier also checks the local rollback/deprecation decision log. Every
 non-app-owned route with `rollbackDeprecationNotes: true` must be represented by

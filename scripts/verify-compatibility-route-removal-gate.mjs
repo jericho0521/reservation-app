@@ -58,6 +58,8 @@ const defaultFrontendSourceScanTargets = [
 const defaultCompatibilityWrapperAllowlist = new Set([
   "lib/reservation-platform-client.ts",
 ]);
+const staleFrontendSourceScanBlockerPattern =
+  /source scan for direct frontend usage is not yet recorded/i;
 
 const importSpecifierPattern =
   /\b(?:import\s*(?:["']([^"']+)["']|[^"'()]+?\s*from\s*["']([^"']+)["'])|export\s*[^"'()]+?\s*from\s*["']([^"']+)["']|require\s*\(\s*["']([^"']+)["']|import\s*\(\s*["']([^"']+)["'])/g;
@@ -129,6 +131,7 @@ export async function verifyCompatibilityRouteInventory(inventory, options = {})
     validateRouteStatus(route, routeLabel, failures);
     validateStandaloneEquivalent(route, routeLabel, failures);
     validateRemovalGates(route, requiredRemovalGates, routeLabel, failures);
+    validateStaleFrontendSourceScanBlockers(route, routeLabel, failures);
     validateAppOwnedRoute(route, routeLabel, failures);
   }
 
@@ -956,6 +959,23 @@ function validateRemovalGates(route, requiredRemovalGates, routeLabel, failures)
     );
     if (openGateNames.length > 0) {
       failures.push(`${routeLabel}: removable route still has open gates: ${openGateNames.join(", ")}.`);
+    }
+  }
+}
+
+function validateStaleFrontendSourceScanBlockers(route, routeLabel, failures) {
+  if (!Array.isArray(route.removalBlockedBy)) {
+    return;
+  }
+
+  for (const blocker of route.removalBlockedBy) {
+    if (
+      typeof blocker === "string" &&
+      staleFrontendSourceScanBlockerPattern.test(blocker)
+    ) {
+      failures.push(
+        `${routeLabel}: removalBlockedBy contains stale direct frontend source-scan blocker; backend-platform:verify-compatibility-route-removal-gate now records verifyFrontendCompatibilityRouteSourceUsage results.`,
+      );
     }
   }
 }

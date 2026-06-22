@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "phase": "phase-9-compatibility-route-removal",
   "generatedFrom": "current app/api route tree",
-  "lastUpdated": "2026-06-21",
+  "lastUpdated": "2026-06-22",
   "requiredRemovalGates": [
     "standaloneEquivalent",
     "frontendCutover",
@@ -49,7 +49,7 @@
       "standaloneEquivalent": "/v1/services/{id}",
       "frontendUsage": {
         "state": "no-current-wrapper-usage",
-        "notes": "No current frontend wrapper call is known, but removal still waits for route-level parity and deprecation proof."
+        "notes": "Direct frontend source-usage scan is now recorded by backend-platform:verify-compatibility-route-removal-gate and currently passes for direct usage; no current frontend wrapper call is known, but removal still waits for route-level parity and deprecation proof."
       },
       "removalGates": {
         "standaloneEquivalent": true,
@@ -61,7 +61,7 @@
       },
       "removalBlockedBy": [
         "strict live /v1 catalog read parity is not complete",
-        "source scan for direct frontend usage is not yet recorded"
+        "full frontend cutover, SDK/direct parity, auth/tenant/idempotency proof, and route tests are not complete"
       ]
     },
     {
@@ -72,7 +72,7 @@
       "standaloneEquivalent": "/v1/venues",
       "frontendUsage": {
         "state": "no-current-wrapper-usage",
-        "notes": "No current frontend wrapper call is known, but removal still waits for route-level parity and deprecation proof."
+        "notes": "Direct frontend source-usage scan is now recorded by backend-platform:verify-compatibility-route-removal-gate and currently passes for direct usage; no current frontend wrapper call is known, but removal still waits for route-level parity and deprecation proof."
       },
       "removalGates": {
         "standaloneEquivalent": true,
@@ -84,7 +84,7 @@
       },
       "removalBlockedBy": [
         "strict live /v1 catalog parity is not complete",
-        "source scan for direct frontend usage is not yet recorded"
+        "full frontend cutover, SDK/direct parity, auth/tenant/idempotency proof, and route tests are not complete"
       ]
     },
     {
@@ -95,7 +95,7 @@
       "standaloneEquivalent": "/v1/venues/{id}",
       "frontendUsage": {
         "state": "no-current-wrapper-usage",
-        "notes": "No current frontend wrapper call is known, but removal still waits for route-level parity and deprecation proof."
+        "notes": "Direct frontend source-usage scan is now recorded by backend-platform:verify-compatibility-route-removal-gate and currently passes for direct usage; no current frontend wrapper call is known, but removal still waits for route-level parity and deprecation proof."
       },
       "removalGates": {
         "standaloneEquivalent": true,
@@ -107,7 +107,7 @@
       },
       "removalBlockedBy": [
         "strict live /v1 catalog read parity is not complete",
-        "source scan for direct frontend usage is not yet recorded"
+        "full frontend cutover, SDK/direct parity, auth/tenant/idempotency proof, and route tests are not complete"
       ]
     },
     {

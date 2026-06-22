@@ -224,6 +224,47 @@ test("compatibility route gate rejects rollback/deprecation false without a note
   );
 });
 
+test("compatibility route gate rejects stale direct frontend source-scan blockers", async () => {
+  const repoRoot = await createFixtureRepo();
+  const result = await verifyCompatibilityRouteInventory(
+    baseInventory(routeFixture({
+      removalBlockedBy: [
+        "frontend cutover remains incomplete",
+        "source scan for direct frontend usage is not yet recorded",
+        "rollback or deprecation notes are not written",
+      ],
+    })),
+    { repoRoot },
+  );
+
+  assert.equal(result.ok, false);
+  assert.match(
+    result.failures.join("\n"),
+    /\/api\/services: removalBlockedBy contains stale direct frontend source-scan blocker/,
+  );
+});
+
+test("compatibility route gate allows legitimate frontend cutover and local-mode blockers", async () => {
+  const repoRoot = await createFixtureRepo();
+  const result = await verifyCompatibilityRouteInventory(
+    baseInventory(routeFixture({
+      frontendUsage: {
+        state: "local-mode-compatibility",
+        notes: "Direct frontend source-usage scan is recorded and passing; the wrapper still supports local compatibility mode.",
+      },
+      removalBlockedBy: [
+        "current frontend local mode still targets /api/services through the compatibility wrapper",
+        "full frontend cutover remains incomplete",
+        "rollback or deprecation notes are not written",
+      ],
+    })),
+    { repoRoot },
+  );
+
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.failures, []);
+});
+
 test("compatibility route gate does not require decision log coverage for app-owned routes", async () => {
   const repoRoot = await createFixtureRepo(
     ["app/api/analytics-chat/route.ts"],

@@ -174,6 +174,20 @@ venue, correlation, idempotency, query, and reservation payload details. The
 smoke fails if browser reservation-platform calls hit relative `/api`,
 current-frontend `/api/v1`, or mock-backend `/api` compatibility paths.
 
+The admin browser smoke now provides the same bounded local external-origin
+proof for admin flows. `current-frontend:admin-platform-smoke` starts a mock
+standalone reservation platform backend on a separate `127.0.0.1` origin,
+starts Next.js with `NEXT_PUBLIC_RESERVATION_PLATFORM_BASE_URL` pointing at
+that mock backend, and drives the existing admin reservation list/search,
+complete/cancel/restore, services, and resource-maintenance list/create/end
+flows. The mock backend serves only `/v1/reservations`, `/v1/services`, and
+`/v1/resource-maintenance` routes, handles CORS preflight for the browser's
+custom platform headers, and asserts tenant, venue, correlation, idempotency,
+query, route, and payload details. The smoke tracks browser-observed non-OPTIONS
+standalone `/v1` calls separately from backend-handled calls and fails if admin
+reservation-platform calls hit current-frontend `/api`, current-frontend
+`/api/v1`, or mock-backend `/api` compatibility paths.
+
 This remains a local mock proof only. It does not call a live standalone
 backend, Supabase, deployment, durable idempotency store, or seeded platform
 data, and it does not remove any current compatibility routes.

@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import http from "node:http";
 import { createRequire } from "node:module";
 import { once } from "node:events";
 import { existsSync } from "node:fs";
@@ -8,7 +9,7 @@ import { pathToFileURL } from "node:url";
 
 const require = createRequire(import.meta.url);
 const rootDir = process.cwd();
-const requiredApiCalls = new Map([
+const requiredBrowserApiCalls = new Map([
   ["reservationList", false],
   ["reservationSearch", false],
   ["reservationComplete", false],
@@ -19,7 +20,10 @@ const requiredApiCalls = new Map([
   ["maintenanceCreate", false],
   ["maintenanceEnd", false],
 ]);
-const observedApiRequests = [];
+const requiredBackendApiCalls = new Map(requiredBrowserApiCalls);
+const observedBrowserStandaloneApiRequests = [];
+const observedBackendStandaloneApiRequests = [];
+const observedCurrentFrontendApiRequests = [];
 const legacyApiRequests = [];
 const routeAssertions = [];
 const reservationStatuses = new Map([
@@ -28,6 +32,7 @@ const reservationStatuses = new Map([
   ["res_platform_completed", "completed"],
 ]);
 const legacyReservationApiPrefixes = [
+  "/api/v1",
   "/api/services",
   "/api/venues",
   "/api/availability",
@@ -95,7 +100,7 @@ async function waitForServer(url, processRef) {
   throw new Error(`Timed out waiting for ${url}: ${lastError?.message ?? "unknown error"}`);
 }
 
-function startNextDevServer(port) {
+function startNextDevServer(port, platformBaseUrl) {
   const nextBin = require.resolve("next/dist/bin/next");
   const child = spawn(process.execPath, [nextBin, "dev", "-p", String(port), "--hostname", "127.0.0.1"], {
     cwd: rootDir,
@@ -103,6 +108,7 @@ function startNextDevServer(port) {
       ...process.env,
       NEXT_TELEMETRY_DISABLED: "1",
       NEXT_PUBLIC_RESERVATION_API_MODE: "platform",
+      NEXT_PUBLIC_RESERVATION_PLATFORM_BASE_URL: platformBaseUrl,
       NEXT_PUBLIC_RESERVATION_TENANT_ID: "tenant_admin_platform_smoke",
       NEXT_PUBLIC_RESERVATION_VENUE_ID: "venue_admin_platform_smoke",
       NEXT_PUBLIC_RESERVATION_PLATFORM_SMOKE: "1",
@@ -121,6 +127,39 @@ function startNextDevServer(port) {
   return child;
 }
 
+async function startMockPlatformBackend(port, frontendBaseUrl) {
+  const platformBaseUrl = `http://127.0.0.1:${port}`;
+  const server = http.createServer(async (request, response) => {
+    try {
+      await handleMockPlatformRequest(request, response, {
+        frontendBaseUrl,
+        platformBaseUrl,
+      });
+    } catch (error) {
+      response.writeHead(500, corsHeaders(frontendBaseUrl, {
+        "Content-Type": "application/json",
+      }));
+      response.end(JSON.stringify({
+        error: error instanceof Error ? error.message : "Mock platform backend failed",
+      }));
+    }
+  });
+
+  server.listen(port, "127.0.0.1");
+  await once(server, "listening");
+  return server;
+}
+
+async function stopServer(server) {
+  if (!server?.listening) {
+    return;
+  }
+
+  await new Promise((resolve, reject) => {
+    server.close((error) => error ? reject(error) : resolve());
+  });
+}
+
 async function stopProcess(child) {
   if (!child || child.exitCode !== null) {
     return;
@@ -137,16 +176,32 @@ async function stopProcess(child) {
   }
 }
 
-function fulfillJson(route, payload, status = 200) {
-  return route.fulfill({
-    status,
-    contentType: "application/json",
-    body: JSON.stringify(payload),
-  });
+function corsHeaders(frontendBaseUrl, extra = {}) {
+  return {
+    "Access-Control-Allow-Origin": frontendBaseUrl,
+    "Access-Control-Allow-Methods": "GET,POST,PATCH,OPTIONS",
+    "Access-Control-Allow-Headers": [
+      "Authorization",
+      "Content-Type",
+      "Idempotency-Key",
+      "X-Correlation-Id",
+      "X-Reservation-Tenant-Id",
+      "X-Reservation-Venue-Id",
+    ].join(", "),
+    "Access-Control-Max-Age": "600",
+    "Vary": "Origin",
+    ...extra,
+  };
 }
 
-function assertPlatformHeaders(request, label) {
-  const headers = request.headers();
+function sendJson(response, frontendBaseUrl, payload, status = 200) {
+  response.writeHead(status, corsHeaders(frontendBaseUrl, {
+    "Content-Type": "application/json",
+  }));
+  response.end(JSON.stringify(payload));
+}
+
+function assertPlatformHeaders(headers, label) {
   routeAssertions.push([
     `${label} tenant header`,
     headers["x-reservation-tenant-id"] === "tenant_admin_platform_smoke",
@@ -161,22 +216,87 @@ function assertPlatformHeaders(request, label) {
   ]);
 }
 
-function assertIdempotencyHeader(request, label, prefix) {
+function assertBrowserPlatformHeaders(request, label) {
   const headers = request.headers();
+  assertPlatformHeaders(headers, label);
+}
+
+function assertIdempotencyHeader(headers, label, prefix) {
   routeAssertions.push([
     `${label} idempotency header`,
     typeof headers["idempotency-key"] === "string" && headers["idempotency-key"].startsWith(prefix),
   ]);
 }
 
-function observeApiRequest(request) {
+function markRequiredBrowserCall(request) {
   const url = new URL(request.url());
+  const payload = request.postData() ? request.postDataJSON() : undefined;
+
+  if (url.pathname === "/v1/reservations" && request.method() === "GET") {
+    if (url.searchParams.get("search")) {
+      requiredBrowserApiCalls.set("reservationSearch", true);
+    } else {
+      requiredBrowserApiCalls.set("reservationList", true);
+    }
+  }
+
+  if (url.pathname.startsWith("/v1/reservations/") && request.method() === "PATCH") {
+    const reservationId = decodeURIComponent(url.pathname.split("/").pop() ?? "");
+    if (reservationId === "res_platform_confirmed" && payload?.status === "completed") {
+      requiredBrowserApiCalls.set("reservationComplete", true);
+    }
+    if (reservationId === "res_platform_confirmed" && payload?.status === "cancelled") {
+      requiredBrowserApiCalls.set("reservationCancel", true);
+    }
+    if (reservationId === "res_platform_cancelled" && payload?.status === "confirmed") {
+      requiredBrowserApiCalls.set("reservationRestore", true);
+    }
+  }
+
+  if (url.pathname === "/v1/services" && request.method() === "GET") {
+    requiredBrowserApiCalls.set("services", true);
+  }
+
+  if (url.pathname === "/v1/resource-maintenance" && request.method() === "GET") {
+    requiredBrowserApiCalls.set("maintenanceList", true);
+  }
+
+  if (url.pathname === "/v1/resource-maintenance" && request.method() === "POST") {
+    requiredBrowserApiCalls.set("maintenanceCreate", true);
+  }
+
+  if (url.pathname === "/v1/resource-maintenance/maint_rs1/end" && request.method() === "POST") {
+    requiredBrowserApiCalls.set("maintenanceEnd", true);
+  }
+}
+
+function observeBrowserRequest(request, frontendBaseUrl, platformBaseUrl) {
+  const url = new URL(request.url());
+  if (
+    request.method() !== "OPTIONS" &&
+    url.origin === platformBaseUrl &&
+    url.pathname.startsWith("/v1/")
+  ) {
+    observedBrowserStandaloneApiRequests.push(`${request.method()} ${url.href}`);
+    markRequiredBrowserCall(request);
+    assertBrowserPlatformHeaders(request, `browser ${url.pathname}`);
+  }
+
+  if (url.origin === platformBaseUrl && url.pathname.startsWith("/api/")) {
+    legacyApiRequests.push(`${request.method()} ${url.href}`);
+    return;
+  }
+
+  if (url.origin !== frontendBaseUrl) {
+    return;
+  }
+
   if (!url.pathname.startsWith("/api/")) {
     return;
   }
 
   const methodAndPath = `${request.method()} ${url.pathname}${url.search}`;
-  observedApiRequests.push(methodAndPath);
+  observedCurrentFrontendApiRequests.push(methodAndPath);
   if (legacyReservationApiPrefixes.some((prefix) => url.pathname === prefix || url.pathname.startsWith(`${prefix}/`))) {
     legacyApiRequests.push(methodAndPath);
   }
@@ -224,7 +344,173 @@ function currentReservations(search) {
   );
 }
 
-async function runBrowserSmoke(baseUrl) {
+async function readRequestJson(request) {
+  const chunks = [];
+  for await (const chunk of request) {
+    chunks.push(chunk);
+  }
+
+  const body = Buffer.concat(chunks).toString("utf8");
+  return body ? JSON.parse(body) : undefined;
+}
+
+async function handleMockPlatformRequest(request, response, { frontendBaseUrl, platformBaseUrl }) {
+  const requestUrl = new URL(request.url ?? "/", platformBaseUrl);
+  const methodAndPath = `${request.method} ${requestUrl.pathname}${requestUrl.search}`;
+
+  if (request.method === "OPTIONS") {
+    response.writeHead(204, corsHeaders(frontendBaseUrl));
+    response.end();
+    return;
+  }
+
+  if (requestUrl.pathname.startsWith("/api/")) {
+    legacyApiRequests.push(methodAndPath);
+    sendJson(response, frontendBaseUrl, { error: "Compatibility /api routes are forbidden in this smoke." }, 500);
+    return;
+  }
+
+  if (requestUrl.pathname.startsWith("/v1/")) {
+    observedBackendStandaloneApiRequests.push(`${request.method} ${requestUrl.href}`);
+  }
+
+  if (requestUrl.pathname === "/v1/reservations" && request.method === "GET") {
+    assertPlatformHeaders(request.headers, "reservation list");
+    routeAssertions.push(["reservation list method", request.method === "GET"]);
+
+    const search = requestUrl.searchParams.get("search");
+    if (search) {
+      requiredBackendApiCalls.set("reservationSearch", true);
+      routeAssertions.push(["reservation search query", search === "Cancelled"]);
+    } else {
+      requiredBackendApiCalls.set("reservationList", true);
+    }
+
+    sendJson(response, frontendBaseUrl, { reservations: currentReservations(search) });
+    return;
+  }
+
+  if (requestUrl.pathname.startsWith("/v1/reservations/") && request.method === "PATCH") {
+    const reservationId = decodeURIComponent(requestUrl.pathname.split("/").pop() ?? "");
+    const payload = await readRequestJson(request);
+
+    assertPlatformHeaders(request.headers, `reservation ${reservationId}`);
+    assertIdempotencyHeader(request.headers, `reservation ${reservationId}`, `reservation-update-${reservationId}-`);
+    routeAssertions.push([`reservation ${reservationId} method`, request.method === "PATCH"]);
+
+    if (reservationId === "res_platform_confirmed" && payload.status === "completed") {
+      requiredBackendApiCalls.set("reservationComplete", true);
+    }
+    if (reservationId === "res_platform_confirmed" && payload.status === "cancelled") {
+      requiredBackendApiCalls.set("reservationCancel", true);
+    }
+    if (reservationId === "res_platform_cancelled" && payload.status === "confirmed") {
+      requiredBackendApiCalls.set("reservationRestore", true);
+    }
+
+    reservationStatuses.set(reservationId, payload.status);
+    sendJson(response, frontendBaseUrl, reservationPayload(reservationId, payload.status));
+    return;
+  }
+
+  if (requestUrl.pathname === "/v1/services" && request.method === "GET") {
+    requiredBackendApiCalls.set("services", true);
+    assertPlatformHeaders(request.headers, "services");
+    routeAssertions.push(["services method", request.method === "GET"]);
+    sendJson(response, frontendBaseUrl, {
+      services: [
+        {
+          service_id: "svc_admin_platform_smoke",
+          venue_id: "venue_admin_platform_smoke",
+          name: "Admin Platform Smoke Session",
+          description: "Deterministic admin browser smoke service",
+          total_quantity: 3,
+          resource_kind: "seat",
+          resource_strategy: "assigned_resource",
+          reservation_policy: {
+            kind: "assigned_resource",
+            require_resource_labels: true,
+          },
+          resources: ["RS1", "RS2", "RS3"].map((label, index) => ({
+            resource_id: `resource_${index + 1}`,
+            service_id: "svc_admin_platform_smoke",
+            label,
+            kind: "seat",
+            capacity: 1,
+            is_active: true,
+            metadata: {},
+          })),
+          metadata: {
+            total_seats: 3,
+            created_at: "2026-01-01T00:00:00.000Z",
+          },
+        },
+      ],
+    });
+    return;
+  }
+
+  if (requestUrl.pathname === "/v1/resource-maintenance" && request.method === "GET") {
+    requiredBackendApiCalls.set("maintenanceList", true);
+    assertPlatformHeaders(request.headers, "maintenance list");
+    routeAssertions.push(["maintenance list method", request.method === "GET"]);
+    routeAssertions.push([
+      "maintenance service query",
+      requestUrl.searchParams.get("service_id") === "svc_admin_platform_smoke",
+    ]);
+    sendJson(response, frontendBaseUrl, {
+      maintenance: [
+        {
+          maintenance_id: "maint_rs1",
+          service_id: "svc_admin_platform_smoke",
+          resource_id: "resource_1",
+          reason: "Initial smoke maintenance",
+          starts_at: "2026-01-01T00:00:00.000Z",
+          ends_at: null,
+          metadata: {
+            resource_label: "RS1",
+          },
+        },
+      ],
+    });
+    return;
+  }
+
+  if (requestUrl.pathname === "/v1/resource-maintenance" && request.method === "POST") {
+    const payload = await readRequestJson(request);
+    requiredBackendApiCalls.set("maintenanceCreate", true);
+    assertPlatformHeaders(request.headers, "maintenance create");
+    assertIdempotencyHeader(request.headers, "maintenance create", "resource-maintenance-create-svc_admin_platform_smoke-RS2-");
+    routeAssertions.push(["maintenance create method", request.method === "POST"]);
+    routeAssertions.push(["maintenance create resource label", payload.metadata?.resource_label === "RS2"]);
+    sendJson(response, frontendBaseUrl, {
+      maintenance_id: "maint_rs2",
+      service_id: payload.service_id,
+      resource_id: "resource_2",
+      reason: payload.reason,
+      starts_at: "2026-01-01T01:00:00.000Z",
+      metadata: payload.metadata,
+    });
+    return;
+  }
+
+  if (requestUrl.pathname === "/v1/resource-maintenance/maint_rs1/end" && request.method === "POST") {
+    requiredBackendApiCalls.set("maintenanceEnd", true);
+    assertPlatformHeaders(request.headers, "maintenance end");
+    assertIdempotencyHeader(request.headers, "maintenance end", "resource-maintenance-end-maint_rs1-");
+    routeAssertions.push(["maintenance end method", request.method === "POST"]);
+    routeAssertions.push(["maintenance end path", requestUrl.pathname === "/v1/resource-maintenance/maint_rs1/end"]);
+    sendJson(response, frontendBaseUrl, {
+      maintenance_id: "maint_rs1",
+      ended: true,
+    });
+    return;
+  }
+
+  sendJson(response, frontendBaseUrl, { error: `Unexpected mock platform route: ${methodAndPath}` }, 404);
+}
+
+async function runBrowserSmoke(baseUrl, platformBaseUrl) {
   const playwright = await importWorkspacePackage("playwright");
   const chromium = playwright.chromium ?? playwright.default?.chromium;
   if (!chromium) {
@@ -235,144 +521,7 @@ async function runBrowserSmoke(baseUrl) {
 
   try {
     const page = await browser.newPage();
-    page.on("request", observeApiRequest);
-
-    await page.route(new RegExp(`^${baseUrl.replaceAll(".", "\\.")}/api/v1/reservations(?:\\?.*)?$`), async (route) => {
-      const request = route.request();
-      const url = new URL(request.url());
-      assertPlatformHeaders(request, "reservation list");
-      routeAssertions.push(["reservation list method", request.method() === "GET"]);
-
-      const search = url.searchParams.get("search");
-      if (search) {
-        requiredApiCalls.set("reservationSearch", true);
-        routeAssertions.push(["reservation search query", search === "Cancelled"]);
-      } else {
-        requiredApiCalls.set("reservationList", true);
-      }
-
-      await fulfillJson(route, { reservations: currentReservations(search) });
-    });
-
-    await page.route(`${baseUrl}/api/v1/reservations/*`, async (route) => {
-      const request = route.request();
-      const url = new URL(request.url());
-      const reservationId = decodeURIComponent(url.pathname.split("/").pop() ?? "");
-      const payload = request.postDataJSON();
-
-      assertPlatformHeaders(request, `reservation ${reservationId}`);
-      assertIdempotencyHeader(request, `reservation ${reservationId}`, `reservation-update-${reservationId}-`);
-      routeAssertions.push([`reservation ${reservationId} method`, request.method() === "PATCH"]);
-
-      if (reservationId === "res_platform_confirmed" && payload.status === "completed") {
-        requiredApiCalls.set("reservationComplete", true);
-      }
-      if (reservationId === "res_platform_confirmed" && payload.status === "cancelled") {
-        requiredApiCalls.set("reservationCancel", true);
-      }
-      if (reservationId === "res_platform_cancelled" && payload.status === "confirmed") {
-        requiredApiCalls.set("reservationRestore", true);
-      }
-
-      reservationStatuses.set(reservationId, payload.status);
-      await fulfillJson(route, reservationPayload(reservationId, payload.status));
-    });
-
-    await page.route(`${baseUrl}/api/v1/services`, async (route) => {
-      const request = route.request();
-      requiredApiCalls.set("services", true);
-      assertPlatformHeaders(request, "services");
-      routeAssertions.push(["services method", request.method() === "GET"]);
-      await fulfillJson(route, {
-        services: [
-          {
-            service_id: "svc_admin_platform_smoke",
-            venue_id: "venue_admin_platform_smoke",
-            name: "Admin Platform Smoke Session",
-            description: "Deterministic admin browser smoke service",
-            total_quantity: 3,
-            resource_kind: "seat",
-            resource_strategy: "assigned_resource",
-            reservation_policy: {
-              kind: "assigned_resource",
-              require_resource_labels: true,
-            },
-            resources: ["RS1", "RS2", "RS3"].map((label, index) => ({
-              resource_id: `resource_${index + 1}`,
-              service_id: "svc_admin_platform_smoke",
-              label,
-              kind: "seat",
-              capacity: 1,
-              is_active: true,
-              metadata: {},
-            })),
-            metadata: {
-              total_seats: 3,
-              created_at: "2026-01-01T00:00:00.000Z",
-            },
-          },
-        ],
-      });
-    });
-
-    await page.route(new RegExp(`^${baseUrl.replaceAll(".", "\\.")}/api/v1/resource-maintenance\\?.*$`), async (route) => {
-      const request = route.request();
-      const url = new URL(request.url());
-      requiredApiCalls.set("maintenanceList", true);
-      assertPlatformHeaders(request, "maintenance list");
-      routeAssertions.push(["maintenance list method", request.method() === "GET"]);
-      routeAssertions.push([
-        "maintenance service query",
-        url.searchParams.get("service_id") === "svc_admin_platform_smoke",
-      ]);
-      await fulfillJson(route, {
-        maintenance: [
-          {
-            maintenance_id: "maint_rs1",
-            service_id: "svc_admin_platform_smoke",
-            resource_id: "resource_1",
-            reason: "Initial smoke maintenance",
-            starts_at: "2026-01-01T00:00:00.000Z",
-            ends_at: null,
-            metadata: {
-              resource_label: "RS1",
-            },
-          },
-        ],
-      });
-    });
-
-    await page.route(`${baseUrl}/api/v1/resource-maintenance`, async (route) => {
-      const request = route.request();
-      const payload = request.postDataJSON();
-      requiredApiCalls.set("maintenanceCreate", true);
-      assertPlatformHeaders(request, "maintenance create");
-      assertIdempotencyHeader(request, "maintenance create", "resource-maintenance-create-svc_admin_platform_smoke-RS2-");
-      routeAssertions.push(["maintenance create method", request.method() === "POST"]);
-      routeAssertions.push(["maintenance create resource label", payload.metadata?.resource_label === "RS2"]);
-      await fulfillJson(route, {
-        maintenance_id: "maint_rs2",
-        service_id: payload.service_id,
-        resource_id: "resource_2",
-        reason: payload.reason,
-        starts_at: "2026-01-01T01:00:00.000Z",
-        metadata: payload.metadata,
-      });
-    });
-
-    await page.route(`${baseUrl}/api/v1/resource-maintenance/*/end`, async (route) => {
-      const request = route.request();
-      const url = new URL(request.url());
-      requiredApiCalls.set("maintenanceEnd", true);
-      assertPlatformHeaders(request, "maintenance end");
-      assertIdempotencyHeader(request, "maintenance end", "resource-maintenance-end-maint_rs1-");
-      routeAssertions.push(["maintenance end method", request.method() === "POST"]);
-      routeAssertions.push(["maintenance end path", url.pathname.endsWith("/api/v1/resource-maintenance/maint_rs1/end")]);
-      await fulfillJson(route, {
-        maintenance_id: "maint_rs1",
-        ended: true,
-      });
-    });
+    page.on("request", (request) => observeBrowserRequest(request, baseUrl, platformBaseUrl));
 
     await page.goto(`${baseUrl}/admin/platform-smoke`, { waitUntil: "domcontentloaded" });
     await page.getByText("Confirmed Customer").waitFor({ timeout: 30_000 });
@@ -384,7 +533,9 @@ async function runBrowserSmoke(baseUrl) {
     await page.locator("tr", { hasText: "Confirmed Customer" }).getByRole("button", { name: "Cancel", exact: true }).click();
     const searchResponse = page.waitForResponse((response) => {
       const url = new URL(response.url());
-      return url.pathname === "/api/v1/reservations" && url.searchParams.get("search") === "Cancelled";
+      return url.origin === platformBaseUrl &&
+        url.pathname === "/v1/reservations" &&
+        url.searchParams.get("search") === "Cancelled";
     });
     await page.getByPlaceholder("Search by name, email, or phone...").fill("Cancelled");
     await searchResponse;
@@ -402,12 +553,14 @@ async function runBrowserSmoke(baseUrl) {
     const maintenanceCreateResponse = page.waitForResponse((response) => {
       const url = new URL(response.url());
       return response.request().method() === "POST" &&
-        url.pathname === "/api/v1/resource-maintenance";
+        url.origin === platformBaseUrl &&
+        url.pathname === "/v1/resource-maintenance";
     });
     const maintenanceEndResponse = page.waitForResponse((response) => {
       const url = new URL(response.url());
       return response.request().method() === "POST" &&
-        url.pathname === "/api/v1/resource-maintenance/maint_rs1/end";
+        url.origin === platformBaseUrl &&
+        url.pathname === "/v1/resource-maintenance/maint_rs1/end";
     });
     await page.getByRole("button", { name: "Save Changes" }).click();
     await Promise.all([maintenanceCreateResponse, maintenanceEndResponse]);
@@ -418,12 +571,20 @@ async function runBrowserSmoke(baseUrl) {
 }
 
 function assertSmokeProof() {
-  const missingCalls = [...requiredApiCalls.entries()]
+  const missingBrowserCalls = [...requiredBrowserApiCalls.entries()]
     .filter(([, wasObserved]) => !wasObserved)
     .map(([name]) => name);
 
-  if (missingCalls.length > 0) {
-    throw new Error(`Missing expected platform API calls: ${missingCalls.join(", ")}`);
+  if (missingBrowserCalls.length > 0) {
+    throw new Error(`Missing expected browser-observed platform API calls: ${missingBrowserCalls.join(", ")}`);
+  }
+
+  const missingBackendCalls = [...requiredBackendApiCalls.entries()]
+    .filter(([, wasHandled]) => !wasHandled)
+    .map(([name]) => name);
+
+  if (missingBackendCalls.length > 0) {
+    throw new Error(`Missing expected backend-handled platform API calls: ${missingBackendCalls.join(", ")}`);
   }
 
   const failedAssertions = routeAssertions
@@ -437,31 +598,58 @@ function assertSmokeProof() {
   if (legacyApiRequests.length > 0) {
     throw new Error(`Legacy API requests observed during admin platform smoke: ${legacyApiRequests.join(", ")}`);
   }
+
+  if (observedCurrentFrontendApiRequests.length > 0) {
+    throw new Error(
+      `Current frontend /api requests observed during standalone admin platform smoke: ${observedCurrentFrontendApiRequests.join(", ")}`,
+    );
+  }
+
+  const nonBrowserStandaloneCalls = observedBrowserStandaloneApiRequests.filter((request) => !request.includes("/v1/"));
+  if (nonBrowserStandaloneCalls.length > 0) {
+    throw new Error(`Non-/v1 browser-observed standalone platform requests observed: ${nonBrowserStandaloneCalls.join(", ")}`);
+  }
+
+  const nonBackendStandaloneCalls = observedBackendStandaloneApiRequests.filter((request) => !request.includes("/v1/"));
+  if (nonBackendStandaloneCalls.length > 0) {
+    throw new Error(`Non-/v1 backend-handled standalone platform requests observed: ${nonBackendStandaloneCalls.join(", ")}`);
+  }
 }
 
 async function main() {
   const port = await findFreePort();
+  let platformPort = await findFreePort();
+  while (platformPort === port) {
+    platformPort = await findFreePort();
+  }
   const baseUrl = `http://127.0.0.1:${port}`;
-  const server = startNextDevServer(port);
+  const platformBaseUrl = `http://127.0.0.1:${platformPort}`;
+  let platformServer;
+  let server;
 
   try {
+    platformServer = await startMockPlatformBackend(platformPort, baseUrl);
+    server = startNextDevServer(port, platformBaseUrl);
     await waitForServer(`${baseUrl}/admin/platform-smoke`, server);
-    await runBrowserSmoke(baseUrl);
+    await runBrowserSmoke(baseUrl, platformBaseUrl);
     assertSmokeProof();
     console.log("Current frontend admin platform smoke passed.");
-    console.log(`Observed API requests: ${observedApiRequests.join(", ")}`);
+    console.log(`Mock standalone platform origin: ${platformBaseUrl}`);
+    console.log(`Browser-observed standalone /v1 requests: ${observedBrowserStandaloneApiRequests.join(", ")}`);
+    console.log(`Backend-handled standalone /v1 requests: ${observedBackendStandaloneApiRequests.join(", ")}`);
   } finally {
     await stopProcess(server);
+    await stopServer(platformServer);
   }
 }
 
 main().catch((error) => {
   if (
     error instanceof Error &&
-    /Executable doesn't exist|browserType.launch/i.test(error.message)
+    /Executable doesn't exist|browserType.launch|spawn EPERM/i.test(error.message)
   ) {
     console.error(
-      "Playwright Chromium is not installed. Install browsers in CI/bootstrap with: corepack pnpm exec playwright install chromium",
+      "Playwright Chromium is not installed or could not launch in this environment. Install browsers in CI/bootstrap with: corepack pnpm exec playwright install chromium",
     );
   }
   console.error(error);

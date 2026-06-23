@@ -124,6 +124,15 @@ test("consumer repo readiness accepts the current inventory", async () => {
   assert.equal(await pathExists(result.materializedTree.path), false);
 });
 
+test("current inventory includes chat transport wrapper but not full chat UI", async () => {
+  const inventory = await readFrontendConsumerRepoInventory();
+  const sourceAreasByPath = new Map(inventory.sourceAreas.map((sourceArea) => [sourceArea.path, sourceArea]));
+
+  assert.equal(sourceAreasByPath.get("lib/reservation-chat-client.ts")?.classification, "include");
+  assert.equal(sourceAreasByPath.get("components/chat")?.classification, "reference-only");
+  assert.equal(sourceAreasByPath.get("app/chat-booking")?.classification, "reference-only");
+});
+
 test("consumer repo readiness materializes and cleans up the frontend target tree by default", async () => {
   const repoRoot = await createFixtureRepo();
   const result = await verifyFrontendConsumerRepoInventory(inventoryFixture(), packageJsonFixture(), { repoRoot });

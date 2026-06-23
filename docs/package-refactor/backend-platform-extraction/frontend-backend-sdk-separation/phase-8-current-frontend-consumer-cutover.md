@@ -124,12 +124,13 @@ An additional local frontend consumer repository readiness proof now exists:
 The inventory is scoped to reservation platform client/wrapper/proof source,
 not every current app screen and not a complete runnable frontend app slice. It
 classifies the reservation form component closure, the reservation platform
-client, public DTO types, admin reservation data helpers, and the admin
-reservation loader as `include`; backend platform, storage, route, migration,
-and provider areas as `exclude`; and route shells/navigation/admin UI, chat,
-content, analytics, broad admin, landing, and app scaffolding areas as
-`reference-only` until their app-owned API and navigation dependencies are
-separated or intentionally included in a later frontend repo proof. Root
+client, the browser-safe chat transport wrapper, public DTO types, admin
+reservation data helpers, and the admin reservation loader as `include`;
+backend platform, storage, route, migration, and provider areas as `exclude`;
+and route shells/navigation/admin UI, full chat UI, content, analytics, broad
+admin, landing, and app scaffolding areas as `reference-only` until their
+app-owned API and navigation dependencies are separated or intentionally
+included in a later frontend repo proof. Root
 package dependencies are classified as `frontend-runtime`, `frontend-dev`,
 `sdk-consumer`, `backend-only-excluded`, or `current-monorepo-only`. The
 verifier is CI-safe and local-only: it validates inventory shape, listed
@@ -201,6 +202,12 @@ The setting may be an origin such as `https://api.example.test` or may already
 include `/v1`; the resolver keeps either form on a single `/v1` path. Empty or
 non-absolute values preserve the current-app `/api/v1/chat/...` compatibility
 fallback, and local chat mode still uses `/api/chat`.
+
+The frontend consumer repository readiness proof now includes only this
+browser-safe chat transport wrapper and its legacy response mapping. It still
+keeps `app/chat-booking` and `components/chat` as `reference-only` because the
+full chat UI closure has not been proven extractable without current-app shell,
+backend, or provider dependencies.
 
 This is a bounded local unit proof only. It does not prove live provider-backed
 enabled chat, live standalone backend parity, CORS in a deployed browser

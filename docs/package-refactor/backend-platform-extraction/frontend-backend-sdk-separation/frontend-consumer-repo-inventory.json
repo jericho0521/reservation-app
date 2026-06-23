@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "phase": "phase-12-frontend-repo-consumer-proof",
-  "lastUpdated": "2026-06-21",
+  "lastUpdated": "2026-06-23",
   "status": "partial-readiness-only",
   "proofScope": {
     "createdFrontendRepository": false,
@@ -41,7 +41,7 @@
     {
       "path": "app/chat-booking",
       "classification": "reference-only",
-      "notes": "Current chat UI still has local /api/chat compatibility fallback and is not part of this reservation consumer repo proof until optional chat platform cutover is complete."
+      "notes": "Current chat route shell is not part of this reservation consumer repo proof; only the browser-safe chat transport wrapper is included until the full chat UI closure is proven free of current-app shell/backend/provider imports."
     },
     {
       "path": "app/admin",
@@ -136,7 +136,7 @@
     {
       "path": "components/chat",
       "classification": "reference-only",
-      "notes": "Current chat UI remains tied to optional chat compatibility and is not included until chat cutover is proven."
+      "notes": "Full current chat UI remains reference-only until its complete import closure is proven frontend-consumer-safe without current-app shell, backend, or provider dependencies."
     },
     {
       "path": "components/content",
@@ -170,8 +170,8 @@
     },
     {
       "path": "lib/reservation-chat-client.ts",
-      "classification": "reference-only",
-      "notes": "Chat consumer wrapper still keeps local /api/chat compatibility fallback; optional chat separation remains outside this reservation consumer proof."
+      "classification": "include",
+      "notes": "Browser-safe chat transport wrapper and legacy response mapping can live in a consumer frontend now that configured platform chat mode targets standalone /v1/chat paths; full chat UI extraction remains out of scope."
     },
     {
       "path": "lib/admin-auth-client.ts",

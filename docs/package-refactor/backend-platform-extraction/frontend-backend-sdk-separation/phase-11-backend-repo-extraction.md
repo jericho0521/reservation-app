@@ -159,6 +159,14 @@ Implemented artifacts:
   package-graph, readiness, and migration-bundle reconciliation guardrails stay
   as current-repository root scripts instead of being exposed as post-extraction
   backend root scripts.
+- The standalone extraction manifest now also copies
+  `backend-repo-bootstrap.md` and `backend-package-ownership.md` into
+  `docs/backend-platform-extraction/` inside the OS-temp backend candidate.
+  This proves backend repository bootstrap and ownership guidance is
+  materialized with the candidate, while frontend/backend separation planning
+  docs such as
+  `frontend-backend-sdk-separation/frontend-backend-separation-completion-plan/README.md`
+  remain outside the materialized backend tree.
 - This phase file now references the actual manifest and verifier script names
   instead of stale `extraction-manifest.json` and
   `extraction-dry-run-plan.json` inputs.
@@ -210,9 +218,13 @@ validation for `packages:build`, `packages:test`,
 `backend-platform:verify-standalone-api-skeleton`, and the filtered commands
 reached through `phase-11:verify-generated-backend-workspace`, plus
 `database:migration-index:check` and its
-`database-migration-bundle-manifest.json` input; unit coverage also proves the
-same guard catches the standalone extraction manifest default path if an
-extraction verifier command is reintroduced. This is still only a local OS-temp
+`database-migration-bundle-manifest.json` input. The materialized tree now also
+contains backend-owned bootstrap and package ownership docs under
+`docs/backend-platform-extraction/`, and focused unit coverage proves the
+frontend separation completion plan README is not copied into the backend
+candidate. Unit coverage also proves the same guard catches the standalone
+extraction manifest default path if an extraction verifier command is
+reintroduced. This is still only a local OS-temp
 generated metadata proof; it removes the whole temporary tree automatically. It
 does not mutate source files, git-tracked paths, or create a real repository,
 and it does not copy compatibility-shim or excluded entries. For local
@@ -239,7 +251,8 @@ Still not complete:
 - actual extracted-repository install/build/test execution outside the current
   Next.js app workspace; the dry-run now materializes and validates a temporary
   target tree candidate with generated backend-root workspace metadata and
-  candidate-local root-script/package-script coherence only
+  candidate-local root-script/package-script coherence plus backend-owned
+  bootstrap/ownership docs only
 - live deployed `/v1` backend proof
 - disposable database migration/RLS/idempotency proof
 - strict SDK/direct HTTP live parity proof

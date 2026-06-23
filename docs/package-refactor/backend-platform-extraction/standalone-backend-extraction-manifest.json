@@ -157,6 +157,18 @@
       "rationale": "API resources, SDK methods, error conventions, and idempotency conventions define backend platform public contracts."
     },
     {
+      "id": "backend-repository-ownership-docs",
+      "classification": "copy-candidate",
+      "currentPaths": [
+        "docs/package-refactor/backend-platform-extraction/backend-repo-bootstrap.md",
+        "docs/package-refactor/backend-platform-extraction/backend-package-ownership.md"
+      ],
+      "targetBackendPaths": ["docs/backend-platform-extraction"],
+      "ownershipCategory": "operations",
+      "status": "ready-for-extraction-planning",
+      "rationale": "Backend repository bootstrap and backend package ownership docs are backend-owned operational guidance that should be materialized into the standalone backend candidate without copying frontend separation planning docs."
+    },
+    {
       "id": "database-reservation-sql-assets",
       "classification": "compatibility-shim",
       "currentPaths": ["supabase/base-schema.sql", "supabase/reservations-rls.sql", "supabase/create-reservation-atomic.sql", "supabase/security-hardening.sql"],

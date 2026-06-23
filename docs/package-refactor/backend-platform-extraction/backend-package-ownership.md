@@ -18,6 +18,7 @@ only; it does not publish packages or create a separate repository.
 | `packages/contract-types` | `@reservation-platform/contract-types` | `packages/contract-types` | Move candidate; ready for extraction planning | Public contract package candidate | Yes, if exports remain DTO/schema only. | No backend route handlers, storage adapters, service-role auth helpers, or frontend UI. |
 | `packages/sdk` | `@reservation-platform/sdk` | `packages/sdk` | Copy candidate; ready for extraction planning | Public consumer package candidate | Yes, if it stays HTTP-only. | No backend internals, migrations, Supabase clients, LangChain/provider SDKs, React/Next requirements, or route handler imports. |
 | `docs/package-refactor/backend-platform-extraction/contracts` | Contract docs | `contracts` | Copy candidate; ready for extraction planning | Public/reference docs | Yes | No current-app UI or frontend deployment instructions as backend requirements. |
+| `docs/package-refactor/backend-platform-extraction/backend-repo-bootstrap.md` and `docs/package-refactor/backend-platform-extraction/backend-package-ownership.md` | Backend repository ownership docs | `docs/backend-platform-extraction` | Copy candidates; ready for extraction planning | Backend operations/reference docs | No for runtime consumers; yes as backend repository documentation. | No frontend separation planning docs, frontend repo materialization plans, or current-app UI ownership docs. |
 | `scripts/vercel-sandbox-supabase.ts`, `scripts/start-local-supabase.ps1`, `scripts/stop-local-supabase.ps1` | Backend operations helpers | `scripts` | Copy candidates; require generalization | Private backend operations scripts | No | No current frontend deployment assumptions or hard-coded Project Play environment naming. |
 | `app/api/v1`, legacy reservation `app/api/**`, and `app/api/chat` | Current Next.js compatibility routes | `apps/api/src/routes` or `packages/ai-chat` | Compatibility/reference only | Not included as canonical backend source | No | Reimplement behavior through `apps/api` and backend packages. Do not copy route files verbatim. |
 
@@ -61,8 +62,11 @@ corepack pnpm run backend-platform:verify-extracted-workspace-readiness
 These commands are safe locally. The manifest and dry-run checks validate
 manifest shape, source existence,
 target backend paths, frontend exclusions, compatibility-shim treatment, target
-collisions, and generated artifact exclusion. They do not copy files or create
-a backend repository. The package-graph boundary command is also safe locally:
+collisions, and generated artifact exclusion. The dry run materializes a
+disposable OS-temp backend candidate, including the backend bootstrap and
+package ownership docs under `docs/backend-platform-extraction/`, and removes
+it by default. It does not create a permanent backend repository. The
+package-graph boundary command is also safe locally:
 it reads backend-owned package/app `package.json` files, confirms the expected
 Phase 11 manifests exist, rejects frontend-only dependencies in backend
 packages, and keeps `@reservation-platform/sdk` free of backend-only runtime

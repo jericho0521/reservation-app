@@ -44,6 +44,14 @@ const generatedRootVerifierInputManifests = [
   "docs/package-refactor/backend-platform-extraction/database-migration-bundle-manifest.json",
 ];
 
+const backendRepositoryOwnershipDocs = [
+  "docs/package-refactor/backend-platform-extraction/backend-repo-bootstrap.md",
+  "docs/package-refactor/backend-platform-extraction/backend-package-ownership.md",
+];
+
+const frontendSeparationCompletionPlanReadme =
+  "docs/package-refactor/backend-platform-extraction/frontend-backend-sdk-separation/frontend-backend-separation-completion-plan/README.md";
+
 function manifestFixture(entries = defaultEntries()) {
   return {
     schemaVersion: 1,
@@ -109,6 +117,15 @@ function defaultEntries() {
       rationale: "Fixture backend root verifier input manifests for candidate commands.",
     },
     {
+      id: "fixture-backend-repository-ownership-docs",
+      classification: "copy-candidate",
+      currentPaths: backendRepositoryOwnershipDocs,
+      targetBackendPaths: ["docs/backend-platform-extraction"],
+      ownershipCategory: "operations",
+      status: "ready-for-extraction-planning",
+      rationale: "Fixture backend repository bootstrap and ownership docs.",
+    },
+    {
       id: "fixture-shim",
       classification: "compatibility-shim",
       currentPaths: ["packages/shim"],
@@ -170,6 +187,15 @@ async function createFixtureRepo(options = {}) {
   for (const manifestPath of generatedRootVerifierInputManifests) {
     await writeFixtureFile(repoRoot, manifestPath, "{}\n");
   }
+
+  for (const docPath of backendRepositoryOwnershipDocs) {
+    await writeFixtureFile(repoRoot, docPath, `# ${path.basename(docPath)}\n`);
+  }
+  await writeFixtureFile(
+    repoRoot,
+    frontendSeparationCompletionPlanReadme,
+    "# Frontend separation completion plan\n",
+  );
 
   await writeFixtureFile(repoRoot, "package.json", JSON.stringify({
     name: "fixture-current-frontend",
@@ -253,12 +279,24 @@ test("standalone backend dry-run materializes only move/copy candidates and boun
       )),
       true,
     );
+    assert.equal(await pathExists(path.join(
+      result.materializedRoot,
+      "docs/backend-platform-extraction/backend-repo-bootstrap.md",
+    )), true);
+    assert.equal(await pathExists(path.join(
+      result.materializedRoot,
+      "docs/backend-platform-extraction/backend-package-ownership.md",
+    )), true);
 
     assert.equal(await pathExists(path.join(result.materializedRoot, "packages/domain/src/index.js.map")), false);
     assert.equal(await pathExists(path.join(result.materializedRoot, "packages/domain/dist/index.js")), false);
     assert.equal(await pathExists(path.join(result.materializedRoot, "packages/domain/node_modules/ignored/index.js")), false);
     assert.equal(await pathExists(path.join(result.materializedRoot, "packages/domain/shim/package.json")), false);
     assert.equal(await pathExists(path.join(result.materializedRoot, "app/page.tsx")), false);
+    assert.equal(await pathExists(path.join(
+      result.materializedRoot,
+      frontendSeparationCompletionPlanReadme,
+    )), false);
   } finally {
     await rm(result.materializedRoot, { recursive: true, force: true });
     await rm(repoRoot, { recursive: true, force: true });

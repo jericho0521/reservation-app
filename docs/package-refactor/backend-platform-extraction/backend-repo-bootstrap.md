@@ -17,6 +17,9 @@ Use these current-repository inputs:
   `docs/package-refactor/backend-platform-extraction/backend-package-ownership.md`
 - backend contract docs under
   `docs/package-refactor/backend-platform-extraction/contracts`
+- backend repository bootstrap and package ownership docs, materialized into the
+  candidate as `docs/backend-platform-extraction/backend-repo-bootstrap.md` and
+  `docs/backend-platform-extraction/backend-package-ownership.md`
 
 Treat current `app/api/**` route files as reference-only compatibility context.
 They can inform behavior, but they are not canonical backend source for the new
@@ -194,7 +197,8 @@ backend source:
   `dist-packages`, `coverage`, `out`, source maps, and `*.tsbuildinfo`
 
 The extraction manifest and dry-run verifier are the current guardrails for
-these exclusions:
+these exclusions and for materializing backend-owned repository docs without
+bringing frontend separation planning docs into the backend candidate:
 
 ```powershell
 corepack pnpm run backend-platform:verify-extraction-manifest
@@ -203,5 +207,8 @@ corepack pnpm run backend-platform:verify-package-graph-boundary
 corepack pnpm run backend-platform:verify-extracted-workspace-readiness
 ```
 
-These commands are safe to run locally. They are read-only checks over the
-manifest, current file tree, and backend package manifests.
+These commands are safe to run locally. The manifest, package-graph, and
+extracted-workspace checks are read-only. The dry-run command copies planned
+move/copy candidates into a disposable OS-temp backend candidate, validates it,
+and removes it by default; it does not create a permanent repository, install
+dependencies, publish packages, deploy a service, or call live infrastructure.

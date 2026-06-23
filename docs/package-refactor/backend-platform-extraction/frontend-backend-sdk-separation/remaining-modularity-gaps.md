@@ -50,6 +50,18 @@ actually separable products rather than modular packages inside this monorepo.
 | Coordinate subagents around the repo-first plug-and-play outcome. | [Phase 29 Subagent Execution Matrix](phase-29-subagent-execution-matrix.md) | Planned. This phase defines worker focus, spec review gates, quality review gates, and downstream update rules for Phases 25 through 28 so subagents preserve the backend-as-product, SDK-as-install-surface, frontend-as-consumer model. |
 | Prove migrations, row-level security, and tenant isolation in a disposable backend. | [Phase 6 Proof and Removal Gate Results](phase-6-external-frontend-proof-removal-gate-results.md) | Explicitly documented as required live proof. The package-owned migration bundle now includes concrete verified assets for extensions, tenant/auth compatibility, catalog schema, resource schema, booking schema, resource-maintenance schema/RPC, availability-rule schema, atomic reservation RPC, RLS policies, core security hardening, durable idempotency SQL, a generated ordered checksum index that separates core, optional AI retrieval, and development seed inputs, package-local DB-client-neutral helpers/contracts for selecting deterministic migration plans from that index, and a CI-safe live migration harness. `corepack pnpm run database:live-proof` validates disposable DB env and safely skips when unconfigured; `database:live-proof:strict` / `RESERVATION_DATABASE_LIVE_STRICT=1` fails on missing/malformed env or unavailable `psql`, and applies the package-owned plan when fully configured. This is readiness only. A real disposable database run, seeded proof, RLS behavior assertions, tenant isolation assertions, live atomic reservation behavior, and live durable idempotency remain incomplete in this branch. |
 
+## Phase 11 Backend Candidate Doc Materialization Note
+
+The Phase 11 backend repository extraction gap now includes a bounded OS-temp
+dry-run proof that `backend-repo-bootstrap.md` and
+`backend-package-ownership.md` are copied into
+`docs/backend-platform-extraction/` in the backend candidate. Focused unit
+coverage also proves frontend separation planning docs, especially
+`frontend-backend-sdk-separation/frontend-backend-separation-completion-plan/README.md`,
+are not materialized. This is still not a permanent backend repo, install,
+publish, deploy, live infrastructure proof, or extracted-repository build/test
+outside the current workspace.
+
 ## Subagent Handoff Rule
 
 When assigning a subagent a remaining gap, give it this index plus the owning

@@ -39,6 +39,8 @@ function passingLocalPrerequisiteVerifiers() {
   return {
     currentFrontendConsumerRepoReadiness: async () => ({ ok: true, failures: [] }),
     compatibilityRouteRemovalGate: async () => ({ ok: true, failures: [] }),
+    backendExtractionDryRunReadiness: async () => ({ ok: true, failures: [] }),
+    extractedBackendWorkspaceReadiness: async () => ({ ok: true, failures: [] }),
   };
 }
 
@@ -49,6 +51,10 @@ test("live platform proof readiness includes passing local prerequisite surfaces
   assert.equal(byId(parsed, "current_frontend_consumer_repo_readiness").strict.status, "ready");
   assert.equal(byId(parsed, "compatibility_route_removal_gate").safe.status, "ready");
   assert.equal(byId(parsed, "compatibility_route_removal_gate").strict.status, "ready");
+  assert.equal(byId(parsed, "backend_extraction_dry_run_readiness").safe.status, "ready");
+  assert.equal(byId(parsed, "backend_extraction_dry_run_readiness").strict.status, "ready");
+  assert.equal(byId(parsed, "extracted_backend_workspace_readiness").safe.status, "ready");
+  assert.equal(byId(parsed, "extracted_backend_workspace_readiness").strict.status, "ready");
 });
 
 test("live platform proof readiness safely skips live proof env surfaces when env is absent", async () => {
@@ -61,9 +67,11 @@ test("live platform proof readiness safely skips live proof env surfaces when en
   assert.equal(parsed.status, "skip");
   assert.equal(parsed.shouldFail, false);
   assert.equal(parsed.strictReady, false);
-  assert.equal(parsed.surfaces.length, 6);
+  assert.equal(parsed.surfaces.length, 8);
   assert.equal(byId(parsed, "current_frontend_consumer_repo_readiness").safe.status, "ready");
   assert.equal(byId(parsed, "compatibility_route_removal_gate").safe.status, "ready");
+  assert.equal(byId(parsed, "backend_extraction_dry_run_readiness").safe.status, "ready");
+  assert.equal(byId(parsed, "extracted_backend_workspace_readiness").safe.status, "ready");
   assert.equal(byId(parsed, "standalone_api_deployment_config").safe.status, "skip");
   assert.equal(byId(parsed, "database_live_migration_proof").safe.status, "skip");
   assert.equal(byId(parsed, "sdk_direct_live_parity").safe.status, "skip");
@@ -107,6 +115,14 @@ test("live platform proof readiness includes local prerequisite failures in stri
         ok: false,
         failures: ["compatibility route inventory drifted"],
       }),
+      backendExtractionDryRunReadiness: async () => ({
+        ok: false,
+        failures: ["backend extraction dry-run drifted"],
+      }),
+      extractedBackendWorkspaceReadiness: async () => ({
+        ok: false,
+        failures: ["extracted backend workspace model drifted"],
+      }),
     },
   });
 
@@ -119,6 +135,8 @@ test("live platform proof readiness includes local prerequisite failures in stri
     [
       "current_frontend_consumer_repo_readiness",
       "compatibility_route_removal_gate",
+      "backend_extraction_dry_run_readiness",
+      "extracted_backend_workspace_readiness",
     ],
   );
   assert.match(
@@ -128,6 +146,14 @@ test("live platform proof readiness includes local prerequisite failures in stri
   assert.match(
     byId(parsed, "compatibility_route_removal_gate").strict.message,
     /compatibility route inventory drifted/,
+  );
+  assert.match(
+    byId(parsed, "backend_extraction_dry_run_readiness").strict.message,
+    /backend extraction dry-run drifted/,
+  );
+  assert.match(
+    byId(parsed, "extracted_backend_workspace_readiness").strict.message,
+    /extracted backend workspace model drifted/,
   );
 });
 

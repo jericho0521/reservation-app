@@ -5,8 +5,10 @@ import { pathToFileURL } from "node:url";
 import { verifyCompatibilityRouteRemovalGate } from "./verify-compatibility-route-removal-gate.mjs";
 import { verifyCurrentFrontendConsumerRepoReadiness } from "./verify-current-frontend-consumer-repo-readiness.mjs";
 import { readLiveDatabaseConfig } from "./verify-database-live-proof.mjs";
+import { verifyExtractedBackendWorkspaceReadiness } from "./verify-extracted-backend-workspace-readiness.mjs";
 import { readLiveBackendParityConfig } from "./verify-live-backend-parity.mjs";
 import { readSdkRegistryInstallConfig } from "./verify-sdk-registry-install.mjs";
+import { verifyStandaloneBackendExtractionDryRun } from "./verify-standalone-backend-extraction-dry-run.mjs";
 import {
   readStandaloneApiDeploymentConfig,
   standaloneApiDeploymentStrictEnvName,
@@ -69,6 +71,22 @@ const localPrerequisiteSurfaces = [
     strictCommand: "corepack pnpm run backend-platform:verify-compatibility-route-removal-gate",
     verifierName: "compatibilityRouteRemovalGate",
     verify: verifyCompatibilityRouteRemovalGate,
+  },
+  {
+    id: "backend_extraction_dry_run_readiness",
+    label: "Backend extraction dry-run readiness",
+    safeCommand: "corepack pnpm run backend-platform:verify-extraction-dry-run",
+    strictCommand: "corepack pnpm run backend-platform:verify-extraction-dry-run",
+    verifierName: "backendExtractionDryRunReadiness",
+    verify: verifyStandaloneBackendExtractionDryRun,
+  },
+  {
+    id: "extracted_backend_workspace_readiness",
+    label: "Extracted backend workspace readiness",
+    safeCommand: "corepack pnpm run backend-platform:verify-extracted-workspace-readiness",
+    strictCommand: "corepack pnpm run backend-platform:verify-extracted-workspace-readiness",
+    verifierName: "extractedBackendWorkspaceReadiness",
+    verify: verifyExtractedBackendWorkspaceReadiness,
   },
 ];
 

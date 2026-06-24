@@ -87,11 +87,15 @@ The local prerequisite gates are:
 
 - `corepack pnpm run current-frontend:consumer-repo-readiness`
 - `corepack pnpm run backend-platform:verify-compatibility-route-removal-gate`
+- `corepack pnpm run backend-platform:verify-extraction-dry-run`
+- `corepack pnpm run backend-platform:verify-extracted-workspace-readiness`
 
 These prerequisite surfaces are local-only checks. They validate current
-frontend consumer repository readiness and compatibility route removal gate
-readiness before Phase 10 reports strict live-proof readiness. They do not
-create a frontend repository, delete compatibility routes, install packages,
+frontend consumer repository readiness, compatibility route removal gate
+readiness, backend extraction dry-run readiness, and extracted backend
+workspace readiness before Phase 10 reports strict live-proof readiness. They
+do not create a frontend or backend repository, run extracted-repository
+install/build/test commands, delete compatibility routes, install packages,
 publish packages, deploy a backend, open a browser, call a live backend, or
 mutate live data.
 
@@ -122,6 +126,8 @@ strict proof commands are configured enough to run:
 
 - `corepack pnpm run current-frontend:consumer-repo-readiness`
 - `corepack pnpm run backend-platform:verify-compatibility-route-removal-gate`
+- `corepack pnpm run backend-platform:verify-extraction-dry-run`
+- `corepack pnpm run backend-platform:verify-extracted-workspace-readiness`
 - `corepack pnpm run backend-platform:verify-standalone-deployment-config:strict`
 - `corepack pnpm run database:live-proof:strict`
 - `corepack pnpm run sdk:live-parity:strict`
@@ -146,13 +152,14 @@ environment contract and local separation prerequisites can be checked locally
 and in CI without touching live systems. It does not prove deployed backend
 health, disposable database migration application, RLS/tenant isolation, durable
 idempotency, SDK/direct parity, registry package install, enabled provider chat
-behavior or provider configuration, route deletion, frontend repository
-creation, or package publishing until the strict commands themselves pass
-against disposable live infrastructure and the later removal/repository phases
-explicitly perform their own actions. Disabled-chat live parity is now part of
-the strict SDK/direct live parity command when the explicit disabled mode is
-configured, but it is not complete proof until that strict command passes
-against the disposable live backend.
+behavior or provider configuration, route deletion, frontend or backend
+repository creation, extracted-repository install/build/test execution, or
+package publishing until the strict commands themselves pass against disposable
+live infrastructure and the later removal/repository phases explicitly perform
+their own actions. Disabled-chat live parity is now part of the strict
+SDK/direct live parity command when the explicit disabled mode is configured,
+but it is not complete proof until that strict command passes against the
+disposable live backend.
 
 ## Acceptance Criteria
 

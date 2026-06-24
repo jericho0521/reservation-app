@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { access, cp, mkdir, mkdtemp, readdir, readFile, rm, stat } from "node:fs/promises";
+import { access, cp, mkdir, mkdtemp, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
@@ -28,6 +28,15 @@ const frontendDependencyClassifications = new Set([
   "frontend-runtime",
   "frontend-dev",
   "sdk-consumer",
+]);
+const generatedFrontendDependencySectionByClassification = new Map([
+  ["frontend-runtime", "dependencies"],
+  ["sdk-consumer", "dependencies"],
+  ["frontend-dev", "devDependencies"],
+]);
+const excludedDependencyClassifications = new Set([
+  "backend-only-excluded",
+  "current-monorepo-only",
 ]);
 
 const backendOnlyDependencyNames = new Set([
@@ -139,7 +148,8 @@ export async function verifyFrontendConsumerRepoInventory(inventory, packageJson
   await validateSourceAreas(inventory.sourceAreas, repoRoot, failures);
   await validateIncludedImportClosure(inventory.sourceAreas, repoRoot, failures);
   const materializedTree = await validateMaterializedFrontendConsumerTargetTree(
-    inventory.sourceAreas,
+    inventory,
+    packageJson,
     repoRoot,
     materializationOptions,
     failures,
@@ -335,7 +345,7 @@ async function collectIncludeRoots(sourceAreas, repoRoot) {
   return includeRoots;
 }
 
-async function validateMaterializedFrontendConsumerTargetTree(sourceAreas, repoRoot, options, failures) {
+async function validateMaterializedFrontendConsumerTargetTree(inventory, packageJson, repoRoot, options, failures) {
   const materializedTree = {
     created: false,
     path: null,
@@ -362,12 +372,23 @@ async function validateMaterializedFrontendConsumerTargetTree(sourceAreas, repoR
 
     await mkdir(materializedRoot, { recursive: true });
 
-    const includeTargets = await collectMaterializedIncludeTargets(sourceAreas, repoRoot);
+    const candidatePackageJson = generateFrontendConsumerPackageJson(
+      inventory.dependencies,
+      packageJson,
+      failures,
+    );
+    await writeFile(
+      path.join(materializedRoot, "package.json"),
+      `${JSON.stringify(candidatePackageJson, null, 2)}\n`,
+    );
+
+    const includeTargets = await collectMaterializedIncludeTargets(inventory.sourceAreas, repoRoot);
     for (const includeTarget of includeTargets) {
       await copyIncludeTarget(includeTarget, repoRoot, materializedRoot);
     }
 
     await validateMaterializedAllowedPaths(materializedRoot, includeTargets, failures);
+    validateMaterializedPackageJson(candidatePackageJson, inventory.dependencies, failures);
     await validateMaterializedImportClosure(materializedRoot, failures);
 
     return materializedTree;
@@ -427,6 +448,69 @@ async function copyIncludeTarget(includeTarget, repoRoot, materializedRoot) {
       return isPathInsideRepo(repoRoot, sourcePath) && !isGeneratedArtifactPath(normalizedPath);
     },
   });
+}
+
+function generateFrontendConsumerPackageJson(dependencies, rootPackageJson, failures) {
+  const candidatePackageJson = {
+    name: "reservation-frontend-consumer-candidate",
+    private: true,
+    dependencies: {},
+    devDependencies: {},
+  };
+
+  for (const dependency of dependencies) {
+    const generatedSection = generatedFrontendDependencySectionByClassification.get(dependency?.classification);
+    if (!generatedSection || !isNonBlankString(dependency?.name)) {
+      continue;
+    }
+
+    const sourceSection = dependency.section;
+    const version = rootPackageJson[sourceSection]?.[dependency.name];
+    if (!isNonBlankString(version)) {
+      failures.push(
+        `${getDependencyLabel(dependency, 0)}: cannot generate frontend consumer package.json entry because root package.json ${sourceSection} version is missing.`,
+      );
+      continue;
+    }
+
+    candidatePackageJson[generatedSection][dependency.name] = version;
+  }
+
+  return candidatePackageJson;
+}
+
+function validateMaterializedPackageJson(candidatePackageJson, inventoryDependencies, failures) {
+  if (
+    candidatePackageJson.name !== "reservation-frontend-consumer-candidate" ||
+    candidatePackageJson.private !== true
+  ) {
+    failures.push("Generated frontend consumer package.json must be private candidate metadata.");
+  }
+
+  const generatedDependencies = {
+    ...candidatePackageJson.dependencies,
+    ...candidatePackageJson.devDependencies,
+  };
+
+  for (const dependencyName of Object.keys(generatedDependencies).sort()) {
+    if (isBackendOnlyDependency(dependencyName)) {
+      failures.push(
+        `${dependencyName}: generated frontend consumer package.json must not include backend-only dependency names or prefixes.`,
+      );
+    }
+  }
+
+  for (const dependency of inventoryDependencies) {
+    if (!isNonBlankString(dependency?.name) || !excludedDependencyClassifications.has(dependency.classification)) {
+      continue;
+    }
+
+    if (Object.hasOwn(generatedDependencies, dependency.name)) {
+      failures.push(
+        `${dependency.name}: generated frontend consumer package.json must exclude ${dependency.classification} inventory dependencies.`,
+      );
+    }
+  }
 }
 
 async function validateMaterializedAllowedPaths(materializedRoot, includeTargets, failures) {
@@ -681,6 +765,10 @@ function isForbiddenMaterializedPath(normalizedPath) {
 }
 
 function isAllowedMaterializedPath(normalizedPath, includeTargets) {
+  if (normalizedPath === "package.json") {
+    return true;
+  }
+
   return includeTargets.some((includeTarget) => {
     if (normalizedPath === includeTarget.repoPath) {
       return true;

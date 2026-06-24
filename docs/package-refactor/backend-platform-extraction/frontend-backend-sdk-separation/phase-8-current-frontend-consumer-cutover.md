@@ -148,20 +148,26 @@ commands to remain prerequisite checks:
 
 The same safe verifier now also materializes a temporary frontend consumer
 target-tree candidate in the OS temp directory from `include` source areas
-only. It excludes generated/install/cache artifacts such as `node_modules`,
-`.next`, `dist`, `coverage`, source maps, and TypeScript build info, validates
-that the copied tree contains only allowed frontend-consumer paths, blocks
-backend/current-app server paths such as `app/api`, `apps`, `packages`,
-`lib/langchain`, `lib/reservations`, `lib/supabase-admin.ts`, `supabase`, and
-`dist-packages`, and rechecks local import closure with `@/` imports remapped
-inside the materialized tree. The temp tree is removed by default; setting
-`CURRENT_FRONTEND_CONSUMER_KEEP_MATERIALIZED_TREE=1` keeps the OS-temp copy for
-debugging without accepting a custom output path.
+only. It writes a generated root `package.json` in that OS-temp candidate with
+private package metadata, frontend-runtime and SDK-consumer dependencies copied
+from the current root package metadata into `dependencies`, and frontend-dev
+dependencies copied into `devDependencies`. The verifier rejects generated
+metadata if backend-only dependency names/prefixes or inventory entries marked
+`backend-only-excluded` or `current-monorepo-only` appear. It excludes
+generated/install/cache artifacts such as `node_modules`, `.next`, `dist`,
+`coverage`, source maps, and TypeScript build info, validates that the copied
+tree contains only allowed frontend-consumer paths plus the generated root
+metadata, blocks backend/current-app server paths such as `app/api`, `apps`,
+`packages`, `lib/langchain`, `lib/reservations`, `lib/supabase-admin.ts`,
+`supabase`, and `dist-packages`, and rechecks local import closure with `@/`
+imports remapped inside the materialized tree. The temp tree is removed by
+default; setting `CURRENT_FRONTEND_CONSUMER_KEEP_MATERIALIZED_TREE=1` keeps the
+OS-temp copy for debugging without accepting a custom output path.
 
-This is still temporary target-tree readiness only. It does not create a new
-frontend repository, delete compatibility routes, install or publish packages,
-make network calls, run browser checks, or prove a complete standalone
-frontend app build/run from a separated repo.
+This is still temporary target-tree and local metadata readiness only. It does
+not create a new frontend repository, delete compatibility routes, install or
+publish packages, make network calls, run browser checks, or prove a complete
+standalone frontend app build/run from a separated repo.
 
 The form-booking browser smoke now provides a bounded local external-origin
 proof for the current frontend. `current-frontend:platform-smoke` starts a

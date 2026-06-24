@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { access, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { access, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -17,7 +17,9 @@ function packageJsonFixture(overrides = {}) {
     dependencies: {
       next: "1.0.0",
       react: "1.0.0",
+      "@ai-sdk/react": "1.0.0",
       "@reservation-platform/api": "workspace:*",
+      "@reservation-platform/sdk": "workspace:*",
     },
     devDependencies: {
       typescript: "1.0.0",
@@ -73,6 +75,18 @@ function inventoryFixture(overrides = {}) {
         notes: "Backend package.",
       },
       {
+        name: "@reservation-platform/sdk",
+        section: "dependencies",
+        classification: "sdk-consumer",
+        notes: "Frontend SDK.",
+      },
+      {
+        name: "@ai-sdk/react",
+        section: "dependencies",
+        classification: "current-monorepo-only",
+        notes: "Current monorepo package.",
+      },
+      {
         name: "typescript",
         section: "devDependencies",
         classification: "frontend-dev",
@@ -106,6 +120,10 @@ async function pathExists(absolutePath) {
   } catch {
     return false;
   }
+}
+
+async function readMaterializedPackageJson(materializedTreePath) {
+  return JSON.parse(await readFile(path.join(materializedTreePath, "package.json"), "utf8"));
 }
 
 test("consumer repo readiness accepts the current inventory", async () => {
@@ -157,8 +175,40 @@ test("consumer repo readiness can keep a bounded OS-temp materialized tree for d
     assert.equal(result.materializedTree.kept, true);
     assert.equal(result.materializedTree.cleanedUp, false);
     assert.equal(await pathExists(result.materializedTree.path), true);
+    assert.equal(await pathExists(path.join(result.materializedTree.path, "package.json")), true);
     assert.ok(path.resolve(result.materializedTree.path).startsWith(path.resolve(tmpdir())));
     assert.equal(path.relative(repoRoot, result.materializedTree.path).startsWith(".."), true);
+  } finally {
+    await rm(path.dirname(result.materializedTree.path), { recursive: true, force: true });
+  }
+});
+
+test("consumer repo readiness generates frontend-only package metadata in the materialized tree", async () => {
+  const repoRoot = await createFixtureRepo();
+  const result = await verifyFrontendConsumerRepoInventory(
+    inventoryFixture(),
+    packageJsonFixture(),
+    { repoRoot, keepMaterializedTree: true },
+  );
+
+  try {
+    assert.equal(result.ok, true);
+
+    const materializedPackageJson = await readMaterializedPackageJson(result.materializedTree.path);
+    assert.equal(materializedPackageJson.name, "reservation-frontend-consumer-candidate");
+    assert.equal(materializedPackageJson.private, true);
+    assert.deepEqual(materializedPackageJson.dependencies, {
+      next: "1.0.0",
+      react: "1.0.0",
+      "@reservation-platform/sdk": "workspace:*",
+    });
+    assert.deepEqual(materializedPackageJson.devDependencies, {
+      typescript: "1.0.0",
+    });
+    assert.equal(Object.hasOwn(materializedPackageJson.dependencies, "@reservation-platform/api"), false);
+    assert.equal(Object.hasOwn(materializedPackageJson.dependencies, "@ai-sdk/react"), false);
+    assert.equal(Object.hasOwn(materializedPackageJson.devDependencies, "@reservation-platform/api"), false);
+    assert.equal(Object.hasOwn(materializedPackageJson.devDependencies, "@ai-sdk/react"), false);
   } finally {
     await rm(path.dirname(result.materializedTree.path), { recursive: true, force: true });
   }
@@ -292,7 +342,9 @@ test("consumer repo readiness rejects backend-only dependencies marked as fronte
   const result = await verifyFrontendConsumerRepoInventory(inventory, packageJsonFixture(), { repoRoot });
 
   assert.equal(result.ok, false);
-  assert.match(result.failures.join("\n"), /backend-only dependency must not be classified/);
+  const failures = result.failures.join("\n");
+  assert.match(failures, /backend-only dependency must not be classified/);
+  assert.match(failures, /generated frontend consumer package\.json must not include backend-only dependency/);
 });
 
 test("consumer repo readiness rejects backend paths marked as include", async () => {

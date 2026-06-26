@@ -113,6 +113,7 @@ flowchart LR
 - [Current Frontend and Backend Separation Plan](current-frontend-backend-separation-plan/README.md)
 - [Backend Platform Product Completion Plan](backend-platform-product-completion-plan/README.md)
 - [Current Hard Separation Completion Plan](current-hard-separation-completion-plan/README.md)
+- [Final Product Separation Plan](final-product-separation-plan/README.md)
 
 ## Separation Rules
 
@@ -250,3 +251,10 @@ yet?" It starts from the current partially separated branch and assigns the
 remaining work to baseline lock, backend product boundary closure, SDK install
 contract closure, current frontend consumer detachment, external live adoption
 proof, and compatibility cleanup/release decisions.
+
+The final product separation plan is the current subagent handoff pack for
+turning the modular branch into the intended product model: backend platform
+repository as product, SDK as installable contract, frontend apps as replaceable
+consumers, and AI chat/LangChain workflows behind backend-owned service
+contracts. Use it when assigning the remaining hard-separation work after the
+latest strict proof results.

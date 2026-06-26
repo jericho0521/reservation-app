@@ -46,3 +46,33 @@ This fixture is not a replacement for a separate Next.js consumer, live backend
 parity, direct HTTP parity against a seeded backend, optional chat proof, or CI
 wiring. It is the local-tarball Vite/React browser build proof required by the
 external SDK readiness plan.
+
+## DB-backed External Browser Proof
+
+The fixture can also run as a materialized external frontend against the
+standalone DB-backed `/v1` backend:
+
+```powershell
+corepack pnpm run packages:pack
+corepack pnpm run sdk:smoke:vite:db-backed:strict
+```
+
+The strict command requires the same disposable database environment as the
+DB-backed standalone proof, for example
+`RESERVATION_DATABASE_LIVE_URL` and
+`RESERVATION_DATABASE_LIVE_DOCKER_CONTAINER`. Without that environment, the
+safe default command below checks the env contract and skips without installing
+packages, touching a database, starting a backend, or launching a browser:
+
+```powershell
+corepack pnpm run sdk:smoke:vite:db-backed
+```
+
+In strict mode, the proof copies this fixture to an OS temp directory outside
+the repository, stages the packed SDK and contract tarballs under `artifacts/`,
+generates a lockfile, installs with lifecycle scripts disabled, typechecks,
+builds with Vite, starts a DB-backed standalone `/v1` backend, starts Vite from
+the temp root, and drives the browser through metadata, catalog, availability,
+reservation create, and reservation read calls. It fails if the browser uses
+current-app `/api` routes or any local fallback instead of the standalone
+backend origin.

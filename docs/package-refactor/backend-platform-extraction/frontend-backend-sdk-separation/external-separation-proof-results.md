@@ -404,6 +404,60 @@ Scope:
   ownership, browser smoke from a fully materialized frontend repository
   outside the current workspace, or compatibility route cleanup/deprecation.
 
+## 2026-06-27 External Vite Frontend DB-backed Browser Smoke
+
+Disposable database:
+
+- Docker container: `reservation-proof-postgres-d8b0-external-vite-rerun`
+- Database URL:
+  `postgresql://postgres:postgres@localhost:5432/reservation_proof`
+- The disposable container was removed after proof completion.
+
+Materialized frontend root:
+
+- `C:\Users\User\AppData\Local\Temp\reservation-external-vite-proof-TRIBcy\vite-consumer`
+- The proof copied `examples/sdk-vite-react-smoke` into the temp root outside
+  the repository, excluded workspace/generated files, staged packed SDK and
+  contract tarballs under `artifacts/`, and rewrote the temp package metadata
+  to install from those staged artifacts.
+
+Command:
+
+- `RESERVATION_DATABASE_LIVE_URL=postgresql://postgres:postgres@localhost:5432/reservation_proof`
+  `RESERVATION_DATABASE_LIVE_DOCKER_CONTAINER=reservation-proof-postgres-d8b0-external-vite-rerun`
+  `corepack pnpm run sdk:smoke:vite:db-backed:strict`
+
+Result:
+
+- Passed.
+- The proof generated a lockfile in the external Vite root, installed
+  dependencies with lifecycle scripts disabled, ran `tsc --noEmit`, ran
+  `vite build`, applied backend-owned migrations, verified disposable
+  database RLS/admin/idempotency behavior, seeded the external Vite proof
+  venue/service/resource data, started a standalone DB-backed `/v1` backend
+  with CORS restricted to the Vite origin, started Vite from the materialized
+  external root, and drove the browser through the SDK smoke UI.
+- Browser-observed standalone calls were `GET /v1/metadata`, `GET /v1/venues`,
+  `GET /v1/services?venue_id=external-vite-proof-venue`,
+  `GET /v1/resources?service_id=10000000-0000-4000-8000-000000000101`,
+  `GET /v1/availability?service_id=10000000-0000-4000-8000-000000000101&date=2030-01-03&quantity=1`,
+  `POST /v1/reservations`, and
+  `GET /v1/reservations/a2b9c9d5-9a18-4a3b-a599-f56400945726`.
+- The proof failed on current-frontend `/api` usage, local `/v1` fallback,
+  standalone-backend `/api` usage, missing required `/v1` calls, failed browser
+  requests, or non-2xx standalone `/v1` responses.
+
+Scope:
+
+- This closes the materialized external Vite frontend browser smoke against a
+  DB-backed standalone backend on a separate origin.
+- It proves the SDK can drive a browser frontend that starts outside the repo
+  from packed artifacts and uses standalone `/v1` only for the covered
+  metadata, catalog, availability, create, and read flow.
+- It does not prove a hosted backend deployment, public/private registry
+  publishing, the full current frontend repo split, optional chat browser flow,
+  or compatibility route cleanup/deprecation.
+
 ## Remaining External Proof
 
 Strict readiness checks run without live configuration:
@@ -437,9 +491,11 @@ Still not complete:
 
 - real hosted standalone backend deployment beyond the committed local/CI
   deployment manifest contract;
-- fully materialized external-frontend browser smoke against the DB-backed
-  standalone backend, if the release gate requires proof beyond the current
-  frontend public booking and admin browser flows;
 - public/private registry install proof, if the release path requires one
   beyond disposable registry proof;
+- full current-frontend repository extraction and browser proof, if the release
+  gate requires proof beyond the materialized Vite SDK consumer and current
+  frontend public/admin platform smokes;
+- optional chat browser flow from an external frontend, if chat is part of the
+  release gate;
 - compatibility route removal or deprecation based on the full evidence chain.

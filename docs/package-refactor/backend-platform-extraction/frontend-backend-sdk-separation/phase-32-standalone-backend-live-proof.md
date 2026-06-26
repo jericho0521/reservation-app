@@ -106,9 +106,9 @@ Still open:
 - The production standalone runtime still expects Supabase HTTP client
   configuration; the direct PostgreSQL adapter currently lives in the proof
   harness, not in the deployable backend runtime.
-- Fully materialized external-frontend browser smoke and compatibility cleanup
-  still depend on the full release proof chain, not only backend route parity,
-  CORS readiness, and current-frontend public/admin browser smoke.
+- Compatibility cleanup still depends on the full release proof chain, not only
+  backend route parity, CORS readiness, current-frontend public/admin browser
+  smoke, and the materialized external Vite SDK consumer smoke.
 
 ## Subagent Handoff Notes
 

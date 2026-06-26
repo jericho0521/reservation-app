@@ -99,6 +99,39 @@ flowchart TD
 - Compatibility route removal decisions are updated from evidence, not
   assumption.
 
+## 2026-06-27 Result
+
+Status: partially passed. The external Vite SDK consumer proof now runs from a
+materialized temp root outside this repository against a DB-backed standalone
+`/v1` backend. Hosted deployment, optional chat browser proof, full current
+frontend repo extraction proof, and compatibility cleanup remain open.
+
+Evidence:
+
+- `corepack pnpm run sdk:smoke:vite:db-backed:strict` passed with a disposable
+  Docker Postgres database and standalone DB-backed backend.
+- The proof copied `examples/sdk-vite-react-smoke` to an OS temp directory,
+  staged packed SDK and contract tarballs, generated an external lockfile,
+  installed with lifecycle scripts disabled, ran typecheck, and ran `vite
+  build`.
+- The browser flow called standalone `/v1/metadata`, `/v1/venues`,
+  `/v1/services`, `/v1/resources`, `/v1/availability`, `POST
+  /v1/reservations`, and `GET /v1/reservations/{id}` from a separate Vite
+  origin.
+- The proof fails on current frontend `/api` fallback, backend `/api` fallback,
+  local `/v1` fallback, missing required `/v1` calls, failed browser requests,
+  or non-2xx backend responses.
+
+Still open:
+
+- Hosted standalone backend deployment.
+- Full current frontend repository extraction and browser proof, if required
+  beyond the current frontend public/admin platform smokes.
+- Optional chat browser proof from an external frontend, if chat is in scope
+  for release.
+- Compatibility route remove/deprecate/retain decisions from the full evidence
+  chain.
+
 ## Subagent Handoff Notes
 
 Give the worker this file plus Phases 10, 24, 25, 26, and 27. The worker must

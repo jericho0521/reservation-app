@@ -112,6 +112,7 @@ flowchart LR
 - [Backend Product and Frontend Consumer Plan](backend-product-frontend-consumer-plan/README.md)
 - [Current Frontend and Backend Separation Plan](current-frontend-backend-separation-plan/README.md)
 - [Backend Platform Product Completion Plan](backend-platform-product-completion-plan/README.md)
+- [Current Hard Separation Completion Plan](current-hard-separation-completion-plan/README.md)
 
 ## Separation Rules
 
@@ -242,3 +243,10 @@ SDK as installable contract, and frontend as replaceable consumer. Use it when
 subagents need a phase-by-phase plan that starts from the latest proof status
 and continues through deployable backend runtime, SDK install, frontend
 detachment, external adoption proof, and compatibility cleanup.
+
+The current hard separation completion plan is the latest focused execution
+pack for the question "are the frontend and backend modules actually separated
+yet?" It starts from the current partially separated branch and assigns the
+remaining work to baseline lock, backend product boundary closure, SDK install
+contract closure, current frontend consumer detachment, external live adoption
+proof, and compatibility cleanup/release decisions.

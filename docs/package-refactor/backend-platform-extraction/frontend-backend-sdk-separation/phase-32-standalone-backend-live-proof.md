@@ -94,6 +94,11 @@ Evidence:
   disposable Postgres container, proving the standalone DB-backed backend can
   serve the current frontend public booking browser flow from a separate origin
   through `/v1/services`, `/v1/availability`, and `/v1/reservations`.
+- `current-frontend:db-backed-admin-platform-smoke:strict` passed against a
+  disposable Postgres container, proving the standalone DB-backed backend can
+  serve the current frontend admin reservation and resource-maintenance browser
+  flows from a separate origin through `/v1/reservations`, `/v1/services`, and
+  `/v1/resource-maintenance` without current-app `/api` fallback.
 
 Still open:
 
@@ -101,10 +106,9 @@ Still open:
 - The production standalone runtime still expects Supabase HTTP client
   configuration; the direct PostgreSQL adapter currently lives in the proof
   harness, not in the deployable backend runtime.
-- Admin DB-backed browser smoke, fully materialized external-frontend browser
-  smoke, and compatibility cleanup still depend on the full release proof
-  chain, not only backend route parity, CORS readiness, and current-frontend
-  public booking smoke.
+- Fully materialized external-frontend browser smoke and compatibility cleanup
+  still depend on the full release proof chain, not only backend route parity,
+  CORS readiness, and current-frontend public/admin browser smoke.
 
 ## Subagent Handoff Notes
 

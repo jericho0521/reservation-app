@@ -377,7 +377,7 @@ function normalizeBooking(row) {
 }
 
 export function createDbBackedRepositories(client) {
-  const getServiceRow = async (id) => client.json(selectJsonObjectSql(`
+  const serviceRowSelection = `
 select
   services.*,
   (
@@ -409,6 +409,9 @@ select
     limit 1
   ) as layout
 from public.services services
+`;
+  const getServiceRow = async (id) => client.json(selectJsonObjectSql(`
+${serviceRowSelection}
 where services.id = ${sqlUuid(id)}
 limit 1
 `));
@@ -434,7 +437,7 @@ left join public.services services on services.id = bookings.service_id
     catalogRepository: {
       listVenues: async () => ({ data: await client.json(selectJsonArraySql("select * from public.venues order by name")), error: null }),
       getVenue: async (id) => ({ data: await client.json(selectJsonObjectSql(`select * from public.venues where id = ${sqlUuid(id)} limit 1`)), error: null }),
-      listServices: async () => ({ data: await client.json(selectJsonArraySql("select * from public.services order by name")), error: null }),
+      listServices: async () => ({ data: await client.json(selectJsonArraySql(`${serviceRowSelection} order by services.name`)), error: null }),
       getService: async (id) => ({ data: await getServiceRow(id), error: null }),
       listResources: async (input = {}) => ({
         data: await client.json(selectJsonArraySql(`

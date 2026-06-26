@@ -295,6 +295,27 @@ mock platform smoke but still covers the public booking flow only; admin
 DB-backed browser smoke and fully materialized external-frontend browser smoke
 remain separate gates if required before route removal.
 
+The DB-backed admin browser smoke now covers the current frontend admin
+reservation and resource-maintenance flows against the same class of
+standalone backend target. `current-frontend:db-backed-admin-platform-smoke:strict`
+starts from the disposable database proof configuration, applies package-owned
+migrations, verifies RLS/admin/idempotency database behavior, seeds DB-backed
+admin reservation and maintenance fixtures, starts the standalone `/v1` backend
+with frontend-origin CORS, then starts the current frontend on a separate
+origin in platform mode. It drives `/admin/platform-smoke` through reservation
+list, complete, restore, cancel, search, and restore behavior, then drives
+`/admin/platform-smoke/maintenance` through service loading,
+resource-maintenance list, resource-maintenance create, and
+resource-maintenance end behavior. The smoke fails if the browser uses
+current-frontend `/api`, standalone-backend `/api`, misses required
+tenant/venue/correlation headers, misses idempotency headers on mutations, or
+skips required standalone `/v1` calls.
+
+This closes current-frontend DB-backed browser proof for the covered public
+booking and admin flows. Fully materialized external-frontend browser smoke,
+full chat UI extraction, live enabled chat provider behavior, hosted backend
+deployment, and compatibility route cleanup remain separate gates.
+
 The current frontend chat client now has the same browser-safe standalone
 backend URL switch for platform chat mode. When
 `NEXT_PUBLIC_RESERVATION_PLATFORM_BASE_URL` is configured as an absolute URL,

@@ -346,9 +346,63 @@ Scope:
 
 - This closes the current-frontend public booking browser smoke against a
   DB-backed standalone backend on a separate origin.
-- It does not prove the admin browser smoke against the DB-backed backend,
-  hosted deployment, or a browser smoke from a fully materialized frontend
-  repository outside the current workspace.
+- It does not prove hosted deployment or a browser smoke from a fully
+  materialized frontend repository outside the current workspace.
+
+## 2026-06-27 DB-backed Current Frontend Admin Browser Smoke
+
+Disposable database:
+
+- Docker container: `reservation-proof-postgres-d8b0-admin-smoke`
+- Database URL:
+  `postgresql://postgres:postgres@localhost:5432/reservation_proof`
+- SQL was applied by streaming migration files through Docker `psql` inside the
+  named disposable container.
+- The disposable container was removed after proof completion.
+
+Command:
+
+- `RESERVATION_DATABASE_LIVE_URL=postgresql://postgres:postgres@localhost:5432/reservation_proof`
+  `RESERVATION_DATABASE_LIVE_DOCKER_CONTAINER=reservation-proof-postgres-d8b0-admin-smoke`
+  `corepack pnpm run current-frontend:db-backed-admin-platform-smoke:strict`
+
+Result:
+
+- Passed.
+- The proof applied backend-owned package migrations, ran the disposable
+  database RLS/admin/idempotency behavior proof, seeded DB-backed admin
+  reservation/resource-maintenance fixtures, started the standalone `/v1`
+  backend with DB-backed repositories and frontend-origin CORS, then started
+  the current frontend on a separate `127.0.0.1` origin in platform mode.
+- The browser drove `/admin/platform-smoke` through reservation list,
+  complete, restore, cancel, search, and restore flows.
+- The browser then drove `/admin/platform-smoke/maintenance` through service
+  loading, resource-maintenance list, resource-maintenance create, and
+  resource-maintenance end flows.
+- Browser-observed standalone calls included `GET /v1/reservations`,
+  `PATCH /v1/reservations/{id}`, `GET /v1/reservations?search=Cancelled`,
+  `GET /v1/services`, `GET /v1/resource-maintenance`, `POST
+  /v1/resource-maintenance`, and `POST /v1/resource-maintenance/{id}/end`.
+- The proof failed if the browser used current-frontend `/api` routes,
+  standalone-backend `/api` routes, missing tenant/venue/correlation headers,
+  missing idempotency headers on mutations, or missing required `/v1` calls.
+
+Fixes required before this pass:
+
+- The DB-backed proof repository now returns resource and layout data from
+  `listServices`, not only `getService`, so the current frontend maintenance
+  screen can render resource buttons from `GET /v1/services`.
+- The admin smoke waits for reservation mutation responses and the follow-up
+  list refresh before changing filters or navigating, preventing browser aborts
+  from being mistaken for backend failures.
+
+Scope:
+
+- This closes the current-frontend admin browser smoke against a DB-backed
+  standalone backend on a separate origin.
+- It does not prove hosted deployment, production direct PostgreSQL adapter
+  ownership, browser smoke from a fully materialized frontend repository
+  outside the current workspace, or compatibility route cleanup/deprecation.
 
 ## Remaining External Proof
 
@@ -383,9 +437,9 @@ Still not complete:
 
 - real hosted standalone backend deployment beyond the committed local/CI
   deployment manifest contract;
-- admin/current-frontend or fully materialized external-frontend browser smoke
-  against the DB-backed standalone backend, if the release gate requires more
-  than public booking flow coverage;
+- fully materialized external-frontend browser smoke against the DB-backed
+  standalone backend, if the release gate requires proof beyond the current
+  frontend public booking and admin browser flows;
 - public/private registry install proof, if the release path requires one
   beyond disposable registry proof;
 - compatibility route removal or deprecation based on the full evidence chain.

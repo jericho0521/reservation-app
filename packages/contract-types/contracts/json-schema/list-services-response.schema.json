@@ -417,6 +417,9 @@
         "end_at": {
           "type": "string"
         },
+        "search": {
+          "type": "string"
+        },
         "service_id": {
           "type": "string"
         },

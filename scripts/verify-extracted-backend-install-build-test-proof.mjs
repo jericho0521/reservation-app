@@ -204,7 +204,13 @@ export function readExtractedBackendInstallProofConfig(env, options = {}) {
 
 function runProcess(command, args, options = {}) {
   return new Promise((resolve, reject) => {
-    const child = spawn(command, args, {
+    const executable = process.platform === "win32" && command === "corepack"
+      ? process.execPath
+      : command;
+    const executableArgs = process.platform === "win32" && command === "corepack"
+      ? [path.join(path.dirname(process.execPath), "node_modules/corepack/dist/corepack.js"), ...args]
+      : args;
+    const child = spawn(executable, executableArgs, {
       ...options,
       shell: false,
     });

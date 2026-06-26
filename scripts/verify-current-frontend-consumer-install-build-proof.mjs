@@ -20,6 +20,8 @@ export const currentFrontendConsumerProofAllowInstallEnvName =
   "CURRENT_FRONTEND_CONSUMER_PROOF_ALLOW_INSTALL";
 export const currentFrontendConsumerProofStrictEnvName =
   "CURRENT_FRONTEND_CONSUMER_PROOF_STRICT";
+export const currentFrontendConsumerPackageSourceEnvName =
+  "CURRENT_FRONTEND_CONSUMER_PACKAGE_SOURCE";
 
 export const currentFrontendConsumerInstallProofAllowlistedSteps = Object.freeze([
   Object.freeze({
@@ -43,6 +45,10 @@ export const currentFrontendConsumerInstallProofAllowlistedSteps = Object.freeze
 ]);
 
 const forbiddenDependencySpecPrefixes = ["workspace:", "file:", "link:", "portal:"];
+const artifactAllowedPackageNames = new Set([
+  "@reservation-platform/contract-types",
+  "@reservation-platform/sdk",
+]);
 const defaultModeFrontendSafetyMessage =
   "Default mode does not install dependencies, call the network, publish packages, start a dev server, open a browser, or execute generated frontend commands.";
 
@@ -107,7 +113,52 @@ const installRelevantDependencySections = [
   "peerDependencies",
 ];
 
-function validateNoLocalDependencySpecs(packageJson, errors) {
+function validatePackageSource(value, errors) {
+  const packageSource = value || "registry";
+  if (packageSource !== "registry" && packageSource !== "artifact") {
+    errors.push(`${currentFrontendConsumerPackageSourceEnvName} must be registry or artifact when set.`);
+  }
+  return packageSource;
+}
+
+function validateArtifactFileSpec(root, sectionName, dependencyName, spec, errors) {
+  if (!artifactAllowedPackageNames.has(dependencyName)) {
+    errors.push(
+      `prepared frontend consumer package.json ${sectionName}.${dependencyName} must not use file: artifact specs; only SDK and contract package artifacts are allowed.`,
+    );
+    return;
+  }
+
+  const filePath = spec.slice("file:".length);
+  if (!filePath || path.isAbsolute(filePath)) {
+    errors.push(
+      `prepared frontend consumer package.json ${sectionName}.${dependencyName} file: artifact spec must be a relative path staged inside the prepared root artifacts directory.`,
+    );
+    return;
+  }
+
+  const resolvedArtifactPath = path.resolve(root, filePath);
+  const expectedArtifactRoot = path.resolve(root, "artifacts");
+  if (!isPathInside(expectedArtifactRoot, resolvedArtifactPath)) {
+    errors.push(
+      `prepared frontend consumer package.json ${sectionName}.${dependencyName} file: artifact spec must resolve inside the prepared root artifacts directory.`,
+    );
+  }
+
+  if (!spec.endsWith(".tgz")) {
+    errors.push(
+      `prepared frontend consumer package.json ${sectionName}.${dependencyName} file: artifact spec must point at a .tgz package artifact.`,
+    );
+  }
+
+  if (!existsSync(resolvedArtifactPath)) {
+    errors.push(
+      `prepared frontend consumer package.json ${sectionName}.${dependencyName} file: artifact ${filePath} must exist.`,
+    );
+  }
+}
+
+function validateNoLocalDependencySpecs(packageJson, root, packageSource, errors) {
   for (const sectionName of installRelevantDependencySections) {
     const section = packageJson?.[sectionName];
     if (section === undefined) {
@@ -125,15 +176,44 @@ function validateNoLocalDependencySpecs(packageJson, errors) {
       }
       const matchingPrefix = forbiddenDependencySpecPrefixes.find((prefix) => spec.startsWith(prefix));
       if (matchingPrefix) {
+        if (matchingPrefix === "file:" && packageSource === "artifact") {
+          validateArtifactFileSpec(root, sectionName, dependencyName, spec, errors);
+          continue;
+        }
         errors.push(
           `prepared frontend consumer package.json ${sectionName}.${dependencyName} must not use ${matchingPrefix} dependency specs.`,
         );
       }
     }
   }
+
+  const overrides = packageJson?.pnpm?.overrides;
+  if (overrides !== undefined) {
+    if (!overrides || typeof overrides !== "object" || Array.isArray(overrides)) {
+      errors.push("prepared frontend consumer package.json pnpm.overrides must be an object when present.");
+      return;
+    }
+
+    for (const [dependencyName, spec] of Object.entries(overrides)) {
+      if (typeof spec !== "string") {
+        errors.push(`prepared frontend consumer package.json pnpm.overrides.${dependencyName} spec must be a string.`);
+        continue;
+      }
+      const matchingPrefix = forbiddenDependencySpecPrefixes.find((prefix) => spec.startsWith(prefix));
+      if (matchingPrefix) {
+        if (matchingPrefix === "file:" && packageSource === "artifact") {
+          validateArtifactFileSpec(root, "pnpm.overrides", dependencyName, spec, errors);
+          continue;
+        }
+        errors.push(
+          `prepared frontend consumer package.json pnpm.overrides.${dependencyName} must not use ${matchingPrefix} dependency specs.`,
+        );
+      }
+    }
+  }
 }
 
-function validatePreparedRoot(root, repoRoot, errors) {
+function validatePreparedRoot(root, repoRoot, packageSource, errors) {
   if (!path.isAbsolute(root)) {
     errors.push(`${currentFrontendConsumerProofRootEnvName} must be an absolute path to a prepared frontend consumer workspace.`);
     return null;
@@ -177,7 +257,7 @@ function validatePreparedRoot(root, repoRoot, errors) {
   const packageJson = readPackageJson(resolvedRoot, errors);
   if (packageJson) {
     validateGeneratedScripts(packageJson, errors);
-    validateNoLocalDependencySpecs(packageJson, errors);
+    validateNoLocalDependencySpecs(packageJson, resolvedRoot, packageSource, errors);
   }
 
   return resolvedRoot;
@@ -193,6 +273,10 @@ export function readCurrentFrontendConsumerInstallProofConfig(env, options = {})
   const allowInstall = trimEnvValue(env, currentFrontendConsumerProofAllowInstallEnvName) === "1";
   const errors = [];
   const missing = rootValue ? [] : [currentFrontendConsumerProofRootEnvName];
+  const packageSource = validatePackageSource(
+    trimEnvValue(env, currentFrontendConsumerPackageSourceEnvName),
+    errors,
+  );
 
   if (
     hasEnvValue(env, currentFrontendConsumerProofAllowInstallEnvName) &&
@@ -202,12 +286,13 @@ export function readCurrentFrontendConsumerInstallProofConfig(env, options = {})
   }
 
   const resolvedRoot = rootValue
-    ? validatePreparedRoot(rootValue, repoRoot, errors)
+    ? validatePreparedRoot(rootValue, repoRoot, packageSource, errors)
     : null;
 
   const configured = [
     currentFrontendConsumerProofRootEnvName,
     currentFrontendConsumerProofAllowInstallEnvName,
+    currentFrontendConsumerPackageSourceEnvName,
   ].filter((name) => hasEnvValue(env, name) && trimEnvValue(env, name).length > 0);
   const ready = missing.length === 0 && errors.length === 0;
   const plannedSteps = ready ? buildCurrentFrontendConsumerInstallProofSteps(resolvedRoot) : [];
@@ -235,8 +320,9 @@ export function readCurrentFrontendConsumerInstallProofConfig(env, options = {})
     values: {
       [currentFrontendConsumerProofRootEnvName]: resolvedRoot ?? rootValue,
       [currentFrontendConsumerProofAllowInstallEnvName]: trimEnvValue(env, currentFrontendConsumerProofAllowInstallEnvName),
+      [currentFrontendConsumerPackageSourceEnvName]: packageSource,
     },
-    config: ready ? { root: resolvedRoot } : null,
+    config: ready ? { root: resolvedRoot, packageSource } : null,
     repoRoot,
     missing,
     configured,
@@ -256,7 +342,13 @@ export function readCurrentFrontendConsumerInstallProofConfig(env, options = {})
 
 function runProcess(command, args, options = {}) {
   return new Promise((resolve, reject) => {
-    const child = spawn(command, args, {
+    const executable = process.platform === "win32" && command === "corepack"
+      ? process.execPath
+      : command;
+    const executableArgs = process.platform === "win32" && command === "corepack"
+      ? [path.join(path.dirname(process.execPath), "node_modules/corepack/dist/corepack.js"), ...args]
+      : args;
+    const child = spawn(executable, executableArgs, {
       ...options,
       shell: false,
     });

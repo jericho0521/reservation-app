@@ -160,6 +160,17 @@ const packageDependencySections = [
   "peerDependencies",
 ];
 
+const generatedBuildOrderByPackageName = new Map([
+  ["@reservation-platform/contract-types", 10],
+  ["@project-play/reservations-core", 20],
+  ["@reservation-platform/api", 30],
+  ["@project-play/reservations-supabase", 40],
+  ["@reservation-platform/database", 50],
+  ["@reservation-platform/ai-chat", 60],
+  ["@reservation-platform/sdk", 70],
+  ["@reservation-platform/standalone-api-skeleton", 80],
+]);
+
 const sourceExtensions = new Set([".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx", ".mts", ".cts"]);
 const nodeBuiltinModuleNames = new Set(
   builtinModules.map((moduleName) => moduleName.replace(/^node:/, "").split("/")[0]),
@@ -471,9 +482,9 @@ async function createGeneratedBackendWorkspaceMetadata({
     ? sourceRootPackage.packageManager
     : "pnpm@10.33.2";
 
-  const buildPackages = expectedPackages.filter((expectedPackage) =>
-    expectedPackage.requiredScripts?.includes("build")
-  );
+  const buildPackages = expectedPackages
+    .filter((expectedPackage) => expectedPackage.requiredScripts?.includes("build"))
+    .sort(compareGeneratedPackageBuildOrder);
   const testPackages = expectedPackages.filter((expectedPackage) =>
     expectedPackage.requiredScripts?.includes("test")
   );
@@ -518,6 +529,12 @@ async function createGeneratedBackendWorkspaceMetadata({
       ],
     },
   };
+}
+
+function compareGeneratedPackageBuildOrder(left, right) {
+  const leftOrder = generatedBuildOrderByPackageName.get(left.packageName) ?? 1000;
+  const rightOrder = generatedBuildOrderByPackageName.get(right.packageName) ?? 1000;
+  return leftOrder - rightOrder || left.packageName.localeCompare(right.packageName);
 }
 
 function createGeneratedRootDevDependencies(sourceRootPackage) {

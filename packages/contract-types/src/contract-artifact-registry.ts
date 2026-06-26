@@ -243,6 +243,7 @@ export const publicJsonSchemaDefinitions: Record<string, JsonSchema> = {
     service_id: stringSchema,
     status: stringSchema,
     customer_id: stringSchema,
+    search: stringSchema,
     start_at: stringSchema,
     end_at: stringSchema,
   }),

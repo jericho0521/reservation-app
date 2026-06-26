@@ -230,19 +230,24 @@ including after symlink/junction realpath resolution, the workspace contains
 `package.json` and `pnpm-lock.yaml`, the generated `typecheck`, `build`, and
 `start` scripts are exactly `tsc --noEmit`, `next build`, and `next start`,
 `dependencies`, `devDependencies`, `optionalDependencies`, and
-`peerDependencies` contain no `workspace:`, `file:`, `link:`, or `portal:`
-specs, and `CURRENT_FRONTEND_CONSUMER_PROOF_ALLOW_INSTALL=1` is set. When those
-gates pass, strict mode runs only the static allowlisted commands
+`peerDependencies` contain no `workspace:`, `link:`, or `portal:` specs in
+registry mode; explicit artifact mode permits only staged SDK and contract
+`.tgz` package artifacts under the prepared root `artifacts/` directory and
+validates `pnpm.overrides` the same way. `CURRENT_FRONTEND_CONSUMER_PROOF_ALLOW_INSTALL=1`
+must be set. When those gates pass, strict mode runs only the static
+allowlisted commands
 `corepack pnpm install --frozen-lockfile --ignore-scripts`,
 `corepack pnpm run typecheck`, and `corepack pnpm run build` inside the
 prepared workspace. The install step ignores package and dependency lifecycle
 scripts, and the harness intentionally never runs `start`.
 
-This proof is not complete Phase 8 separation until the strict command passes
-against a real prepared frontend consumer workspace materialized outside this
-repository. Until then, the current frontend remains proven only as local
-metadata/readiness plus bounded mock-backend browser smoke, not as an installed
-and built separated consumer repository.
+This strict proof passed once against
+`C:\Users\User\AppData\Local\Temp\current-frontend-consumer-tree-3vrf7e\frontend-consumer`
+with SDK and contract tarballs staged as prepared artifacts. This proves the
+selected current-frontend consumer slice can install, typecheck, and build
+outside the monorepo from package artifacts. It does not prove public/private
+registry install, live backend behavior, live browser runtime, full chat UI
+extraction, or a complete separated frontend repository.
 
 The form-booking browser smoke now provides a bounded local external-origin
 proof for the current frontend. `current-frontend:platform-smoke` starts a

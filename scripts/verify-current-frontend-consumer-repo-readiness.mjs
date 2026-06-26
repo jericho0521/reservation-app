@@ -32,9 +32,11 @@ export const generatedFrontendConsumerTsconfig = {
     jsx: "react-jsx",
     strict: true,
     noEmit: true,
+    skipLibCheck: true,
     isolatedModules: true,
     esModuleInterop: true,
     resolveJsonModule: true,
+    typeRoots: ["./node_modules/@types"],
     baseUrl: ".",
     paths: {
       "@/*": ["./*"],
@@ -759,11 +761,25 @@ export function validateGeneratedFrontendConsumerTsconfig(tsconfig, failures) {
     failures,
   );
   validateGeneratedTsconfigExactValue(
+    compilerOptions.skipLibCheck,
+    true,
+    "Generated frontend consumer tsconfig.json compilerOptions.skipLibCheck",
+    failures,
+  );
+  validateGeneratedTsconfigExactValue(
     compilerOptions.baseUrl,
     ".",
     "Generated frontend consumer tsconfig.json compilerOptions.baseUrl",
     failures,
   );
+
+  if (
+    !Array.isArray(compilerOptions.typeRoots) ||
+    compilerOptions.typeRoots.length !== 1 ||
+    compilerOptions.typeRoots[0] !== "./node_modules/@types"
+  ) {
+    failures.push("Generated frontend consumer tsconfig.json compilerOptions.typeRoots must contain only ./node_modules/@types.");
+  }
 
   if (
     !compilerOptions.paths ||

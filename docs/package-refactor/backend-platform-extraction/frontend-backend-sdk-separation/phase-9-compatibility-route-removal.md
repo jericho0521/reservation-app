@@ -104,8 +104,10 @@ not make network, deployment, or live backend calls, and it proves only local
 dispatch/test route-surface coverage and bounded direct source usage rather
 than live parity, SDK/direct parity, full frontend cutover, auth/tenant
 behavior, idempotency behavior, deployability, route-level test completion,
-strict prepared frontend install/build proof, strict extracted backend
-install/build/test proof, or route removability.
+or route removability. The strict prepared frontend install/build proof and
+strict extracted backend install/build/test proof have passed once against
+external prepared roots, but those proofs alone do not satisfy the remaining
+live parity, auth, database, registry, and route-test gates.
 
 The inventory required-removal-gate contract now explicitly includes
 `current-frontend:consumer-install-proof:strict` and
@@ -156,8 +158,7 @@ This improves Phase 9 readiness for the optional chat route family but does not
 make any chat compatibility route removable. Route deletion remains blocked by
 live standalone backend parity, enabled provider-backed chat proof,
 auth/tenant/idempotency proof, rollback/deprecation readiness, and broader
-frontend cutover gates, plus strict prepared frontend install/build proof and
-strict extracted backend install/build/test proof.
+frontend cutover gates.
 
 ## Implementation Steps
 
@@ -186,9 +187,8 @@ strict extracted backend install/build/test proof.
 - Source scans proving current frontend no longer depends on removed routes.
   Started as a bounded direct-frontend-usage scan inside
   `backend-platform:verify-compatibility-route-removal-gate`; full route
-  deletion remains blocked because no routes have live parity/auth/idempotency,
-  tests, frontend cutover, strict prepared frontend install/build proof, and
-  strict extracted backend install/build/test proof complete.
+deletion remains blocked because no routes have live parity/auth/idempotency,
+ tests, frontend cutover, and registry/live proof complete.
   Rollback/deprecation notes are locally documented but do not make any route
   removable.
 

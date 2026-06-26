@@ -90,7 +90,14 @@ flowchart LR
 - [Phase 27: SDK Public Release Surface](phase-27-sdk-public-release-surface.md)
 - [Phase 28: Live Backend and External Consumer Proof](phase-28-live-backend-and-external-consumer-proof.md)
 - [Phase 29: Subagent Execution Matrix](phase-29-subagent-execution-matrix.md)
+- [Phase 30: Package Source and Frontend Proof](phase-30-package-source-and-frontend-proof.md)
+- [Phase 31: Disposable Database Proof](phase-31-disposable-database-proof.md)
+- [Phase 32: Standalone Backend Live Proof](phase-32-standalone-backend-live-proof.md)
+- [Phase 33: SDK and Direct HTTP Parity Proof](phase-33-sdk-direct-parity-proof.md)
+- [Phase 34: Registry Release Proof](phase-34-registry-release-proof.md)
+- [Phase 35: Compatibility Cleanup and Release Decision](phase-35-compatibility-cleanup-release-decision.md)
 - [Remaining Modularity Gaps Index](remaining-modularity-gaps.md)
+- [External Separation Proof Results](external-separation-proof-results.md)
 - [Focused Backend Platform, SDK, and Frontend Split Execution Plan](plugin-platform-split/README.md)
 - [Repo Product Split Plan](repo-product-split-plan/README.md)
 - [Frontend and Backend Hard Separation Plan](frontend-backend-hard-separation-plan/README.md)
@@ -156,6 +163,13 @@ repository is the product, the SDK is the only package a new frontend installs,
 the current frontend becomes a replaceable consumer, live proof must use a real
 standalone backend target, and subagents must update downstream phases whenever
 shared assumptions change.
+
+Phases 30 through 35 are the proof-completion plan based on the first real
+external separation proof results. They start with the concrete blocker that
+the SDK and contract packages are not yet available from an approved package
+source, then prove a disposable database, live standalone backend, SDK/direct
+HTTP parity, registry installation, and compatibility route cleanup or
+deprecation from evidence.
 
 The frontend/backend hard separation plan is the focused continuation for the
 practical proof question: whether the current refactor has crossed from

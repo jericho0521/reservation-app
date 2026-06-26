@@ -296,15 +296,21 @@ database live-proof commands must point only at disposable infrastructure. None
 of these commands create a repository, copy files, publish packages, or deploy
 a service.
 
+Strict external proof result:
+
+- `backend-platform:extracted-install-proof:strict` passed once against the
+  prepared extracted backend workspace at
+  `C:\tmp\reservation-separation-proofs\standalone-backend-extraction-yBf9oq`.
+  The proof generated a lockfile outside this repository, installed with
+  `--frozen-lockfile --ignore-scripts`, ran the generated backend workspace
+  verifier, built all backend packages in dependency order, ran package tests,
+  reran the standalone API skeleton tests, and checked the database migration
+  index.
+
 Still not complete:
 
 - actual standalone repository creation
 - final backend package renaming and visibility decisions
-- completed strict extracted-repository install/build/test execution outside
-  the current Next.js app workspace; the harness now exists and is wired into
-  safe and strict release gates, but this is not complete until
-  `backend-platform:extracted-install-proof:strict` passes against a real
-  prepared extracted backend workspace with explicit install approval
 - live deployed `/v1` backend proof
 - disposable database migration/RLS/idempotency proof
 - strict SDK/direct HTTP live parity proof

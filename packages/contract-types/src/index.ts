@@ -219,6 +219,7 @@ export interface ListReservationsQuery {
   service_id?: string;
   status?: string;
   customer_id?: string;
+  search?: string;
   start_at?: string;
   end_at?: string;
 }

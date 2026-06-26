@@ -301,6 +301,8 @@ test("consumer repo readiness generates frontend-safe tsconfig metadata in the m
     assert.equal(materializedTsconfig.compilerOptions.moduleResolution, "Bundler");
     assert.equal(materializedTsconfig.compilerOptions.strict, true);
     assert.equal(materializedTsconfig.compilerOptions.noEmit, true);
+    assert.equal(materializedTsconfig.compilerOptions.skipLibCheck, true);
+    assert.deepEqual(materializedTsconfig.compilerOptions.typeRoots, ["./node_modules/@types"]);
     assert.deepEqual(materializedTsconfig.compilerOptions.paths, { "@/*": ["./*"] });
     assert.deepEqual(materializedTsconfig.include, ["**/*.ts", "**/*.tsx", "**/*.mts"]);
     assert.deepEqual(materializedTsconfig.exclude, ["node_modules"]);
@@ -326,6 +328,8 @@ test("consumer repo readiness rejects invalid generated tsconfig metadata", () =
         moduleResolution: "NodeNext",
         strict: false,
         noEmit: false,
+        skipLibCheck: false,
+        typeRoots: ["../node_modules/@types", "packages/types"],
         baseUrl: ".",
         paths: {
           "@/*": ["./*"],
@@ -352,6 +356,8 @@ test("consumer repo readiness rejects invalid generated tsconfig metadata", () =
   assert.match(failureText, /compilerOptions\.moduleResolution must be "Bundler"/);
   assert.match(failureText, /compilerOptions\.strict must be true/);
   assert.match(failureText, /compilerOptions\.noEmit must be true/);
+  assert.match(failureText, /compilerOptions\.skipLibCheck must be true/);
+  assert.match(failureText, /compilerOptions\.typeRoots must contain only \.\/node_modules\/@types/);
   assert.match(failureText, /exclude must contain only node_modules/);
   assert.match(failureText, /"packages"/);
   assert.match(failureText, /"\.next"/);

@@ -183,7 +183,7 @@ async function sendPlatformChatMessage(input: SendChatMessageInput): Promise<Leg
     return disabledChatResponse(session.chatSessionId);
   }
 
-  const chatSessionId = session.chatSessionId;
+  const chatSessionId = requirePlatformChatSessionId(session);
   const body: PlatformChatMessageInput = { message };
 
   const response = await fetch(
@@ -218,7 +218,7 @@ async function confirmPlatformChatBooking(input: ConfirmChatBookingInput): Promi
     return disabledChatResponse(session.chatSessionId);
   }
 
-  const chatSessionId = session.chatSessionId;
+  const chatSessionId = requirePlatformChatSessionId(session);
   const reservationIntentId = input.confirmBooking.reservation_intent_id;
 
   if (!reservationIntentId) {
@@ -333,6 +333,13 @@ function disabledChatResponse(threadId?: string): LegacyChatResponse {
     action: null,
     confirmed: false,
   };
+}
+
+function requirePlatformChatSessionId(session: PlatformChatSessionResult) {
+  if (!session.chatSessionId) {
+    throw new Error("Reservation platform chat session response did not include a session id.");
+  }
+  return session.chatSessionId;
 }
 
 function getFirstSafeLegacyAction(...actions: unknown[]) {

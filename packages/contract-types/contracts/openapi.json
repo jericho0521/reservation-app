@@ -452,6 +452,9 @@
           "end_at": {
             "type": "string"
           },
+          "search": {
+            "type": "string"
+          },
           "service_id": {
             "type": "string"
           },
@@ -1687,6 +1690,14 @@
           {
             "in": "query",
             "name": "customer_id",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "search",
             "required": false,
             "schema": {
               "type": "string"

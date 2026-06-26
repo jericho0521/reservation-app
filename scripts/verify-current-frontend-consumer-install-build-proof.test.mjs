@@ -6,6 +6,7 @@ import test from "node:test";
 
 import {
   currentFrontendConsumerInstallProofAllowlistedSteps,
+  currentFrontendConsumerPackageSourceEnvName,
   currentFrontendConsumerProofAllowInstallEnvName,
   currentFrontendConsumerProofRootEnvName,
   generatedFrontendConsumerScripts,
@@ -36,6 +37,7 @@ async function createPreparedFrontendRoot(options = {}) {
         typescript: "^5",
         ...(options.devDependencies ?? {}),
       },
+      ...(options.pnpm ? { pnpm: options.pnpm } : {}),
       ...(options.optionalDependencies
         ? { optionalDependencies: options.optionalDependencies }
         : {}),
@@ -200,6 +202,75 @@ test("frontend consumer install proof rejects local workspace dependency specs",
     assert.match(parsed.message, /devDependencies\.eslint must not use file:/);
     assert.match(parsed.message, /optionalDependencies\.sharp must not use link:/);
     assert.match(parsed.message, /peerDependencies\.react must not use portal:/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("frontend consumer install proof allows staged SDK artifact specs only in artifact mode", async () => {
+  const root = await createPreparedFrontendRoot({
+    dependencies: {
+      "@reservation-platform/contract-types": "file:artifacts/reservation-platform-contract-types-0.0.0.tgz",
+      "@reservation-platform/sdk": "file:artifacts/reservation-platform-sdk-0.0.0.tgz",
+    },
+    pnpm: {
+      overrides: {
+        "@reservation-platform/contract-types": "file:artifacts/reservation-platform-contract-types-0.0.0.tgz",
+      },
+    },
+  });
+
+  try {
+    await mkdir(path.join(root, "artifacts"));
+    await writeFile(path.join(root, "artifacts", "reservation-platform-contract-types-0.0.0.tgz"), "contract", "utf8");
+    await writeFile(path.join(root, "artifacts", "reservation-platform-sdk-0.0.0.tgz"), "sdk", "utf8");
+
+    const parsed = readCurrentFrontendConsumerInstallProofConfig(
+      {
+        [currentFrontendConsumerProofRootEnvName]: root,
+        [currentFrontendConsumerPackageSourceEnvName]: "artifact",
+      },
+      { argv: ["--strict"] },
+    );
+
+    assert.equal(parsed.status, "fail");
+    assert.equal(parsed.ready, true);
+    assert.equal(parsed.config.packageSource, "artifact");
+    assert.match(parsed.message, new RegExp(`${currentFrontendConsumerProofAllowInstallEnvName}=1`));
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("frontend consumer install proof rejects unstaged or escaping artifact specs", async () => {
+  const root = await createPreparedFrontendRoot({
+    dependencies: {
+      "@reservation-platform/contract-types": "file:../contract-types.tgz",
+      "@reservation-platform/sdk": "file:artifacts/reservation-platform-sdk-0.0.0.zip",
+      lodash: "file:artifacts/lodash-1.0.0.tgz",
+    },
+    pnpm: {
+      overrides: {
+        react: "file:artifacts/react-1.0.0.tgz",
+      },
+    },
+  });
+
+  try {
+    const parsed = readCurrentFrontendConsumerInstallProofConfig(
+      {
+        [currentFrontendConsumerProofRootEnvName]: root,
+        [currentFrontendConsumerPackageSourceEnvName]: "artifact",
+      },
+      { argv: ["--strict"] },
+    );
+
+    assert.equal(parsed.status, "fail");
+    assert.equal(parsed.ready, false);
+    assert.match(parsed.message, /contract-types.*must resolve inside the prepared root artifacts directory/);
+    assert.match(parsed.message, /sdk.*must point at a \.tgz package artifact/);
+    assert.match(parsed.message, /lodash.*only SDK and contract package artifacts are allowed/);
+    assert.match(parsed.message, /react.*only SDK and contract package artifacts are allowed/);
   } finally {
     await rm(root, { recursive: true, force: true });
   }

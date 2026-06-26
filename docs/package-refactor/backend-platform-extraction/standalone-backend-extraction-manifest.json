@@ -49,6 +49,24 @@
       "rationale": "The existing Supabase adapter package manifest is copied into the materialized backend target candidate so the expected adapter package root has a concrete package.json placeholder until final package naming and visibility are reconciled."
     },
     {
+      "id": "adapter-reservations-supabase-typescript-config-root",
+      "classification": "copy-candidate",
+      "currentPaths": ["packages/reservations-supabase/tsconfig.json"],
+      "targetBackendPaths": ["packages/adapter-supabase/tsconfig.json"],
+      "ownershipCategory": "adapter-supabase",
+      "status": "requires-reconciliation",
+      "rationale": "The strict extracted backend build proof needs the Supabase adapter package TypeScript config alongside its package manifest and source until final package naming and build metadata are reconciled."
+    },
+    {
+      "id": "adapter-reservations-supabase-typescript-config-build",
+      "classification": "copy-candidate",
+      "currentPaths": ["packages/reservations-supabase/tsconfig.build.json"],
+      "targetBackendPaths": ["packages/adapter-supabase/tsconfig.build.json"],
+      "ownershipCategory": "adapter-supabase",
+      "status": "requires-reconciliation",
+      "rationale": "The strict extracted backend build proof needs the Supabase adapter package build TypeScript config alongside its package manifest and source until final package naming and build metadata are reconciled."
+    },
+    {
       "id": "adapter-reservations-supabase-package-sql",
       "classification": "compatibility-shim",
       "currentPaths": ["packages/reservations-supabase/sql"],

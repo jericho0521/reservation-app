@@ -59,8 +59,8 @@ This phase answers: is the backend product usable as its own service target?
 
 ## 2026-06-27 Result
 
-Status: passed for disposable DB-backed standalone route behavior; deployment
-configuration remains open.
+Status: passed for disposable DB-backed standalone route behavior and committed
+deployment configuration; hosted deployment remains open.
 
 Evidence:
 
@@ -79,11 +79,17 @@ Evidence:
   PostgreSQL-backed repository adapters injected into `apps/api`, and served
   catalog, availability, reservation, disabled-chat, idempotency, and
   resource-maintenance behavior to the SDK/direct parity verifier.
+- `apps/api/deployment.config.json` now records the standalone deployment
+  contract, and
+  `corepack pnpm run backend-platform:verify-standalone-deployment-config:strict`
+  passed with complete backend-only env placeholders.
+- The deployment verifier checks the manifest against `apps/api/package.json`,
+  `apps/api/src/runtime.ts`, build/start commands, health path, Supabase env,
+  auth alternatives, optional runtime env, and forbidden public secret prefixes.
 
 Still open:
 
-- Standalone deployment config is not complete against a real backend runtime
-  target.
+- A hosted deployment to a real platform target is not complete.
 - The production standalone runtime still expects Supabase HTTP client
   configuration; the direct PostgreSQL adapter currently lives in the proof
   harness, not in the deployable backend runtime.

@@ -257,6 +257,36 @@ Scope:
   browser smoke against this DB-backed backend, or compatibility route
   cleanup/deprecation.
 
+## 2026-06-27 Standalone Deployment Config Manifest Proof
+
+Deployment config artifact:
+
+- `apps/api/deployment.config.json`
+
+Command:
+
+- `PORT=4100`
+  `RESERVATION_SUPABASE_URL=https://reservation-platform.supabase.co`
+  `RESERVATION_SUPABASE_ANON_KEY=anon-key`
+  `RESERVATION_SUPABASE_SERVICE_ROLE_KEY=service-role-key`
+  `RESERVATION_PLATFORM_SERVICE_API_KEY=platform-service-token`
+  `corepack pnpm run backend-platform:verify-standalone-deployment-config:strict`
+
+Result:
+
+- Passed.
+- The verifier validates the deployment manifest against the standalone API
+  package name, build command, start command, health path, backend-only
+  Supabase env names, auth alternatives, optional runtime env names, forbidden
+  `NEXT_PUBLIC_*` secret-style prefixes, and runtime env reads in
+  `apps/api/src/runtime.ts`.
+
+Scope:
+
+- This closes the committed standalone deployment configuration contract.
+- It does not deploy a production host, create cloud infrastructure, connect to
+  Supabase, or replace the DB-backed disposable live parity proof.
+
 ## Remaining External Proof
 
 Strict readiness checks run without live configuration:
@@ -288,7 +318,8 @@ Strict readiness checks run without live configuration:
 
 Still not complete:
 
-- standalone backend deployment configuration against a real runtime target;
+- real hosted standalone backend deployment beyond the committed local/CI
+  deployment manifest contract;
 - external frontend browser smoke against the DB-backed standalone backend;
 - public/private registry install proof, if the release path requires one
   beyond disposable registry proof;

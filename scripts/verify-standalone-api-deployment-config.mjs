@@ -60,6 +60,8 @@ const runtimeEnvMemberAccessPattern =
 
 const scriptDirectory = dirname(fileURLToPath(import.meta.url));
 const defaultRuntimeSourcePath = resolve(scriptDirectory, "../apps/api/src/runtime.ts");
+const defaultDeploymentManifestPath = resolve(scriptDirectory, "../apps/api/deployment.config.json");
+const defaultStandaloneApiPackageJsonPath = resolve(scriptDirectory, "../apps/api/package.json");
 
 const nextPublicBackendSecretPattern =
   /^NEXT_PUBLIC_(?:RESERVATION_SUPABASE(?:_|$)|RESERVATION_PLATFORM_SERVICE_API_KEY$|RESERVATION_PLATFORM_AUTH_|.*(?:SERVICE_ROLE|OPENROUTER|GOOGLE_GENERATIVE_AI|GEMINI).*)/u;
@@ -239,6 +241,116 @@ function extractRuntimeEnvNamesFromSource(source) {
   return sortedUnique(runtimeEnvNames);
 }
 
+function readJsonFile(filePath) {
+  return JSON.parse(readFileSync(filePath, "utf8"));
+}
+
+function asStringArray(value) {
+  return Array.isArray(value) && value.every((item) => typeof item === "string")
+    ? value
+    : null;
+}
+
+function arraysEqual(left, right) {
+  return left.length === right.length && left.every((value, index) => value === right[index]);
+}
+
+function validateCommand(value, name, errors) {
+  if (typeof value !== "string" || value.trim().length === 0) {
+    errors.push(`Standalone deployment manifest ${name} must be a non-empty string.`);
+    return;
+  }
+
+  if (/[;&|`]/u.test(value)) {
+    errors.push(`Standalone deployment manifest ${name} must not use shell control operators.`);
+  }
+}
+
+function validateEnvList(value, name, expected, errors) {
+  const list = asStringArray(value);
+  if (!list) {
+    errors.push(`Standalone deployment manifest ${name} must be a string array.`);
+    return;
+  }
+
+  if (!arraysEqual(list, expected)) {
+    errors.push(`Standalone deployment manifest ${name} must equal ${expected.join(", ")}.`);
+  }
+}
+
+export function verifyStandaloneDeploymentManifest(options = {}) {
+  const manifest = options.manifest ?? readJsonFile(options.manifestPath ?? defaultDeploymentManifestPath);
+  const packageJson = options.packageJson ?? readJsonFile(options.packageJsonPath ?? defaultStandaloneApiPackageJsonPath);
+  const errors = [];
+
+  if (manifest.service !== "reservation-platform-standalone-api") {
+    errors.push("Standalone deployment manifest service must be reservation-platform-standalone-api.");
+  }
+  if (manifest.packageName !== packageJson.name) {
+    errors.push(`Standalone deployment manifest packageName must match apps/api/package.json name ${packageJson.name}.`);
+  }
+  if (manifest.runtime !== "node") {
+    errors.push("Standalone deployment manifest runtime must be node.");
+  }
+  validateCommand(manifest.buildCommand, "buildCommand", errors);
+  validateCommand(manifest.startCommand, "startCommand", errors);
+  if (manifest.buildCommand !== "corepack pnpm --filter @reservation-platform/standalone-api-skeleton run build") {
+    errors.push("Standalone deployment manifest buildCommand must build the standalone API workspace package.");
+  }
+  if (manifest.startCommand !== "node apps/api/dist/server.js") {
+    errors.push("Standalone deployment manifest startCommand must start the built standalone API server.");
+  }
+  if (manifest.healthPath !== "/v1/health") {
+    errors.push("Standalone deployment manifest healthPath must be /v1/health.");
+  }
+  if (manifest.portEnv !== "PORT") {
+    errors.push("Standalone deployment manifest portEnv must be PORT.");
+  }
+  validateEnvList(manifest.requiredSupabaseEnv, "requiredSupabaseEnv", standaloneApiSupabaseEnvNames, errors);
+  const authAlternatives = Array.isArray(manifest.authEnvAlternatives) ? manifest.authEnvAlternatives : null;
+  const expectedAuthAlternatives = [
+    [standaloneApiServiceAuthEnvName],
+    standaloneApiAuthRequiredEnvNames,
+  ];
+  if (!authAlternatives || !authAlternatives.every((entry) => asStringArray(entry))) {
+    errors.push("Standalone deployment manifest authEnvAlternatives must be an array of string arrays.");
+  } else if (
+    authAlternatives.length !== expectedAuthAlternatives.length ||
+    !authAlternatives.every((entry, index) => arraysEqual(entry, expectedAuthAlternatives[index]))
+  ) {
+    errors.push("Standalone deployment manifest authEnvAlternatives must list service-token and JWT/JWKS auth alternatives.");
+  }
+  validateEnvList(
+    manifest.optionalRuntimeEnv,
+    "optionalRuntimeEnv",
+    [
+      ...standaloneApiAuthOptionalEnvNames,
+      ...standaloneApiAiChatEnvNames,
+    ],
+    errors,
+  );
+  validateEnvList(
+    manifest.forbiddenPublicEnvPrefixes,
+    "forbiddenPublicEnvPrefixes",
+    [
+      "NEXT_PUBLIC_RESERVATION_SUPABASE",
+      "NEXT_PUBLIC_RESERVATION_PLATFORM_SERVICE_API_KEY",
+      "NEXT_PUBLIC_RESERVATION_PLATFORM_AUTH_",
+      "NEXT_PUBLIC_OPENROUTER",
+      "NEXT_PUBLIC_GOOGLE_GENERATIVE_AI",
+      "NEXT_PUBLIC_GEMINI",
+    ],
+    errors,
+  );
+
+  return {
+    manifest,
+    packageName: packageJson.name,
+    errors,
+    ok: errors.length === 0,
+  };
+}
+
 export function verifyStandaloneRuntimeEnvNameContract(options = {}) {
   const runtimeSource = options.runtimeSource
     ?? readFileSync(options.runtimeSourcePath ?? defaultRuntimeSourcePath, "utf8");
@@ -289,7 +401,8 @@ export function readStandaloneApiDeploymentConfig(env, options = {}) {
     argv.includes("--strict") ||
     trimEnvValue(env, standaloneApiDeploymentStrictEnvName) === "1";
   const runtimeEnvContract = verifyStandaloneRuntimeEnvNameContract(options.runtimeEnvContractOptions);
-  const errors = [...runtimeEnvContract.errors];
+  const deploymentManifest = verifyStandaloneDeploymentManifest(options.deploymentManifestOptions);
+  const errors = [...runtimeEnvContract.errors, ...deploymentManifest.errors];
   const values = {};
 
   for (const name of standaloneApiKnownEnvNames) {
@@ -431,6 +544,7 @@ export function readStandaloneApiDeploymentConfig(env, options = {}) {
     aiChatConfigured,
     nextPublicBackendSecrets,
     runtimeEnvContract,
+    deploymentManifest,
     ready,
     status,
     shouldSkip: status === "skip",

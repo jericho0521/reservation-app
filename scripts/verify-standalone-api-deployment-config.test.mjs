@@ -5,6 +5,7 @@ import {
   readStandaloneApiDeploymentConfig,
   standaloneApiAiChatEnvNames,
   standaloneApiRuntimeEnvNames,
+  verifyStandaloneDeploymentManifest,
   verifyStandaloneRuntimeEnvNameContract,
 } from "./verify-standalone-api-deployment-config.mjs";
 
@@ -30,6 +31,98 @@ function validDeploymentEnv(overrides = {}) {
 function runtimeSourceForEnvNames(names) {
   return names.map((name) => `env.${name};`).join("\n");
 }
+
+function validDeploymentManifest(overrides = {}) {
+  return {
+    service: "reservation-platform-standalone-api",
+    packageName: "@reservation-platform/standalone-api-skeleton",
+    runtime: "node",
+    buildCommand: "corepack pnpm --filter @reservation-platform/standalone-api-skeleton run build",
+    startCommand: "node apps/api/dist/server.js",
+    healthPath: "/v1/health",
+    portEnv: "PORT",
+    requiredSupabaseEnv: [
+      "RESERVATION_SUPABASE_URL",
+      "RESERVATION_SUPABASE_ANON_KEY",
+      "RESERVATION_SUPABASE_SERVICE_ROLE_KEY",
+    ],
+    authEnvAlternatives: [
+      ["RESERVATION_PLATFORM_SERVICE_API_KEY"],
+      [
+        "RESERVATION_PLATFORM_AUTH_JWKS_URL",
+        "RESERVATION_PLATFORM_AUTH_ISSUER",
+        "RESERVATION_PLATFORM_AUTH_AUDIENCE",
+      ],
+    ],
+    optionalRuntimeEnv: [
+      "RESERVATION_PLATFORM_AUTH_ALGORITHMS",
+      "RESERVATION_PLATFORM_AUTH_CLOCK_TOLERANCE_SECONDS",
+      "RESERVATION_PLATFORM_AUTH_JWKS_CACHE_TTL_SECONDS",
+      "RESERVATION_PLATFORM_AUTH_SUBJECT_CLAIM",
+      "RESERVATION_PLATFORM_AUTH_TENANT_IDS_CLAIM",
+      "RESERVATION_PLATFORM_AUTH_VENUE_IDS_CLAIM",
+      "RESERVATION_PLATFORM_AUTH_ROLES_CLAIM",
+      "RESERVATION_PLATFORM_AUTH_SCOPES_CLAIM",
+      "GOOGLE_GENERATIVE_AI_API_KEY",
+      "GOOGLE_GENERATIVE_AI_MODEL",
+      "OPENROUTER_API_KEY",
+      "OPENROUTER_CHAT_MODEL",
+    ],
+    forbiddenPublicEnvPrefixes: [
+      "NEXT_PUBLIC_RESERVATION_SUPABASE",
+      "NEXT_PUBLIC_RESERVATION_PLATFORM_SERVICE_API_KEY",
+      "NEXT_PUBLIC_RESERVATION_PLATFORM_AUTH_",
+      "NEXT_PUBLIC_OPENROUTER",
+      "NEXT_PUBLIC_GOOGLE_GENERATIVE_AI",
+      "NEXT_PUBLIC_GEMINI",
+    ],
+    ...overrides,
+  };
+}
+
+test("standalone deployment manifest accepts the committed API deployment contract", () => {
+  const result = verifyStandaloneDeploymentManifest();
+
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.errors, []);
+  assert.equal(result.manifest.healthPath, "/v1/health");
+});
+
+test("standalone deployment manifest rejects package-name drift", () => {
+  const result = verifyStandaloneDeploymentManifest({
+    manifest: validDeploymentManifest({ packageName: "@wrong/package" }),
+    packageJson: { name: "@reservation-platform/standalone-api-skeleton" },
+  });
+
+  assert.equal(result.ok, false);
+  assert.match(result.errors.join(" "), /packageName must match/);
+});
+
+test("standalone deployment manifest rejects shell control operators in commands", () => {
+  const result = verifyStandaloneDeploymentManifest({
+    manifest: validDeploymentManifest({
+      buildCommand: "corepack pnpm --filter @reservation-platform/standalone-api-skeleton run build && echo leaked",
+    }),
+    packageJson: { name: "@reservation-platform/standalone-api-skeleton" },
+  });
+
+  assert.equal(result.ok, false);
+  assert.match(result.errors.join(" "), /buildCommand must not use shell control operators/);
+});
+
+test("standalone deployment manifest rejects env-list drift", () => {
+  const result = verifyStandaloneDeploymentManifest({
+    manifest: validDeploymentManifest({
+      requiredSupabaseEnv: ["RESERVATION_SUPABASE_URL"],
+      authEnvAlternatives: [["RESERVATION_PLATFORM_SERVICE_API_KEY"]],
+    }),
+    packageJson: { name: "@reservation-platform/standalone-api-skeleton" },
+  });
+
+  assert.equal(result.ok, false);
+  assert.match(result.errors.join(" "), /requiredSupabaseEnv must equal/);
+  assert.match(result.errors.join(" "), /authEnvAlternatives must list/);
+});
 
 test("standalone runtime and deployment verifier env-name contract currently matches", () => {
   const contract = verifyStandaloneRuntimeEnvNameContract();

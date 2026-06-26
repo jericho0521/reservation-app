@@ -133,6 +133,14 @@ at least one auth mechanism: `RESERVATION_PLATFORM_SERVICE_API_KEY` or complete
 service token, and backend AI/chat provider env are validated when present, and
 `NEXT_PUBLIC_*` backend secret-style names are rejected.
 
+The deployable runtime contract is recorded in `apps/api/deployment.config.json`.
+The verifier checks that manifest against `apps/api/package.json` and
+`apps/api/src/runtime.ts`: the package name must stay aligned, the build command
+must build `@reservation-platform/standalone-api-skeleton`, the start command
+must run `node apps/api/dist/server.js`, health must stay on `/v1/health`,
+Supabase env must stay backend-only, and the auth alternatives must remain
+service-token or JWT/JWKS based.
+
 It is not live backend parity. The health endpoints are deployability/readiness
 hygiene only: they prove that a deployed host process can answer a cheap public
 request, not that the service has been deployed, connected to Supabase, applied

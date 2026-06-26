@@ -56,6 +56,35 @@ surface without losing backend behavior?
 - SDK artifacts contain client code and public types only.
 - Any contract change is reflected in release notes and compatibility docs.
 
+## 2026-06-27 Result
+
+Status: passed for DB-backed standalone disposable infrastructure.
+
+Evidence:
+
+- `corepack pnpm run backend-platform:db-backed-live-parity-proof:strict`
+  passed against the disposable Docker Postgres container
+  `reservation-proof-postgres-d8b0-sdk`.
+- The proof started a standalone `/v1` backend from `apps/api` with
+  proof-only PostgreSQL-backed repositories and then invoked the existing
+  `scripts/verify-live-backend-parity.mjs --strict` verifier against that same
+  backend URL.
+- SDK/direct parity passed for metadata, service, resource, availability,
+  reservation list/summary, disabled chat error behavior, reservation create
+  idempotency replay, reservation read, reservation list after create,
+  resource-maintenance list, resource-maintenance create idempotency replay,
+  resource-maintenance end idempotency replay, and resource-maintenance list
+  after end.
+
+Still open:
+
+- The older generic `sdk:live-parity:strict` env surface still requires a
+  separately configured live backend URL.
+- External frontend browser smoke against this DB-backed standalone backend is
+  not yet complete.
+- Compatibility route removal/deprecation must wait for the full evidence
+  chain, including frontend adoption proof and deployment config.
+
 ## Subagent Handoff Notes
 
 Give the worker this file, the SDK public API docs, and live backend proof

@@ -11,6 +11,10 @@ import { verifyCompatibilityRouteRemovalGate } from "./verify-compatibility-rout
 import { readCurrentFrontendConsumerInstallProofConfig } from "./verify-current-frontend-consumer-install-build-proof.mjs";
 import { verifyCurrentFrontendConsumerRepoReadiness } from "./verify-current-frontend-consumer-repo-readiness.mjs";
 import { readLiveDatabaseConfig } from "./verify-database-live-proof.mjs";
+import {
+  dbBackedStandaloneLiveParityStrictEnvName,
+  readDbBackedStandaloneLiveParityProofConfig,
+} from "./verify-db-backed-standalone-live-parity.mjs";
 import { readExtractedBackendInstallProofConfig } from "./verify-extracted-backend-install-build-test-proof.mjs";
 import { verifyExtractedBackendWorkspaceReadiness } from "./verify-extracted-backend-workspace-readiness.mjs";
 import { readLiveBackendParityConfig } from "./verify-live-backend-parity.mjs";
@@ -33,6 +37,7 @@ const strictEnvNames = [
   livePlatformProofReadinessStrictEnvName,
   standaloneApiDeploymentStrictEnvName,
   standaloneBackendLiveProofStrictEnvName,
+  dbBackedStandaloneLiveParityStrictEnvName,
   "RESERVATION_DATABASE_LIVE_STRICT",
   "RESERVATION_PLATFORM_LIVE_STRICT",
   "RESERVATION_SDK_REGISTRY_STRICT",
@@ -84,6 +89,13 @@ const proofSurfaces = [
     safeCommand: "corepack pnpm run sdk:live-parity",
     strictCommand: "corepack pnpm run sdk:live-parity:strict",
     read: (env, argv) => fromStatusParser(readLiveBackendParityConfig(env, { argv })),
+  },
+  {
+    id: "db_backed_standalone_live_parity",
+    label: "DB-backed standalone backend SDK/direct parity",
+    safeCommand: "corepack pnpm run backend-platform:db-backed-live-parity-proof",
+    strictCommand: "corepack pnpm run backend-platform:db-backed-live-parity-proof:strict",
+    read: (env, argv) => fromStatusParser(readDbBackedStandaloneLiveParityProofConfig(env, argv)),
   },
   {
     id: "sdk_registry_install_proof",

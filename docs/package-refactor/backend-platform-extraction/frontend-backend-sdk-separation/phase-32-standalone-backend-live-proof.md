@@ -59,7 +59,8 @@ This phase answers: is the backend product usable as its own service target?
 
 ## 2026-06-27 Result
 
-Status: partially passed for standalone health only.
+Status: passed for disposable DB-backed standalone route behavior; deployment
+configuration remains open.
 
 Evidence:
 
@@ -69,18 +70,25 @@ Evidence:
   `RESERVATION_STANDALONE_BACKEND_LIVE_BASE_URL=http://127.0.0.1:4110`.
 - The strict proof validated the `/v1/health` JSON contract and then the local
   proof process was stopped.
+- `corepack pnpm run backend-platform:db-backed-live-parity-proof:strict`
+  passed against the disposable Docker Postgres container
+  `reservation-proof-postgres-d8b0-sdk`.
+- The DB-backed proof applied package-owned migrations, verified database
+  RLS/admin visibility/durable idempotency behavior, seeded a neutral
+  service/resource fixture, started the standalone `/v1` backend with
+  PostgreSQL-backed repository adapters injected into `apps/api`, and served
+  catalog, availability, reservation, disabled-chat, idempotency, and
+  resource-maintenance behavior to the SDK/direct parity verifier.
 
 Still open:
 
 - Standalone deployment config is not complete against a real backend runtime
   target.
-- The current standalone runtime expects Supabase HTTP client configuration,
-  while the disposable proof database is raw PostgreSQL. DB-backed live route
-  proof therefore still needs Supabase/PostgREST-compatible disposable
-  infrastructure or a backend runtime adapter that can talk directly to the
-  disposable PostgreSQL database.
-- SDK/direct parity and compatibility cleanup still require DB-backed live
-  route behavior, not health-only proof.
+- The production standalone runtime still expects Supabase HTTP client
+  configuration; the direct PostgreSQL adapter currently lives in the proof
+  harness, not in the deployable backend runtime.
+- External frontend smoke and compatibility cleanup still depend on the full
+  release proof chain, not only backend route parity.
 
 ## Subagent Handoff Notes
 

@@ -154,7 +154,7 @@ test("live platform proof readiness safely skips live proof env surfaces when en
   assert.equal(parsed.status, "skip");
   assert.equal(parsed.shouldFail, false);
   assert.equal(parsed.strictReady, false);
-  assert.equal(parsed.surfaces.length, 16);
+  assert.equal(parsed.surfaces.length, 17);
   assert.deepEqual(
     parsed.surfaces.map((surface) => surface.id),
     [
@@ -173,6 +173,7 @@ test("live platform proof readiness safely skips live proof env surfaces when en
       "standalone_backend_live_health_proof",
       "database_live_migration_proof",
       "sdk_direct_live_parity",
+      "db_backed_standalone_live_parity",
       "sdk_registry_install_proof",
     ],
   );
@@ -193,12 +194,14 @@ test("live platform proof readiness safely skips live proof env surfaces when en
   assert.equal(byId(parsed, "standalone_backend_live_health_proof").safe.status, "skip");
   assert.equal(byId(parsed, "database_live_migration_proof").safe.status, "skip");
   assert.equal(byId(parsed, "sdk_direct_live_parity").safe.status, "skip");
+  assert.equal(byId(parsed, "db_backed_standalone_live_parity").safe.status, "skip");
   assert.equal(byId(parsed, "sdk_registry_install_proof").safe.status, "skip");
   assert.equal(byId(parsed, "extracted_backend_install_build_test_proof").strict.status, "fail");
   assert.equal(byId(parsed, "standalone_api_deployment_config").strict.status, "fail");
   assert.equal(byId(parsed, "standalone_backend_live_health_proof").strict.status, "fail");
   assert.equal(byId(parsed, "database_live_migration_proof").strict.status, "fail");
   assert.equal(byId(parsed, "sdk_direct_live_parity").strict.status, "fail");
+  assert.equal(byId(parsed, "db_backed_standalone_live_parity").strict.status, "fail");
   assert.equal(byId(parsed, "sdk_registry_install_proof").strict.status, "fail");
 });
 
@@ -274,6 +277,7 @@ test("live platform proof readiness fails strict mode when proof surfaces are un
       "standalone_backend_live_health_proof",
       "database_live_migration_proof",
       "sdk_direct_live_parity",
+      "db_backed_standalone_live_parity",
       "sdk_registry_install_proof",
     ],
   );
@@ -541,6 +545,7 @@ test("safe readiness ignores individual proof strict flags and remains non-faili
     {
       RESERVATION_DATABASE_LIVE_STRICT: "1",
       RESERVATION_PLATFORM_LIVE_STRICT: "1",
+      RESERVATION_DB_BACKED_STANDALONE_LIVE_PARITY_STRICT: "1",
       RESERVATION_SDK_REGISTRY_STRICT: "1",
       RESERVATION_STANDALONE_API_DEPLOYMENT_CONFIG_STRICT: "1",
       RESERVATION_STANDALONE_BACKEND_LIVE_PROOF_STRICT: "1",
@@ -562,6 +567,7 @@ test("safe readiness ignores individual proof strict flags and remains non-faili
   assert.equal(byId(parsed, "standalone_backend_live_health_proof").safe.status, "skip");
   assert.equal(byId(parsed, "database_live_migration_proof").safe.status, "skip");
   assert.equal(byId(parsed, "sdk_direct_live_parity").safe.status, "skip");
+  assert.equal(byId(parsed, "db_backed_standalone_live_parity").safe.status, "skip");
   assert.equal(byId(parsed, "sdk_registry_install_proof").safe.status, "skip");
 });
 

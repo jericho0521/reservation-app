@@ -40,6 +40,8 @@
     "database:verify-migration-bundle": "corepack pnpm run database:migration-index:check && node scripts/verify-database-migration-bundle.mjs",
     "database:live-proof": "node scripts/verify-database-live-proof.mjs",
     "database:live-proof:strict": "node scripts/verify-database-live-proof.mjs --strict",
+    "backend-platform:db-backed-live-parity-proof": "node scripts/verify-db-backed-standalone-live-parity.mjs",
+    "backend-platform:db-backed-live-parity-proof:strict": "node scripts/verify-db-backed-standalone-live-parity.mjs --strict",
     "sdk:smoke:plain:install": "corepack pnpm --dir examples/sdk-plain-typescript-smoke install --frozen-lockfile --config.package-import-method=copy --config.confirm-modules-purge=false",
     "sdk:smoke:plain": "corepack pnpm --dir examples/sdk-plain-typescript-smoke run typecheck && corepack pnpm --dir examples/sdk-plain-typescript-smoke run smoke",
     "sdk:smoke:server:install": "corepack pnpm --dir examples/sdk-server-to-server-smoke install --frozen-lockfile --config.package-import-method=copy --config.confirm-modules-purge=false",

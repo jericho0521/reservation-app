@@ -214,6 +214,49 @@ Scope:
 - It does not publish public/private packages, prove provenance/signing, or
   replace a future private/public registry pilot.
 
+## 2026-06-27 DB-Backed Standalone Backend SDK/Direct Parity Proof
+
+Disposable backend/database target:
+
+- Docker container: `reservation-proof-postgres-d8b0-sdk`
+- Database URL shape: `postgresql://postgres:***@localhost:5432/reservation_proof`
+- The proof used package-owned migrations from
+  `packages/database/migrations/supabase`.
+- The standalone backend was a local Node HTTP server created from `apps/api`
+  standalone route handlers with proof-only PostgreSQL-backed repository
+  adapters injected through `createStandaloneApiHandler`.
+- No production database, hosted Supabase project, public registry, or frontend
+  compatibility route was used.
+
+Command:
+
+- `RESERVATION_DATABASE_LIVE_URL=postgresql://postgres:***@localhost:5432/reservation_proof`
+  `RESERVATION_DATABASE_LIVE_DOCKER_CONTAINER=reservation-proof-postgres-d8b0-sdk`
+  `corepack pnpm run backend-platform:db-backed-live-parity-proof:strict`
+
+Result:
+
+- Passed.
+- The proof applied all package-owned database migrations, reran the disposable
+  database RLS/admin visibility/idempotency behavior proof, seeded a neutral
+  service/resource/reservation fixture, started a standalone `/v1` backend on
+  `127.0.0.1`, then ran the existing SDK/direct HTTP parity verifier against
+  that same backend URL.
+- Parity passed for metadata, service, resource, availability, reservation
+  list/summary, disabled chat error behavior, reservation create idempotency
+  replay, reservation read, reservation list after create, resource-maintenance
+  list, resource-maintenance create idempotency replay, resource-maintenance end
+  idempotency replay, and resource-maintenance list after end.
+
+Scope:
+
+- This closes the DB-backed standalone route behavior and SDK/direct parity
+  proof slice for disposable local infrastructure.
+- It does not replace standalone deployment configuration, permanent backend
+  repository extraction, public/private registry publishing, external frontend
+  browser smoke against this DB-backed backend, or compatibility route
+  cleanup/deprecation.
+
 ## Remaining External Proof
 
 Strict readiness checks run without live configuration:
@@ -226,8 +269,13 @@ Strict readiness checks run without live configuration:
   It now fails closed with two unready strict surfaces when the prepared roots,
   disposable database env, standalone health URL, and disposable registry env
   are configured: standalone deployment config and SDK/direct live parity env.
-  The database live proof, standalone health proof, and disposable registry
-  proof surfaces are ready when their proof env is configured.
+  A later DB-backed standalone parity proof passed through
+  `backend-platform:db-backed-live-parity-proof:strict`; the readiness
+  aggregator now tracks that proof surface separately from the older generic
+  SDK/direct live parity env check.
+  The database live proof, standalone health proof, DB-backed standalone parity
+  proof, and disposable registry proof surfaces are ready when their proof env
+  is configured.
 - `backend-platform:live-proof:strict` previously failed closed because
   `RESERVATION_STANDALONE_BACKEND_LIVE_BASE_URL` was not configured; the later
   local standalone health proof above passed.
@@ -240,9 +288,8 @@ Strict readiness checks run without live configuration:
 
 Still not complete:
 
-- standalone backend deployment configuration and DB-backed API proof against
-  disposable infrastructure;
-- SDK/direct HTTP live parity proof against the same backend;
+- standalone backend deployment configuration against a real runtime target;
+- external frontend browser smoke against the DB-backed standalone backend;
 - public/private registry install proof, if the release path requires one
   beyond disposable registry proof;
 - compatibility route removal or deprecation based on the full evidence chain.

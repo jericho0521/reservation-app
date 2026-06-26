@@ -8,6 +8,7 @@ import {
   type StandaloneApiHandler,
 } from "./routes.js";
 import {
+  createStandaloneCorsOptionsFromEnv,
   createStandaloneSupabaseDependenciesFromEnv,
   type StandaloneSupabaseEnv,
   type StandaloneSupabaseRuntimeOptions,
@@ -17,22 +18,43 @@ export interface StandaloneNodeServerEnvBootstrapOptions extends StandaloneSupab
   env?: StandaloneSupabaseEnv;
 }
 
-export function createStandaloneNodeServer(handler: StandaloneApiHandler = handleStandaloneApiRequest) {
+export interface StandaloneCorsOptions {
+  allowedOrigins?: readonly string[];
+}
+
+export interface StandaloneNodeServerOptions {
+  cors?: StandaloneCorsOptions;
+}
+
+export function createStandaloneNodeServer(
+  handler: StandaloneApiHandler = handleStandaloneApiRequest,
+  options: StandaloneNodeServerOptions = {},
+) {
   return createServer(async (request, response) => {
     const method = request.method ?? "GET";
     const path = request.url ?? "/";
     const headers = request.headers as StandaloneApiRequest["headers"];
 
+    if (method.toUpperCase() === "OPTIONS") {
+      writeStandaloneResponse(
+        response,
+        corsPreflightResponse(headers, options.cors),
+        headers,
+        options.cors,
+      );
+      return;
+    }
+
     if (shouldHandleBeforeJsonParse({ method, path, headers })) {
       const result = await handler({ method, path, headers });
-      writeStandaloneResponse(response, result);
+      writeStandaloneResponse(response, result, headers, options.cors);
       return;
     }
 
     if (shouldRunHandlerPreflight({ method, path, headers })) {
       const result = await handler({ method, path, headers, internalPreflight: "auth-only" });
       if (!isSuccessfulPreflightResponse(result)) {
-        writeStandaloneResponse(response, result);
+        writeStandaloneResponse(response, result, headers, options.cors);
         return;
       }
     }
@@ -40,7 +62,7 @@ export function createStandaloneNodeServer(handler: StandaloneApiHandler = handl
     const rawBody = await readRawBody(request);
     const bodyResult = parseJsonBody(rawBody);
     if (bodyResult.error) {
-      writeStandaloneResponse(response, bodyResult.error);
+      writeStandaloneResponse(response, bodyResult.error, headers, options.cors);
       return;
     }
 
@@ -51,7 +73,7 @@ export function createStandaloneNodeServer(handler: StandaloneApiHandler = handl
       body: bodyResult.body,
     });
 
-    writeStandaloneResponse(response, result);
+    writeStandaloneResponse(response, result, headers, options.cors);
   });
 }
 
@@ -61,7 +83,9 @@ export function createStandaloneNodeServerFromEnv(
   const { env = process.env, ...runtimeOptions } = options;
   const dependencies = createStandaloneSupabaseDependenciesFromEnv(env, runtimeOptions);
 
-  return createStandaloneNodeServer(createStandaloneApiHandler(dependencies));
+  return createStandaloneNodeServer(createStandaloneApiHandler(dependencies), {
+    cors: createStandaloneCorsOptionsFromEnv(env),
+  });
 }
 
 if (isDirectRun()) {
@@ -117,9 +141,61 @@ function parseJsonBody(rawBody: string | undefined): JsonBodyReadResult {
 function writeStandaloneResponse(
   response: ServerResponse,
   result: StandaloneApiResponse,
+  requestHeaders?: StandaloneApiRequest["headers"],
+  cors?: StandaloneCorsOptions,
 ) {
-  response.writeHead(result.status, result.headers);
+  response.writeHead(result.status, {
+    ...result.headers,
+    ...corsResponseHeaders(requestHeaders, cors),
+  });
   response.end(serializeStandaloneResponseBody(result));
+}
+
+function corsPreflightResponse(
+  requestHeaders: StandaloneApiRequest["headers"],
+  cors: StandaloneCorsOptions | undefined,
+): StandaloneApiResponse {
+  const headers = corsResponseHeaders(requestHeaders, cors);
+  if (!headers["access-control-allow-origin"]) {
+    return platformError(403, "forbidden", "CORS origin is not allowed.");
+  }
+
+  return {
+    status: 204,
+    headers,
+    body: undefined,
+  };
+}
+
+function corsResponseHeaders(
+  requestHeaders: StandaloneApiRequest["headers"] | undefined,
+  cors: StandaloneCorsOptions | undefined,
+) {
+  const origin = getHeader(requestHeaders, "Origin");
+  if (!origin || !isAllowedCorsOrigin(origin, cors)) {
+    return {};
+  }
+
+  const requestedHeaders = getHeader(requestHeaders, "Access-Control-Request-Headers");
+  return {
+    "access-control-allow-origin": origin,
+    "access-control-allow-methods": "GET,POST,PATCH,OPTIONS",
+    "access-control-allow-headers": requestedHeaders || [
+      "Authorization",
+      "Content-Type",
+      "Idempotency-Key",
+      "X-Correlation-Id",
+      "X-Reservation-Tenant-Id",
+      "X-Reservation-Venue-Id",
+    ].join(", "),
+    "access-control-max-age": "600",
+    vary: "Origin",
+  };
+}
+
+function isAllowedCorsOrigin(origin: string, cors: StandaloneCorsOptions | undefined) {
+  const allowedOrigins = cors?.allowedOrigins ?? [];
+  return allowedOrigins.includes("*") || allowedOrigins.includes(origin);
 }
 
 function serializeStandaloneResponseBody(result: StandaloneApiResponse) {

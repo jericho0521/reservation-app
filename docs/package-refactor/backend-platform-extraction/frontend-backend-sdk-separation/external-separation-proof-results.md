@@ -287,6 +287,30 @@ Scope:
 - It does not deploy a production host, create cloud infrastructure, connect to
   Supabase, or replace the DB-backed disposable live parity proof.
 
+## 2026-06-27 Standalone Backend Browser CORS Contract Proof
+
+Command:
+
+- `node --import tsx --test apps/api/src/server.test.ts scripts/verify-standalone-api-deployment-config.test.mjs`
+
+Result:
+
+- Passed.
+- The standalone API runtime now reads
+  `RESERVATION_PLATFORM_CORS_ALLOWED_ORIGINS` as a backend runtime env value.
+- The Node server handles browser `OPTIONS` preflight itself and reflects CORS
+  headers only for configured origins.
+- The deployment manifest/verifier include the CORS env in the standalone
+  runtime contract.
+
+Scope:
+
+- This removes the server-layer CORS blocker for a real external frontend
+  browser smoke against the standalone backend.
+- It is not yet the browser smoke itself; that still needs to start the
+  DB-backed standalone backend and drive the frontend against that live `/v1`
+  origin.
+
 ## Remaining External Proof
 
 Strict readiness checks run without live configuration:

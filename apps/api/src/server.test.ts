@@ -83,6 +83,50 @@ test("standalone env bootstrap uses service-token-only auth without Supabase rep
   });
 });
 
+test("standalone env bootstrap serves configured browser CORS preflight and response headers", async () => {
+  const server = createStandaloneNodeServerFromEnv({
+    env: {
+      RESERVATION_PLATFORM_SERVICE_API_KEY: "platform-service-secret",
+      RESERVATION_PLATFORM_CORS_ALLOWED_ORIGINS: "http://frontend.example.test",
+    },
+    createClient() {
+      throw new Error("Supabase client creation should not run for service-token-only env.");
+    },
+  });
+
+  await withListeningServer(server, async (baseUrl) => {
+    const preflight = await fetch(`${baseUrl}/v1/services`, {
+      method: "OPTIONS",
+      headers: {
+        Origin: "http://frontend.example.test",
+        "Access-Control-Request-Method": "GET",
+        "Access-Control-Request-Headers": "authorization,x-reservation-tenant-id",
+      },
+    });
+    const dataResponse = await fetch(`${baseUrl}/v1/services`, {
+      headers: {
+        Origin: "http://frontend.example.test",
+      },
+    });
+    const blockedPreflight = await fetch(`${baseUrl}/v1/services`, {
+      method: "OPTIONS",
+      headers: {
+        Origin: "http://blocked.example.test",
+        "Access-Control-Request-Method": "GET",
+      },
+    });
+
+    assert.equal(preflight.status, 204);
+    assert.equal(preflight.headers.get("access-control-allow-origin"), "http://frontend.example.test");
+    assert.equal(preflight.headers.get("access-control-allow-methods"), "GET,POST,PATCH,OPTIONS");
+    assert.equal(preflight.headers.get("access-control-allow-headers"), "authorization,x-reservation-tenant-id");
+    assert.equal(dataResponse.status, 401);
+    assert.equal(dataResponse.headers.get("access-control-allow-origin"), "http://frontend.example.test");
+    assert.equal(blockedPreflight.status, 403);
+    assert.equal(blockedPreflight.headers.get("access-control-allow-origin"), null);
+  });
+});
+
 test("standalone env bootstrap fails closed for partial Supabase env before exposing a server", () => {
   let createClientCalls = 0;
 

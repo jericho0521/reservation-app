@@ -86,6 +86,10 @@ Evidence:
 - The deployment verifier checks the manifest against `apps/api/package.json`,
   `apps/api/src/runtime.ts`, build/start commands, health path, Supabase env,
   auth alternatives, optional runtime env, and forbidden public secret prefixes.
+- The standalone Node server now owns browser CORS preflight handling through
+  the backend-only `RESERVATION_PLATFORM_CORS_ALLOWED_ORIGINS` env contract,
+  and focused server plus deployment-verifier tests prove allowed origins get
+  preflight/response headers while blocked origins do not.
 
 Still open:
 
@@ -93,8 +97,9 @@ Still open:
 - The production standalone runtime still expects Supabase HTTP client
   configuration; the direct PostgreSQL adapter currently lives in the proof
   harness, not in the deployable backend runtime.
-- External frontend smoke and compatibility cleanup still depend on the full
-  release proof chain, not only backend route parity.
+- External frontend smoke against the DB-backed standalone backend and
+  compatibility cleanup still depend on the full release proof chain, not only
+  backend route parity and CORS readiness.
 
 ## Subagent Handoff Notes
 

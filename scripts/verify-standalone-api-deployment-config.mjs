@@ -30,6 +30,10 @@ export const standaloneApiAuthOptionalEnvNames = [
   "RESERVATION_PLATFORM_AUTH_SCOPES_CLAIM",
 ];
 
+export const standaloneApiCorsOptionalEnvNames = [
+  "RESERVATION_PLATFORM_CORS_ALLOWED_ORIGINS",
+];
+
 export const standaloneApiAiChatEnvNames = [
   "GOOGLE_GENERATIVE_AI_API_KEY",
   "GOOGLE_GENERATIVE_AI_MODEL",
@@ -42,6 +46,7 @@ export const standaloneApiRuntimeEnvNames = [
   standaloneApiServiceAuthEnvName,
   ...standaloneApiAuthRequiredEnvNames,
   ...standaloneApiAuthOptionalEnvNames,
+  ...standaloneApiCorsOptionalEnvNames,
 ];
 
 export const standaloneApiDeploymentReadinessOnlyEnvNames = [
@@ -56,7 +61,7 @@ const standaloneApiKnownEnvNames = [
 ];
 
 const runtimeEnvMemberAccessPattern =
-  /(?<![\w$])env\s*\??\.\s*(RESERVATION_SUPABASE_[A-Z0-9_]+|RESERVATION_PLATFORM_SERVICE_API_KEY|RESERVATION_PLATFORM_AUTH_[A-Z0-9_]+)\b/gu;
+  /(?<![\w$])env\s*\??\.\s*(RESERVATION_SUPABASE_[A-Z0-9_]+|RESERVATION_PLATFORM_SERVICE_API_KEY|RESERVATION_PLATFORM_AUTH_[A-Z0-9_]+|RESERVATION_PLATFORM_CORS_ALLOWED_ORIGINS)\b/gu;
 
 const scriptDirectory = dirname(fileURLToPath(import.meta.url));
 const defaultRuntimeSourcePath = resolve(scriptDirectory, "../apps/api/src/runtime.ts");
@@ -325,6 +330,7 @@ export function verifyStandaloneDeploymentManifest(options = {}) {
     "optionalRuntimeEnv",
     [
       ...standaloneApiAuthOptionalEnvNames,
+      ...standaloneApiCorsOptionalEnvNames,
       ...standaloneApiAiChatEnvNames,
     ],
     errors,

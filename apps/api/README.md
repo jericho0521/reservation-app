@@ -141,6 +141,12 @@ must run `node apps/api/dist/server.js`, health must stay on `/v1/health`,
 Supabase env must stay backend-only, and the auth alternatives must remain
 service-token or JWT/JWKS based.
 
+Browser frontends should be enabled through
+`RESERVATION_PLATFORM_CORS_ALLOWED_ORIGINS`, a comma-separated list of exact
+allowed origins such as `https://frontend.example.com`. The standalone API
+handles `OPTIONS` preflight requests itself and reflects CORS headers only for
+configured origins.
+
 It is not live backend parity. The health endpoints are deployability/readiness
 hygiene only: they prove that a deployed host process can answer a cheap public
 request, not that the service has been deployed, connected to Supabase, applied

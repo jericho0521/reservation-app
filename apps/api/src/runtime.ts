@@ -29,6 +29,7 @@ export const STANDALONE_SUPABASE_ENV_NAMES = {
   authVenueIdsClaim: "RESERVATION_PLATFORM_AUTH_VENUE_IDS_CLAIM",
   authRolesClaim: "RESERVATION_PLATFORM_AUTH_ROLES_CLAIM",
   authScopesClaim: "RESERVATION_PLATFORM_AUTH_SCOPES_CLAIM",
+  corsAllowedOrigins: "RESERVATION_PLATFORM_CORS_ALLOWED_ORIGINS",
 } as const;
 
 export interface StandaloneSupabaseConfig {
@@ -54,6 +55,7 @@ export interface StandaloneSupabaseEnv extends Record<string, string | undefined
   RESERVATION_PLATFORM_AUTH_VENUE_IDS_CLAIM?: string;
   RESERVATION_PLATFORM_AUTH_ROLES_CLAIM?: string;
   RESERVATION_PLATFORM_AUTH_SCOPES_CLAIM?: string;
+  RESERVATION_PLATFORM_CORS_ALLOWED_ORIGINS?: string;
 }
 
 export interface StandaloneSupabaseClient {
@@ -200,6 +202,12 @@ export function standaloneSupabaseConfigFromEnv(env: StandaloneSupabaseEnv): Sta
     supabaseAnonKey: env.RESERVATION_SUPABASE_ANON_KEY,
     supabaseServiceRoleKey: env.RESERVATION_SUPABASE_SERVICE_ROLE_KEY,
     serviceApiKey: env.RESERVATION_PLATFORM_SERVICE_API_KEY,
+  };
+}
+
+export function createStandaloneCorsOptionsFromEnv(env: StandaloneSupabaseEnv = process.env) {
+  return {
+    allowedOrigins: splitEnvList(env.RESERVATION_PLATFORM_CORS_ALLOWED_ORIGINS),
   };
 }
 

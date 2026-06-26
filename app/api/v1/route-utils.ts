@@ -28,6 +28,9 @@ import {
   createSupabaseTenantVenueRepository,
 } from "@project-play/reservations-supabase";
 
+type SupabaseIdempotencyRepositoryInput = Parameters<typeof createSupabaseIdempotencyRepository>[0];
+type SupabaseTenantVenueRepositoryInput = Parameters<typeof createSupabaseTenantVenueRepository>[0];
+
 export const backendRuntimeServiceApiKeyEnvName = "RESERVATION_PLATFORM_SERVICE_API_KEY";
 
 export function platformJsonError(
@@ -355,7 +358,9 @@ export function resolveBackendRuntimeIdempotencyRepository(): IdempotencyReposit
   }
 
   try {
-    backendRuntimeIdempotencyRepository = createSupabaseIdempotencyRepository(supabaseAdmin());
+    backendRuntimeIdempotencyRepository = createSupabaseIdempotencyRepository(
+      supabaseAdmin() as unknown as SupabaseIdempotencyRepositoryInput,
+    );
     return backendRuntimeIdempotencyRepository;
   } catch (error) {
     if (!(error instanceof MissingSupabaseServiceRoleKeyError)) {
@@ -379,7 +384,9 @@ export function resolveBackendRuntimeTenantVenueRepository(): PlatformTenantVenu
     return backendRuntimeTenantVenueRepository;
   }
 
-  backendRuntimeTenantVenueRepository = createSupabaseTenantVenueRepository(supabaseAdmin());
+  backendRuntimeTenantVenueRepository = createSupabaseTenantVenueRepository(
+    supabaseAdmin() as unknown as SupabaseTenantVenueRepositoryInput,
+  );
   return backendRuntimeTenantVenueRepository;
 }
 

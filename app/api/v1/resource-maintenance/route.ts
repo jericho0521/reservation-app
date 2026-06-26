@@ -15,6 +15,8 @@ import {
   runJsonMutationIdempotently,
 } from "../route-utils";
 
+type SupabaseResourceMaintenanceRepositoryInput = Parameters<typeof createSupabaseResourceMaintenanceRepository>[0];
+
 function getUserId(user: unknown) {
   const id = typeof user === "object" && user !== null && "id" in user
     ? (user as { id: unknown }).id
@@ -36,7 +38,9 @@ export async function GET(request: Request) {
     return auth;
   }
 
-  const repository = createSupabaseResourceMaintenanceRepository(auth.context.supabase);
+  const repository = createSupabaseResourceMaintenanceRepository(
+    auth.context.supabase as unknown as SupabaseResourceMaintenanceRepositoryInput,
+  );
   const result = await listResourceMaintenance({ repository, serviceId });
   return Response.json(result.body, { status: result.status });
 }
@@ -69,7 +73,9 @@ export async function POST(request: Request) {
           );
         }
 
-        const repository = createSupabaseResourceMaintenanceRepository(auth.supabase);
+        const repository = createSupabaseResourceMaintenanceRepository(
+          auth.supabase as unknown as SupabaseResourceMaintenanceRepositoryInput,
+        );
         const result = await createResourceMaintenance({
           repository,
           data: parsedInput.data,

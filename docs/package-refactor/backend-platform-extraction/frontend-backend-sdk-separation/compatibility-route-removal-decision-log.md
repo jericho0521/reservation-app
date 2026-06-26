@@ -36,6 +36,20 @@ Current gate status:
 - 0 routes are currently removable.
 - 0 routes remain blocked by strict prepared-root proof gates.
 
+Runtime deprecation status:
+
+- `proxy.ts` now marks retained reservation-platform compatibility routes with
+  `Deprecation: true`, `Link: </v1/...>; rel="successor-version"`,
+  `X-Reservation-Compatibility-Route: deprecated`,
+  `X-Reservation-Compatibility-Status: remove-later`, and
+  `X-Reservation-Standalone-Route`.
+- The proxy does not rewrite, redirect, delete, or block compatibility routes;
+  it only signals the proven standalone successor path while local fallback
+  remains available.
+- App-owned routes and optional chat compatibility routes are not marked by
+  this deprecation proxy because they are outside the proven reservation
+  platform replacement set or still lack enabled optional-module proof.
+
 The app-owned analytics, blog, and update routes in
 `compatibility-route-inventory.json` are outside reservation-platform route
 removal scope. They remain current-app routes with `keep-app-owned` status and
@@ -70,8 +84,9 @@ non-public catalog behavior.
 
 Rollback/deprecation decision: keep the current app compatibility routes as the
 rollback fallback until hosted deployment/runtime ownership, route tests, and
-current frontend local-mode cutover policy are resolved. Do not delete or
-deprecate these routes in this slice.
+current frontend local-mode cutover policy are resolved. Runtime deprecation
+headers now point callers to the standalone `/v1` successor routes; do not
+delete these routes in this slice.
 
 ## Venues Catalog
 
@@ -92,8 +107,9 @@ contract requires non-public catalog behavior.
 
 Rollback/deprecation decision: keep the current app compatibility routes as the
 rollback fallback until the hosted/runtime release target is settled and final
-cleanup tests prove no current frontend dependency on these paths. Do not
-delete or deprecate these routes in this slice.
+cleanup tests prove no current frontend dependency on these paths. Runtime
+deprecation headers now point callers to the standalone `/v1` successor routes;
+do not delete these routes in this slice.
 
 ## Availability
 
@@ -113,7 +129,8 @@ backend-owned tenant or auth proof required by the final availability contract.
 
 Rollback/deprecation decision: keep both availability compatibility routes as
 rollback fallback until hosted/runtime ownership is resolved and the frontend
-no longer needs local fallback. Do not delete or deprecate these routes in this
+no longer needs local fallback. Runtime deprecation headers now point callers
+to the standalone `/v1` successor route; do not delete these routes in this
 slice.
 
 ## Reservations And Legacy Bookings
@@ -138,7 +155,8 @@ and final production runtime ownership for the DB adapter/auth path.
 Rollback/deprecation decision: keep the legacy booking and `/api/v1`
 reservation compatibility routes as rollback fallback until current frontend
 local-mode policy, route cleanup tests, hosted deployment, and production
-runtime ownership are resolved. Do not delete or deprecate these routes in this
+runtime ownership are resolved. Runtime deprecation headers now point callers
+to the standalone `/v1` successor routes; do not delete these routes in this
 slice.
 
 ## Resource Maintenance
@@ -162,7 +180,8 @@ production runtime ownership for the DB adapter/auth path.
 Rollback/deprecation decision: keep the seat-maintenance and resource
 maintenance compatibility routes as rollback fallback until current frontend
 local-mode policy, route cleanup tests, hosted deployment, and production
-runtime ownership are resolved. Do not delete or deprecate these routes in this
+runtime ownership are resolved. Runtime deprecation headers now point callers
+to the standalone `/v1` successor routes; do not delete these routes in this
 slice.
 
 ## Metadata
@@ -181,7 +200,8 @@ if required for release, and route tests.
 
 Rollback/deprecation decision: keep `/api/v1/metadata` as rollback fallback
 until hosted/runtime ownership is settled and current consumers no longer rely
-on current-app `/api/v1` fallback. Do not delete or deprecate this route in
+on current-app `/api/v1` fallback. Runtime deprecation headers now point
+callers to the standalone `/v1` successor route; do not delete this route in
 this slice.
 
 ## Resource Catalogs And Layouts
@@ -203,8 +223,9 @@ catalog contract requires non-public catalog behavior.
 
 Rollback/deprecation decision: keep these current-app resource catalog and
 layout compatibility routes as rollback fallback until hosted/runtime ownership
-is settled and frontend cutover policy is resolved. Do not delete or deprecate
-these routes in this slice.
+is settled and frontend cutover policy is resolved. Runtime deprecation
+headers now point callers to the standalone `/v1` successor routes; do not
+delete these routes in this slice.
 
 ## Optional Chat Module
 

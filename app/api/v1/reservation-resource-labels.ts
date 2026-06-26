@@ -40,6 +40,12 @@ function itemWithResolvedLabel(
   };
 }
 
+function serviceIdFromReservationMutation(input: ReservationMutationInput) {
+  return "service_id" in input && typeof input.service_id === "string"
+    ? input.service_id
+    : null;
+}
+
 export async function resolveResourceIdsForLegacyReservation<T extends ReservationMutationInput>(
   input: T,
   createRepository: ResourceLabelRepositoryFactory = createReservationResourceLabelRepository,
@@ -49,12 +55,13 @@ export async function resolveResourceIdsForLegacyReservation<T extends Reservati
     return input;
   }
 
-  if (typeof input.service_id !== "string" || input.service_id.trim().length === 0) {
+  const serviceId = serviceIdFromReservationMutation(input);
+  if (!serviceId || serviceId.trim().length === 0) {
     return input;
   }
 
   const labelsById = await createRepository()
-    .resolveLabelsById(input.service_id, ids);
+    .resolveLabelsById(serviceId, ids);
 
   return {
     ...input,

@@ -33,7 +33,7 @@ export async function PATCH(
       }),
       async mutate(body, auth) {
         const preparedPatch = prepareReservationUpdatePatch(body);
-        if (preparedPatch.error) {
+        if ("error" in preparedPatch) {
           return Response.json(preparedPatch.error, { status: preparedPatch.status });
         }
 

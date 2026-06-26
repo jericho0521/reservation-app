@@ -43,7 +43,12 @@
       "removalBlockedBy": [
         "current frontend local mode still targets /api/services",
         "hosted backend deployment and route cleanup tests are not complete"
-      ]
+      ],
+      "deprecationSignaling": {
+        "active": true,
+        "filePath": "proxy.ts",
+        "successorRoute": "/v1/services"
+      }
     },
     {
       "routePath": "/api/services/{id}",
@@ -68,7 +73,12 @@
       "removalBlockedBy": [
         "final cleanup tests must prove no current frontend dependency on this compatibility path",
         "hosted backend deployment and route cleanup tests are not complete"
-      ]
+      ],
+      "deprecationSignaling": {
+        "active": true,
+        "filePath": "proxy.ts",
+        "successorRoute": "/v1/services/{id}"
+      }
     },
     {
       "routePath": "/api/venues",
@@ -93,7 +103,12 @@
       "removalBlockedBy": [
         "final cleanup tests must prove no current frontend dependency on this compatibility path",
         "hosted backend deployment and route cleanup tests are not complete"
-      ]
+      ],
+      "deprecationSignaling": {
+        "active": true,
+        "filePath": "proxy.ts",
+        "successorRoute": "/v1/venues"
+      }
     },
     {
       "routePath": "/api/venues/{id}",
@@ -118,7 +133,12 @@
       "removalBlockedBy": [
         "final cleanup tests must prove no current frontend dependency on this compatibility path",
         "hosted backend deployment and route cleanup tests are not complete"
-      ]
+      ],
+      "deprecationSignaling": {
+        "active": true,
+        "filePath": "proxy.ts",
+        "successorRoute": "/v1/venues/{id}"
+      }
     },
     {
       "routePath": "/api/availability",
@@ -143,7 +163,12 @@
       "removalBlockedBy": [
         "current frontend local mode still targets /api/availability",
         "hosted backend deployment and route cleanup tests are not complete"
-      ]
+      ],
+      "deprecationSignaling": {
+        "active": true,
+        "filePath": "proxy.ts",
+        "successorRoute": "/v1/availability"
+      }
     },
     {
       "routePath": "/api/bookings",
@@ -168,7 +193,12 @@
       "removalBlockedBy": [
         "current frontend local mode still targets /api/bookings",
         "hosted backend deployment and production DB adapter/auth runtime ownership are not complete"
-      ]
+      ],
+      "deprecationSignaling": {
+        "active": true,
+        "filePath": "proxy.ts",
+        "successorRoute": "/v1/reservations"
+      }
     },
     {
       "routePath": "/api/bookings/{id}",
@@ -193,7 +223,12 @@
       "removalBlockedBy": [
         "current frontend local mode still targets /api/bookings/{id}",
         "hosted backend deployment and production DB adapter/auth runtime ownership are not complete"
-      ]
+      ],
+      "deprecationSignaling": {
+        "active": true,
+        "filePath": "proxy.ts",
+        "successorRoute": "/v1/reservations/{id}"
+      }
     },
     {
       "routePath": "/api/seat-maintenance",
@@ -218,7 +253,12 @@
       "removalBlockedBy": [
         "current frontend local mode still targets /api/seat-maintenance",
         "hosted backend deployment and production DB adapter/auth runtime ownership are not complete"
-      ]
+      ],
+      "deprecationSignaling": {
+        "active": true,
+        "filePath": "proxy.ts",
+        "successorRoute": "/v1/resource-maintenance"
+      }
     },
     {
       "routePath": "/api/v1/metadata",
@@ -243,7 +283,12 @@
       "removalBlockedBy": [
         "current app /api/v1 fallback remains available until final cutover policy is decided",
         "hosted backend deployment and route cleanup tests are not complete"
-      ]
+      ],
+      "deprecationSignaling": {
+        "active": true,
+        "filePath": "proxy.ts",
+        "successorRoute": "/v1/metadata"
+      }
     },
     {
       "routePath": "/api/v1/services",
@@ -268,7 +313,12 @@
       "removalBlockedBy": [
         "current app /api/v1 fallback remains available until final cutover policy is decided",
         "hosted backend deployment and route cleanup tests are not complete"
-      ]
+      ],
+      "deprecationSignaling": {
+        "active": true,
+        "filePath": "proxy.ts",
+        "successorRoute": "/v1/services"
+      }
     },
     {
       "routePath": "/api/v1/services/{id}",
@@ -293,7 +343,12 @@
       "removalBlockedBy": [
         "current app /api/v1 fallback remains available until final cutover policy is decided",
         "hosted backend deployment and route cleanup tests are not complete"
-      ]
+      ],
+      "deprecationSignaling": {
+        "active": true,
+        "filePath": "proxy.ts",
+        "successorRoute": "/v1/services/{id}"
+      }
     },
     {
       "routePath": "/api/v1/venues",
@@ -318,7 +373,12 @@
       "removalBlockedBy": [
         "current app /api/v1 fallback remains available until final cutover policy is decided",
         "hosted backend deployment and route cleanup tests are not complete"
-      ]
+      ],
+      "deprecationSignaling": {
+        "active": true,
+        "filePath": "proxy.ts",
+        "successorRoute": "/v1/venues"
+      }
     },
     {
       "routePath": "/api/v1/venues/{id}",
@@ -343,7 +403,12 @@
       "removalBlockedBy": [
         "current app /api/v1 fallback remains available until final cutover policy is decided",
         "hosted backend deployment and route cleanup tests are not complete"
-      ]
+      ],
+      "deprecationSignaling": {
+        "active": true,
+        "filePath": "proxy.ts",
+        "successorRoute": "/v1/venues/{id}"
+      }
     },
     {
       "routePath": "/api/v1/resources",
@@ -368,7 +433,12 @@
       "removalBlockedBy": [
         "current app /api/v1 fallback remains available until final cutover policy is decided",
         "hosted backend deployment and route cleanup tests are not complete"
-      ]
+      ],
+      "deprecationSignaling": {
+        "active": true,
+        "filePath": "proxy.ts",
+        "successorRoute": "/v1/resources"
+      }
     },
     {
       "routePath": "/api/v1/resources/{id}",
@@ -393,7 +463,12 @@
       "removalBlockedBy": [
         "current app /api/v1 fallback remains available until final cutover policy is decided",
         "hosted backend deployment and route cleanup tests are not complete"
-      ]
+      ],
+      "deprecationSignaling": {
+        "active": true,
+        "filePath": "proxy.ts",
+        "successorRoute": "/v1/resources/{id}"
+      }
     },
     {
       "routePath": "/api/v1/resource-layouts/{id}",
@@ -418,7 +493,12 @@
       "removalBlockedBy": [
         "current app /api/v1 fallback remains available until final cutover policy is decided",
         "hosted backend deployment and route cleanup tests are not complete"
-      ]
+      ],
+      "deprecationSignaling": {
+        "active": true,
+        "filePath": "proxy.ts",
+        "successorRoute": "/v1/resource-layouts/{id}"
+      }
     },
     {
       "routePath": "/api/v1/availability",
@@ -443,7 +523,12 @@
       "removalBlockedBy": [
         "current app /api/v1 fallback remains available until final cutover policy is decided",
         "hosted backend deployment and route cleanup tests are not complete"
-      ]
+      ],
+      "deprecationSignaling": {
+        "active": true,
+        "filePath": "proxy.ts",
+        "successorRoute": "/v1/availability"
+      }
     },
     {
       "routePath": "/api/v1/reservations",
@@ -468,7 +553,12 @@
       "removalBlockedBy": [
         "current app /api/v1 fallback remains available until final cutover policy is decided",
         "hosted backend deployment and production DB adapter/auth runtime ownership are not complete"
-      ]
+      ],
+      "deprecationSignaling": {
+        "active": true,
+        "filePath": "proxy.ts",
+        "successorRoute": "/v1/reservations"
+      }
     },
     {
       "routePath": "/api/v1/reservations/{id}",
@@ -493,7 +583,12 @@
       "removalBlockedBy": [
         "current app /api/v1 fallback remains available until final cutover policy is decided",
         "hosted backend deployment and production DB adapter/auth runtime ownership are not complete"
-      ]
+      ],
+      "deprecationSignaling": {
+        "active": true,
+        "filePath": "proxy.ts",
+        "successorRoute": "/v1/reservations/{id}"
+      }
     },
     {
       "routePath": "/api/v1/reservations/{id}/cancel",
@@ -518,7 +613,12 @@
       "removalBlockedBy": [
         "current app /api/v1 fallback remains available until final cutover policy is decided",
         "hosted backend deployment and production DB adapter/auth runtime ownership are not complete"
-      ]
+      ],
+      "deprecationSignaling": {
+        "active": true,
+        "filePath": "proxy.ts",
+        "successorRoute": "/v1/reservations/{id}/cancel"
+      }
     },
     {
       "routePath": "/api/v1/reservations/{id}/reschedule",
@@ -543,7 +643,12 @@
       "removalBlockedBy": [
         "current app /api/v1 fallback remains available until final cutover policy is decided",
         "hosted backend deployment and production DB adapter/auth runtime ownership are not complete"
-      ]
+      ],
+      "deprecationSignaling": {
+        "active": true,
+        "filePath": "proxy.ts",
+        "successorRoute": "/v1/reservations/{id}/reschedule"
+      }
     },
     {
       "routePath": "/api/v1/resource-maintenance",
@@ -568,7 +673,12 @@
       "removalBlockedBy": [
         "current app /api/v1 fallback remains available until final cutover policy is decided",
         "hosted backend deployment and production DB adapter/auth runtime ownership are not complete"
-      ]
+      ],
+      "deprecationSignaling": {
+        "active": true,
+        "filePath": "proxy.ts",
+        "successorRoute": "/v1/resource-maintenance"
+      }
     },
     {
       "routePath": "/api/v1/resource-maintenance/{id}/end",
@@ -593,7 +703,12 @@
       "removalBlockedBy": [
         "current app /api/v1 fallback remains available until final cutover policy is decided",
         "hosted backend deployment and production DB adapter/auth runtime ownership are not complete"
-      ]
+      ],
+      "deprecationSignaling": {
+        "active": true,
+        "filePath": "proxy.ts",
+        "successorRoute": "/v1/resource-maintenance/{id}/end"
+      }
     },
     {
       "routePath": "/api/v1/chat/reservation-sessions",
@@ -865,5 +980,17 @@
         "tenant, auth, and idempotency proof for booking-creating chat confirmation is not complete"
       ]
     }
-  ]
+  ],
+  "runtimeDeprecationSignaling": {
+    "status": "active-for-remove-later-reservation-platform-routes",
+    "filePath": "proxy.ts",
+    "headers": [
+      "Deprecation",
+      "Link",
+      "X-Reservation-Compatibility-Route",
+      "X-Reservation-Compatibility-Status",
+      "X-Reservation-Standalone-Route"
+    ],
+    "note": "Runtime proxy adds deprecation and successor /v1 headers for retained reservation-platform compatibility routes without rewriting or deleting them. Optional chat and app-owned routes are not marked by this proxy."
+  }
 }

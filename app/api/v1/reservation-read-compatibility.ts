@@ -11,6 +11,7 @@ import {
 } from "./route-utils";
 
 type ReservationRouteContext = { params: Promise<{ id: string }> };
+type SupabaseReservationReadRepositoryInput = Parameters<typeof createSupabaseReservationReadRepository>[0];
 
 interface ReadLegacyCompatibleReservationOptions extends PlatformAuthenticatedSupabaseOptions {
   repository?: Pick<ReservationReadRepositoryPort, "readReservationById">;
@@ -33,7 +34,9 @@ export async function readLegacyCompatibleReservation(
 
   const { id } = await params;
   const result = await readReservationById({
-    repository: options.repository ?? createSupabaseReservationReadRepository(auth.context.supabase),
+    repository: options.repository ?? createSupabaseReservationReadRepository(
+      auth.context.supabase as unknown as SupabaseReservationReadRepositoryInput,
+    ),
     reservationId: id,
   });
 

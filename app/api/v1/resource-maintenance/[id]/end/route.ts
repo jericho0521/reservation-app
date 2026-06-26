@@ -9,6 +9,8 @@ import {
   runJsonMutationIdempotently,
 } from "../../../route-utils";
 
+type SupabaseResourceMaintenanceRepositoryInput = Parameters<typeof createSupabaseResourceMaintenanceRepository>[0];
+
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
@@ -41,7 +43,9 @@ export async function POST(
           );
         }
 
-        const repository = createSupabaseResourceMaintenanceRepository(auth.supabase);
+        const repository = createSupabaseResourceMaintenanceRepository(
+          auth.supabase as unknown as SupabaseResourceMaintenanceRepositoryInput,
+        );
         const result = await endResourceMaintenance({
           repository,
           maintenanceId: id,

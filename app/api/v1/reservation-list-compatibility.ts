@@ -10,6 +10,8 @@ import {
   type PlatformAuthenticatedSupabaseOptions,
 } from "./route-utils";
 
+type SupabaseReservationReadRepositoryInput = Parameters<typeof createSupabaseReservationReadRepository>[0];
+
 interface ListLegacyCompatibleReservationsOptions extends PlatformAuthenticatedSupabaseOptions {
   repository?: Pick<ReservationReadRepositoryPort, "listReservations" | "getReservationsSummary">;
   tenantVenueRepository?: PlatformTenantVenueRepository;
@@ -29,7 +31,9 @@ export async function listLegacyCompatibleReservations(
   }
 
   const result = await listReservations({
-    repository: options.repository ?? createSupabaseReservationReadRepository(auth.context.supabase),
+    repository: options.repository ?? createSupabaseReservationReadRepository(
+      auth.context.supabase as unknown as SupabaseReservationReadRepositoryInput,
+    ),
     search: request.nextUrl.searchParams.get("search"),
   });
   return NextResponse.json(result.body, { status: result.status });

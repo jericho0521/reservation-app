@@ -3,6 +3,7 @@ import { createSupabaseReservationMutationRepository } from "@project-play/reser
 import type { PlatformAuthenticatedSupabaseContext } from "./route-utils";
 
 type ReservationRouteContext = { params: Promise<{ id: string }> };
+type SupabaseReservationMutationRepositoryInput = Parameters<typeof createSupabaseReservationMutationRepository>[0];
 
 export async function cancelLegacyCompatibleReservation(
   { params }: ReservationRouteContext,
@@ -10,7 +11,9 @@ export async function cancelLegacyCompatibleReservation(
 ) {
   const { id } = await params;
   const result = await cancelReservation({
-    repository: createSupabaseReservationMutationRepository(auth.supabase),
+    repository: createSupabaseReservationMutationRepository(
+      auth.supabase as unknown as SupabaseReservationMutationRepositoryInput,
+    ),
     reservationId: id,
   });
 

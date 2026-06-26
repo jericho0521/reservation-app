@@ -311,6 +311,45 @@ Scope:
   DB-backed standalone backend and drive the frontend against that live `/v1`
   origin.
 
+## 2026-06-27 DB-backed Current Frontend Browser Smoke
+
+Disposable database:
+
+- Docker container: `reservation-proof-postgres-d8b0-frontend-smoke`
+- Database URL:
+  `postgresql://postgres:postgres@localhost:5432/reservation_proof`
+
+Command:
+
+- `RESERVATION_DATABASE_LIVE_URL=postgresql://postgres:postgres@localhost:5432/reservation_proof`
+  `RESERVATION_DATABASE_LIVE_DOCKER_CONTAINER=reservation-proof-postgres-d8b0-frontend-smoke`
+  `corepack pnpm run current-frontend:db-backed-platform-smoke:strict`
+
+Result:
+
+- Passed.
+- The proof applied backend-owned package migrations, ran the disposable
+  database RLS/admin/idempotency behavior proof, seeded the DB-backed proof
+  service/resource fixture, started the standalone `apps/api` `/v1` backend
+  with CORS restricted to the frontend proof origin, started the current
+  frontend on a separate `127.0.0.1` origin in platform mode, and drove the
+  browser through `/form-booking`.
+- Browser-observed standalone calls were `GET /v1/services`,
+  `GET /v1/availability`, and `POST /v1/reservations`.
+- The proof failed if the browser used current-frontend `/api` routes,
+  standalone-backend `/api` routes, missing tenant/venue/correlation headers,
+  or missing required `/v1` calls.
+- The created reservation was written by the standalone DB-backed backend into
+  the disposable database through the browser flow.
+
+Scope:
+
+- This closes the current-frontend public booking browser smoke against a
+  DB-backed standalone backend on a separate origin.
+- It does not prove the admin browser smoke against the DB-backed backend,
+  hosted deployment, or a browser smoke from a fully materialized frontend
+  repository outside the current workspace.
+
 ## Remaining External Proof
 
 Strict readiness checks run without live configuration:
@@ -344,7 +383,9 @@ Still not complete:
 
 - real hosted standalone backend deployment beyond the committed local/CI
   deployment manifest contract;
-- external frontend browser smoke against the DB-backed standalone backend;
+- admin/current-frontend or fully materialized external-frontend browser smoke
+  against the DB-backed standalone backend, if the release gate requires more
+  than public booking flow coverage;
 - public/private registry install proof, if the release path requires one
   beyond disposable registry proof;
 - compatibility route removal or deprecation based on the full evidence chain.

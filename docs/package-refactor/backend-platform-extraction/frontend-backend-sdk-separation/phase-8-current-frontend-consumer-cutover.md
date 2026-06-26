@@ -279,6 +279,22 @@ This remains a local mock proof only. It does not call a live standalone
 backend, Supabase, deployment, durable idempotency store, or seeded platform
 data, and it does not remove any current compatibility routes.
 
+The DB-backed browser smoke now provides the first real standalone-backend
+current-frontend proof for the public booking flow.
+`current-frontend:db-backed-platform-smoke:strict` starts from the same
+disposable database configuration as the DB-backed standalone parity proof,
+applies package-owned migrations, verifies RLS/admin/idempotency database
+behavior, starts the standalone `/v1` backend with DB-backed repositories and
+frontend-origin CORS, then starts the current frontend on a separate origin in
+platform mode and drives `/form-booking` through service selection,
+availability, resource selection, and reservation creation. It fails if the
+browser uses current-frontend `/api`, standalone-backend `/api`, misses
+required tenant/venue/correlation headers, or skips `GET /v1/services`,
+`GET /v1/availability`, or `POST /v1/reservations`. This is stronger than the
+mock platform smoke but still covers the public booking flow only; admin
+DB-backed browser smoke and fully materialized external-frontend browser smoke
+remain separate gates if required before route removal.
+
 The current frontend chat client now has the same browser-safe standalone
 backend URL switch for platform chat mode. When
 `NEXT_PUBLIC_RESERVATION_PLATFORM_BASE_URL` is configured as an absolute URL,

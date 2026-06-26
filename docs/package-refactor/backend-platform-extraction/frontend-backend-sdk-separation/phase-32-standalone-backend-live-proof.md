@@ -90,6 +90,10 @@ Evidence:
   the backend-only `RESERVATION_PLATFORM_CORS_ALLOWED_ORIGINS` env contract,
   and focused server plus deployment-verifier tests prove allowed origins get
   preflight/response headers while blocked origins do not.
+- `current-frontend:db-backed-platform-smoke:strict` passed against a
+  disposable Postgres container, proving the standalone DB-backed backend can
+  serve the current frontend public booking browser flow from a separate origin
+  through `/v1/services`, `/v1/availability`, and `/v1/reservations`.
 
 Still open:
 
@@ -97,9 +101,10 @@ Still open:
 - The production standalone runtime still expects Supabase HTTP client
   configuration; the direct PostgreSQL adapter currently lives in the proof
   harness, not in the deployable backend runtime.
-- External frontend smoke against the DB-backed standalone backend and
-  compatibility cleanup still depend on the full release proof chain, not only
-  backend route parity and CORS readiness.
+- Admin DB-backed browser smoke, fully materialized external-frontend browser
+  smoke, and compatibility cleanup still depend on the full release proof
+  chain, not only backend route parity, CORS readiness, and current-frontend
+  public booking smoke.
 
 ## Subagent Handoff Notes
 

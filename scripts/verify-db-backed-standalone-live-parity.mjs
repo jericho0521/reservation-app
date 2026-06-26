@@ -18,17 +18,17 @@ import {
 const strict = process.argv.includes("--strict")
   || process.env.RESERVATION_DB_BACKED_STANDALONE_LIVE_PARITY_STRICT === "1";
 export const dbBackedStandaloneLiveParityStrictEnvName = "RESERVATION_DB_BACKED_STANDALONE_LIVE_PARITY_STRICT";
-const serviceApiKey = process.env.RESERVATION_DB_BACKED_STANDALONE_LIVE_PARITY_API_KEY?.trim()
+export const serviceApiKey = process.env.RESERVATION_DB_BACKED_STANDALONE_LIVE_PARITY_API_KEY?.trim()
   || "db-backed-standalone-proof-key";
-const tenantId = process.env.RESERVATION_DB_BACKED_STANDALONE_LIVE_PARITY_TENANT_ID?.trim()
+export const tenantId = process.env.RESERVATION_DB_BACKED_STANDALONE_LIVE_PARITY_TENANT_ID?.trim()
   || "db-backed-proof-tenant";
-const serviceId = process.env.RESERVATION_DB_BACKED_STANDALONE_LIVE_PARITY_SERVICE_ID?.trim()
+export const serviceId = process.env.RESERVATION_DB_BACKED_STANDALONE_LIVE_PARITY_SERVICE_ID?.trim()
   || "10000000-0000-4000-8000-000000000101";
-const resourceId = process.env.RESERVATION_DB_BACKED_STANDALONE_LIVE_PARITY_RESOURCE_ID?.trim()
+export const resourceId = process.env.RESERVATION_DB_BACKED_STANDALONE_LIVE_PARITY_RESOURCE_ID?.trim()
   || "10000000-0000-4000-8000-000000000201";
-const startAt = process.env.RESERVATION_DB_BACKED_STANDALONE_LIVE_PARITY_START_AT?.trim()
+export const startAt = process.env.RESERVATION_DB_BACKED_STANDALONE_LIVE_PARITY_START_AT?.trim()
   || "2030-01-02T12:00:00.000Z";
-const endAt = process.env.RESERVATION_DB_BACKED_STANDALONE_LIVE_PARITY_END_AT?.trim()
+export const endAt = process.env.RESERVATION_DB_BACKED_STANDALONE_LIVE_PARITY_END_AT?.trim()
   || "2030-01-02T13:00:00.000Z";
 
 function fail(message) {
@@ -99,7 +99,7 @@ function timeFromIso(value) {
   return value.slice(11, 16);
 }
 
-class PsqlJsonClient {
+export class PsqlJsonClient {
   constructor(config) {
     this.config = config;
   }
@@ -156,7 +156,7 @@ function selectJsonObjectSql(innerSql) {
   return `select coalesce((select to_jsonb(row) from (${innerSql}) row), 'null'::jsonb)::text`;
 }
 
-async function seedProofData(client) {
+export async function seedProofData(client) {
   const date = dateFromIso(startAt);
   const startTime = timeFromIso(startAt);
   const endTime = timeFromIso(endAt);
@@ -376,7 +376,7 @@ function normalizeBooking(row) {
   };
 }
 
-function createDbBackedRepositories(client) {
+export function createDbBackedRepositories(client) {
   const getServiceRow = async (id) => client.json(selectJsonObjectSql(`
 select
   services.*,
@@ -784,16 +784,17 @@ async function closeServer(server) {
   });
 }
 
-async function assertProofServerPreflight(baseUrl) {
+export async function assertProofServerPreflight(baseUrl, options = {}) {
   const healthResponse = await fetch(`${baseUrl}/v1/health`);
   if (!healthResponse.ok) {
     throw new Error(`standalone proof server health preflight returned ${healthResponse.status}`);
   }
 
+  const proofServiceApiKey = options.serviceApiKey ?? serviceApiKey;
   const serviceResponse = await fetch(`${baseUrl}/v1/services/${encodeURIComponent(serviceId)}`, {
     headers: {
       Accept: "application/json",
-      Authorization: `Bearer ${serviceApiKey}`,
+      ...(proofServiceApiKey ? { Authorization: `Bearer ${proofServiceApiKey}` } : {}),
       "X-Reservation-Tenant-Id": tenantId,
       "X-Correlation-Id": "db-backed-standalone-proof-preflight",
     },
@@ -803,6 +804,80 @@ async function assertProofServerPreflight(baseUrl) {
     throw new Error(`standalone proof server service preflight returned ${serviceResponse.status}: ${serviceText.slice(0, 500)}`);
   }
   console.log("PASS DB-backed standalone backend proof server preflight reached health and service routes.");
+}
+
+export async function prepareDbBackedStandaloneProofDatabase(parsed) {
+  let psqlCommand = "";
+  if (!parsed.values[databaseLiveDockerContainerEnvName]) {
+    psqlCommand = await resolvePsqlCommand(parsed.values.RESERVATION_DATABASE_LIVE_PSQL);
+  }
+
+  const databaseConfig = {
+    databaseUrl: parsed.values.RESERVATION_DATABASE_LIVE_URL,
+    psqlCommand,
+    dockerContainer: parsed.values[databaseLiveDockerContainerEnvName],
+  };
+  const plan = await loadMigrationProofPlan({
+    includeAiRetrieval: parsed.values.RESERVATION_DATABASE_LIVE_INCLUDE_AI_RETRIEVAL === "1",
+    includeDevelopmentSeeds: parsed.values.RESERVATION_DATABASE_LIVE_INCLUDE_DEVELOPMENT_SEEDS === "1",
+  });
+  await runPsqlPlan(databaseConfig, plan);
+  await runDatabaseBehaviorProof(databaseConfig);
+
+  const client = new PsqlJsonClient(databaseConfig);
+  await seedProofData(client);
+
+  return { client, databaseConfig };
+}
+
+export async function startDbBackedStandaloneProofServer(input) {
+  const { client, authServiceApiKey = serviceApiKey, corsAllowedOrigins = [] } = input;
+  const { createStandaloneNodeServer } = await tsImport(
+    pathToFileURL(path.join(process.cwd(), "apps", "api", "src", "server.ts")).href,
+    import.meta.url,
+  );
+  const { createStandaloneApiHandler } = await tsImport(
+    pathToFileURL(path.join(process.cwd(), "apps", "api", "src", "routes.ts")).href,
+    import.meta.url,
+  );
+  const repositories = createDbBackedRepositories(client);
+  const standaloneHandler = createStandaloneApiHandler({
+    ...repositories,
+    ...(authServiceApiKey ? { auth: { serviceApiKey: authServiceApiKey } } : {}),
+  });
+  const server = createStandaloneNodeServer(async (request) => {
+    const response = await standaloneHandler(request);
+    if (response.status >= 400 && request.path?.includes("/v1/resource-maintenance")) {
+      console.error("DB-backed standalone proof resource-maintenance failure", JSON.stringify({
+        method: request.method,
+        path: request.path,
+        body: request.body,
+        response: response.body,
+      }));
+    }
+    return response;
+  }, {
+    cors: { allowedOrigins: corsAllowedOrigins },
+  });
+  server.on("clientError", (error) => {
+    console.error(`WARN DB-backed standalone proof server client error: ${error.message}`);
+  });
+
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const address = server.address();
+  const port = typeof address === "object" && address ? address.port : null;
+  if (!port) {
+    await closeServer(server);
+    throw new Error("Standalone backend proof server did not expose a local port.");
+  }
+
+  return {
+    server,
+    baseUrl: `http://127.0.0.1:${port}`,
+    async close() {
+      await closeServer(server);
+    },
+  };
 }
 
 async function main() {
@@ -832,63 +907,9 @@ async function main() {
     return;
   }
 
-  let psqlCommand = "";
-  if (!parsed.values[databaseLiveDockerContainerEnvName]) {
-    psqlCommand = await resolvePsqlCommand(parsed.values.RESERVATION_DATABASE_LIVE_PSQL);
-  }
-
-  const databaseConfig = {
-    databaseUrl: parsed.values.RESERVATION_DATABASE_LIVE_URL,
-    psqlCommand,
-    dockerContainer: parsed.values[databaseLiveDockerContainerEnvName],
-  };
-  const plan = await loadMigrationProofPlan({
-    includeAiRetrieval: parsed.values.RESERVATION_DATABASE_LIVE_INCLUDE_AI_RETRIEVAL === "1",
-    includeDevelopmentSeeds: parsed.values.RESERVATION_DATABASE_LIVE_INCLUDE_DEVELOPMENT_SEEDS === "1",
-  });
-  await runPsqlPlan(databaseConfig, plan);
-  await runDatabaseBehaviorProof(databaseConfig);
-
-  const client = new PsqlJsonClient(databaseConfig);
-  await seedProofData(client);
-
-  const { createStandaloneNodeServer } = await tsImport(
-    pathToFileURL(path.join(process.cwd(), "apps", "api", "src", "server.ts")).href,
-    import.meta.url,
-  );
-  const { createStandaloneApiHandler } = await tsImport(
-    pathToFileURL(path.join(process.cwd(), "apps", "api", "src", "routes.ts")).href,
-    import.meta.url,
-  );
-  const repositories = createDbBackedRepositories(client);
-  const standaloneHandler = createStandaloneApiHandler({
-    ...repositories,
-    auth: { serviceApiKey },
-  });
-  const server = createStandaloneNodeServer(async (request) => {
-    const response = await standaloneHandler(request);
-    if (response.status >= 400 && request.path?.includes("/v1/resource-maintenance")) {
-      console.error("DB-backed standalone proof resource-maintenance failure", JSON.stringify({
-        method: request.method,
-        path: request.path,
-        body: request.body,
-        response: response.body,
-      }));
-    }
-    return response;
-  });
-  server.on("clientError", (error) => {
-    console.error(`WARN DB-backed standalone proof server client error: ${error.message}`);
-  });
-
-  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
-  const address = server.address();
-  const port = typeof address === "object" && address ? address.port : null;
-  if (!port) {
-    await closeServer(server);
-    throw new Error("Standalone backend proof server did not expose a local port.");
-  }
-  const baseUrl = `http://127.0.0.1:${port}`;
+  const { client } = await prepareDbBackedStandaloneProofDatabase(parsed);
+  const proofServer = await startDbBackedStandaloneProofServer({ client, authServiceApiKey: serviceApiKey });
+  const baseUrl = proofServer.baseUrl;
   console.log(`DB-backed standalone backend proof server listening on ${baseUrl}`);
   await assertProofServerPreflight(baseUrl);
 
@@ -911,7 +932,7 @@ async function main() {
       },
     });
   } finally {
-    await closeServer(server);
+    await proofServer.close();
   }
 
   console.log("PASS DB-backed standalone live parity proof verified database-backed /v1 routes through SDK/direct HTTP parity.");

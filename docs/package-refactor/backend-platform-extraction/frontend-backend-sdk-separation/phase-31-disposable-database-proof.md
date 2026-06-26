@@ -74,6 +74,27 @@ flowchart TD
 - The resulting environment contract is clear enough for a standalone backend
   deployment.
 
+## 2026-06-27 Result
+
+Status: passed for disposable PostgreSQL database behavior.
+
+Evidence:
+
+- `corepack pnpm run database:live-proof:strict` passed against the named
+  disposable Docker Postgres container `reservation-proof-postgres-d8b0` with
+  `RESERVATION_DATABASE_LIVE_DOCKER_CONTAINER` configured.
+- The proof applied all 11 backend-owned package migrations from
+  `packages/database/migrations/supabase`.
+- The behavior proof verified booking RLS, public booking insert policy, anon
+  catalog read, anon booking insert, non-admin authenticated booking
+  invisibility, admin authenticated booking visibility, and durable idempotency
+  claim/store/replay through the database RPCs.
+
+This closes the disposable database migration/RLS/idempotency portion of the
+external separation proof. It does not by itself prove the standalone backend
+service, SDK/direct live parity, registry installation, or compatibility route
+removal.
+
 ## Subagent Handoff Notes
 
 Give the worker this file plus database scripts and backend adapter packages.

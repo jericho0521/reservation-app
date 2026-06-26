@@ -110,6 +110,7 @@ flowchart LR
 - [Current Refactor Separation Gap Plan](current-refactor-separation-gap-plan/README.md)
 - [Current Separation Answer Plan](current-separation-answer-plan/README.md)
 - [Backend Product and Frontend Consumer Plan](backend-product-frontend-consumer-plan/README.md)
+- [Current Frontend and Backend Separation Plan](current-frontend-backend-separation-plan/README.md)
 
 ## Separation Rules
 
@@ -227,3 +228,9 @@ the intended product model: backend repository as infrastructure product, SDK
 as the installable contract, and any frontend as a replaceable consumer. Use it
 when subagents need one focused folder with downstream update rules, AI chat
 ownership, external adoption proof, and compatibility cleanup gates.
+
+The current frontend and backend separation plan is the latest focused answer
+for whether the branch is separated right now. It states that the branch is
+partially separated, then gives subagents phase files for baseline audit,
+backend product boundary closure, SDK install contract, frontend consumer
+detachment, live external proof, and compatibility cleanup/release decisions.

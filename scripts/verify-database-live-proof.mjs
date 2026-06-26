@@ -14,6 +14,7 @@ const supabaseMigrationsSourcePath = path.join(repoRoot, "packages", "database",
 const strict = process.argv.includes("--strict") || process.env.RESERVATION_DATABASE_LIVE_STRICT === "1";
 
 const requiredEnvNames = ["RESERVATION_DATABASE_LIVE_URL"];
+export const databaseLiveDockerContainerEnvName = "RESERVATION_DATABASE_LIVE_DOCKER_CONTAINER";
 
 export function readLiveDatabaseConfig(env, argv = []) {
   const values = {
@@ -22,6 +23,7 @@ export function readLiveDatabaseConfig(env, argv = []) {
     RESERVATION_DATABASE_LIVE_INCLUDE_AI_RETRIEVAL: env.RESERVATION_DATABASE_LIVE_INCLUDE_AI_RETRIEVAL?.trim() ?? "",
     RESERVATION_DATABASE_LIVE_INCLUDE_DEVELOPMENT_SEEDS:
       env.RESERVATION_DATABASE_LIVE_INCLUDE_DEVELOPMENT_SEEDS?.trim() ?? "",
+    [databaseLiveDockerContainerEnvName]: env[databaseLiveDockerContainerEnvName]?.trim() ?? "",
   };
   const missing = requiredEnvNames.filter((name) => values[name].length === 0);
   const configured = requiredEnvNames.filter((name) => values[name].length > 0);
@@ -50,6 +52,12 @@ export function readLiveDatabaseConfig(env, argv = []) {
 
   if (values.RESERVATION_DATABASE_LIVE_PSQL.length === 0) {
     errors.push("RESERVATION_DATABASE_LIVE_PSQL must not be empty when set.");
+  }
+  if (
+    values[databaseLiveDockerContainerEnvName] &&
+    !/^[a-zA-Z0-9][a-zA-Z0-9_.-]*$/.test(values[databaseLiveDockerContainerEnvName])
+  ) {
+    errors.push(`${databaseLiveDockerContainerEnvName} must be a Docker container name or id using only letters, numbers, dot, underscore, and dash.`);
   }
 
   return {
@@ -93,14 +101,32 @@ async function loadSupabaseMigrationApi() {
 export function buildPsqlCommands(config, plan) {
   return plan.entries.map((entry) => ({
     label: entry.path,
-    command: config.psqlCommand,
-    args: [
-      config.databaseUrl,
-      "-v",
-      "ON_ERROR_STOP=1",
-      "-f",
-      entry.absolutePath,
-    ],
+    ...(config.dockerContainer
+      ? {
+          command: "docker",
+          args: [
+            "exec",
+            "-i",
+            config.dockerContainer,
+            "psql",
+            config.databaseUrl,
+            "-v",
+            "ON_ERROR_STOP=1",
+            "-f",
+            "-",
+          ],
+          stdinFile: entry.absolutePath,
+        }
+      : {
+          command: config.psqlCommand,
+          args: [
+            config.databaseUrl,
+            "-v",
+            "ON_ERROR_STOP=1",
+            "-f",
+            entry.absolutePath,
+          ],
+        }),
   }));
 }
 
@@ -121,8 +147,221 @@ export async function runPsqlPlan(config, plan) {
   const commands = buildPsqlCommands(config, plan);
   for (const command of commands) {
     console.log(`APPLY ${command.label}`);
-    await runProcess(command.command, command.args, { stdio: "inherit" });
+    if (command.stdinFile) {
+      await runProcessWithFileStdin(command.command, command.args, command.stdinFile, { stdio: ["pipe", "inherit", "inherit"] });
+    } else {
+      await runProcess(command.command, command.args, { stdio: "inherit" });
+    }
   }
+}
+
+export function buildDatabaseBehaviorProofSql() {
+  return `
+insert into auth.users (id, email)
+values
+  ('00000000-0000-4000-8000-000000000001', 'admin-proof@example.invalid'),
+  ('00000000-0000-4000-8000-000000000002', 'non-admin-proof@example.invalid')
+on conflict (id) do nothing;
+
+insert into public.admin_users (user_id)
+values ('00000000-0000-4000-8000-000000000001')
+on conflict (user_id) do nothing;
+
+insert into public.services (
+  id,
+  name,
+  total_seats,
+  resource_kind,
+  selection_mode,
+  reservation_policy
+)
+values (
+  '10000000-0000-4000-8000-000000000001',
+  'Database Live Proof Service',
+  4,
+  'capacity_bucket',
+  'quantity',
+  '{"kind":"capacity","selection_mode":"quantity","require_resource_labels":false,"allow_partial_capacity":true}'::jsonb
+)
+on conflict (id) do nothing;
+
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_class
+    where oid = 'public.bookings'::regclass
+      and relrowsecurity
+  ) then
+    raise exception 'bookings RLS is not enabled';
+  end if;
+
+  if not exists (
+    select 1
+    from pg_policies
+    where schemaname = 'public'
+      and tablename = 'bookings'
+      and policyname = 'Public can create bookings'
+  ) then
+    raise exception 'public booking insert policy is missing';
+  end if;
+end
+$$;
+
+set role anon;
+do $$
+declare
+  v_services integer;
+begin
+  select count(*) into v_services from public.services;
+  if v_services < 1 then
+    raise exception 'anon catalog select did not see seeded services';
+  end if;
+end
+$$;
+
+insert into public.bookings (
+  id,
+  service_id,
+  user_name,
+  user_email,
+  user_phone,
+  booking_date,
+  start_time,
+  end_time,
+  seats_booked,
+  status,
+  interface_type
+)
+values (
+  '20000000-0000-4000-8000-000000000001',
+  '10000000-0000-4000-8000-000000000001',
+  'Database Proof Customer',
+  'database-proof@example.invalid',
+  '000',
+  current_date + 1,
+  '10:00',
+  '11:00',
+  1,
+  'confirmed',
+  'form'
+);
+reset role;
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-4000-8000-000000000002';
+do $$
+declare
+  v_visible_bookings integer;
+begin
+  select count(*) into v_visible_bookings from public.bookings;
+  if v_visible_bookings <> 0 then
+    raise exception 'non-admin authenticated user unexpectedly read bookings';
+  end if;
+end
+$$;
+reset role;
+reset request.jwt.claim.sub;
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-4000-8000-000000000001';
+do $$
+declare
+  v_visible_bookings integer;
+begin
+  select count(*) into v_visible_bookings from public.bookings;
+  if v_visible_bookings < 1 then
+    raise exception 'admin authenticated user could not read bookings';
+  end if;
+end
+$$;
+reset role;
+reset request.jwt.claim.sub;
+
+set role service_role;
+do $$
+declare
+  v_claim record;
+begin
+  select * into v_claim
+  from public.platform_claim_idempotency_record(
+    'database-live-proof-key',
+    'tenant-proof',
+    'post',
+    '/v1/reservations',
+    'fingerprint-a'
+  );
+  if v_claim.claimed is not true or v_claim.status <> 'in_progress' then
+    raise exception 'first idempotency claim did not create in-progress record';
+  end if;
+
+  select * into v_claim
+  from public.platform_claim_idempotency_record(
+    'database-live-proof-key',
+    'tenant-proof',
+    'post',
+    '/v1/reservations',
+    'fingerprint-a'
+  );
+  if v_claim.claimed is not false or v_claim.status <> 'in_progress' then
+    raise exception 'duplicate idempotency claim did not replay in-progress record';
+  end if;
+
+  perform public.platform_store_idempotency_record(
+    'database-live-proof-key',
+    'tenant-proof',
+    'post',
+    '/v1/reservations',
+    'fingerprint-a',
+    201,
+    '{"reservation_id":"database-live-proof"}'::jsonb
+  );
+
+  select * into v_claim
+  from public.platform_claim_idempotency_record(
+    'database-live-proof-key',
+    'tenant-proof',
+    'post',
+    '/v1/reservations',
+    'fingerprint-a'
+  );
+  if v_claim.claimed is not false
+    or v_claim.status <> 'completed'
+    or v_claim.response_status <> 201
+    or v_claim.response_body->>'reservation_id' <> 'database-live-proof' then
+    raise exception 'completed idempotency record did not replay stored response';
+  end if;
+end
+$$;
+reset role;
+`;
+}
+
+export async function runDatabaseBehaviorProof(config) {
+  console.log("VERIFY disposable database RLS, tenant/admin visibility, and durable idempotency behavior");
+  const sql = buildDatabaseBehaviorProofSql();
+  if (config.dockerContainer) {
+    await runProcessWithStdin("docker", [
+      "exec",
+      "-i",
+      config.dockerContainer,
+      "psql",
+      config.databaseUrl,
+      "-v",
+      "ON_ERROR_STOP=1",
+      "-f",
+      "-",
+    ], sql, { stdio: ["pipe", "inherit", "inherit"] });
+    return;
+  }
+
+  await runProcessWithStdin(config.psqlCommand, [
+    config.databaseUrl,
+    "-v",
+    "ON_ERROR_STOP=1",
+    "-f",
+    "-",
+  ], sql, { stdio: ["pipe", "inherit", "inherit"] });
 }
 
 function runProcess(command, args, options = {}) {
@@ -139,6 +378,29 @@ function runProcess(command, args, options = {}) {
       }
       reject(new Error(`${command} exited with ${signal ?? code}`));
     });
+  });
+}
+
+async function runProcessWithFileStdin(command, args, stdinFile, options = {}) {
+  const input = await readFile(stdinFile);
+  await runProcessWithStdin(command, args, input, options);
+}
+
+function runProcessWithStdin(command, args, input, options = {}) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(command, args, {
+      ...options,
+      shell: false,
+    });
+    child.on("error", reject);
+    child.on("exit", (code, signal) => {
+      if (code === 0) {
+        resolve();
+        return;
+      }
+      reject(new Error(`${command} exited with ${signal ?? code}`));
+    });
+    child.stdin.end(input);
   });
 }
 
@@ -182,17 +444,19 @@ async function main() {
     return;
   }
 
-  let psqlCommand;
-  try {
-    psqlCommand = await resolvePsqlCommand(parsed.values.RESERVATION_DATABASE_LIVE_PSQL);
-  } catch {
-    const message = `psql command was not found or executable: ${parsed.values.RESERVATION_DATABASE_LIVE_PSQL}.`;
-    if (strict) {
-      fail(message);
+  let psqlCommand = "";
+  if (!parsed.values[databaseLiveDockerContainerEnvName]) {
+    try {
+      psqlCommand = await resolvePsqlCommand(parsed.values.RESERVATION_DATABASE_LIVE_PSQL);
+    } catch {
+      const message = `psql command was not found or executable: ${parsed.values.RESERVATION_DATABASE_LIVE_PSQL}.`;
+      if (strict) {
+        fail(message);
+        return;
+      }
+      skip(`${message} No database connection was made.`);
       return;
     }
-    skip(`${message} No database connection was made.`);
-    return;
   }
 
   const plan = await loadMigrationProofPlan({
@@ -202,13 +466,15 @@ async function main() {
   const config = {
     databaseUrl: parsed.values.RESERVATION_DATABASE_LIVE_URL,
     psqlCommand,
+    dockerContainer: parsed.values[databaseLiveDockerContainerEnvName],
   };
 
   console.log(
-    `Database live migration proof applying ${plan.migrations.length} migrations and ${plan.seeds.length} seeds from packages/database.`,
+    `Database live migration proof applying ${plan.migrations.length} migrations and ${plan.seeds.length} seeds from packages/database${config.dockerContainer ? ` through docker container ${config.dockerContainer}` : ""}.`,
   );
   await runPsqlPlan(config, plan);
-  console.log("PASS database live migration proof applied package-owned migration plan.");
+  await runDatabaseBehaviorProof(config);
+  console.log("PASS database live migration proof applied package-owned migration plan and verified RLS/idempotency behavior.");
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {

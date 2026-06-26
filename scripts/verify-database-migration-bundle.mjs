@@ -802,7 +802,7 @@ function validatePlatformIdempotencyMigration(repoPath, sql) {
     "create or replace function public.platform_normalize_idempotency_tenant",
     "create or replace function public.platform_claim_idempotency_record",
     "create or replace function public.platform_store_idempotency_record",
-    "on conflict (tenant_id, key) do nothing",
+    "on conflict on constraint platform_idempotency_records_key_scope_unique do nothing",
     "for update",
     "idempotency record identity mismatch",
     "security definer",

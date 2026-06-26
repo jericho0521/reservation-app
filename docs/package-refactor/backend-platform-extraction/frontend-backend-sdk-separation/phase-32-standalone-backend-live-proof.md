@@ -57,6 +57,31 @@ This phase answers: is the backend product usable as its own service target?
 - Secrets stay server-side and out of frontend/SDK artifacts.
 - The proof target can be used by an external frontend and SDK parity test.
 
+## 2026-06-27 Result
+
+Status: partially passed for standalone health only.
+
+Evidence:
+
+- A local standalone `apps/api` Node process was started outside the current
+  Next.js frontend runtime with `node --import tsx apps/api/src/server.ts`.
+- `corepack pnpm run backend-platform:live-proof:strict` passed with
+  `RESERVATION_STANDALONE_BACKEND_LIVE_BASE_URL=http://127.0.0.1:4110`.
+- The strict proof validated the `/v1/health` JSON contract and then the local
+  proof process was stopped.
+
+Still open:
+
+- Standalone deployment config is not complete against a real backend runtime
+  target.
+- The current standalone runtime expects Supabase HTTP client configuration,
+  while the disposable proof database is raw PostgreSQL. DB-backed live route
+  proof therefore still needs Supabase/PostgREST-compatible disposable
+  infrastructure or a backend runtime adapter that can talk directly to the
+  disposable PostgreSQL database.
+- SDK/direct parity and compatibility cleanup still require DB-backed live
+  route behavior, not health-only proof.
+
 ## Subagent Handoff Notes
 
 Give the worker this file plus the database proof result. If deployment access

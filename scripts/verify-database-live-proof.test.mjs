@@ -2,7 +2,9 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  buildDatabaseBehaviorProofSql,
   buildPsqlCommands,
+  databaseLiveDockerContainerEnvName,
   loadMigrationProofPlan,
   readLiveDatabaseConfig,
 } from "./verify-database-live-proof.mjs";
@@ -49,6 +51,33 @@ test("database live proof config accepts PostgreSQL URL and optional plan flags"
   assert.deepEqual(parsed.missing, []);
   assert.deepEqual(parsed.errors, []);
   assert.equal(parsed.values.RESERVATION_DATABASE_LIVE_URL, "postgres://user:pass@localhost:5432/reservation_test");
+});
+
+test("database live proof config accepts safe Docker psql container names", () => {
+  const parsed = readLiveDatabaseConfig(
+    {
+      RESERVATION_DATABASE_LIVE_URL: "postgres://postgres:postgres@127.0.0.1:5432/postgres",
+      [databaseLiveDockerContainerEnvName]: "reservation-proof-postgres_1.2",
+    },
+    ["--strict"],
+  );
+
+  assert.equal(parsed.ready, true);
+  assert.deepEqual(parsed.errors, []);
+  assert.equal(parsed.values[databaseLiveDockerContainerEnvName], "reservation-proof-postgres_1.2");
+});
+
+test("database live proof config rejects unsafe Docker container command text", () => {
+  const parsed = readLiveDatabaseConfig(
+    {
+      RESERVATION_DATABASE_LIVE_URL: "postgres://postgres:postgres@127.0.0.1:5432/postgres",
+      [databaseLiveDockerContainerEnvName]: "postgres;rm",
+    },
+    ["--strict"],
+  );
+
+  assert.equal(parsed.ready, false);
+  assert.match(parsed.errors.join(" "), /must be a Docker container name or id/);
 });
 
 test("database live proof plan selects backend-owned core migrations by default", async () => {
@@ -132,4 +161,40 @@ test("database live proof builds psql commands without shell interpolation", asy
   ]);
   assert.match(first.args[4], /packages.database.migrations.supabase.000001_extensions\.sql$/);
   assert.equal(first.args.some((arg) => String(arg).includes(";")), false);
+});
+
+test("database live proof builds Docker psql commands with streamed SQL input", async () => {
+  const plan = await loadMigrationProofPlan();
+  const [first] = buildPsqlCommands(
+    {
+      databaseUrl: "postgres://postgres:postgres@127.0.0.1:5432/postgres",
+      dockerContainer: "reservation-proof-postgres",
+    },
+    { entries: plan.entries.slice(0, 1) },
+  );
+
+  assert.equal(first.command, "docker");
+  assert.deepEqual(first.args, [
+    "exec",
+    "-i",
+    "reservation-proof-postgres",
+    "psql",
+    "postgres://postgres:postgres@127.0.0.1:5432/postgres",
+    "-v",
+    "ON_ERROR_STOP=1",
+    "-f",
+    "-",
+  ]);
+  assert.match(first.stdinFile, /packages.database.migrations.supabase.000001_extensions\.sql$/);
+});
+
+test("database live proof behavior SQL covers RLS and idempotency checks", () => {
+  const sql = buildDatabaseBehaviorProofSql();
+
+  assert.match(sql, /bookings RLS is not enabled/);
+  assert.match(sql, /set role anon/i);
+  assert.match(sql, /set role authenticated/i);
+  assert.match(sql, /set role service_role/i);
+  assert.match(sql, /platform_claim_idempotency_record/);
+  assert.match(sql, /platform_store_idempotency_record/);
 });

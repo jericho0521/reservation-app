@@ -32,3 +32,33 @@ grant execute on function public.replace_service_seat_maintenance(uuid, text[], 
 
 revoke all on function public.create_reservation_atomic(jsonb) from public;
 grant execute on function public.create_reservation_atomic(jsonb) to service_role;
+
+grant select on public.services, public.venues to anon, authenticated;
+grant select on public.resource_layouts, public.reservable_resources, public.service_availability_rules
+  to anon, authenticated;
+
+grant insert on public.bookings, public.reservation_items to anon, authenticated;
+
+grant select on public.admin_users to authenticated;
+grant select, insert, update, delete on
+  public.services,
+  public.venues,
+  public.resource_layouts,
+  public.reservable_resources,
+  public.service_availability_rules,
+  public.bookings,
+  public.reservation_items,
+  public.service_seat_maintenance
+to authenticated;
+
+grant select, insert, update, delete on
+  public.services,
+  public.venues,
+  public.resource_layouts,
+  public.reservable_resources,
+  public.service_availability_rules,
+  public.bookings,
+  public.reservation_items,
+  public.service_seat_maintenance,
+  public.admin_users
+to service_role;

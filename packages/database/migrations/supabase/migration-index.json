@@ -19,8 +19,8 @@
       "path": "packages/database/migrations/supabase/000002_platform_tenant_auth.sql",
       "module": "core",
       "scope": "reservation-platform",
-      "sha256": "95876f22f1432c6bd3c9375b4c599a7a872c565b6fb3e44a52bae4579e36f864",
-      "bytes": 1185
+      "sha256": "df151af8b2fdc23002ff0ddbc7d94fd3f49ec633dbe63cab7c295324cadd784f",
+      "bytes": 2039
     },
     {
       "order": 3,
@@ -83,16 +83,16 @@
       "path": "packages/database/migrations/supabase/000010_core_security_hardening.sql",
       "module": "core",
       "scope": "reservation-platform",
-      "sha256": "fe15716b4cc3d72c2063181b9925295c2b6375fcd6809531777089e2cf79cef6",
-      "bytes": 1641
+      "sha256": "00d3acacd4175dfba47650109461ef8aaf7e1d84b5a8e80619b4de857451dcfc",
+      "bytes": 2542
     },
     {
       "order": 11,
       "path": "packages/database/migrations/supabase/000011_platform_idempotency.sql",
       "module": "core",
       "scope": "reservation-platform",
-      "sha256": "ef84d9aa4998cc1de0fa0baba6026cdf6a67763dcb9e359a88ba290fe4390f17",
-      "bytes": 5327
+      "sha256": "4a3c7a2afcab9aa3ab4fceb0d43d51a538f1a655f6c66673d9f9a57f5581fdcc",
+      "bytes": 5463
     }
   ],
   "optionalMigrations": [

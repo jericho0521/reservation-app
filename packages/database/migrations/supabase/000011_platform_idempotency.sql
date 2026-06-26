@@ -95,7 +95,7 @@ begin
     p_fingerprint,
     'in_progress'
   )
-  on conflict (tenant_id, key) do nothing
+  on conflict on constraint platform_idempotency_records_key_scope_unique do nothing
   returning * into v_record;
 
   if found then
@@ -180,3 +180,4 @@ revoke all on function public.platform_store_idempotency_record(text, text, text
 
 grant execute on function public.platform_claim_idempotency_record(text, text, text, text, text) to service_role;
 grant execute on function public.platform_store_idempotency_record(text, text, text, text, text, integer, jsonb) to service_role;
+grant select, insert, update, delete on public.platform_idempotency_records to service_role;

@@ -105,6 +105,77 @@ Fixes required before this pass:
 - The public `ListReservationsQuery` contract now includes `search`, matching
   the current frontend admin list usage and SDK request surface.
 
+## 2026-06-27 Disposable Database Live Proof
+
+Disposable database target:
+
+- Docker container `reservation-proof-postgres-d8b0` using `postgres:15-alpine`.
+- Connection URL was supplied through `RESERVATION_DATABASE_LIVE_URL` and is
+  intentionally not committed.
+- SQL was applied by streaming migration files through
+  `RESERVATION_DATABASE_LIVE_DOCKER_CONTAINER=reservation-proof-postgres-d8b0`
+  into Docker `psql`; host `psql` was not required.
+- The disposable container was removed after proof completion.
+
+Command:
+
+- `RESERVATION_DATABASE_LIVE_URL=<redacted disposable postgres url>`
+  `RESERVATION_DATABASE_LIVE_DOCKER_CONTAINER=reservation-proof-postgres-d8b0`
+  `corepack pnpm run database:live-proof:strict`
+
+Result:
+
+- Passed.
+- The strict proof applied 11 backend-owned package migrations from
+  `packages/database/migrations/supabase`.
+- The proof then seeded disposable auth users, an admin user, a service, and a
+  reservation scenario.
+- It verified booking RLS is enabled, the public booking insert policy exists,
+  anon catalog reads work, anon reservation insert works, non-admin
+  authenticated users cannot read bookings, admin authenticated users can read
+  bookings, and durable platform idempotency claim/store/replay works through
+  the database RPCs.
+
+Fixes required before this pass:
+
+- The live proof harness now supports Docker-backed `psql` by streaming SQL
+  files into a named disposable container.
+- The tenant/auth migration now creates local Supabase-compatible `auth`
+  schema, roles, `auth.users`, and `auth.uid()` compatibility when a plain
+  PostgreSQL database is used for disposable proof.
+- Core security hardening grants now allow the intended anon/authenticated
+  catalog and reservation behavior under RLS.
+- The idempotency migration now uses the named uniqueness constraint for the
+  claim upsert, avoiding an ambiguous `tenant_id` reference inside the RPC.
+
+## 2026-06-27 Standalone Backend Health Proof
+
+Standalone backend target:
+
+- Local `apps/api` Node server started from the repository root with
+  `node --import tsx apps/api/src/server.ts`.
+- Proof URL: `http://127.0.0.1:4110/v1/health`.
+- The process was stopped after the proof command completed.
+
+Command:
+
+- `RESERVATION_STANDALONE_BACKEND_LIVE_BASE_URL=http://127.0.0.1:4110`
+  `corepack pnpm run backend-platform:live-proof:strict`
+
+Result:
+
+- Passed.
+- The health proof received HTTP 200 from `/v1/health` and validated the
+  standalone health response contract.
+
+Scope:
+
+- This proves a standalone `apps/api` process can serve the health endpoint
+  outside the current Next.js frontend runtime.
+- It does not prove deployment configuration, Supabase/PostgREST connectivity,
+  DB-backed catalog/reservation/resource-maintenance behavior, SDK/direct live
+  parity, registry installation, or compatibility route removal.
+
 ## Remaining External Proof
 
 Strict readiness checks run without live configuration:
@@ -114,22 +185,23 @@ Strict readiness checks run without live configuration:
   `RESERVATION_EXTRACTED_BACKEND_PROOF_ROOT=C:\tmp\reservation-separation-proofs\standalone-backend-extraction-yBf9oq`
   and
   `CURRENT_FRONTEND_CONSUMER_PROOF_ROOT=C:\Users\User\AppData\Local\Temp\current-frontend-consumer-tree-3vrf7e\frontend-consumer`.
-  It failed closed with five unready strict surfaces: standalone deployment
-  config, standalone backend live URL, database live URL, SDK/direct live
-  parity env, and SDK registry proof mode.
-- `backend-platform:live-proof:strict` failed closed because
-  `RESERVATION_STANDALONE_BACKEND_LIVE_BASE_URL` is not configured.
-- `database:live-proof:strict` failed closed because
-  `RESERVATION_DATABASE_LIVE_URL` is not configured.
+  It now fails closed with four unready strict surfaces: standalone deployment
+  config, standalone backend live URL, SDK/direct live parity env, and SDK
+  registry proof mode. The database live proof surface is ready when the
+  disposable database env is configured.
+- `backend-platform:live-proof:strict` previously failed closed because
+  `RESERVATION_STANDALONE_BACKEND_LIVE_BASE_URL` was not configured; the later
+  local standalone health proof above passed.
+- `database:live-proof:strict` previously failed closed when
+  `RESERVATION_DATABASE_LIVE_URL` was not configured; the later disposable
+  Docker-backed strict run above passed.
 - `sdk:registry-install-proof:strict` failed closed because
   `RESERVATION_SDK_REGISTRY_PROOF_MODE` is not configured.
 
 Still not complete:
 
-- disposable database migration, RLS, tenant-isolation, and durable idempotency
-  proof;
-- live standalone backend deployment/health proof against that disposable
-  backend;
+- standalone backend deployment configuration and DB-backed API proof against
+  disposable infrastructure;
 - SDK/direct HTTP live parity proof against the same backend;
 - public/private registry install proof;
 - compatibility route removal or deprecation based on the full evidence chain.

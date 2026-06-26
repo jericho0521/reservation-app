@@ -111,6 +111,7 @@ flowchart LR
 - [Current Separation Answer Plan](current-separation-answer-plan/README.md)
 - [Backend Product and Frontend Consumer Plan](backend-product-frontend-consumer-plan/README.md)
 - [Current Frontend and Backend Separation Plan](current-frontend-backend-separation-plan/README.md)
+- [Backend Platform Product Completion Plan](backend-platform-product-completion-plan/README.md)
 
 ## Separation Rules
 
@@ -234,3 +235,10 @@ for whether the branch is separated right now. It states that the branch is
 partially separated, then gives subagents phase files for baseline audit,
 backend product boundary closure, SDK install contract, frontend consumer
 detachment, live external proof, and compatibility cleanup/release decisions.
+
+The backend platform product completion plan is the current execution pack for
+finishing the intended product architecture: backend repository as product,
+SDK as installable contract, and frontend as replaceable consumer. Use it when
+subagents need a phase-by-phase plan that starts from the latest proof status
+and continues through deployable backend runtime, SDK install, frontend
+detachment, external adoption proof, and compatibility cleanup.

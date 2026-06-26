@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "phase": "phase-9-compatibility-route-removal",
   "generatedFrom": "current app/api route tree",
-  "lastUpdated": "2026-06-22",
+  "lastUpdated": "2026-06-27",
   "requiredRemovalGates": [
     "standaloneEquivalent",
     "frontendCutover",
@@ -42,7 +42,7 @@
       },
       "removalBlockedBy": [
         "current frontend local mode still targets /api/services",
-        "strict live /v1 catalog parity is not complete"
+        "hosted backend deployment and route cleanup tests are not complete"
       ]
     },
     {
@@ -66,8 +66,8 @@
         "backend-platform:extracted-install-proof:strict": true
       },
       "removalBlockedBy": [
-        "strict live /v1 catalog read parity is not complete",
-        "full frontend cutover, SDK/direct parity, auth/tenant/idempotency proof, and route tests are not complete"
+        "final cleanup tests must prove no current frontend dependency on this compatibility path",
+        "hosted backend deployment and route cleanup tests are not complete"
       ]
     },
     {
@@ -91,8 +91,8 @@
         "backend-platform:extracted-install-proof:strict": true
       },
       "removalBlockedBy": [
-        "strict live /v1 catalog parity is not complete",
-        "full frontend cutover, SDK/direct parity, auth/tenant/idempotency proof, and route tests are not complete"
+        "final cleanup tests must prove no current frontend dependency on this compatibility path",
+        "hosted backend deployment and route cleanup tests are not complete"
       ]
     },
     {
@@ -116,8 +116,8 @@
         "backend-platform:extracted-install-proof:strict": true
       },
       "removalBlockedBy": [
-        "strict live /v1 catalog read parity is not complete",
-        "full frontend cutover, SDK/direct parity, auth/tenant/idempotency proof, and route tests are not complete"
+        "final cleanup tests must prove no current frontend dependency on this compatibility path",
+        "hosted backend deployment and route cleanup tests are not complete"
       ]
     },
     {
@@ -142,7 +142,7 @@
       },
       "removalBlockedBy": [
         "current frontend local mode still targets /api/availability",
-        "strict live /v1 availability parity is not complete"
+        "hosted backend deployment and route cleanup tests are not complete"
       ]
     },
     {
@@ -167,8 +167,7 @@
       },
       "removalBlockedBy": [
         "current frontend local mode still targets /api/bookings",
-        "strict live /v1 reservation create/list parity is not complete",
-        "auth, tenant, and durable idempotency proof is not complete"
+        "hosted backend deployment and production DB adapter/auth runtime ownership are not complete"
       ]
     },
     {
@@ -193,8 +192,7 @@
       },
       "removalBlockedBy": [
         "current frontend local mode still targets /api/bookings/{id}",
-        "strict live /v1 reservation read/update parity is not complete",
-        "auth, tenant, and durable idempotency proof is not complete"
+        "hosted backend deployment and production DB adapter/auth runtime ownership are not complete"
       ]
     },
     {
@@ -219,8 +217,7 @@
       },
       "removalBlockedBy": [
         "current frontend local mode still targets /api/seat-maintenance",
-        "strict live /v1 resource-maintenance parity is not complete",
-        "auth, tenant, and durable idempotency proof is not complete"
+        "hosted backend deployment and production DB adapter/auth runtime ownership are not complete"
       ]
     },
     {
@@ -244,8 +241,8 @@
         "backend-platform:extracted-install-proof:strict": true
       },
       "removalBlockedBy": [
-        "current platform compatibility mode still supports /api/v1 fallback",
-        "strict live /v1 metadata parity is not complete"
+        "current app /api/v1 fallback remains available until final cutover policy is decided",
+        "hosted backend deployment and route cleanup tests are not complete"
       ]
     },
     {
@@ -269,8 +266,8 @@
         "backend-platform:extracted-install-proof:strict": true
       },
       "removalBlockedBy": [
-        "current platform compatibility mode still supports /api/v1 fallback",
-        "strict live /v1 catalog parity is not complete"
+        "current app /api/v1 fallback remains available until final cutover policy is decided",
+        "hosted backend deployment and route cleanup tests are not complete"
       ]
     },
     {
@@ -294,8 +291,8 @@
         "backend-platform:extracted-install-proof:strict": true
       },
       "removalBlockedBy": [
-        "current platform compatibility mode still supports /api/v1 fallback",
-        "strict live /v1 catalog read parity is not complete"
+        "current app /api/v1 fallback remains available until final cutover policy is decided",
+        "hosted backend deployment and route cleanup tests are not complete"
       ]
     },
     {
@@ -319,8 +316,8 @@
         "backend-platform:extracted-install-proof:strict": true
       },
       "removalBlockedBy": [
-        "current platform compatibility mode still supports /api/v1 fallback",
-        "strict live /v1 catalog parity is not complete"
+        "current app /api/v1 fallback remains available until final cutover policy is decided",
+        "hosted backend deployment and route cleanup tests are not complete"
       ]
     },
     {
@@ -344,8 +341,8 @@
         "backend-platform:extracted-install-proof:strict": true
       },
       "removalBlockedBy": [
-        "current platform compatibility mode still supports /api/v1 fallback",
-        "strict live /v1 catalog read parity is not complete"
+        "current app /api/v1 fallback remains available until final cutover policy is decided",
+        "hosted backend deployment and route cleanup tests are not complete"
       ]
     },
     {
@@ -369,8 +366,8 @@
         "backend-platform:extracted-install-proof:strict": true
       },
       "removalBlockedBy": [
-        "current platform compatibility mode still supports /api/v1 fallback",
-        "strict live /v1 resource parity is not complete"
+        "current app /api/v1 fallback remains available until final cutover policy is decided",
+        "hosted backend deployment and route cleanup tests are not complete"
       ]
     },
     {
@@ -394,8 +391,8 @@
         "backend-platform:extracted-install-proof:strict": true
       },
       "removalBlockedBy": [
-        "current platform compatibility mode still supports /api/v1 fallback",
-        "strict live /v1 resource read parity is not complete"
+        "current app /api/v1 fallback remains available until final cutover policy is decided",
+        "hosted backend deployment and route cleanup tests are not complete"
       ]
     },
     {
@@ -419,8 +416,8 @@
         "backend-platform:extracted-install-proof:strict": true
       },
       "removalBlockedBy": [
-        "current platform compatibility mode still supports /api/v1 fallback",
-        "strict live /v1 resource layout parity is not complete"
+        "current app /api/v1 fallback remains available until final cutover policy is decided",
+        "hosted backend deployment and route cleanup tests are not complete"
       ]
     },
     {
@@ -444,8 +441,8 @@
         "backend-platform:extracted-install-proof:strict": true
       },
       "removalBlockedBy": [
-        "current platform compatibility mode still supports /api/v1 fallback",
-        "strict live /v1 availability parity is not complete"
+        "current app /api/v1 fallback remains available until final cutover policy is decided",
+        "hosted backend deployment and route cleanup tests are not complete"
       ]
     },
     {
@@ -469,9 +466,8 @@
         "backend-platform:extracted-install-proof:strict": true
       },
       "removalBlockedBy": [
-        "current platform compatibility mode still supports /api/v1 fallback",
-        "strict live /v1 reservation create/list parity is not complete",
-        "auth, tenant, and durable idempotency proof is not complete"
+        "current app /api/v1 fallback remains available until final cutover policy is decided",
+        "hosted backend deployment and production DB adapter/auth runtime ownership are not complete"
       ]
     },
     {
@@ -495,9 +491,8 @@
         "backend-platform:extracted-install-proof:strict": true
       },
       "removalBlockedBy": [
-        "current platform compatibility mode still supports /api/v1 fallback",
-        "strict live /v1 reservation read/update parity is not complete",
-        "auth, tenant, and durable idempotency proof is not complete"
+        "current app /api/v1 fallback remains available until final cutover policy is decided",
+        "hosted backend deployment and production DB adapter/auth runtime ownership are not complete"
       ]
     },
     {
@@ -521,9 +516,8 @@
         "backend-platform:extracted-install-proof:strict": true
       },
       "removalBlockedBy": [
-        "current platform compatibility mode still supports /api/v1 fallback",
-        "strict live /v1 cancel parity is not complete",
-        "auth, tenant, and durable idempotency proof is not complete"
+        "current app /api/v1 fallback remains available until final cutover policy is decided",
+        "hosted backend deployment and production DB adapter/auth runtime ownership are not complete"
       ]
     },
     {
@@ -547,9 +541,8 @@
         "backend-platform:extracted-install-proof:strict": true
       },
       "removalBlockedBy": [
-        "current platform compatibility mode still supports /api/v1 fallback",
-        "strict live /v1 reschedule parity is not complete",
-        "auth, tenant, and durable idempotency proof is not complete"
+        "current app /api/v1 fallback remains available until final cutover policy is decided",
+        "hosted backend deployment and production DB adapter/auth runtime ownership are not complete"
       ]
     },
     {
@@ -573,9 +566,8 @@
         "backend-platform:extracted-install-proof:strict": true
       },
       "removalBlockedBy": [
-        "current platform compatibility mode still supports /api/v1 fallback",
-        "strict live /v1 resource-maintenance parity is not complete",
-        "auth, tenant, and durable idempotency proof is not complete"
+        "current app /api/v1 fallback remains available until final cutover policy is decided",
+        "hosted backend deployment and production DB adapter/auth runtime ownership are not complete"
       ]
     },
     {
@@ -599,9 +591,8 @@
         "backend-platform:extracted-install-proof:strict": true
       },
       "removalBlockedBy": [
-        "current platform compatibility mode still supports /api/v1 fallback",
-        "strict live /v1 resource-maintenance end parity is not complete",
-        "auth, tenant, and durable idempotency proof is not complete"
+        "current app /api/v1 fallback remains available until final cutover policy is decided",
+        "hosted backend deployment and production DB adapter/auth runtime ownership are not complete"
       ]
     },
     {

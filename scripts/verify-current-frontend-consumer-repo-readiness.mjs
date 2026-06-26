@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { access, cp, mkdir, mkdtemp, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { builtinModules } from "node:module";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
@@ -13,6 +14,35 @@ export const requiredPrerequisiteCommands = [
   "current-frontend:verify-platform-secrets",
 ];
 export const keepMaterializedTreeEnv = "CURRENT_FRONTEND_CONSUMER_KEEP_MATERIALIZED_TREE";
+export const generatedFrontendConsumerScripts = {
+  typecheck: "tsc --noEmit",
+  build: "next build",
+  start: "next start",
+};
+export const generatedSdkConsumerDependencySpecs = {
+  "@reservation-platform/contract-types": "0.0.0",
+  "@reservation-platform/sdk": "0.0.0",
+};
+export const generatedFrontendConsumerTsconfig = {
+  compilerOptions: {
+    target: "ES2022",
+    lib: ["DOM", "DOM.Iterable", "ES2022"],
+    module: "ESNext",
+    moduleResolution: "Bundler",
+    jsx: "react-jsx",
+    strict: true,
+    noEmit: true,
+    isolatedModules: true,
+    esModuleInterop: true,
+    resolveJsonModule: true,
+    baseUrl: ".",
+    paths: {
+      "@/*": ["./*"],
+    },
+  },
+  include: ["**/*.ts", "**/*.tsx", "**/*.mts"],
+  exclude: ["node_modules"],
+};
 
 const allowedSourceClassifications = new Set(["include", "exclude", "reference-only"]);
 const allowedDependencyClassifications = new Set([
@@ -23,7 +53,10 @@ const allowedDependencyClassifications = new Set([
   "current-monorepo-only",
 ]);
 const allowedDependencySections = new Set(["dependencies", "devDependencies"]);
-const sourceExtensions = new Set([".js", ".jsx", ".mjs", ".ts", ".tsx"]);
+const sourceExtensions = new Set([".js", ".jsx", ".mjs", ".ts", ".tsx", ".mts"]);
+const nodeBuiltinModuleNames = new Set(
+  builtinModules.map((moduleName) => moduleName.replace(/^node:/, "").split("/")[0]),
+);
 const frontendDependencyClassifications = new Set([
   "frontend-runtime",
   "frontend-dev",
@@ -102,6 +135,74 @@ const forbiddenMaterializedPathPrefixes = [
 const forbiddenMaterializedPathExact = new Set([
   "lib/supabase-admin.ts",
 ]);
+const forbiddenMaterializedWorkspaceMetadataFileNames = new Set([
+  "pnpm-workspace.yaml",
+  "turbo.json",
+]);
+
+const forbiddenGeneratedFrontendScriptFragments = [
+  "backend-platform:",
+  "database:",
+  "sdk:release",
+  "sdk:registry",
+  "packages:",
+  "current-frontend:",
+  "app/api",
+  "packages/",
+  "supabase",
+  "scripts/verify-",
+  "pnpm --filter",
+];
+const forbiddenGeneratedFrontendDependencySpecPrefixes = [
+  "workspace:",
+  "file:",
+  "link:",
+  "portal:",
+];
+const generatedFrontendConsumerScriptPackageRequirements = [
+  {
+    scriptName: "typecheck",
+    command: "tsc --noEmit",
+    binaryName: "tsc",
+    packageName: "typescript",
+  },
+  {
+    scriptName: "build",
+    command: "next build",
+    binaryName: "next",
+    packageName: "next",
+  },
+  {
+    scriptName: "start",
+    command: "next start",
+    binaryName: "next",
+    packageName: "next",
+  },
+];
+const forbiddenGeneratedTsconfigTopLevelKeys = new Set(["extends", "references"]);
+const forbiddenGeneratedTsconfigCompilerOptionKeys = new Set([
+  "composite",
+  "outDir",
+  "rootDirs",
+]);
+const forbiddenGeneratedTsconfigStringFragments = [
+  ".next",
+  "app/api",
+  "apps",
+  "lib/langchain",
+  "lib/reservations",
+  "lib/supabase-admin",
+  "packages",
+  "supabase",
+];
+const forbiddenGeneratedTsconfigPackageFragments = [
+  "@reservation-platform/api",
+  "@reservation-platform/database",
+  "@reservation-platform/ai-chat",
+  "@project-play/reservations-core",
+  "@project-play/reservations-supabase",
+  "@project-play/reservation-chat-core",
+];
 
 const importSpecifierPattern =
   /\b(?:import\s*(?:["']([^"']+)["']|[^"'()]+?\s*from\s*["']([^"']+)["'])|export\s*[^"'()]+?\s*from\s*["']([^"']+)["']|require\s*\(\s*["']([^"']+)["']|import\s*\(\s*["']([^"']+)["'])/g;
@@ -377,19 +478,27 @@ async function validateMaterializedFrontendConsumerTargetTree(inventory, package
       packageJson,
       failures,
     );
-    await writeFile(
-      path.join(materializedRoot, "package.json"),
-      `${JSON.stringify(candidatePackageJson, null, 2)}\n`,
-    );
+    const candidateTsconfig = generateFrontendConsumerTsconfig();
 
     const includeTargets = await collectMaterializedIncludeTargets(inventory.sourceAreas, repoRoot);
     for (const includeTarget of includeTargets) {
       await copyIncludeTarget(includeTarget, repoRoot, materializedRoot);
     }
 
+    await writeFile(
+      path.join(materializedRoot, "package.json"),
+      `${JSON.stringify(candidatePackageJson, null, 2)}\n`,
+    );
+    await writeFile(
+      path.join(materializedRoot, "tsconfig.json"),
+      `${JSON.stringify(candidateTsconfig, null, 2)}\n`,
+    );
+
     await validateMaterializedAllowedPaths(materializedRoot, includeTargets, failures);
     validateMaterializedPackageJson(candidatePackageJson, inventory.dependencies, failures);
+    validateGeneratedFrontendConsumerTsconfig(candidateTsconfig, failures);
     await validateMaterializedImportClosure(materializedRoot, failures);
+    await validateMaterializedExternalPackageDependencies(materializedRoot, candidatePackageJson, failures);
 
     return materializedTree;
   } finally {
@@ -454,9 +563,18 @@ function generateFrontendConsumerPackageJson(dependencies, rootPackageJson, fail
   const candidatePackageJson = {
     name: "reservation-frontend-consumer-candidate",
     private: true,
+    packageManager: rootPackageJson.packageManager,
+    scripts: { ...generatedFrontendConsumerScripts },
     dependencies: {},
     devDependencies: {},
   };
+
+  if (!isExactPinnedPnpmPackageManager(rootPackageJson.packageManager)) {
+    failures.push(
+      `Generated frontend consumer portability requires source root package.json packageManager to be an exact pinned pnpm value like "pnpm@10.33.2"; found ${JSON.stringify(rootPackageJson.packageManager)}.`,
+    );
+    delete candidatePackageJson.packageManager;
+  }
 
   for (const dependency of dependencies) {
     const generatedSection = generatedFrontendDependencySectionByClassification.get(dependency?.classification);
@@ -465,7 +583,8 @@ function generateFrontendConsumerPackageJson(dependencies, rootPackageJson, fail
     }
 
     const sourceSection = dependency.section;
-    const version = rootPackageJson[sourceSection]?.[dependency.name];
+    const version = generatedSdkConsumerDependencySpecs[dependency.name]
+      ?? rootPackageJson[sourceSection]?.[dependency.name];
     if (!isNonBlankString(version)) {
       failures.push(
         `${getDependencyLabel(dependency, 0)}: cannot generate frontend consumer package.json entry because root package.json ${sourceSection} version is missing.`,
@@ -486,6 +605,11 @@ function validateMaterializedPackageJson(candidatePackageJson, inventoryDependen
   ) {
     failures.push("Generated frontend consumer package.json must be private candidate metadata.");
   }
+
+  validateGeneratedFrontendConsumerScripts(candidatePackageJson.scripts, failures);
+  validateGeneratedFrontendConsumerPackageManager(candidatePackageJson.packageManager, failures);
+  validateGeneratedFrontendConsumerDependencySpecs(candidatePackageJson, failures);
+  validateGeneratedFrontendConsumerScriptPackageCoherence(candidatePackageJson, failures);
 
   const generatedDependencies = {
     ...candidatePackageJson.dependencies,
@@ -513,6 +637,198 @@ function validateMaterializedPackageJson(candidatePackageJson, inventoryDependen
   }
 }
 
+function validateGeneratedFrontendConsumerPackageManager(packageManager, failures) {
+  if (!isExactPinnedPnpmPackageManager(packageManager)) {
+    failures.push(
+      `Generated frontend consumer package.json portability requires packageManager to be an exact pinned pnpm value like "pnpm@10.33.2"; found ${JSON.stringify(packageManager)}.`,
+    );
+  }
+}
+
+function validateGeneratedFrontendConsumerDependencySpecs(candidatePackageJson, failures) {
+  for (const sectionName of ["dependencies", "devDependencies"]) {
+    const section = candidatePackageJson[sectionName];
+    if (!section || typeof section !== "object" || Array.isArray(section)) {
+      failures.push(`Generated frontend consumer package.json ${sectionName} must be an object.`);
+      continue;
+    }
+
+    for (const [dependencyName, spec] of Object.entries(section)) {
+      if (!isNonBlankString(spec)) {
+        failures.push(
+          `${dependencyName}: generated frontend consumer package.json ${sectionName} spec must be a non-empty string.`,
+        );
+        continue;
+      }
+
+      for (const forbiddenPrefix of forbiddenGeneratedFrontendDependencySpecPrefixes) {
+        if (spec.startsWith(forbiddenPrefix)) {
+          failures.push(
+            `${dependencyName}: generated frontend consumer package.json portability requires ${sectionName} specs to be installable outside this monorepo; found non-portable ${JSON.stringify(forbiddenPrefix)} spec ${JSON.stringify(spec)}.`,
+          );
+        }
+      }
+    }
+  }
+}
+
+function validateGeneratedFrontendConsumerScriptPackageCoherence(candidatePackageJson, failures) {
+  const scripts = candidatePackageJson.scripts;
+  if (!scripts || typeof scripts !== "object" || Array.isArray(scripts)) {
+    return;
+  }
+
+  for (const requirement of generatedFrontendConsumerScriptPackageRequirements) {
+    if (scripts[requirement.scriptName] !== requirement.command) {
+      continue;
+    }
+
+    if (!hasGeneratedPackageDependency(candidatePackageJson, requirement.packageName)) {
+      failures.push(
+        `Generated frontend consumer script ${requirement.scriptName} command ${JSON.stringify(requirement.command)} uses ${requirement.binaryName}, which requires generated package metadata dependency ${requirement.packageName} in dependencies or devDependencies.`,
+      );
+    }
+  }
+}
+
+function hasGeneratedPackageDependency(candidatePackageJson, packageName) {
+  return hasOwnPackageDependency(candidatePackageJson.dependencies, packageName) ||
+    hasOwnPackageDependency(candidatePackageJson.devDependencies, packageName);
+}
+
+function hasOwnPackageDependency(section, packageName) {
+  return !!section && typeof section === "object" && !Array.isArray(section) && Object.hasOwn(section, packageName);
+}
+
+function generateFrontendConsumerTsconfig() {
+  return structuredClone(generatedFrontendConsumerTsconfig);
+}
+
+export function validateGeneratedFrontendConsumerTsconfig(tsconfig, failures) {
+  if (!tsconfig || typeof tsconfig !== "object" || Array.isArray(tsconfig)) {
+    failures.push("Generated frontend consumer tsconfig.json must be a JSON object.");
+    return;
+  }
+
+  for (const key of forbiddenGeneratedTsconfigTopLevelKeys) {
+    if (Object.hasOwn(tsconfig, key)) {
+      failures.push(`Generated frontend consumer tsconfig.json must not include top-level ${key}.`);
+    }
+  }
+
+  const compilerOptions = tsconfig.compilerOptions;
+  if (!compilerOptions || typeof compilerOptions !== "object" || Array.isArray(compilerOptions)) {
+    failures.push("Generated frontend consumer tsconfig.json compilerOptions must be an object.");
+    return;
+  }
+
+  for (const key of forbiddenGeneratedTsconfigCompilerOptionKeys) {
+    if (Object.hasOwn(compilerOptions, key)) {
+      failures.push(`Generated frontend consumer tsconfig.json compilerOptions must not include ${key}.`);
+    }
+  }
+
+  validateGeneratedTsconfigArrayIncludes(
+    compilerOptions.lib,
+    ["DOM", "DOM.Iterable"],
+    "Generated frontend consumer tsconfig.json compilerOptions.lib",
+    failures,
+  );
+  validateGeneratedTsconfigExactValue(
+    compilerOptions.jsx,
+    "react-jsx",
+    "Generated frontend consumer tsconfig.json compilerOptions.jsx",
+    failures,
+  );
+  validateGeneratedTsconfigExactValue(
+    compilerOptions.moduleResolution,
+    "Bundler",
+    "Generated frontend consumer tsconfig.json compilerOptions.moduleResolution",
+    failures,
+  );
+  validateGeneratedTsconfigExactValue(
+    compilerOptions.strict,
+    true,
+    "Generated frontend consumer tsconfig.json compilerOptions.strict",
+    failures,
+  );
+  validateGeneratedTsconfigExactValue(
+    compilerOptions.noEmit,
+    true,
+    "Generated frontend consumer tsconfig.json compilerOptions.noEmit",
+    failures,
+  );
+  validateGeneratedTsconfigExactValue(
+    compilerOptions.baseUrl,
+    ".",
+    "Generated frontend consumer tsconfig.json compilerOptions.baseUrl",
+    failures,
+  );
+
+  if (
+    !compilerOptions.paths ||
+    typeof compilerOptions.paths !== "object" ||
+    Array.isArray(compilerOptions.paths)
+  ) {
+    failures.push("Generated frontend consumer tsconfig.json compilerOptions.paths must be an object.");
+  } else if (Object.keys(compilerOptions.paths).length !== 1 || !Object.hasOwn(compilerOptions.paths, "@/*")) {
+    failures.push("Generated frontend consumer tsconfig.json compilerOptions.paths must contain only @/*.");
+  } else if (
+    !Array.isArray(compilerOptions.paths["@/*"]) ||
+    compilerOptions.paths["@/*"].length !== 1 ||
+    compilerOptions.paths["@/*"][0] !== "./*"
+  ) {
+    failures.push("Generated frontend consumer tsconfig.json must map @/* to ./* only.");
+  }
+
+  validateGeneratedTsconfigArrayIncludes(
+    tsconfig.include,
+    ["**/*.ts", "**/*.tsx", "**/*.mts"],
+    "Generated frontend consumer tsconfig.json include",
+    failures,
+  );
+  if (!Array.isArray(tsconfig.exclude) || tsconfig.exclude.length !== 1 || tsconfig.exclude[0] !== "node_modules") {
+    failures.push("Generated frontend consumer tsconfig.json exclude must contain only node_modules.");
+  }
+
+  validateNoForbiddenGeneratedTsconfigStrings(tsconfig, failures);
+}
+
+export function validateGeneratedFrontendConsumerScripts(scripts, failures) {
+  if (!scripts || typeof scripts !== "object" || Array.isArray(scripts)) {
+    failures.push("Generated frontend consumer package.json scripts must be an object.");
+    return;
+  }
+
+  for (const [scriptName, expectedCommand] of Object.entries(generatedFrontendConsumerScripts)) {
+    const command = scripts[scriptName];
+    if (!isNonBlankString(command)) {
+      failures.push(`Generated frontend consumer script ${scriptName} must be present and non-empty.`);
+      continue;
+    }
+    if (command !== expectedCommand) {
+      failures.push(
+        `Generated frontend consumer script ${scriptName} must be ${JSON.stringify(expectedCommand)}.`,
+      );
+    }
+  }
+
+  for (const [scriptName, command] of Object.entries(scripts)) {
+    if (!isNonBlankString(command)) {
+      failures.push(`Generated frontend consumer script ${scriptName} must be non-empty.`);
+      continue;
+    }
+
+    for (const forbiddenFragment of forbiddenGeneratedFrontendScriptFragments) {
+      if (command.includes(forbiddenFragment)) {
+        failures.push(
+          `Generated frontend consumer script ${scriptName} must not contain forbidden command fragment ${JSON.stringify(forbiddenFragment)}.`,
+        );
+      }
+    }
+  }
+}
+
 async function validateMaterializedAllowedPaths(materializedRoot, includeTargets, failures) {
   const materializedPaths = await collectMaterializedPaths(materializedRoot);
 
@@ -521,6 +837,11 @@ async function validateMaterializedAllowedPaths(materializedRoot, includeTargets
 
     if (isGeneratedArtifactPath(relativePath)) {
       failures.push(`${relativePath}: generated/install/cache artifact must not be materialized.`);
+    }
+    if (isForbiddenMaterializedWorkspaceMetadataPath(relativePath)) {
+      failures.push(
+        `${relativePath}: generated frontend consumer must be a standalone app candidate, not a workspace root; monorepo workspace metadata must not be materialized.`,
+      );
     }
     if (isForbiddenMaterializedPath(relativePath)) {
       failures.push(`${relativePath}: backend/current-app server path must not be materialized.`);
@@ -570,6 +891,36 @@ async function validateMaterializedImportClosure(materializedRoot, failures) {
           `${relativePath}: local import ${specifier} does not resolve inside the materialized frontend consumer tree.`,
         );
       }
+    }
+  }
+}
+
+async function validateMaterializedExternalPackageDependencies(materializedRoot, candidatePackageJson, failures) {
+  const sourceFiles = [];
+  const declaredDependencies = new Set([
+    ...Object.keys(candidatePackageJson.dependencies ?? {}),
+    ...Object.keys(candidatePackageJson.devDependencies ?? {}),
+  ]);
+
+  await collectSourceFiles(materializedRoot, sourceFiles);
+
+  for (const filePath of sourceFiles) {
+    const content = await readFile(filePath, "utf8");
+    const relativePath = normalizeRepoPath(path.relative(materializedRoot, filePath));
+
+    for (const specifier of extractImportSpecifiers(content)) {
+      if (specifier.startsWith(".") || specifier.startsWith("@/") || isNodeBuiltinSpecifier(specifier)) {
+        continue;
+      }
+
+      const packageName = deriveExternalPackageName(specifier);
+      if (!packageName || declaredDependencies.has(packageName)) {
+        continue;
+      }
+
+      failures.push(
+        `${relativePath}: generated frontend consumer package metadata/import-closure is missing external dependency ${packageName} for import ${specifier}.`,
+      );
     }
   }
 }
@@ -624,6 +975,21 @@ function extractImportSpecifiers(content) {
   }
 
   return specifiers.filter(Boolean);
+}
+
+function deriveExternalPackageName(specifier) {
+  const segments = specifier.split("/");
+  if (specifier.startsWith("@")) {
+    return segments.length >= 2 ? `${segments[0]}/${segments[1]}` : null;
+  }
+
+  return segments[0] || null;
+}
+
+function isNodeBuiltinSpecifier(specifier) {
+  const normalizedSpecifier = specifier.replace(/^node:/, "");
+  const rootSpecifier = normalizedSpecifier.split("/")[0];
+  return nodeBuiltinModuleNames.has(rootSpecifier);
 }
 
 async function resolveRepoLocalImport(specifier, importerPath, repoRoot) {
@@ -764,8 +1130,13 @@ function isForbiddenMaterializedPath(normalizedPath) {
     );
 }
 
+function isForbiddenMaterializedWorkspaceMetadataPath(normalizedPath) {
+  const fileName = normalizedPath.split("/").at(-1) ?? "";
+  return forbiddenMaterializedWorkspaceMetadataFileNames.has(fileName);
+}
+
 function isAllowedMaterializedPath(normalizedPath, includeTargets) {
-  if (normalizedPath === "package.json") {
+  if (normalizedPath === "package.json" || normalizedPath === "tsconfig.json") {
     return true;
   }
 
@@ -847,6 +1218,92 @@ function getDependencyLabel(dependency, index) {
 
 function isNonBlankString(value) {
   return typeof value === "string" && value.trim().length > 0;
+}
+
+function isExactPinnedPnpmPackageManager(value) {
+  return typeof value === "string" && value === value.trim() && /^pnpm@\d+\.\d+\.\d+$/.test(value);
+}
+
+function validateGeneratedTsconfigArrayIncludes(value, expectedValues, label, failures) {
+  if (!Array.isArray(value)) {
+    failures.push(`${label} must be an array.`);
+    return;
+  }
+
+  for (const expectedValue of expectedValues) {
+    if (!value.includes(expectedValue)) {
+      failures.push(`${label} must include ${expectedValue}.`);
+    }
+  }
+}
+
+function validateGeneratedTsconfigExactValue(actualValue, expectedValue, label, failures) {
+  if (actualValue !== expectedValue) {
+    failures.push(`${label} must be ${JSON.stringify(expectedValue)}.`);
+  }
+}
+
+function validateNoForbiddenGeneratedTsconfigStrings(value, failures, location = "tsconfig.json") {
+  if (typeof value === "string") {
+    const normalizedValue = normalizeTsconfigStringForValidation(value);
+
+    if (isAbsoluteTsconfigPath(value)) {
+      failures.push(`Generated frontend consumer ${location} must not use absolute path ${JSON.stringify(value)}.`);
+    }
+    if (hasTsconfigTraversalPathSegment(value)) {
+      failures.push(`Generated frontend consumer ${location} must not use .. path traversal ${JSON.stringify(value)}.`);
+    }
+
+    for (const forbiddenFragment of forbiddenGeneratedTsconfigStringFragments) {
+      if (matchesForbiddenGeneratedTsconfigPathFragment(normalizedValue, forbiddenFragment)) {
+        failures.push(
+          `Generated frontend consumer ${location} must not point at backend/current-app or generated path fragment ${JSON.stringify(forbiddenFragment)}.`,
+        );
+      }
+    }
+    for (const forbiddenFragment of forbiddenGeneratedTsconfigPackageFragments) {
+      if (value.includes(forbiddenFragment)) {
+        failures.push(
+          `Generated frontend consumer ${location} must not point at backend package fragment ${JSON.stringify(forbiddenFragment)}.`,
+        );
+      }
+    }
+    return;
+  }
+
+  if (Array.isArray(value)) {
+    for (const [index, item] of value.entries()) {
+      validateNoForbiddenGeneratedTsconfigStrings(item, failures, `${location}[${index}]`);
+    }
+    return;
+  }
+
+  if (value && typeof value === "object") {
+    for (const [key, item] of Object.entries(value)) {
+      validateNoForbiddenGeneratedTsconfigStrings(key, failures, `${location}.${key}`);
+      validateNoForbiddenGeneratedTsconfigStrings(item, failures, `${location}.${key}`);
+    }
+  }
+}
+
+function normalizeTsconfigStringForValidation(value) {
+  return value.replace(/\\/g, "/").replace(/\/+$/, "");
+}
+
+function isAbsoluteTsconfigPath(value) {
+  return path.posix.isAbsolute(value) || path.win32.isAbsolute(value);
+}
+
+function hasTsconfigTraversalPathSegment(value) {
+  return normalizeTsconfigStringForValidation(value).split("/").includes("..");
+}
+
+function matchesForbiddenGeneratedTsconfigPathFragment(value, forbiddenFragment) {
+  const normalizedFragment = normalizeTsconfigStringForValidation(forbiddenFragment);
+  return value === normalizedFragment ||
+    value.startsWith(`${normalizedFragment}/`) ||
+    value.includes(`/${normalizedFragment}/`) ||
+    value.endsWith(`/${normalizedFragment}`);
 }
 
 function isPathInsideRepo(repoRoot, absoluteFilePath) {

@@ -37,6 +37,7 @@ const expectedPackages = [
 ];
 
 const generatedRootVerifierScripts = [
+  "scripts/verify-backend-platform-extraction-boundary.mjs",
   "scripts/generate-database-migration-index.mjs",
 ];
 
@@ -271,6 +272,7 @@ test("standalone backend dry-run materializes only move/copy candidates and boun
     assert.equal(await pathExists(path.join(result.materializedRoot, "package.json")), true);
     assert.equal(await pathExists(path.join(result.materializedRoot, "pnpm-workspace.yaml")), true);
     assert.equal(await pathExists(path.join(result.materializedRoot, "tsconfig.json")), true);
+    assert.equal(await pathExists(path.join(result.materializedRoot, "scripts/verify-backend-platform-extraction-boundary.mjs")), true);
     assert.equal(await pathExists(path.join(result.materializedRoot, "scripts/generate-database-migration-index.mjs")), true);
     assert.equal(
       await pathExists(path.join(
@@ -330,6 +332,14 @@ test("standalone backend dry-run generates backend-only root metadata instead of
     assert.equal(generatedRootPackage.scripts["backend-platform:verify-package-graph-boundary"], undefined);
     assert.equal(generatedRootPackage.scripts["backend-platform:verify-extracted-workspace-readiness"], undefined);
     assert.equal(generatedRootPackage.scripts["database:verify-migration-bundle"], undefined);
+    assert.equal(
+      generatedRootPackage.scripts["backend-platform:verify-extraction-boundary"],
+      "node scripts/verify-backend-platform-extraction-boundary.mjs --backend-candidate",
+    );
+    assert.match(
+      generatedRootPackage.scripts["phase-11:verify-generated-backend-workspace"],
+      /backend-platform:verify-extraction-boundary/,
+    );
     assert.match(generatedRootPackage.scripts["phase-11:verify-generated-backend-workspace"], /database:migration-index:check/);
     assert.equal(generatedRootPackage.dependencies, undefined);
     assert.equal(generatedRootPackage.devDependencies["@types/node"], "^20");
@@ -362,6 +372,235 @@ test("standalone backend dry-run cleans up the materialized tree by default", as
   assert.equal(await pathExists(result.materializedRoot), false);
 
   await rm(repoRoot, { recursive: true, force: true });
+});
+
+test("standalone backend dry-run scans the materialized backend candidate source boundary", async () => {
+  const { repoRoot, manifestPath } = await createFixtureRepo();
+  await writeFixtureFile(
+    repoRoot,
+    "packages/domain-source/src/frontend-leak.ts",
+    [
+      'import React from "react";',
+      'import Page from "@/app/page";',
+      "export const leak = { React, Page };",
+      "",
+    ].join("\n"),
+  );
+
+  const result = await verifyStandaloneBackendExtractionDryRun({
+    repoRoot,
+    manifestPath,
+    expectedPackages,
+    keepMaterializedTree: true,
+  });
+
+  try {
+    assert.equal(result.ok, false);
+    assert.match(
+      result.failures.join("\n"),
+      /materialized backend boundary: packages\/domain\/src\/frontend-leak\.ts: imports forbidden React UI\/runtime import: react/,
+    );
+    assert.match(
+      result.failures.join("\n"),
+      /materialized backend boundary: packages\/domain\/src\/frontend-leak\.ts: imports forbidden current Next\.js app route or UI surface from backend package source: @\/app\/page/,
+    );
+  } finally {
+    await rm(result.materializedRoot, { recursive: true, force: true });
+    await rm(repoRoot, { recursive: true, force: true });
+  }
+});
+
+test("standalone backend dry-run accepts materialized package source importing a declared dependency", async () => {
+  const { repoRoot, manifestPath } = await createFixtureRepo();
+  await writeFixtureFile(repoRoot, "packages/domain-source/package.json", JSON.stringify({
+    name: "@fixture/domain",
+    scripts: { build: "echo ok", test: "echo ok" },
+    dependencies: {
+      nanoid: "^5.0.0",
+    },
+  }));
+  await writeFixtureFile(
+    repoRoot,
+    "packages/domain-source/src/declared-dependency.ts",
+    [
+      'import { nanoid } from "nanoid";',
+      "export const id = nanoid();",
+      "",
+    ].join("\n"),
+  );
+
+  const result = await verifyStandaloneBackendExtractionDryRun({
+    repoRoot,
+    manifestPath,
+    expectedPackages,
+    keepMaterializedTree: true,
+  });
+
+  try {
+    assert.equal(result.ok, true);
+  } finally {
+    await rm(result.materializedRoot, { recursive: true, force: true });
+    await rm(repoRoot, { recursive: true, force: true });
+  }
+});
+
+test("standalone backend dry-run rejects undeclared materialized package source imports", async () => {
+  const { repoRoot, manifestPath } = await createFixtureRepo();
+  await writeFixtureFile(
+    repoRoot,
+    "packages/domain-source/src/undeclared-dependency.ts",
+    [
+      'import { z } from "zod";',
+      "export const schema = z.object({});",
+      "",
+    ].join("\n"),
+  );
+
+  const result = await verifyStandaloneBackendExtractionDryRun({
+    repoRoot,
+    manifestPath,
+    expectedPackages,
+    keepMaterializedTree: true,
+  });
+
+  try {
+    assert.equal(result.ok, false);
+    assert.match(
+      result.failures.join("\n"),
+      /packages\/domain\/src\/undeclared-dependency\.ts: materialized backend package dependency closure failed for package @fixture\/domain \(packages\/domain\); import zod resolves to package zod, but packages\/domain\/package\.json does not declare it/,
+    );
+  } finally {
+    await rm(result.materializedRoot, { recursive: true, force: true });
+    await rm(repoRoot, { recursive: true, force: true });
+  }
+});
+
+test("standalone backend dry-run derives scoped package names for materialized imports", async () => {
+  const { repoRoot, manifestPath } = await createFixtureRepo();
+  await writeFixtureFile(repoRoot, "packages/domain-source/package.json", JSON.stringify({
+    name: "@fixture/domain",
+    scripts: { build: "echo ok", test: "echo ok" },
+    dependencies: {
+      "@scope/pkg": "^1.0.0",
+    },
+  }));
+  await writeFixtureFile(
+    repoRoot,
+    "packages/domain-source/src/scoped-dependency.ts",
+    [
+      'export { helper } from "@scope/pkg/subpath";',
+      "",
+    ].join("\n"),
+  );
+
+  const result = await verifyStandaloneBackendExtractionDryRun({
+    repoRoot,
+    manifestPath,
+    expectedPackages,
+    keepMaterializedTree: true,
+  });
+
+  try {
+    assert.equal(result.ok, true);
+  } finally {
+    await rm(result.materializedRoot, { recursive: true, force: true });
+    await rm(repoRoot, { recursive: true, force: true });
+  }
+});
+
+test("standalone backend dry-run allows Node built-ins in materialized package source", async () => {
+  const { repoRoot, manifestPath } = await createFixtureRepo();
+  await writeFixtureFile(
+    repoRoot,
+    "packages/domain-source/src/node-builtins.ts",
+    [
+      'import path from "node:path";',
+      'import { readFile } from "fs/promises";',
+      'const crypto = await import("node:crypto");',
+      'const os = require("os");',
+      "export const builtins = { crypto, os, path, readFile };",
+      "",
+    ].join("\n"),
+  );
+
+  const result = await verifyStandaloneBackendExtractionDryRun({
+    repoRoot,
+    manifestPath,
+    expectedPackages,
+    keepMaterializedTree: true,
+  });
+
+  try {
+    assert.equal(result.ok, true);
+  } finally {
+    await rm(result.materializedRoot, { recursive: true, force: true });
+    await rm(repoRoot, { recursive: true, force: true });
+  }
+});
+
+test("standalone backend dry-run rejects undeclared imports of another materialized workspace package", async () => {
+  const { repoRoot, manifestPath } = await createFixtureRepo();
+  await writeFixtureFile(
+    repoRoot,
+    "packages/domain-source/src/workspace-package.ts",
+    [
+      'import { api } from "@reservation-platform/api";',
+      "export const workspaceImport = api;",
+      "",
+    ].join("\n"),
+  );
+
+  const result = await verifyStandaloneBackendExtractionDryRun({
+    repoRoot,
+    manifestPath,
+    expectedPackages,
+    keepMaterializedTree: true,
+  });
+
+  try {
+    assert.equal(result.ok, false);
+    assert.match(
+      result.failures.join("\n"),
+      /packages\/domain\/src\/workspace-package\.ts: materialized backend package dependency closure failed for package @fixture\/domain \(packages\/domain\); import @reservation-platform\/api resolves to package @reservation-platform\/api, but packages\/domain\/package\.json does not declare it/,
+    );
+  } finally {
+    await rm(result.materializedRoot, { recursive: true, force: true });
+    await rm(repoRoot, { recursive: true, force: true });
+  }
+});
+
+test("standalone backend dry-run allows declared imports of another materialized workspace package", async () => {
+  const { repoRoot, manifestPath } = await createFixtureRepo();
+  await writeFixtureFile(repoRoot, "packages/domain-source/package.json", JSON.stringify({
+    name: "@fixture/domain",
+    scripts: { build: "echo ok", test: "echo ok" },
+    dependencies: {
+      "@reservation-platform/api": "workspace:*",
+    },
+  }));
+  await writeFixtureFile(
+    repoRoot,
+    "packages/domain-source/src/workspace-package.ts",
+    [
+      'import { api } from "@reservation-platform/api";',
+      "export const workspaceImport = api;",
+      "",
+    ].join("\n"),
+  );
+
+  const result = await verifyStandaloneBackendExtractionDryRun({
+    repoRoot,
+    manifestPath,
+    expectedPackages,
+    keepMaterializedTree: true,
+  });
+
+  try {
+    assert.equal(result.ok, true);
+  } finally {
+    await rm(result.materializedRoot, { recursive: true, force: true });
+    await rm(repoRoot, { recursive: true, force: true });
+  }
 });
 
 test("standalone backend dry-run validates generated root filter commands against materialized package scripts", async () => {
@@ -619,6 +858,10 @@ test("standalone backend dry-run fails when a generated root script references a
 
   try {
     assert.equal(result.ok, false);
+    assert.match(
+      result.failures.join("\n"),
+      /generated backend root script backend-platform:verify-extraction-boundary references scripts\/verify-backend-platform-extraction-boundary\.mjs, but that file was not materialized/,
+    );
     assert.match(
       result.failures.join("\n"),
       /generated backend root script database:migration-index:check references scripts\/generate-database-migration-index\.mjs, but that file was not materialized/,

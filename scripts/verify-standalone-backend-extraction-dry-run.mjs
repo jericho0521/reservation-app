@@ -10,10 +10,15 @@ import {
   rm,
   writeFile,
 } from "node:fs/promises";
+import { builtinModules } from "node:module";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
+import {
+  backendCandidateScanTargets,
+  verifyBackendPlatformExtractionBoundary,
+} from "./verify-backend-platform-extraction-boundary.mjs";
 import { expectedExtractedBackendPackages } from "./verify-extracted-backend-workspace-readiness.mjs";
 
 const planClassifications = new Set(["move-candidate", "copy-candidate"]);
@@ -82,11 +87,20 @@ const generatedBackendRootMetadataFiles = [
 ];
 
 const requiredGeneratedRootScripts = [
+  "backend-platform:verify-extraction-boundary",
   "backend-platform:verify-standalone-api-skeleton",
   "database:migration-index:check",
   "packages:build",
   "packages:test",
   "phase-11:verify-generated-backend-workspace",
+];
+
+const requiredGeneratedPhase11ScriptInvocations = [
+  "backend-platform:verify-extraction-boundary",
+  "packages:build",
+  "packages:test",
+  "backend-platform:verify-standalone-api-skeleton",
+  "database:migration-index:check",
 ];
 
 const forbiddenGeneratedRootScriptNames = new Set([
@@ -145,6 +159,13 @@ const packageDependencySections = [
   "optionalDependencies",
   "peerDependencies",
 ];
+
+const sourceExtensions = new Set([".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx", ".mts", ".cts"]);
+const nodeBuiltinModuleNames = new Set(
+  builtinModules.map((moduleName) => moduleName.replace(/^node:/, "").split("/")[0]),
+);
+const importSpecifierPattern =
+  /\b(?:import\s*(?:["']([^"']+)["']|[^"'()]+?\s*from\s*["']([^"']+)["'])|export\s*[^"'()]+?\s*from\s*["']([^"']+)["']|require\s*\(\s*["']([^"']+)["']|import\s*\(\s*["']([^"']+)["'])/g;
 
 const generatedRootScriptDefaultInputFiles = new Map([
   [
@@ -367,6 +388,7 @@ async function materializeAndValidateBackendTargetTree(
 
     await writeGeneratedBackendWorkspaceMetadata(context, expectedPackages, createWorkspaceMetadata);
     await validateMaterializedTargetTree(context, expectedPackages);
+    await validateMaterializedBackendBoundary(context);
   } finally {
     if (keepMaterializedTree) {
       context.materializedTreeKept = true;
@@ -374,6 +396,18 @@ async function materializeAndValidateBackendTargetTree(
       await rm(materializedRoot, { recursive: true, force: true });
       context.materializedTreeCleanedUp = true;
     }
+  }
+}
+
+async function validateMaterializedBackendBoundary(context) {
+  const result = await verifyBackendPlatformExtractionBoundary({
+    repoRoot: context.materializedRoot,
+    scanTargets: backendCandidateScanTargets,
+    ignoreMissingScanTargets: true,
+  });
+
+  for (const failure of result.failures) {
+    context.failures.push(`materialized backend boundary: ${failure}`);
   }
 }
 
@@ -455,9 +489,10 @@ async function createGeneratedBackendWorkspaceMetadata({
       scripts: {
         "packages:build": createFilteredPackageScript(buildPackages, "build"),
         "packages:test": createFilteredPackageScript(testPackages, "test"),
+        "backend-platform:verify-extraction-boundary": "node scripts/verify-backend-platform-extraction-boundary.mjs --backend-candidate",
         "backend-platform:verify-standalone-api-skeleton": "corepack pnpm --filter @reservation-platform/api run build && corepack pnpm --filter @reservation-platform/contract-types run build && corepack pnpm --filter @reservation-platform/standalone-api-skeleton run test",
         "database:migration-index:check": "node scripts/generate-database-migration-index.mjs --check",
-        "phase-11:verify-generated-backend-workspace": "corepack pnpm run packages:build && corepack pnpm run packages:test && corepack pnpm run backend-platform:verify-standalone-api-skeleton && corepack pnpm run database:migration-index:check",
+        "phase-11:verify-generated-backend-workspace": "corepack pnpm run backend-platform:verify-extraction-boundary && corepack pnpm run packages:build && corepack pnpm run packages:test && corepack pnpm run backend-platform:verify-standalone-api-skeleton && corepack pnpm run database:migration-index:check",
       },
     },
     pnpmWorkspaceYaml: "packages:\n  - apps/*\n  - packages/*\n",
@@ -560,6 +595,7 @@ async function validateMaterializedTargetTree(context, expectedPackages) {
 
   await validateGeneratedBackendWorkspaceMetadata(context, materializedFiles);
   validateExpectedMaterializedPackageManifests(context, expectedPackages);
+  await validateMaterializedBackendPackageDependencyClosure(context, materializedFiles);
 }
 
 async function validateGeneratedBackendWorkspaceMetadata(context, materializedFiles) {
@@ -615,11 +651,31 @@ async function validateGeneratedRootPackage(context, rootPackage, materializedFi
   }
 
   validateGeneratedRootScriptsAreBackendOnly(context, scripts);
+  validateGeneratedPhase11ScriptComposition(context, scripts);
   validateGeneratedRootScriptFileReferences(context, scripts, materializedFiles);
   await validateGeneratedRootFilteredPackageScripts(context, scripts, materializedFiles);
   validateGeneratedRootInstallBuildTooling(context, rootPackage);
   validateGeneratedRootDependenciesAreBackendOnly(context, rootPackage);
   await validateGeneratedRootPackageIsNotCurrentRootManifest(context, rootPackage);
+}
+
+function validateGeneratedPhase11ScriptComposition(context, scripts) {
+  if (!scripts || typeof scripts !== "object" || Array.isArray(scripts)) {
+    return;
+  }
+
+  const command = scripts["phase-11:verify-generated-backend-workspace"];
+  if (typeof command !== "string") {
+    return;
+  }
+
+  for (const scriptName of requiredGeneratedPhase11ScriptInvocations) {
+    if (!command.includes(`corepack pnpm run ${scriptName}`)) {
+      context.failures.push(
+        `package.json: generated backend root script phase-11:verify-generated-backend-workspace must run ${scriptName}`,
+      );
+    }
+  }
 }
 
 function validateGeneratedRootInstallBuildTooling(context, rootPackage) {
@@ -780,8 +836,142 @@ async function readMaterializedWorkspacePackageManifestIndex(context, materializ
   return packagesByName;
 }
 
+async function validateMaterializedBackendPackageDependencyClosure(context, materializedFiles) {
+  const materializedPackages = await readMaterializedWorkspacePackageManifests(
+    context,
+    materializedFiles,
+  );
+
+  for (const sourceFile of materializedFiles.filter(isMaterializedWorkspaceSourceFilePath).sort(comparePaths)) {
+    const materializedPackage = findNearestMaterializedPackageForFile(
+      materializedPackages,
+      sourceFile,
+    );
+
+    if (!materializedPackage) {
+      context.failures.push(
+        `${sourceFile}: materialized backend package dependency closure could not locate an apps/* or packages/* package.json for this materialized source file`,
+      );
+      continue;
+    }
+
+    const contents = await readMaterializedText(
+      context,
+      sourceFile,
+      `materialized backend package source ${sourceFile}`,
+    );
+    if (contents === null) {
+      continue;
+    }
+
+    const declaredDependencyNames = getManifestDeclaredDependencyNames(materializedPackage.manifest);
+
+    for (const specifier of extractImportSpecifiers(contents)) {
+      if (specifier.startsWith(".") || isNodeBuiltinSpecifier(specifier)) {
+        continue;
+      }
+
+      const packageName = deriveExternalPackageName(specifier);
+      if (!packageName) {
+        continue;
+      }
+
+      if (
+        declaredDependencyNames.has(packageName) ||
+        materializedPackage.packageName === packageName
+      ) {
+        continue;
+      }
+
+      context.failures.push(
+        `${sourceFile}: materialized backend package dependency closure failed for package ${materializedPackage.packageName} (${materializedPackage.packageRoot}); import ${specifier} resolves to package ${packageName}, but ${materializedPackage.manifestPath} does not declare it in dependencies, devDependencies, optionalDependencies, or peerDependencies`,
+      );
+    }
+  }
+}
+
+async function readMaterializedWorkspacePackageManifests(context, materializedFiles) {
+  const packageManifests = [];
+  const packageManifestPaths = materializedFiles
+    .filter(isMaterializedWorkspacePackageManifestPath)
+    .sort(comparePaths);
+
+  for (const manifestPath of packageManifestPaths) {
+    const manifest = await readMaterializedJson(context, manifestPath, `materialized package manifest ${manifestPath}`);
+    if (!manifest || typeof manifest !== "object" || Array.isArray(manifest)) {
+      continue;
+    }
+
+    const packageRoot = path.posix.dirname(manifestPath);
+    packageManifests.push({
+      manifest,
+      manifestPath,
+      packageName: isNonBlankString(manifest.name) ? manifest.name : null,
+      packageRoot,
+    });
+  }
+
+  return packageManifests;
+}
+
+function findNearestMaterializedPackageForFile(materializedPackages, sourceFile) {
+  return [...materializedPackages]
+    .filter((materializedPackage) => isSameOrChildPath(sourceFile, materializedPackage.packageRoot))
+    .sort((left, right) => right.packageRoot.length - left.packageRoot.length)
+    .at(0) ?? null;
+}
+
+function getManifestDeclaredDependencyNames(manifest) {
+  const dependencyNames = new Set();
+
+  for (const sectionName of packageDependencySections) {
+    const dependencies = manifest[sectionName];
+    if (!dependencies || typeof dependencies !== "object" || Array.isArray(dependencies)) {
+      continue;
+    }
+
+    for (const dependencyName of Object.keys(dependencies)) {
+      dependencyNames.add(dependencyName);
+    }
+  }
+
+  return dependencyNames;
+}
+
 function isMaterializedWorkspacePackageManifestPath(repoPath) {
   return /^(?:apps|packages)\/[^/]+\/package\.json$/.test(repoPath);
+}
+
+function isMaterializedWorkspaceSourceFilePath(repoPath) {
+  return /^(?:apps|packages)\/[^/]+\//.test(repoPath) &&
+    repoPath !== "package.json" &&
+    sourceExtensions.has(path.posix.extname(repoPath));
+}
+
+function extractImportSpecifiers(content) {
+  const specifiers = [];
+  importSpecifierPattern.lastIndex = 0;
+
+  for (const match of content.matchAll(importSpecifierPattern)) {
+    specifiers.push(match.slice(1).find(Boolean));
+  }
+
+  return specifiers.filter(Boolean);
+}
+
+function deriveExternalPackageName(specifier) {
+  const segments = specifier.split("/");
+  if (specifier.startsWith("@")) {
+    return segments.length >= 2 ? `${segments[0]}/${segments[1]}` : null;
+  }
+
+  return segments[0] || null;
+}
+
+function isNodeBuiltinSpecifier(specifier) {
+  const normalizedSpecifier = specifier.replace(/^node:/, "");
+  const rootSpecifier = normalizedSpecifier.split("/")[0];
+  return nodeBuiltinModuleNames.has(rootSpecifier);
 }
 
 function getFilteredPackageScriptReferences(command) {

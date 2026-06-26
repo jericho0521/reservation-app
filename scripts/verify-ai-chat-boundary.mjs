@@ -1,7 +1,7 @@
 import { lstat, readdir, readFile } from "node:fs/promises";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 
-const repoRoot = process.cwd();
 const checkedPackages = [
   {
     name: "@project-play/reservation-chat-core",
@@ -102,52 +102,50 @@ const devOnlyDependencies = new Set([
   "typescript",
 ]);
 
-const failures = [];
-const checkedSourceFiles = [];
+export async function verifyAiChatBoundary(options = {}) {
+  const repoRoot = options.repoRoot ?? process.cwd();
+  const failures = [];
+  const checkedSourceFiles = [];
 
-for (const packageConfig of checkedPackages) {
-  const packageRoot = path.join(repoRoot, packageConfig.relativeRoot);
-  const sourceFiles = await collectSourceFiles(path.join(packageRoot, "src"));
-  checkedSourceFiles.push(...sourceFiles);
+  for (const packageConfig of checkedPackages) {
+    const packageRoot = path.join(repoRoot, packageConfig.relativeRoot);
+    const sourceFiles = await collectSourceFiles(path.join(packageRoot, "src"), repoRoot);
+    checkedSourceFiles.push(...sourceFiles);
 
-  for (const filePath of sourceFiles) {
-    const content = await readFile(filePath, "utf8");
-    const relativePath = toPosix(path.relative(repoRoot, filePath));
+    for (const filePath of sourceFiles) {
+      const content = await readFile(filePath, "utf8");
+      const relativePath = toPosix(path.relative(repoRoot, filePath));
 
-    for (const specifier of extractImportSpecifiers(content)) {
-      const failureReason = getForbiddenImportReason(specifier, filePath);
-      if (failureReason) {
-        failures.push(`${relativePath}: imports forbidden ${failureReason}: ${specifier}`);
+      for (const specifier of extractImportSpecifiers(content)) {
+        const failureReason = getForbiddenImportReason(specifier, filePath, repoRoot);
+        if (failureReason) {
+          failures.push(`${relativePath}: imports forbidden ${failureReason}: ${specifier}`);
+        }
+      }
+
+      for (const [marker, pattern] of forbiddenReferencePatterns) {
+        pattern.lastIndex = 0;
+        if (pattern.test(content)) {
+          failures.push(`${relativePath}: references forbidden marker ${marker}`);
+        }
       }
     }
 
-    for (const [marker, pattern] of forbiddenReferencePatterns) {
-      pattern.lastIndex = 0;
-      if (pattern.test(content)) {
-        failures.push(`${relativePath}: references forbidden marker ${marker}`);
-      }
-    }
+    await verifyPackageManifest(packageConfig, repoRoot, failures);
   }
 
-  await verifyPackageManifest(packageConfig);
+  return {
+    ok: failures.length === 0,
+    failures,
+    checkedSourceFileCount: checkedSourceFiles.length,
+    checkedPackageCount: checkedPackages.length,
+  };
 }
 
-if (failures.length > 0) {
-  console.error("AI chat package boundary check failed:");
-  for (const failure of failures) {
-    console.error(`- ${failure}`);
-  }
-  process.exitCode = 1;
-} else {
-  console.log(
-    `Verified provider-neutral reservation chat boundaries across ${checkedSourceFiles.length} production source files and ${checkedPackages.length} package manifests.`,
-  );
-}
-
-async function collectSourceFiles(rootPath) {
+async function collectSourceFiles(rootPath, repoRoot) {
   const collected = [];
   await collectPath(rootPath, collected);
-  return sortFiles(collected);
+  return sortFiles(collected, repoRoot);
 }
 
 async function collectPath(absolutePath, collected) {
@@ -188,7 +186,7 @@ function extractImportSpecifiers(content) {
   return specifiers;
 }
 
-function getForbiddenImportReason(specifier, importerPath) {
+function getForbiddenImportReason(specifier, importerPath, repoRoot) {
   if (forbiddenImportExactSpecifiers.has(specifier)) {
     return forbiddenImportExactSpecifiers.get(specifier);
   }
@@ -200,7 +198,7 @@ function getForbiddenImportReason(specifier, importerPath) {
     return prefixMatch[1];
   }
 
-  const repoRelativeImportPath = getRepoRelativeImportPath(specifier, importerPath);
+  const repoRelativeImportPath = getRepoRelativeImportPath(specifier, importerPath, repoRoot);
   if (!repoRelativeImportPath) {
     return null;
   }
@@ -212,7 +210,7 @@ function getForbiddenImportReason(specifier, importerPath) {
   return repoRule?.[1] ?? null;
 }
 
-function getRepoRelativeImportPath(specifier, importerPath) {
+function getRepoRelativeImportPath(specifier, importerPath, repoRoot) {
   if (specifier.startsWith("@/")) {
     return normalizeRepoImportPath(specifier.slice(2));
   }
@@ -246,7 +244,7 @@ function normalizeRepoImportPath(repoPath) {
   return withoutExtension.replace(/\/index$/, "");
 }
 
-async function verifyPackageManifest(packageConfig) {
+async function verifyPackageManifest(packageConfig, repoRoot, failures) {
   const packageJsonPath = path.join(repoRoot, packageConfig.relativeRoot, "package.json");
   const packageJsonText = await readFile(packageJsonPath, "utf8");
   const packageJson = JSON.parse(packageJsonText);
@@ -309,7 +307,7 @@ function isSameOrChildRepoPath(candidatePath, forbiddenPath) {
   return candidatePath === forbiddenPath || candidatePath.startsWith(`${forbiddenPath}/`);
 }
 
-function sortFiles(files) {
+function sortFiles(files, repoRoot) {
   return [...new Set(files)].sort((a, b) =>
     toPosix(path.relative(repoRoot, a)).localeCompare(toPosix(path.relative(repoRoot, b))),
   );
@@ -317,4 +315,29 @@ function sortFiles(files) {
 
 function toPosix(filePath) {
   return filePath.split(path.sep).join("/");
+}
+
+async function main() {
+  const result = await verifyAiChatBoundary();
+
+  if (!result.ok) {
+    console.error("AI chat package boundary check failed:");
+    for (const failure of result.failures) {
+      console.error(`- ${failure}`);
+    }
+    process.exitCode = 1;
+    return;
+  }
+
+  console.log(
+    `Verified provider-neutral reservation chat boundaries across ${result.checkedSourceFileCount} production source files and ${result.checkedPackageCount} package manifests.`,
+  );
+}
+
+if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
+  main().catch((error) => {
+    console.error("AI chat package boundary check failed:");
+    console.error(error instanceof Error ? error.message : error);
+    process.exitCode = 1;
+  });
 }

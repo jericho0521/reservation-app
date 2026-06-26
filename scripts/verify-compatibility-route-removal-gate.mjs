@@ -14,7 +14,9 @@ export const defaultCompatibilityRouteRemovalDecisionLogPath =
 export const defaultRequiredRemovalGates = [
   "standaloneEquivalent",
   "frontendCutover",
+  "current-frontend:consumer-install-proof:strict",
   "sdkDirectParity",
+  "backend-platform:extracted-install-proof:strict",
   "authTenantIdempotencyProof",
   "tests",
   "rollbackDeprecationNotes",
@@ -94,10 +96,7 @@ export async function verifyCompatibilityRouteRemovalGate(options = {}) {
 export async function verifyCompatibilityRouteInventory(inventory, options = {}) {
   const repoRoot = path.resolve(options.repoRoot ?? process.cwd());
   const failures = [];
-  const requiredRemovalGates = Array.isArray(inventory?.requiredRemovalGates)
-    && inventory.requiredRemovalGates.length > 0
-    ? inventory.requiredRemovalGates
-    : defaultRequiredRemovalGates;
+  const requiredRemovalGates = readRequiredRemovalGates(inventory);
 
   if (!inventory || typeof inventory !== "object" || Array.isArray(inventory)) {
     return failResult(["Inventory must be a JSON object."]);
@@ -106,6 +105,8 @@ export async function verifyCompatibilityRouteInventory(inventory, options = {})
   if (!Array.isArray(inventory.routes) || inventory.routes.length === 0) {
     return failResult(["Inventory must include a non-empty routes array."]);
   }
+
+  validateRequiredRemovalGateList(inventory, failures);
 
   const currentRouteFilePaths = await listCurrentAppApiRouteFiles(repoRoot);
   const inventoryFilePaths = new Set();
@@ -154,12 +155,17 @@ export async function verifyCompatibilityRouteInventory(inventory, options = {})
     wrapperAllowlist: options.compatibilityWrapperAllowlist,
   });
   failures.push(...sourceUsageProof.failures);
+  const routeRemovalSummary = summarizeRouteRemovalReadiness(inventory.routes, requiredRemovalGates);
 
   return {
     ok: failures.length === 0,
     failures,
     routeCount: inventory.routes.length,
     requiredRemovalGates,
+    routeRemovalSummary,
+    readinessMessage: failures.length === 0
+      ? formatRouteRemovalReadinessMessage(routeRemovalSummary)
+      : "local prerequisite gate failed.",
     decisionLogProof,
     standaloneRouteSurfaceProof,
     sourceUsageProof,
@@ -949,7 +955,23 @@ function validateRemovalGates(route, requiredRemovalGates, routeLabel, failures)
     failures.push(`${routeLabel}: removalGates must include booleans for ${missingGateNames.join(", ")}.`);
   }
 
-  if (route.status === "blocked" && route.removalBlockedBy.length === 0) {
+  for (const gateName of strictRemovalGateNames(requiredRemovalGates)) {
+    if (route.removalGates[gateName] !== false) {
+      continue;
+    }
+
+    if (!hasNamedStrictRemovalGateBlocker(route, gateName)) {
+      failures.push(
+        `${routeLabel}: ${gateName} is false but removalBlockedBy does not include a strict prepared-root proof blocker.`,
+      );
+    }
+  }
+
+  if (
+    route.status === "blocked" &&
+    Array.isArray(route.removalBlockedBy) &&
+    route.removalBlockedBy.length === 0
+  ) {
     failures.push(`${routeLabel}: blocked route must list explicit removalBlockedBy gates.`);
   }
 
@@ -990,14 +1012,53 @@ function validateAppOwnedRoute(route, routeLabel, failures) {
   }
 }
 
+function validateRequiredRemovalGateList(inventory, failures) {
+  if (!Array.isArray(inventory.requiredRemovalGates) || inventory.requiredRemovalGates.length === 0) {
+    failures.push(
+      `Inventory requiredRemovalGates must include required gate names: ${defaultRequiredRemovalGates.join(", ")}.`,
+    );
+    return;
+  }
+
+  const invalidGateNames = inventory.requiredRemovalGates.filter((gateName) =>
+    !isNonBlankString(gateName)
+  );
+  if (invalidGateNames.length > 0) {
+    failures.push("Inventory requiredRemovalGates must contain only non-empty strings.");
+  }
+
+  const missingGateNames = defaultRequiredRemovalGates.filter((gateName) =>
+    !inventory.requiredRemovalGates.includes(gateName)
+  );
+  if (missingGateNames.length > 0) {
+    failures.push(`Inventory requiredRemovalGates must include required gate names: ${missingGateNames.join(", ")}.`);
+  }
+}
+
 function hasRollbackDeprecationBlocker(route) {
   if (!Array.isArray(route?.removalBlockedBy)) {
     return false;
   }
 
-  return route.removalBlockedBy.some((blocker) =>
-    typeof blocker === "string" && isRollbackDeprecationBlocker(blocker)
-  );
+  return hasRemovalBlockerMatching(route, isRollbackDeprecationBlocker);
+}
+
+function hasRemovalBlockerMatching(route, matcher) {
+  if (!Array.isArray(route?.removalBlockedBy)) {
+    return false;
+  }
+
+  return route.removalBlockedBy.some((blocker) => {
+    if (typeof blocker !== "string") {
+      return false;
+    }
+
+    if (matcher instanceof RegExp) {
+      return matcher.test(blocker);
+    }
+
+    return matcher(blocker);
+  });
 }
 
 function isRollbackDeprecationBlocker(blocker) {
@@ -1048,13 +1109,98 @@ function isRouteCoveredByDecisionLog(routePath, routeLiterals) {
   return false;
 }
 
+function summarizeRouteRemovalReadiness(routes, requiredRemovalGates = defaultRequiredRemovalGates) {
+  const routeList = Array.isArray(routes) ? routes : [];
+  const statusCounts = Object.fromEntries([...allowedStatuses].map((status) => [status, 0]));
+  const strictGateNames = strictRemovalGateNames(requiredRemovalGates);
+  const strictProofOpenGateCounts = Object.fromEntries(
+    strictGateNames.map((gateName) => [gateName, 0]),
+  );
+  let removableRouteCount = 0;
+  let nonAppOwnedCandidateCount = 0;
+  let strictProofBlockedRouteCount = 0;
+
+  for (const route of routeList) {
+    const status = isNonBlankString(route?.status) ? route.status : "<missing>";
+    statusCounts[status] = (statusCounts[status] ?? 0) + 1;
+
+    if (route?.status === "removable") {
+      removableRouteCount += 1;
+    }
+
+    const isRemovalCandidate =
+      route?.classification !== appOwnedClassification &&
+      reservationRemovalStatuses.has(route?.status);
+    if (!isRemovalCandidate) {
+      continue;
+    }
+
+    nonAppOwnedCandidateCount += 1;
+    let routeHasOpenStrictProofGate = false;
+    for (const gateName of strictGateNames) {
+      if (route?.removalGates?.[gateName] !== false) {
+        continue;
+      }
+
+      strictProofOpenGateCounts[gateName] += 1;
+      routeHasOpenStrictProofGate = true;
+    }
+
+    if (routeHasOpenStrictProofGate) {
+      strictProofBlockedRouteCount += 1;
+    }
+  }
+
+  return {
+    routeCount: routeList.length,
+    statusCounts,
+    removableRouteCount,
+    nonAppOwnedCandidateCount,
+    strictProofOpenGateCounts,
+    strictProofBlockedRouteCount,
+  };
+}
+
+function strictRemovalGateNames(requiredRemovalGates) {
+  return requiredRemovalGates.filter(isStrictRemovalGateName);
+}
+
+function isStrictRemovalGateName(gateName) {
+  return isNonBlankString(gateName) && gateName.endsWith(":strict");
+}
+
+function hasNamedStrictRemovalGateBlocker(route, gateName) {
+  return hasRemovalBlockerMatching(route, new RegExp(escapeRegExp(gateName), "i"));
+}
+
+function formatRouteRemovalReadinessMessage(summary) {
+  return [
+    "local prerequisite gate passed",
+    `${summary.removableRouteCount} removable routes`,
+    `${summary.strictProofBlockedRouteCount} compatibility routes still blocked by strict prepared-root proof gates.`,
+  ].join("; ");
+}
+
 function failResult(failures) {
+  const routeRemovalSummary = summarizeRouteRemovalReadiness([]);
+
   return {
     ok: false,
     failures,
     routeCount: 0,
     requiredRemovalGates: defaultRequiredRemovalGates,
+    routeRemovalSummary,
+    readinessMessage: "local prerequisite gate failed.",
   };
+}
+
+function readRequiredRemovalGates(inventory) {
+  const configuredGates = Array.isArray(inventory?.requiredRemovalGates)
+    && inventory.requiredRemovalGates.length > 0
+    ? inventory.requiredRemovalGates.filter(isNonBlankString)
+    : [];
+
+  return [...new Set([...configuredGates, ...defaultRequiredRemovalGates])];
 }
 
 function getRouteLabel(route) {
@@ -1188,7 +1334,7 @@ function main() {
       }
 
       console.log(
-        `Verified compatibility route removal gate for ${result.routeCount} routes, ${result.standaloneRouteSurfaceProof.coveredStandaloneEquivalents.length} unique local standalone /v1 equivalents, and ${result.sourceUsageProof.scannedFileCount} migrated frontend/platform source files. No network, deployment, or live backend calls were attempted.`,
+        `Verified compatibility route removal gate for ${result.routeCount} routes, ${result.standaloneRouteSurfaceProof.coveredStandaloneEquivalents.length} unique local standalone /v1 equivalents, and ${result.sourceUsageProof.scannedFileCount} migrated frontend/platform source files. ${result.readinessMessage} No network, deployment, or live backend calls were attempted.`,
       );
     })
     .catch((error) => {

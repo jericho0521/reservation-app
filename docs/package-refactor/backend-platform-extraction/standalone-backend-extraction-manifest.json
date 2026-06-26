@@ -199,12 +199,13 @@
       "id": "backend-root-verifier-scripts",
       "classification": "copy-candidate",
       "currentPaths": [
+        "scripts/verify-backend-platform-extraction-boundary.mjs",
         "scripts/generate-database-migration-index.mjs"
       ],
       "targetBackendPaths": ["scripts"],
       "ownershipCategory": "operations",
       "status": "ready-for-extraction-planning",
-      "rationale": "Generated backend root database migration-index checks invoke this backend-owned script via node scripts/*.mjs. Monorepo-to-candidate extraction, package-graph, readiness, and migration-bundle reconciliation guardrails stay in the current repository instead of becoming post-extraction backend root scripts."
+      "rationale": "Generated backend root candidate source-boundary and database migration-index checks invoke these backend-owned scripts via node scripts/*.mjs. Monorepo-to-candidate extraction, package-graph, readiness, and migration-bundle reconciliation guardrails stay in the current repository instead of becoming post-extraction backend root scripts."
     },
     {
       "id": "backend-root-verifier-input-manifests",

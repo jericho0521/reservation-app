@@ -12,6 +12,13 @@ import {
 } from "./verify-compatibility-route-removal-gate.mjs";
 
 const gateDefaults = Object.fromEntries(defaultRequiredRemovalGates.map((gateName) => [gateName, false]));
+const oldRequiredRemovalGates = defaultRequiredRemovalGates.filter((gateName) =>
+  !gateName.endsWith(":strict")
+);
+const strictProofBlockers = [
+  "current-frontend:consumer-install-proof:strict has not passed for a prepared frontend consumer root",
+  "backend-platform:extracted-install-proof:strict has not passed for a prepared extracted backend root",
+];
 
 function baseInventory(route) {
   return {
@@ -44,7 +51,11 @@ function routeFixture(overrides = {}) {
       ...gateDefaults,
       standaloneEquivalent: true,
     },
-    removalBlockedBy: ["fixture gate", "rollback or deprecation notes are not written"],
+    removalBlockedBy: [
+      "fixture gate",
+      "rollback or deprecation notes are not written",
+      ...strictProofBlockers,
+    ],
     ...overrides,
   };
 }
@@ -256,6 +267,7 @@ test("compatibility route gate allows legitimate frontend cutover and local-mode
         "current frontend local mode still targets /api/services through the compatibility wrapper",
         "full frontend cutover remains incomplete",
         "rollback or deprecation notes are not written",
+        ...strictProofBlockers,
       ],
     })),
     { repoRoot },
@@ -263,6 +275,91 @@ test("compatibility route gate allows legitimate frontend cutover and local-mode
 
   assert.equal(result.ok, true);
   assert.deepEqual(result.failures, []);
+});
+
+test("compatibility route gate reports route-removal readiness summary", async () => {
+  const repoRoot = await createFixtureRepo([
+    "app/api/services/route.ts",
+    "app/api/services/[id]/route.ts",
+  ]);
+  const result = await verifyCompatibilityRouteInventory(
+    inventoryWithRoutes([
+      routeFixture(),
+      routeFixture({
+        routePath: "/api/services/{id}",
+        filePath: "app/api/services/[id]/route.ts",
+        status: "removable",
+        standaloneEquivalent: "/v1/services/{id}",
+        removalGates: Object.fromEntries(defaultRequiredRemovalGates.map((gateName) => [gateName, true])),
+        removalBlockedBy: [],
+      }),
+    ]),
+    { repoRoot },
+  );
+
+  assert.equal(result.ok, true);
+  assert.equal(result.routeRemovalSummary.routeCount, 2);
+  assert.equal(result.routeRemovalSummary.statusCounts["remove-later"], 1);
+  assert.equal(result.routeRemovalSummary.statusCounts.removable, 1);
+  assert.equal(result.routeRemovalSummary.removableRouteCount, 1);
+  assert.equal(result.routeRemovalSummary.nonAppOwnedCandidateCount, 2);
+  assert.deepEqual(result.routeRemovalSummary.strictProofOpenGateCounts, {
+    "current-frontend:consumer-install-proof:strict": 1,
+    "backend-platform:extracted-install-proof:strict": 1,
+  });
+  assert.equal(result.routeRemovalSummary.strictProofBlockedRouteCount, 1);
+  assert.match(result.readinessMessage, /1 removable routes/);
+  assert.match(result.readinessMessage, /1 compatibility routes still blocked by strict prepared-root proof gates/);
+});
+
+test("compatibility route gate applies future strict gates to blockers and summary", async () => {
+  const repoRoot = await createFixtureRepo();
+  const futureStrictGate = "future-platform:strict";
+  const requiredRemovalGates = [...defaultRequiredRemovalGates, futureStrictGate];
+  const removalGates = {
+    ...Object.fromEntries(requiredRemovalGates.map((gateName) => [gateName, true])),
+    [futureStrictGate]: false,
+  };
+  const inventory = {
+    schemaVersion: 1,
+    requiredRemovalGates,
+    routes: [
+      routeFixture({
+        removalGates,
+        removalBlockedBy: [],
+      }),
+    ],
+  };
+
+  const missingNamedBlocker = await verifyCompatibilityRouteInventory(inventory, { repoRoot });
+  assert.equal(missingNamedBlocker.ok, false);
+  assert.match(
+    missingNamedBlocker.failures.join("\n"),
+    /\/api\/services: future-platform:strict is false but removalBlockedBy does not include a strict prepared-root proof blocker/,
+  );
+
+  const namedBlocker = await verifyCompatibilityRouteInventory({
+    ...inventory,
+    routes: [
+      routeFixture({
+        removalGates,
+        removalBlockedBy: ["future-platform:strict has not passed for the future fixture root"],
+      }),
+    ],
+  }, { repoRoot });
+
+  assert.equal(namedBlocker.ok, true);
+  assert.equal(namedBlocker.routeRemovalSummary.strictProofOpenGateCounts[futureStrictGate], 1);
+  assert.equal(
+    namedBlocker.routeRemovalSummary.strictProofOpenGateCounts["current-frontend:consumer-install-proof:strict"],
+    0,
+  );
+  assert.equal(
+    namedBlocker.routeRemovalSummary.strictProofOpenGateCounts["backend-platform:extracted-install-proof:strict"],
+    0,
+  );
+  assert.equal(namedBlocker.routeRemovalSummary.strictProofBlockedRouteCount, 1);
+  assert.match(namedBlocker.readinessMessage, /1 compatibility routes still blocked by strict prepared-root proof gates/);
 });
 
 test("compatibility route gate does not require decision log coverage for app-owned routes", async () => {
@@ -432,6 +529,17 @@ test("compatibility route gate requires blocked routes to list blockers", async 
   assert.match(result.failures.join("\n"), /blocked route must list explicit removalBlockedBy gates/);
 });
 
+test("compatibility route gate reports malformed blocked routes without throwing", async () => {
+  const repoRoot = await createFixtureRepo();
+  const result = await verifyCompatibilityRouteInventory(
+    baseInventory(routeFixture({ status: "blocked", removalBlockedBy: undefined })),
+    { repoRoot },
+  );
+
+  assert.equal(result.ok, false);
+  assert.match(result.failures.join("\n"), /\/api\/services: removalBlockedBy must be an array/);
+});
+
 test("compatibility route gate rejects app-owned routes marked for platform removal", async () => {
   const repoRoot = await createFixtureRepo();
   const result = await verifyCompatibilityRouteInventory(
@@ -462,6 +570,82 @@ test("compatibility route gate rejects removable routes with open gates", async 
 
   assert.equal(result.ok, false);
   assert.match(result.failures.join("\n"), /removable route still has open gates/);
+});
+
+test("compatibility route gate rejects removable routes until strict prepared-root proofs pass", async () => {
+  const repoRoot = await createFixtureRepo();
+  const result = await verifyCompatibilityRouteInventory(
+    baseInventory(routeFixture({
+      status: "removable",
+      removalGates: {
+        ...Object.fromEntries(defaultRequiredRemovalGates.map((gateName) => [gateName, true])),
+        "current-frontend:consumer-install-proof:strict": false,
+        "backend-platform:extracted-install-proof:strict": false,
+      },
+      removalBlockedBy: strictProofBlockers,
+    })),
+    { repoRoot },
+  );
+
+  assert.equal(result.ok, false);
+  assert.match(
+    result.failures.join("\n"),
+    /removable route still has open gates: current-frontend:consumer-install-proof:strict, backend-platform:extracted-install-proof:strict/,
+  );
+});
+
+test("compatibility route gate rejects generic strict prepared-root blockers without gate names", async () => {
+  const repoRoot = await createFixtureRepo();
+  const result = await verifyCompatibilityRouteInventory(
+    baseInventory(routeFixture({
+      removalBlockedBy: [
+        "fixture gate",
+        "rollback or deprecation notes are not written",
+        "prepared frontend consumer root proof has not passed",
+        "prepared extracted backend root proof has not passed",
+      ],
+    })),
+    { repoRoot },
+  );
+
+  assert.equal(result.ok, false);
+  assert.match(
+    result.failures.join("\n"),
+    /\/api\/services: current-frontend:consumer-install-proof:strict is false but removalBlockedBy does not include a strict prepared-root proof blocker/,
+  );
+  assert.match(
+    result.failures.join("\n"),
+    /\/api\/services: backend-platform:extracted-install-proof:strict is false but removalBlockedBy does not include a strict prepared-root proof blocker/,
+  );
+});
+
+test("compatibility route gate rejects old inventories missing strict gate declarations", async () => {
+  const repoRoot = await createFixtureRepo();
+  const result = await verifyCompatibilityRouteInventory(
+    {
+      schemaVersion: 1,
+      requiredRemovalGates: oldRequiredRemovalGates,
+      routes: [
+        routeFixture({
+          removalGates: Object.fromEntries(oldRequiredRemovalGates.map((gateName) => [
+            gateName,
+            gateName === "standaloneEquivalent",
+          ])),
+        }),
+      ],
+    },
+    { repoRoot },
+  );
+
+  assert.equal(result.ok, false);
+  assert.match(
+    result.failures.join("\n"),
+    /Inventory requiredRemovalGates must include required gate names: current-frontend:consumer-install-proof:strict, backend-platform:extracted-install-proof:strict/,
+  );
+  assert.match(
+    result.failures.join("\n"),
+    /\/api\/services: removalGates must include booleans for current-frontend:consumer-install-proof:strict, backend-platform:extracted-install-proof:strict/,
+  );
 });
 
 test("compatibility route gate accepts a removable route only when every gate is true", async () => {

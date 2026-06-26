@@ -713,7 +713,7 @@ test("GET /api/v1/reservations/[id] maps invalid ids through platform 400", asyn
   assert.equal(response.status, 400);
   const payload = await response.json();
   assert.equal(payload.error.code, "validation_failed");
-  assert.equal(payload.error.message, "Invalid booking id");
+  assert.equal(payload.error.message, "Invalid reservation id");
   assert.equal(payload.error.status, 400);
   assert.ok(Array.isArray(payload.error.details));
 });
@@ -733,7 +733,7 @@ test("PATCH /api/v1/reservations/[id] local compatibility maps invalid ids throu
   assert.equal(response.status, 400);
   const payload = await response.json();
   assert.equal(payload.error.code, "validation_failed");
-  assert.equal(payload.error.message, "Invalid booking update data");
+  assert.equal(payload.error.message, "Invalid reservation update data");
   assert.equal(payload.error.status, 400);
   assert.ok(Array.isArray(payload.error.details));
 });
@@ -752,7 +752,7 @@ test("reservation cancel local compatibility maps invalid ids through platform 4
   assert.equal(response.status, 400);
   const payload = await response.json();
   assert.equal(payload.error.code, "validation_failed");
-  assert.equal(payload.error.message, "Invalid booking id");
+  assert.equal(payload.error.message, "Invalid reservation id");
   assert.equal(payload.error.status, 400);
   assert.ok(Array.isArray(payload.error.details));
 });
@@ -776,7 +776,7 @@ test("reservation reschedule local compatibility maps invalid ids through platfo
   assert.equal(response.status, 400);
   const payload = await response.json();
   assert.equal(payload.error.code, "validation_failed");
-  assert.equal(payload.error.message, "Invalid booking update data");
+  assert.equal(payload.error.message, "Invalid reservation update data");
   assert.equal(payload.error.status, 400);
   assert.ok(Array.isArray(payload.error.details));
 });
@@ -899,9 +899,10 @@ test("legacy create compatibility maps atomic resource conflicts to platform err
   assert.deepEqual(await response.json(), {
     error: {
       code: "conflict",
-      message: "Some selected seats are no longer available",
+      message: "Some selected resources are no longer available",
       status: 409,
       details: {
+        resource_labels: ["RS2"],
         seat_labels: ["RS2"],
       },
     },
@@ -948,7 +949,7 @@ test("POST /api/v1/reservations maps legacy create validation failures to platfo
   assert.equal(response.status, 400);
   const payload = await response.json();
   assert.equal(payload.error.code, "validation_failed");
-  assert.equal(payload.error.message, "Invalid booking data");
+  assert.equal(payload.error.message, "Invalid reservation data");
   assert.equal(payload.error.status, 400);
   assert.equal(JSON.stringify(payload).includes("Failed to create reservation"), false);
 });

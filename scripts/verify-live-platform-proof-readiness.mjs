@@ -1,14 +1,25 @@
 #!/usr/bin/env node
 
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
 import { pathToFileURL } from "node:url";
 
+import { verifyAiChatBoundary } from "./verify-ai-chat-boundary.mjs";
+import { verifyBackendPackageGraphBoundary } from "./verify-backend-package-graph-boundary.mjs";
+import { verifyBackendPlatformExtractionBoundary } from "./verify-backend-platform-extraction-boundary.mjs";
 import { verifyCompatibilityRouteRemovalGate } from "./verify-compatibility-route-removal-gate.mjs";
+import { readCurrentFrontendConsumerInstallProofConfig } from "./verify-current-frontend-consumer-install-build-proof.mjs";
 import { verifyCurrentFrontendConsumerRepoReadiness } from "./verify-current-frontend-consumer-repo-readiness.mjs";
 import { readLiveDatabaseConfig } from "./verify-database-live-proof.mjs";
+import { readExtractedBackendInstallProofConfig } from "./verify-extracted-backend-install-build-test-proof.mjs";
 import { verifyExtractedBackendWorkspaceReadiness } from "./verify-extracted-backend-workspace-readiness.mjs";
 import { readLiveBackendParityConfig } from "./verify-live-backend-parity.mjs";
 import { readSdkRegistryInstallConfig } from "./verify-sdk-registry-install.mjs";
 import { verifyStandaloneBackendExtractionDryRun } from "./verify-standalone-backend-extraction-dry-run.mjs";
+import {
+  readStandaloneBackendLiveProofConfig,
+  standaloneBackendLiveProofStrictEnvName,
+} from "./verify-standalone-backend-live-proof.mjs";
 import {
   readStandaloneApiDeploymentConfig,
   standaloneApiDeploymentStrictEnvName,
@@ -16,21 +27,49 @@ import {
 
 export const livePlatformProofReadinessStrictEnvName = "RESERVATION_LIVE_PLATFORM_PROOF_READINESS_STRICT";
 
+const execFileAsync = promisify(execFile);
+
 const strictEnvNames = [
   livePlatformProofReadinessStrictEnvName,
   standaloneApiDeploymentStrictEnvName,
+  standaloneBackendLiveProofStrictEnvName,
   "RESERVATION_DATABASE_LIVE_STRICT",
   "RESERVATION_PLATFORM_LIVE_STRICT",
   "RESERVATION_SDK_REGISTRY_STRICT",
+  "RESERVATION_EXTRACTED_BACKEND_PROOF_STRICT",
+  "CURRENT_FRONTEND_CONSUMER_PROOF_STRICT",
 ];
 
+const frontendConsumerInstallProofSurface = {
+  id: "current_frontend_consumer_install_build_proof",
+  label: "Current frontend consumer install/build proof",
+  safeCommand: "corepack pnpm run current-frontend:consumer-install-proof",
+  strictCommand: "corepack pnpm run current-frontend:consumer-install-proof:strict",
+  read: (env, argv) => fromStatusParser(readCurrentFrontendConsumerInstallProofConfig(env, { argv })),
+};
+
 const proofSurfaces = [
+  frontendConsumerInstallProofSurface,
+  {
+    id: "extracted_backend_install_build_test_proof",
+    label: "Extracted backend install/build/test proof",
+    safeCommand: "corepack pnpm run backend-platform:extracted-install-proof",
+    strictCommand: "corepack pnpm run backend-platform:extracted-install-proof:strict",
+    read: (env, argv) => fromStatusParser(readExtractedBackendInstallProofConfig(env, { argv })),
+  },
   {
     id: "standalone_api_deployment_config",
     label: "Standalone backend deployment config",
     safeCommand: "corepack pnpm run backend-platform:verify-standalone-deployment-config",
     strictCommand: "corepack pnpm run backend-platform:verify-standalone-deployment-config:strict",
     read: (env, argv) => fromStatusParser(readStandaloneApiDeploymentConfig(env, { argv })),
+  },
+  {
+    id: "standalone_backend_live_health_proof",
+    label: "Standalone backend live health/readiness proof",
+    safeCommand: "corepack pnpm run backend-platform:live-proof",
+    strictCommand: "corepack pnpm run backend-platform:live-proof:strict",
+    read: (env, argv) => fromStatusParser(readStandaloneBackendLiveProofConfig(env, { argv })),
   },
   {
     id: "database_live_migration_proof",
@@ -70,7 +109,32 @@ const localPrerequisiteSurfaces = [
     safeCommand: "corepack pnpm run backend-platform:verify-compatibility-route-removal-gate",
     strictCommand: "corepack pnpm run backend-platform:verify-compatibility-route-removal-gate",
     verifierName: "compatibilityRouteRemovalGate",
+    allowCustomReadinessMessage: true,
     verify: verifyCompatibilityRouteRemovalGate,
+  },
+  {
+    id: "backend_package_graph_boundary",
+    label: "Backend package graph boundary readiness",
+    safeCommand: "corepack pnpm run backend-platform:verify-package-graph-boundary",
+    strictCommand: "corepack pnpm run backend-platform:verify-package-graph-boundary",
+    verifierName: "backendPackageGraphBoundary",
+    verify: verifyBackendPackageGraphBoundary,
+  },
+  {
+    id: "backend_ai_chat_boundary",
+    label: "Backend AI chat boundary readiness",
+    safeCommand: "corepack pnpm run backend-platform:verify-chat-boundary",
+    strictCommand: "corepack pnpm run backend-platform:verify-chat-boundary",
+    verifierName: "aiChatBoundary",
+    verify: verifyAiChatBoundary,
+  },
+  {
+    id: "backend_platform_extraction_boundary",
+    label: "Backend platform extraction/source boundary readiness",
+    safeCommand: "corepack pnpm run backend-platform:verify-extraction-boundary",
+    strictCommand: "corepack pnpm run backend-platform:verify-extraction-boundary",
+    verifierName: "backendPlatformExtractionBoundary",
+    verify: verifyBackendPlatformExtractionBoundary,
   },
   {
     id: "backend_extraction_dry_run_readiness",
@@ -88,7 +152,58 @@ const localPrerequisiteSurfaces = [
     verifierName: "extractedBackendWorkspaceReadiness",
     verify: verifyExtractedBackendWorkspaceReadiness,
   },
+  {
+    id: "standalone_api_skeleton_readiness",
+    label: "Standalone API skeleton build/test readiness",
+    safeCommand: "corepack pnpm run backend-platform:verify-standalone-api-skeleton",
+    strictCommand: "corepack pnpm run backend-platform:verify-standalone-api-skeleton",
+    verifierName: "standaloneApiSkeletonReadiness",
+    verify: (options) => verifyPnpmScript("backend-platform:verify-standalone-api-skeleton", options),
+  },
+  {
+    id: "database_migration_bundle_readiness",
+    label: "Database migration bundle readiness",
+    safeCommand: "corepack pnpm run database:verify-migration-bundle",
+    strictCommand: "corepack pnpm run database:verify-migration-bundle",
+    verifierName: "databaseMigrationBundleReadiness",
+    verify: (options) => verifyPnpmScript("database:verify-migration-bundle", options),
+  },
 ];
+
+async function verifyPnpmScript(scriptName, options = {}) {
+  const repoRoot = options.repoRoot ?? process.cwd();
+  const command = process.platform === "win32" ? (process.env.ComSpec ?? "cmd.exe") : "corepack";
+  const args = process.platform === "win32"
+    ? ["/d", "/s", "/c", `corepack pnpm run ${scriptName}`]
+    : ["pnpm", "run", scriptName];
+
+  try {
+    await execFileAsync(command, args, {
+      cwd: repoRoot,
+      env: options.env ?? process.env,
+      maxBuffer: 1024 * 1024 * 8,
+    });
+    return {
+      ok: true,
+      failures: [],
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      failures: [formatCommandFailure(scriptName, error)],
+    };
+  }
+}
+
+function formatCommandFailure(scriptName, error) {
+  const details = [
+    error instanceof Error ? error.message : String(error),
+    typeof error?.stdout === "string" ? error.stdout.trim() : "",
+    typeof error?.stderr === "string" ? error.stderr.trim() : "",
+  ].filter(Boolean);
+
+  return `corepack pnpm run ${scriptName} failed${details.length > 0 ? `: ${details.join(" ")}` : "."}`;
+}
 
 function trimEnvValue(env, name) {
   return env[name]?.trim() ?? "";
@@ -175,9 +290,14 @@ function readSurface(surface, env) {
   };
 }
 
-function localPrerequisiteStateFromResult(result) {
+function localPrerequisiteStateFromResult(result, options = {}) {
   const failures = Array.isArray(result?.failures) ? result.failures : [];
   const ready = result?.ok === true && failures.length === 0;
+  const readinessMessage = options.allowCustomReadinessMessage === true &&
+    typeof result?.readinessMessage === "string" &&
+    result.readinessMessage.trim().length > 0
+    ? result.readinessMessage
+    : "local prerequisite gate passed.";
 
   return {
     status: ready ? "ready" : "fail",
@@ -185,7 +305,7 @@ function localPrerequisiteStateFromResult(result) {
     shouldSkip: false,
     shouldFail: !ready,
     message: ready
-      ? "local prerequisite gate passed."
+      ? readinessMessage
       : failures.length > 0
         ? failures.join(" ")
         : "local prerequisite gate failed.",
@@ -222,7 +342,9 @@ async function readLocalPrerequisiteSurface(surface, options = {}) {
 
   let state;
   try {
-    state = localPrerequisiteStateFromResult(await verifier(verifierOptions));
+    state = localPrerequisiteStateFromResult(await verifier(verifierOptions), {
+      allowCustomReadinessMessage: surface.allowCustomReadinessMessage,
+    });
   } catch (error) {
     state = localPrerequisiteStateFromError(error);
   }
@@ -264,8 +386,13 @@ export async function verifyLivePlatformProofReadiness(env, options = {}) {
     localPrerequisiteSurfaces.map((surface) => readLocalPrerequisiteSurface(surface, options)),
   );
   const surfaces = [
-    ...localSurfaces,
-    ...parsed.surfaces.map((surface) => ({
+    localSurfaces[0],
+    {
+      ...parsed.surfaces[0],
+      kind: "live_proof_readiness",
+    },
+    ...localSurfaces.slice(1),
+    ...parsed.surfaces.slice(1).map((surface) => ({
       ...surface,
       kind: "live_proof_readiness",
     })),

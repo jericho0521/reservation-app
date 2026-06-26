@@ -1,7 +1,6 @@
 import { lstat, readdir, readFile } from "node:fs/promises";
 import path from "node:path";
-
-const repoRoot = process.cwd();
+import { pathToFileURL } from "node:url";
 
 const scanTargets = [
   "app/api/v1",
@@ -12,6 +11,17 @@ const scanTargets = [
   "packages/contract-types/src",
   "packages/reservation-platform-api/src",
   "apps/api/src",
+];
+
+export const backendCandidateScanTargets = [
+  "apps/api/src",
+  "packages/api/src",
+  "packages/domain/src",
+  "packages/adapter-supabase/src",
+  "packages/database/src",
+  "packages/ai-chat/src",
+  "packages/contract-types/src",
+  "packages/sdk/src",
 ];
 
 const sourceExtensions = new Set([".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx"]);
@@ -88,52 +98,111 @@ const forbiddenReferencePatterns = [
   ["browser global sessionStorage", /\bsessionStorage\b/],
 ];
 
-const failures = [];
-const files = await collectScanFiles();
+export async function verifyBackendPlatformExtractionBoundary(options = {}) {
+  const repoRoot = options.repoRoot ?? process.cwd();
+  const targets = options.scanTargets ?? scanTargets;
+  const ignoreMissingScanTargets = options.ignoreMissingScanTargets ?? false;
+  const failures = [];
+  const files = await collectScanFiles(repoRoot, targets, { ignoreMissingScanTargets });
 
-for (const filePath of files) {
-  const content = await readFile(filePath, "utf8");
-  const relativePath = toPosix(path.relative(repoRoot, filePath));
+  for (const filePath of files) {
+    const content = await readFile(filePath, "utf8");
+    const relativePath = toPosix(path.relative(repoRoot, filePath));
 
-  for (const specifier of extractImportSpecifiers(content)) {
-    const failureReason = getForbiddenImportReason(specifier, filePath);
-    if (failureReason) {
-      failures.push(`${relativePath}: imports forbidden ${failureReason}: ${specifier}`);
+    for (const specifier of extractImportSpecifiers(content)) {
+      const failureReason = getForbiddenImportReason(specifier, filePath, repoRoot);
+      if (failureReason) {
+        failures.push(`${relativePath}: imports forbidden ${failureReason}: ${specifier}`);
+      }
+    }
+
+    for (const [marker, pattern] of forbiddenReferencePatterns) {
+      pattern.lastIndex = 0;
+      if (pattern.test(content)) {
+        failures.push(`${relativePath}: references forbidden marker ${marker}`);
+      }
     }
   }
 
-  for (const [marker, pattern] of forbiddenReferencePatterns) {
-    pattern.lastIndex = 0;
-    if (pattern.test(content)) {
-      failures.push(`${relativePath}: references forbidden marker ${marker}`);
+  return {
+    ok: failures.length === 0,
+    failures,
+    fileCount: files.length,
+  };
+}
+
+function main() {
+  let cliOptions;
+  try {
+    cliOptions = parseCliOptions(process.argv.slice(2));
+  } catch (error) {
+    console.error("Backend platform extraction boundary check failed:");
+    console.error(error instanceof Error ? error.message : error);
+    process.exitCode = 1;
+    return;
+  }
+
+  verifyBackendPlatformExtractionBoundary(cliOptions)
+    .then((result) => {
+      if (!result.ok) {
+        console.error("Backend platform extraction boundary check failed:");
+        for (const failure of result.failures) {
+          console.error(`- ${failure}`);
+        }
+        process.exitCode = 1;
+        return;
+      }
+
+      console.log(
+        `Verified backend platform extraction boundary across ${result.fileCount} candidate source files.`,
+      );
+    })
+    .catch((error) => {
+      console.error("Backend platform extraction boundary check failed:");
+      console.error(error instanceof Error ? error.message : error);
+      process.exitCode = 1;
+    });
+}
+
+function parseCliOptions(args) {
+  const options = {};
+
+  for (const arg of args) {
+    if (arg === "--backend-candidate") {
+      options.scanTargets = backendCandidateScanTargets;
+      options.ignoreMissingScanTargets = true;
+      continue;
     }
+
+    throw new Error(`Unknown argument: ${arg}`);
   }
+
+  return options;
 }
 
-if (failures.length > 0) {
-  console.error("Backend platform extraction boundary check failed:");
-  for (const failure of failures) {
-    console.error(`- ${failure}`);
-  }
-  process.exitCode = 1;
-} else {
-  console.log(
-    `Verified backend platform extraction boundary across ${files.length} candidate source files.`,
-  );
-}
-
-async function collectScanFiles() {
+async function collectScanFiles(repoRoot, targets, options = {}) {
   const collected = [];
 
-  for (const target of scanTargets) {
-    await collectPath(path.join(repoRoot, target), collected);
+  for (const target of targets) {
+    await collectPath(path.join(repoRoot, target), collected, {
+      ignoreMissingPath: options.ignoreMissingScanTargets,
+    });
   }
 
-  return sortFiles(collected);
+  return sortFiles(collected, repoRoot);
 }
 
-async function collectPath(absolutePath, collected) {
-  const fileStat = await lstat(absolutePath);
+async function collectPath(absolutePath, collected, options = {}) {
+  let fileStat;
+  try {
+    fileStat = await lstat(absolutePath);
+  } catch (error) {
+    if (error?.code === "ENOENT" && options.ignoreMissingPath) {
+      return;
+    }
+
+    throw error;
+  }
 
   if (fileStat.isSymbolicLink()) {
     return;
@@ -145,7 +214,7 @@ async function collectPath(absolutePath, collected) {
       if (entry.name.startsWith(".") || ignoredDirectoryNames.has(entry.name)) {
         continue;
       }
-      await collectPath(path.join(absolutePath, entry.name), collected);
+      await collectPath(path.join(absolutePath, entry.name), collected, options);
     }
     return;
   }
@@ -170,8 +239,8 @@ function extractImportSpecifiers(content) {
   return specifiers;
 }
 
-function getForbiddenImportReason(specifier, importerPath) {
-  if (specifier === "next/server" && isUnderScanSurface(importerPath, "app/api/v1")) {
+function getForbiddenImportReason(specifier, importerPath, repoRoot) {
+  if (specifier === "next/server" && isUnderScanSurface(importerPath, "app/api/v1", repoRoot)) {
     return null;
   }
 
@@ -184,12 +253,12 @@ function getForbiddenImportReason(specifier, importerPath) {
     return prefixMatch[1];
   }
 
-  const repoRelativeImportPath = getRepoRelativeImportPath(specifier, importerPath);
+  const repoRelativeImportPath = getRepoRelativeImportPath(specifier, importerPath, repoRoot);
   if (!repoRelativeImportPath) {
     return null;
   }
 
-  if (isUnderScanSurface(importerPath, "packages") && isSameOrChildRepoPath(repoRelativeImportPath, "app")) {
+  if (isUnderScanSurface(importerPath, "packages", repoRoot) && isSameOrChildRepoPath(repoRelativeImportPath, "app")) {
     return "current Next.js app route or UI surface from backend package source";
   }
 
@@ -200,7 +269,7 @@ function getForbiddenImportReason(specifier, importerPath) {
   return forbiddenRepoRule?.[1] ?? null;
 }
 
-function getRepoRelativeImportPath(specifier, importerPath) {
+function getRepoRelativeImportPath(specifier, importerPath, repoRoot) {
   if (specifier.startsWith("@/")) {
     return normalizeRepoImportPath(specifier.slice(2));
   }
@@ -238,11 +307,11 @@ function isSameOrChildRepoPath(candidatePath, forbiddenPath) {
   return candidatePath === forbiddenPath || candidatePath.startsWith(`${forbiddenPath}/`);
 }
 
-function isUnderScanSurface(filePath, scanSurface) {
+function isUnderScanSurface(filePath, scanSurface, repoRoot) {
   return isSameOrChildRepoPath(toPosix(path.relative(repoRoot, filePath)), scanSurface);
 }
 
-function sortFiles(files) {
+function sortFiles(files, repoRoot) {
   return [...new Set(files)].sort((a, b) =>
     toPosix(path.relative(repoRoot, a)).localeCompare(toPosix(path.relative(repoRoot, b))),
   );
@@ -250,4 +319,8 @@ function sortFiles(files) {
 
 function toPosix(filePath) {
   return filePath.split(path.sep).join("/");
+}
+
+if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
+  main();
 }

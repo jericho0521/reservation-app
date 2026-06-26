@@ -96,6 +96,13 @@ flowchart LR
 - [Frontend and Backend Hard Separation Plan](frontend-backend-hard-separation-plan/README.md)
 - [Frontend and Backend Module Separation Plan](frontend-backend-module-separation-plan/README.md)
 - [Backend SDK Frontend Product Split Plan](backend-sdk-frontend-product-split-plan/README.md)
+- [Backend Product Repo Handoff Plan](backend-product-repo-handoff-plan/README.md)
+- [Frontend, Backend, and SDK Final Separation Plan](frontend-backend-sdk-final-separation-plan/README.md)
+- [Frontend and Backend Physical Separation Plan](frontend-backend-physical-separation-plan/README.md)
+- [Backend Product, SDK, and Frontend Separation Plan](backend-product-sdk-frontend-separation-plan/README.md)
+- [Current Refactor Separation Gap Plan](current-refactor-separation-gap-plan/README.md)
+- [Current Separation Answer Plan](current-separation-answer-plan/README.md)
+- [Backend Product and Frontend Consumer Plan](backend-product-frontend-consumer-plan/README.md)
 
 ## Separation Rules
 
@@ -168,3 +175,41 @@ intended plug-and-play model: backend repository as the infrastructure product,
 SDK as the installable integration surface, and any frontend repository as a
 replaceable consumer. Use it when assigning subagents who need phase-by-phase
 instructions without relying on earlier chat history.
+
+The backend product repo handoff plan is the focused subagent execution pack for
+turning that intent into a reviewed handoff sequence. Use it when workers need
+explicit inputs, proof commands, reviewer checklists, and downstream update
+rules for the backend-as-product, SDK-as-install-surface, frontend-as-consumer
+model.
+
+The backend product, SDK, and frontend separation plan is the concise
+repo-first execution pack for the final intended architecture: backend product
+repository, installable SDK, and replaceable frontend consumer. Use it when a
+subagent needs a bounded phase file that explains both the work and which later
+phase docs must be updated if assumptions change.
+
+The frontend/backend physical separation plan is the most direct answer to the
+current-state question: the branch is modular, but it is not fully product-split
+until a backend repo candidate, SDK artifact, frontend repo candidate, live
+backend proof, external frontend adoption proof, and compatibility cleanup all
+pass without relying on monorepo workspace links.
+
+The current refactor separation gap plan is the most direct handoff pack for
+answering whether this branch is separated right now. It starts from the
+current modular state, names what remains coupled, and gives subagents a
+phase-by-phase route to backend product boundary closure, SDK install surface
+closure, frontend consumer detachment, cross-repo proof, and compatibility
+operations cleanup.
+
+The current separation answer plan is the shortest phase pack for the latest
+status question. It states that this branch is currently modular-monorepo
+readiness, not full product separation, then assigns the remaining work to
+backend product boundary enforcement, SDK install contract enforcement,
+frontend consumer detachment proof, live cross-repo proof, and compatibility
+cleanup/release decision phases.
+
+The backend product and frontend consumer plan is the direct execution pack for
+the intended product model: backend repository as infrastructure product, SDK
+as the installable contract, and any frontend as a replaceable consumer. Use it
+when subagents need one focused folder with downstream update rules, AI chat
+ownership, external adoption proof, and compatibility cleanup gates.

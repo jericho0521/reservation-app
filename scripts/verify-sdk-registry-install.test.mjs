@@ -23,6 +23,15 @@ function privateRegistryEnv(overrides = {}) {
   };
 }
 
+function disposableRegistryEnv(overrides = {}) {
+  return {
+    RESERVATION_SDK_REGISTRY_PROOF_MODE: "disposable",
+    RESERVATION_SDK_REGISTRY_PACKAGE_SPECS:
+      "@reservation-platform/sdk@0.0.0 @reservation-platform/contract-types@0.0.0",
+    ...overrides,
+  };
+}
+
 test("SDK registry install config safely skips when env is absent", () => {
   const parsed = readSdkRegistryInstallConfig({}, { argv: [] });
 
@@ -59,7 +68,7 @@ test("SDK registry install config skips invalid mode by default", () => {
   assert.equal(parsed.status, "skip");
   assert.equal(parsed.shouldSkip, true);
   assert.equal(parsed.ready, false);
-  assert.match(parsed.message, /must be private or public/);
+  assert.match(parsed.message, /must be private, public, or disposable/);
 });
 
 test("SDK registry install config fails invalid mode in strict mode", () => {
@@ -75,7 +84,36 @@ test("SDK registry install config fails invalid mode in strict mode", () => {
   assert.equal(parsed.status, "fail");
   assert.equal(parsed.strict, true);
   assert.equal(parsed.shouldFail, true);
-  assert.match(parsed.message, /must be private or public/);
+  assert.match(parsed.message, /must be private, public, or disposable/);
+});
+
+test("SDK registry install config parses disposable proof mode without registry credentials", () => {
+  const parsed = readSdkRegistryInstallConfig(disposableRegistryEnv({
+    RESERVATION_SDK_REGISTRY_ALLOW_INSTALL: "1",
+    RESERVATION_SDK_REGISTRY_DISPOSABLE_PORT: "0",
+  }), { argv: ["--strict"] });
+
+  assert.equal(parsed.status, "ready");
+  assert.equal(parsed.mode, "disposable");
+  assert.equal(parsed.ready, true);
+  assert.equal(parsed.installReady, true);
+  assert.deepEqual(parsed.requiredEnvNames, ["RESERVATION_SDK_REGISTRY_PACKAGE_SPECS"]);
+  assert.equal(parsed.config.disposableRegistryPort, 0);
+  assert.deepEqual(parsed.config.packageSpecs, [
+    "@reservation-platform/sdk@0.0.0",
+    "@reservation-platform/contract-types@0.0.0",
+  ]);
+});
+
+test("SDK registry install config rejects malformed disposable registry port", () => {
+  const parsed = readSdkRegistryInstallConfig(disposableRegistryEnv({
+    RESERVATION_SDK_REGISTRY_ALLOW_INSTALL: "1",
+    RESERVATION_SDK_REGISTRY_DISPOSABLE_PORT: "70000",
+  }), { argv: ["--strict"] });
+
+  assert.equal(parsed.status, "fail");
+  assert.equal(parsed.ready, false);
+  assert.match(parsed.message, /DISPOSABLE_PORT must be between 0 and 65535/);
 });
 
 test("SDK registry install config parses configured public proof without install opt-in", () => {

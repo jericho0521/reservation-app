@@ -57,6 +57,27 @@ This phase answers: is the SDK genuinely distributable as a product interface?
 - Release notes and compatibility matrix describe the actual proof result.
 - Public release remains gated if only disposable or private proof has passed.
 
+## 2026-06-27 Result
+
+Status: passed for disposable local registry proof.
+
+Evidence:
+
+- `corepack pnpm run packages:pack` produced package tarballs.
+- `corepack pnpm run sdk:registry-install-proof:strict` passed with
+  `RESERVATION_SDK_REGISTRY_PROOF_MODE=disposable`,
+  exact `@reservation-platform/sdk@0.0.0` and
+  `@reservation-platform/contract-types@0.0.0` package specs, and
+  `RESERVATION_SDK_REGISTRY_ALLOW_INSTALL=1`.
+- The proof started a temporary local npm-compatible registry, served the SDK,
+  contract-types, and local `zod` dependency tarballs, installed the exact
+  package names/versions into an external temporary consumer, and typechecked
+  SDK value plus contract type imports.
+
+This closes the disposable registry install proof. Public or private registry
+pilot proof remains separate and still requires explicit registry configuration
+and approval before any publish.
+
 ## Subagent Handoff Notes
 
 Give the worker this file plus SDK package manifests and release artifact

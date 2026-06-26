@@ -176,6 +176,44 @@ Scope:
   DB-backed catalog/reservation/resource-maintenance behavior, SDK/direct live
   parity, registry installation, or compatibility route removal.
 
+## 2026-06-27 Disposable Registry Install Proof
+
+Registry target:
+
+- Temporary local HTTP npm-compatible registry started by
+  `sdk:registry-install-proof:strict` in
+  `RESERVATION_SDK_REGISTRY_PROOF_MODE=disposable`.
+- The registry served packed local tarballs for
+  `@reservation-platform/sdk@0.0.0`,
+  `@reservation-platform/contract-types@0.0.0`, and the local `zod`
+  dependency required by contract types.
+- No public npm publish, private registry credential, or production registry
+  write was used.
+
+Commands:
+
+- `corepack pnpm run packages:pack`
+- `RESERVATION_SDK_REGISTRY_PROOF_MODE=disposable`
+  `RESERVATION_SDK_REGISTRY_PACKAGE_SPECS="@reservation-platform/sdk@0.0.0 @reservation-platform/contract-types@0.0.0"`
+  `RESERVATION_SDK_REGISTRY_ALLOW_INSTALL=1`
+  `corepack pnpm run sdk:registry-install-proof:strict`
+
+Result:
+
+- Passed.
+- The strict proof installed the exact SDK and contract package versions from
+  the disposable registry into an external temporary consumer directory.
+- It disabled lifecycle scripts, kept package-manager cache/store state inside
+  the temp consumer, then typechecked a smoke file importing SDK values and
+  public contract types.
+
+Scope:
+
+- This proves the SDK and contract packages can be consumed by name and exact
+  version from a registry-like source without workspace links or `file:` specs.
+- It does not publish public/private packages, prove provenance/signing, or
+  replace a future private/public registry pilot.
+
 ## Remaining External Proof
 
 Strict readiness checks run without live configuration:
@@ -185,23 +223,26 @@ Strict readiness checks run without live configuration:
   `RESERVATION_EXTRACTED_BACKEND_PROOF_ROOT=C:\tmp\reservation-separation-proofs\standalone-backend-extraction-yBf9oq`
   and
   `CURRENT_FRONTEND_CONSUMER_PROOF_ROOT=C:\Users\User\AppData\Local\Temp\current-frontend-consumer-tree-3vrf7e\frontend-consumer`.
-  It now fails closed with four unready strict surfaces: standalone deployment
-  config, standalone backend live URL, SDK/direct live parity env, and SDK
-  registry proof mode. The database live proof surface is ready when the
-  disposable database env is configured.
+  It now fails closed with two unready strict surfaces when the prepared roots,
+  disposable database env, standalone health URL, and disposable registry env
+  are configured: standalone deployment config and SDK/direct live parity env.
+  The database live proof, standalone health proof, and disposable registry
+  proof surfaces are ready when their proof env is configured.
 - `backend-platform:live-proof:strict` previously failed closed because
   `RESERVATION_STANDALONE_BACKEND_LIVE_BASE_URL` was not configured; the later
   local standalone health proof above passed.
 - `database:live-proof:strict` previously failed closed when
   `RESERVATION_DATABASE_LIVE_URL` was not configured; the later disposable
   Docker-backed strict run above passed.
-- `sdk:registry-install-proof:strict` failed closed because
-  `RESERVATION_SDK_REGISTRY_PROOF_MODE` is not configured.
+- `sdk:registry-install-proof:strict` previously failed closed because
+  `RESERVATION_SDK_REGISTRY_PROOF_MODE` was not configured; the later
+  disposable registry proof above passed.
 
 Still not complete:
 
 - standalone backend deployment configuration and DB-backed API proof against
   disposable infrastructure;
 - SDK/direct HTTP live parity proof against the same backend;
-- public/private registry install proof;
+- public/private registry install proof, if the release path requires one
+  beyond disposable registry proof;
 - compatibility route removal or deprecation based on the full evidence chain.

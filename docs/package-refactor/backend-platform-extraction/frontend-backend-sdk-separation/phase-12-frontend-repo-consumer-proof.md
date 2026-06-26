@@ -109,16 +109,25 @@ package dependencies are separated into `frontend-runtime`, `frontend-dev`,
 verifier performs no network, install, build, deploy, database, or publish
 work. It validates the inventory shape, listed path existence, root package
 dependency coverage, browser-safe `NEXT_PUBLIC_*` frontend environment names,
-and package/script references. It rejects backend-only packages or paths if
-they are classified as frontend runtime/source includes, and it rejects any
-included local source file that imports another local source file not also
-classified as `include`.
+and package/script references. It materializes an OS-temp frontend consumer
+target-tree candidate from `include` entries only and writes private generated
+root package metadata with frontend-only `typecheck`, `build`, and `start`
+scripts set to `tsc --noEmit`, `next build`, and `next start`. Those scripts
+are metadata/readiness only: the verifier checks that they are present,
+non-empty, and do not contain backend-platform, database, SDK release/registry,
+package-workspace, current-frontend proof/smoke, compatibility-route, Supabase,
+monorepo verifier, or `pnpm --filter` command fragments, and that their command
+binaries are backed by generated package metadata (`typescript` for
+`tsc --noEmit`, `next` for `next build` and `next start`), but it does not run
+them. It rejects backend-only packages or paths if they are classified as
+frontend runtime/source includes, and it rejects any included local source file
+that imports another local source file not also classified as `include`.
 
 This proves a bounded local inventory/readiness slice only. No new frontend
 repository was created, no compatibility routes were deleted or marked
 removable, no SDK package was published, and no separated frontend install,
-build, run, or browser smoke proof has been completed. Phase 9 compatibility
-routes remain temporary until every removal gate passes.
+build, run, script execution, or browser smoke proof has been completed. Phase
+9 compatibility routes remain temporary until every removal gate passes.
 
 ## Acceptance Criteria
 

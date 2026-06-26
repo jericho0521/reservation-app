@@ -42,7 +42,9 @@ Each compatibility route needs this checklist:
 | --- | --- |
 | Standalone equivalent | `apps/api` has the matching `/v1` behavior. |
 | Frontend cutover | Current frontend no longer calls the local route. |
+| Current frontend prepared-root proof | `current-frontend:consumer-install-proof:strict` passes against a prepared frontend consumer root; safe skipped/default readiness output does not count. |
 | SDK/direct parity | SDK and raw HTTP return equivalent success/error behavior. |
+| Extracted backend prepared-root proof | `backend-platform:extracted-install-proof:strict` passes against a prepared extracted backend root with install, build, and test proof; safe skipped/default readiness output does not count. |
 | Auth/tenant/idempotency | Backend-owned enforcement is proven. |
 | Tests | Unit/smoke tests cover the replacement path. |
 | Rollback path | Deprecation or feature flag is documented if immediate deletion is risky. |
@@ -101,8 +103,25 @@ currently passing for direct usage on the affected catalog read routes. It does
 not make network, deployment, or live backend calls, and it proves only local
 dispatch/test route-surface coverage and bounded direct source usage rather
 than live parity, SDK/direct parity, full frontend cutover, auth/tenant
-behavior, idempotency behavior, deployability, route-level test completion, or
-route removability.
+behavior, idempotency behavior, deployability, route-level test completion,
+strict prepared frontend install/build proof, strict extracted backend
+install/build/test proof, or route removability.
+
+The inventory required-removal-gate contract now explicitly includes
+`current-frontend:consumer-install-proof:strict` and
+`backend-platform:extracted-install-proof:strict`. Every reservation-platform
+or optional-module compatibility route must carry boolean values for those
+gates, and a route cannot be marked `removable` unless both are `true` along
+with the older gates. While either strict proof is `false`,
+`removalBlockedBy` must name the missing prepared-root proof. The default/safe
+versions of these commands are useful readiness checks only; `SKIPPED` or
+metadata-only output does not satisfy Phase 9 route removal.
+
+The verifier now returns a route-removal summary and readiness message alongside
+the local inventory validity result. Phase 10 readiness surfaces this message
+separately, so a `ready` local prerequisite means the inventory and local checks
+are internally valid, not that any compatibility route is safe to delete while
+strict prepared-root proof gates remain false.
 
 The verifier also checks the local rollback/deprecation decision log. Every
 non-app-owned route with `rollbackDeprecationNotes: true` must be represented by
@@ -137,7 +156,8 @@ This improves Phase 9 readiness for the optional chat route family but does not
 make any chat compatibility route removable. Route deletion remains blocked by
 live standalone backend parity, enabled provider-backed chat proof,
 auth/tenant/idempotency proof, rollback/deprecation readiness, and broader
-frontend cutover gates.
+frontend cutover gates, plus strict prepared frontend install/build proof and
+strict extracted backend install/build/test proof.
 
 ## Implementation Steps
 
@@ -167,8 +187,10 @@ frontend cutover gates.
   Started as a bounded direct-frontend-usage scan inside
   `backend-platform:verify-compatibility-route-removal-gate`; full route
   deletion remains blocked because no routes have live parity/auth/idempotency,
-  tests, and frontend cutover complete. Rollback/deprecation notes are locally
-  documented but do not make any route removable.
+  tests, frontend cutover, strict prepared frontend install/build proof, and
+  strict extracted backend install/build/test proof complete.
+  Rollback/deprecation notes are locally documented but do not make any route
+  removable.
 
 ## Acceptance Criteria
 

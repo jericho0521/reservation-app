@@ -57,6 +57,7 @@ corepack pnpm run backend-platform:verify-extraction-manifest
 corepack pnpm run backend-platform:verify-extraction-dry-run
 corepack pnpm run backend-platform:verify-package-graph-boundary
 corepack pnpm run backend-platform:verify-extracted-workspace-readiness
+corepack pnpm run backend-platform:extracted-install-proof
 ```
 
 These commands are safe locally. The manifest and dry-run checks validate
@@ -78,3 +79,27 @@ scripts, extracted workspace dependency closure, frontend/current-app source
 exclusions, and SDK consumer-safety. It does not create a repository, copy
 files, install dependencies, run an extracted build/test, publish packages,
 deploy, or call live services.
+`backend-platform:extracted-install-proof` is also safe locally by default. It
+validates the prepared-root environment contract and generated root metadata
+shape when configured, then reports `SKIPPED` or `READY`; it does not install
+dependencies, call the network, publish packages, or run commands from a
+generated backend candidate.
+
+Actual extracted install/build/test evidence remains gated by the strict
+prepared-root proof:
+
+```powershell
+corepack pnpm run backend-platform:extracted-install-proof:strict
+```
+
+The strict proof requires `RESERVATION_EXTRACTED_BACKEND_PROOF_ROOT` to point at
+a prepared extracted backend workspace outside the current repository and
+`RESERVATION_EXTRACTED_BACKEND_PROOF_ALLOW_INSTALL=1` to explicitly allow the
+install step. When those requirements are met, it runs only the allowlisted
+`corepack pnpm install --frozen-lockfile --ignore-scripts` and
+`corepack pnpm run phase-11:verify-generated-backend-workspace` commands in that
+prepared workspace. The install disables package and dependency lifecycle
+scripts; the generated backend workspace verifier still runs after install. It
+should be cited as actual install/build/test evidence
+only after it has run successfully against a real prepared extracted backend
+workspace.

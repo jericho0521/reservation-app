@@ -77,6 +77,10 @@ the backend platform repository.
   `corepack pnpm run backend-platform:verify-extraction-manifest`.
 - CI-safe extraction dry-run verifier command:
   `corepack pnpm run backend-platform:verify-extraction-dry-run`.
+- CI-safe extracted backend install/build/test proof harness:
+  `corepack pnpm run backend-platform:extracted-install-proof`.
+- Approval-gated strict extracted backend install/build/test proof:
+  `corepack pnpm run backend-platform:extracted-install-proof:strict`.
 - Read-only extracted workspace metadata/readiness verifier command:
   `corepack pnpm run backend-platform:verify-extracted-workspace-readiness`.
 - Backend repo bootstrap guide.
@@ -151,13 +155,22 @@ Implemented artifacts:
   candidate, verifies generated root `corepack pnpm --filter <package-name> run
   <script>` commands match exactly one materialized `apps/*` or `packages/*`
   package manifest and that the referenced package manifest declares the
-  requested script, verifies expected package manifests exist in applicable
-  target package roots, and deletes the temporary tree by default.
+  requested script, verifies materialized `apps/*` and `packages/*` source
+  imports are closed over that package's own dependency metadata, including
+  imports of other materialized workspace packages, while allowing Node
+  built-ins, runs the backend-candidate source-boundary scan directly against
+  the materialized OS-temp tree, verifies expected package manifests exist in
+  applicable target package roots, and deletes the temporary tree by default.
 - The standalone extraction manifest now includes the backend-owned verifier
-  script and default input manifest needed by the generated backend root
-  database migration-index check. Monorepo-to-candidate extraction,
-  package-graph, readiness, and migration-bundle reconciliation guardrails stay
-  as current-repository root scripts instead of being exposed as post-extraction
+  scripts and default input manifest needed by the generated backend root
+  source-boundary and database migration-index checks. The generated backend
+  root exposes `backend-platform:verify-extraction-boundary` as
+  `node scripts/verify-backend-platform-extraction-boundary.mjs --backend-candidate`,
+  and `phase-11:verify-generated-backend-workspace` runs that candidate-local
+  source scan before package build/test, standalone API skeleton, and database
+  migration-index checks. Monorepo-to-candidate extraction, package-graph,
+  readiness, and migration-bundle reconciliation guardrails stay as
+  current-repository root scripts instead of being exposed as post-extraction
   backend root scripts.
 - The standalone extraction manifest now also copies
   `backend-repo-bootstrap.md` and `backend-package-ownership.md` into
@@ -170,12 +183,29 @@ Implemented artifacts:
 - This phase file now references the actual manifest and verifier script names
   instead of stale `extraction-manifest.json` and
   `extraction-dry-run-plan.json` inputs.
+- `backend-platform:extracted-install-proof` now provides the explicit
+  install/build/test proof harness for a prepared extracted backend workspace.
+  Its default mode validates only the environment contract and generated root
+  metadata shape, prints `SKIPPED` or `READY`, and never installs
+  dependencies, calls the network, publishes packages, or executes generated
+  backend commands in default mode. The strict command fails closed unless
+  `RESERVATION_EXTRACTED_BACKEND_PROOF_ROOT` points at an existing prepared
+  extracted backend workspace outside the current repository,
+  that workspace has `package.json`, `pnpm-lock.yaml`, and the expected
+  generated `phase-11:verify-generated-backend-workspace` script, and
+  `RESERVATION_EXTRACTED_BACKEND_PROOF_ALLOW_INSTALL=1` is set. When those
+  gates are satisfied, the harness runs only two static allowlisted commands
+  in that prepared workspace: `corepack pnpm install --frozen-lockfile --ignore-scripts` and
+  `corepack pnpm run phase-11:verify-generated-backend-workspace`.
+  Install lifecycle scripts are disabled, and the generated backend workspace
+  verifier still runs after install.
 
 Exact local command list:
 
 ```powershell
 corepack pnpm run backend-platform:verify-extraction-manifest
 corepack pnpm run backend-platform:verify-extraction-dry-run
+corepack pnpm run backend-platform:extracted-install-proof
 corepack pnpm run backend-platform:verify-package-graph-boundary
 corepack pnpm run backend-platform:verify-extracted-workspace-readiness
 corepack pnpm run backend-platform:verify-standalone-api-skeleton
@@ -191,6 +221,11 @@ type-check, manifest, package-graph, dry-run, migration-bundle, and readiness
 checks, except for `database:live-proof`.
 `backend-platform:verify-package-graph-boundary` reads package manifests only;
 it does not install, publish, copy files, or create a repository.
+`backend-platform:extracted-install-proof` is safe in this default command list:
+without strict mode it validates the proof harness contract and exits after a
+`SKIPPED` or `READY` report without running install, network, publish, or
+generated backend commands. The strict proof command is separate and runs only
+the static allowlisted install plus generated backend workspace verifier.
 `backend-platform:verify-extracted-workspace-readiness` is also read-only. It
 proves the extracted workspace/package metadata model is coherent enough for
 CI-safe planning, including manifest target-path alignment and local workspace
@@ -202,10 +237,11 @@ validates that candidate. The generated root `package.json` is backend-only: it
 uses the backend repository name, stays private, carries a stable package
 manager field, declares the backend-safe root dev tools needed by
 candidate-local package build/test scripts (`@types/node`, `tsx`, and
-`typescript`), exposes candidate-local package build/test, standalone API
-skeleton, and database migration-index checks, and blocks frontend-only scripts
-or dependencies such as Next, React, browser smoke commands, current-frontend
-checks, and monorepo-only extraction/readiness/package-graph guardrails. The
+`typescript`), exposes candidate-local package build/test, source-boundary,
+standalone API skeleton, and database migration-index checks, and blocks
+frontend-only scripts or dependencies such as Next, React, browser smoke
+commands, current-frontend checks, and monorepo-only
+extraction/readiness/package-graph guardrails. The
 generated `pnpm-workspace.yaml` covers `apps/*` and `packages/*`. The dry run
 also validates every direct `node scripts/*.mjs` reference in generated backend
 root scripts against the materialized target tree and validates known default
@@ -215,19 +251,35 @@ each `corepack pnpm --filter <package-name> run <script>` reference must name
 exactly one materialized `apps/*` or `packages/*` package, and that package
 must declare the requested script. The default generated root now uses that
 validation for `packages:build`, `packages:test`,
-`backend-platform:verify-standalone-api-skeleton`, and the filtered commands
-reached through `phase-11:verify-generated-backend-workspace`, plus
+`backend-platform:verify-extraction-boundary`,
+`backend-platform:verify-standalone-api-skeleton`, and the commands reached
+through `phase-11:verify-generated-backend-workspace`, plus
 `database:migration-index:check` and its
-`database-migration-bundle-manifest.json` input. The materialized tree now also
+`database-migration-bundle-manifest.json` input. The dry-run also scans
+materialized package/app source for literal external import, export, require,
+and dynamic import specifiers, derives scoped packages as `@scope/name`, allows
+Node built-ins such as `node:path` and `fs/promises`, and fails with
+`materialized backend package dependency closure` diagnostics when a source
+file imports an external package that is not declared in that package's own
+manifest. Imports of other materialized workspace packages must still be
+declared by the importing package; workspace presence alone is not sufficient.
+Root `package.json` dependencies intentionally do not satisfy this
+package-level closure check. The materialized tree now also
 contains backend-owned bootstrap and package ownership docs under
 `docs/backend-platform-extraction/`, and focused unit coverage proves the
 frontend separation completion plan README is not copied into the backend
 candidate. Unit coverage also proves the same guard catches the standalone
 extraction manifest default path if an extraction verifier command is
-reintroduced. This is still only a local OS-temp
-generated metadata proof; it removes the whole temporary tree automatically. It
-does not mutate source files, git-tracked paths, or create a real repository,
-and it does not copy compatibility-shim or excluded entries. For local
+reintroduced. The dry-run also imports the reusable boundary verifier and runs
+the backend-candidate source scan against the materialized OS-temp candidate,
+so copied package source that imports React, Next.js/current-app routes,
+frontend components, browser helpers, or frontend-only markers fails the
+dry-run with `materialized backend boundary:` diagnostics before the temp tree
+is removed. This is still only a local OS-temp generated metadata,
+package-level import-closure, root-script/package-script, and source-boundary
+readiness proof; it removes the whole temporary tree automatically. It does not
+mutate source files, git-tracked paths, or create a real repository, and it
+does not copy compatibility-shim or excluded entries. For local
 inspection only,
 `STANDALONE_BACKEND_EXTRACTION_KEEP_MATERIALIZED_TREE=1` keeps the generated
 OS temp directory after the run; this is a boolean debug option, not a custom
@@ -248,11 +300,11 @@ Still not complete:
 
 - actual standalone repository creation
 - final backend package renaming and visibility decisions
-- actual extracted-repository install/build/test execution outside the current
-  Next.js app workspace; the dry-run now materializes and validates a temporary
-  target tree candidate with generated backend-root workspace metadata and
-  candidate-local root-script/package-script coherence plus backend-owned
-  bootstrap/ownership docs only
+- completed strict extracted-repository install/build/test execution outside
+  the current Next.js app workspace; the harness now exists and is wired into
+  safe and strict release gates, but this is not complete until
+  `backend-platform:extracted-install-proof:strict` passes against a real
+  prepared extracted backend workspace with explicit install approval
 - live deployed `/v1` backend proof
 - disposable database migration/RLS/idempotency proof
 - strict SDK/direct HTTP live parity proof

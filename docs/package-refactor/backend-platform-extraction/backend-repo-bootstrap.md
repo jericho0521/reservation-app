@@ -12,6 +12,7 @@ Use these current-repository inputs:
 - `docs/package-refactor/backend-platform-extraction/standalone-backend-extraction-manifest.json`
 - `scripts/verify-standalone-backend-extraction-manifest.mjs`
 - `scripts/verify-standalone-backend-extraction-dry-run.mjs`
+- `scripts/verify-backend-platform-extraction-boundary.mjs`
 - `apps/api`
 - backend-owned package candidates listed in
   `docs/package-refactor/backend-platform-extraction/backend-package-ownership.md`
@@ -32,40 +33,101 @@ its own lockfile:
 
 ```powershell
 corepack enable
-corepack pnpm install --frozen-lockfile
+corepack pnpm install --frozen-lockfile --ignore-scripts
 ```
 
 Safe to run after the backend repository has its own `pnpm-lock.yaml`. In the
 current combined repository, use the existing root lockfile instead of creating
-a new backend-only lockfile in place.
+a new backend-only lockfile in place. `--ignore-scripts` disables package and
+dependency install lifecycle scripts during the install.
 
 ## Build And Test
 
-Minimum local checks for the backend repository should cover package builds,
-standalone API behavior, database bundle checks, and extraction guardrails:
+Phase 11 has two command locations:
+
+- the current repository root, which owns extraction readiness and release
+  proof harnesses
+- the generated or prepared backend candidate root, which owns candidate-local
+  workspace checks
+
+### Current-Repository Readiness Guardrails
+
+Run these readiness guardrails from the current repository root:
 
 ```powershell
 corepack pnpm run packages:build
 corepack pnpm run packages:test
+corepack pnpm run backend-platform:verify-extraction-boundary
 corepack pnpm run backend-platform:verify-standalone-api-skeleton
 corepack pnpm run database:verify-migration-bundle
 corepack pnpm run backend-platform:verify-extraction-manifest
 corepack pnpm run backend-platform:verify-extraction-dry-run
 corepack pnpm run backend-platform:verify-package-graph-boundary
 corepack pnpm run backend-platform:verify-extracted-workspace-readiness
+corepack pnpm run backend-platform:extracted-install-proof
 ```
 
 These commands are safe in the current repository. They are local build, test,
-type-check, manifest, dry-run, and package-graph checks. The package-graph
-boundary command reads backend-owned package/app `package.json` files only. It
-does not create a new repository, copy files, publish packages, deploy a
-service, install dependencies, or run live network/database proofs.
+type-check, manifest, dry-run, package-graph, and release-harness checks. The
+package-graph boundary command reads backend-owned package/app `package.json`
+files only. It does not create a new repository, copy files, publish packages,
+deploy a service, install dependencies, or run live network/database proofs.
 The extracted-workspace readiness command is also read-only. It models the
 future backend workspace metadata from the extraction manifest and current
 package manifests, including target package path renames, required scripts,
 workspace dependency closure, frontend/current-app exclusions, and SDK
 consumer-safety. It does not create a repository, install dependencies, run an
 extracted build/test, publish packages, deploy, or connect to live services.
+
+`backend-platform:extracted-install-proof` is a current-repository release
+harness, not a generated backend repository script. Run
+`corepack pnpm run backend-platform:extracted-install-proof` from the current
+repository root. By default it validates the prepared-root environment contract
+and generated root metadata shape when configured, then reports `SKIPPED` or
+`READY`. It is no-install, no-network, no-publish, and no-generated-command by
+default.
+
+### Generated Backend Candidate Root Checks
+
+After a backend candidate is generated or otherwise prepared, run
+candidate-local commands from that generated backend candidate root:
+
+```powershell
+corepack pnpm run backend-platform:verify-extraction-boundary
+corepack pnpm run phase-11:verify-generated-backend-workspace
+```
+
+In the generated backend candidate root, `backend-platform:verify-extraction-boundary`
+is a candidate-local source scan implemented as
+`node scripts/verify-backend-platform-extraction-boundary.mjs --backend-candidate`.
+It does not call the network, install dependencies, or prove a completed
+separate-repository build. The generated
+`phase-11:verify-generated-backend-workspace` script is the candidate-local
+aggregate check; it runs the candidate-local extraction-boundary scan, package
+build/test scripts, standalone API skeleton verifier, and database migration
+index check in the prepared backend workspace.
+
+### Strict Prepared-Root Proof From Current Repository
+
+Actual clean extracted install/build/test evidence requires a prepared backend
+workspace outside the current repository. Run the strict proof from the current
+repository root, not from inside the generated backend candidate:
+
+```powershell
+corepack pnpm run backend-platform:extracted-install-proof:strict
+```
+
+The strict proof is a current-repository release harness. It requires
+`RESERVATION_EXTRACTED_BACKEND_PROOF_ROOT` to point at the prepared extracted
+backend workspace outside the current repository and
+`RESERVATION_EXTRACTED_BACKEND_PROOF_ALLOW_INSTALL=1` to explicitly allow the
+install step. When those requirements are met, it runs only the allowlisted
+`corepack pnpm install --frozen-lockfile --ignore-scripts` and
+`corepack pnpm run phase-11:verify-generated-backend-workspace` commands in the
+prepared workspace. The install disables package and dependency lifecycle
+scripts; the generated backend workspace verifier still runs after install. It
+must not be treated as passed until it has been run
+against a real prepared extracted backend workspace.
 
 The standalone deployment config parser can be checked without live services:
 
@@ -205,6 +267,7 @@ corepack pnpm run backend-platform:verify-extraction-manifest
 corepack pnpm run backend-platform:verify-extraction-dry-run
 corepack pnpm run backend-platform:verify-package-graph-boundary
 corepack pnpm run backend-platform:verify-extracted-workspace-readiness
+corepack pnpm run backend-platform:extracted-install-proof
 ```
 
 These commands are safe to run locally. The manifest, package-graph, and
@@ -212,3 +275,10 @@ extracted-workspace checks are read-only. The dry-run command copies planned
 move/copy candidates into a disposable OS-temp backend candidate, validates it,
 and removes it by default; it does not create a permanent repository, install
 dependencies, publish packages, deploy a service, or call live infrastructure.
+Run this list from the current repository root. The extracted-install proof
+harness is also safe by default: it checks only the prepared-root proof contract
+and generated root metadata shape when configured, and does not install
+dependencies, call the network, publish packages, or run commands from a
+generated backend candidate. The strict extracted-install proof is also run from
+the current repository root, with `RESERVATION_EXTRACTED_BACKEND_PROOF_ROOT`
+pointing at the prepared extracted backend workspace.

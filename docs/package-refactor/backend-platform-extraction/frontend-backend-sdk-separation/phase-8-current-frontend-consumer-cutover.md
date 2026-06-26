@@ -149,25 +149,100 @@ commands to remain prerequisite checks:
 The same safe verifier now also materializes a temporary frontend consumer
 target-tree candidate in the OS temp directory from `include` source areas
 only. It writes a generated root `package.json` in that OS-temp candidate with
-private package metadata, frontend-runtime and SDK-consumer dependencies copied
-from the current root package metadata into `dependencies`, and frontend-dev
-dependencies copied into `devDependencies`. The verifier rejects generated
-metadata if backend-only dependency names/prefixes or inventory entries marked
-`backend-only-excluded` or `current-monorepo-only` appear. It excludes
+private package metadata, an exact pinned `pnpm@x.y.z` `packageManager` copied
+from the source root package metadata, frontend-only root scripts (`typecheck`,
+`build`, and `start`) set to plain `tsc --noEmit`, `next build`, and `next start`,
+frontend-runtime and SDK-consumer dependencies copied from the current root
+package metadata into `dependencies`, except SDK-facing package entries such as
+`@reservation-platform/sdk` and `@reservation-platform/contract-types` are
+rewritten from current root `workspace:*` specs to deterministic `0.0.0`
+placeholders so the candidate metadata represents installable package artifacts
+instead of monorepo workspace links. Frontend-dev
+dependencies are copied into `devDependencies`. The verifier rejects generated
+metadata if the source `packageManager` is missing, blank, whitespace-padded,
+not `pnpm`, not exact, or uses a range/latest/workspace-style value. It also
+rejects backend-only dependency names/prefixes or inventory entries marked
+`backend-only-excluded` or `current-monorepo-only`, and non-portable generated
+`dependencies` or `devDependencies` specs using `workspace:`, `file:`, `link:`,
+or `portal:` because another frontend repository cannot consume those
+monorepo-local spec forms. It now also scans every materialized source import
+specifier and verifies that each external package import is declared in the
+generated `dependencies` or `devDependencies`, deriving scoped package names as
+`@scope/name` and allowing Node built-in module specifiers such as `node:*`.
+Type-only imports are included in this generated package metadata
+import-closure check. It verifies the generated scripts are present, non-empty,
+and free of backend-platform, database, SDK release/registry,
+package-workspace, current-frontend proof/smoke, compatibility-route, Supabase,
+monorepo verifier, or `pnpm --filter` command fragments. It also verifies
+script/dependency coherence for those generated commands: `tsc --noEmit`
+requires generated `typescript` metadata, while `next build` and `next start`
+require generated `next` metadata in `dependencies` or `devDependencies`. It
+also writes a generated root `tsconfig.json` with frontend-safe TypeScript
+metadata: DOM and DOM iterable libs, strict/noEmit checking, bundler module
+resolution, React JSX,
+`@/*` mapped to the candidate root, source includes for `**/*.ts`,
+`**/*.tsx`, and `**/*.mts`, and only `node_modules` excluded. The verifier
+rejects generated tsconfig metadata that is not an object, lacks
+`compilerOptions`, points at `.next`, current backend/server paths, backend
+packages, `packages`/`apps` path segments or aliases, `extends`, project
+references, composite output settings, `outDir`, `rootDirs`, absolute paths, or
+`..` traversal. The path checks normalize Windows-style backslash separators
+before applying those blocks. It excludes
 generated/install/cache artifacts such as `node_modules`, `.next`, `dist`,
 `coverage`, source maps, and TypeScript build info, validates that the copied
 tree contains only allowed frontend-consumer paths plus the generated root
 metadata, blocks backend/current-app server paths such as `app/api`, `apps`,
 `packages`, `lib/langchain`, `lib/reservations`, `lib/supabase-admin.ts`,
-`supabase`, and `dist-packages`, and rechecks local import closure with `@/`
-imports remapped inside the materialized tree. The temp tree is removed by
-default; setting `CURRENT_FRONTEND_CONSUMER_KEEP_MATERIALIZED_TREE=1` keeps the
-OS-temp copy for debugging without accepting a custom output path.
+`supabase`, and `dist-packages`, rejects monorepo workspace-root metadata such
+as `pnpm-workspace.yaml` or `turbo.json` if an inventory include would
+materialize it, and rechecks local import closure with `@/` imports remapped
+inside the materialized tree. The temp tree is removed by default; setting
+`CURRENT_FRONTEND_CONSUMER_KEEP_MATERIALIZED_TREE=1` keeps the OS-temp copy for
+debugging without accepting a custom output path.
 
 This is still temporary target-tree and local metadata readiness only. It does
 not create a new frontend repository, delete compatibility routes, install or
-publish packages, make network calls, run browser checks, or prove a complete
-standalone frontend app build/run from a separated repo.
+publish packages, install the generated dependencies, execute the generated
+`typecheck`/`build`/`start` scripts, make network calls, run browser checks, or
+prove a complete standalone frontend app install/build/run from a separated
+repo. The generated `package.json` and `tsconfig.json` therefore prove
+deterministic frontend metadata, script/dependency coherence, and
+import-closure shape only, not an executed separated install, typecheck, or
+build.
+
+Phase 8 now also has a bounded prepared-root install/build proof harness:
+
+- Safe command:
+  `corepack pnpm run current-frontend:consumer-install-proof`
+- Strict command:
+  `corepack pnpm run current-frontend:consumer-install-proof:strict`
+- Unit test:
+  `node --import tsx --test scripts\verify-current-frontend-consumer-install-build-proof.test.mjs`
+
+The default command is CI-safe and only validates the proof environment plus
+prepared-root metadata. It reports `SKIPPED` or `READY` without installing
+dependencies, making network calls, publishing packages, executing generated
+frontend commands, starting `next start`, opening a browser, or starting a dev
+server.
+Strict mode fails closed unless `CURRENT_FRONTEND_CONSUMER_PROOF_ROOT` points
+to an existing prepared frontend consumer workspace outside this repository,
+including after symlink/junction realpath resolution, the workspace contains
+`package.json` and `pnpm-lock.yaml`, the generated `typecheck`, `build`, and
+`start` scripts are exactly `tsc --noEmit`, `next build`, and `next start`,
+`dependencies`, `devDependencies`, `optionalDependencies`, and
+`peerDependencies` contain no `workspace:`, `file:`, `link:`, or `portal:`
+specs, and `CURRENT_FRONTEND_CONSUMER_PROOF_ALLOW_INSTALL=1` is set. When those
+gates pass, strict mode runs only the static allowlisted commands
+`corepack pnpm install --frozen-lockfile --ignore-scripts`,
+`corepack pnpm run typecheck`, and `corepack pnpm run build` inside the
+prepared workspace. The install step ignores package and dependency lifecycle
+scripts, and the harness intentionally never runs `start`.
+
+This proof is not complete Phase 8 separation until the strict command passes
+against a real prepared frontend consumer workspace materialized outside this
+repository. Until then, the current frontend remains proven only as local
+metadata/readiness plus bounded mock-backend browser smoke, not as an installed
+and built separated consumer repository.
 
 The form-booking browser smoke now provides a bounded local external-origin
 proof for the current frontend. `current-frontend:platform-smoke` starts a

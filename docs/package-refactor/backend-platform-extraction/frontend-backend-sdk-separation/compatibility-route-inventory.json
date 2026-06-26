@@ -6,7 +6,9 @@
   "requiredRemovalGates": [
     "standaloneEquivalent",
     "frontendCutover",
+    "current-frontend:consumer-install-proof:strict",
     "sdkDirectParity",
+    "backend-platform:extracted-install-proof:strict",
     "authTenantIdempotencyProof",
     "tests",
     "rollbackDeprecationNotes"
@@ -34,11 +36,15 @@
         "sdkDirectParity": false,
         "authTenantIdempotencyProof": false,
         "tests": false,
-        "rollbackDeprecationNotes": true
+        "rollbackDeprecationNotes": true,
+        "current-frontend:consumer-install-proof:strict": false,
+        "backend-platform:extracted-install-proof:strict": false
       },
       "removalBlockedBy": [
         "current frontend local mode still targets /api/services",
-        "strict live /v1 catalog parity is not complete"
+        "strict live /v1 catalog parity is not complete",
+        "current-frontend:consumer-install-proof:strict has not passed for a prepared frontend consumer root",
+        "backend-platform:extracted-install-proof:strict has not passed for a prepared extracted backend root"
       ]
     },
     {
@@ -57,11 +63,15 @@
         "sdkDirectParity": false,
         "authTenantIdempotencyProof": false,
         "tests": false,
-        "rollbackDeprecationNotes": true
+        "rollbackDeprecationNotes": true,
+        "current-frontend:consumer-install-proof:strict": false,
+        "backend-platform:extracted-install-proof:strict": false
       },
       "removalBlockedBy": [
         "strict live /v1 catalog read parity is not complete",
-        "full frontend cutover, SDK/direct parity, auth/tenant/idempotency proof, and route tests are not complete"
+        "full frontend cutover, SDK/direct parity, auth/tenant/idempotency proof, and route tests are not complete",
+        "current-frontend:consumer-install-proof:strict has not passed for a prepared frontend consumer root",
+        "backend-platform:extracted-install-proof:strict has not passed for a prepared extracted backend root"
       ]
     },
     {
@@ -80,11 +90,15 @@
         "sdkDirectParity": false,
         "authTenantIdempotencyProof": false,
         "tests": false,
-        "rollbackDeprecationNotes": true
+        "rollbackDeprecationNotes": true,
+        "current-frontend:consumer-install-proof:strict": false,
+        "backend-platform:extracted-install-proof:strict": false
       },
       "removalBlockedBy": [
         "strict live /v1 catalog parity is not complete",
-        "full frontend cutover, SDK/direct parity, auth/tenant/idempotency proof, and route tests are not complete"
+        "full frontend cutover, SDK/direct parity, auth/tenant/idempotency proof, and route tests are not complete",
+        "current-frontend:consumer-install-proof:strict has not passed for a prepared frontend consumer root",
+        "backend-platform:extracted-install-proof:strict has not passed for a prepared extracted backend root"
       ]
     },
     {
@@ -103,11 +117,15 @@
         "sdkDirectParity": false,
         "authTenantIdempotencyProof": false,
         "tests": false,
-        "rollbackDeprecationNotes": true
+        "rollbackDeprecationNotes": true,
+        "current-frontend:consumer-install-proof:strict": false,
+        "backend-platform:extracted-install-proof:strict": false
       },
       "removalBlockedBy": [
         "strict live /v1 catalog read parity is not complete",
-        "full frontend cutover, SDK/direct parity, auth/tenant/idempotency proof, and route tests are not complete"
+        "full frontend cutover, SDK/direct parity, auth/tenant/idempotency proof, and route tests are not complete",
+        "current-frontend:consumer-install-proof:strict has not passed for a prepared frontend consumer root",
+        "backend-platform:extracted-install-proof:strict has not passed for a prepared extracted backend root"
       ]
     },
     {
@@ -126,11 +144,15 @@
         "sdkDirectParity": false,
         "authTenantIdempotencyProof": false,
         "tests": false,
-        "rollbackDeprecationNotes": true
+        "rollbackDeprecationNotes": true,
+        "current-frontend:consumer-install-proof:strict": false,
+        "backend-platform:extracted-install-proof:strict": false
       },
       "removalBlockedBy": [
         "current frontend local mode still targets /api/availability",
-        "strict live /v1 availability parity is not complete"
+        "strict live /v1 availability parity is not complete",
+        "current-frontend:consumer-install-proof:strict has not passed for a prepared frontend consumer root",
+        "backend-platform:extracted-install-proof:strict has not passed for a prepared extracted backend root"
       ]
     },
     {
@@ -149,12 +171,16 @@
         "sdkDirectParity": false,
         "authTenantIdempotencyProof": false,
         "tests": false,
-        "rollbackDeprecationNotes": true
+        "rollbackDeprecationNotes": true,
+        "current-frontend:consumer-install-proof:strict": false,
+        "backend-platform:extracted-install-proof:strict": false
       },
       "removalBlockedBy": [
         "current frontend local mode still targets /api/bookings",
         "strict live /v1 reservation create/list parity is not complete",
-        "auth, tenant, and durable idempotency proof is not complete"
+        "auth, tenant, and durable idempotency proof is not complete",
+        "current-frontend:consumer-install-proof:strict has not passed for a prepared frontend consumer root",
+        "backend-platform:extracted-install-proof:strict has not passed for a prepared extracted backend root"
       ]
     },
     {
@@ -173,12 +199,16 @@
         "sdkDirectParity": false,
         "authTenantIdempotencyProof": false,
         "tests": false,
-        "rollbackDeprecationNotes": true
+        "rollbackDeprecationNotes": true,
+        "current-frontend:consumer-install-proof:strict": false,
+        "backend-platform:extracted-install-proof:strict": false
       },
       "removalBlockedBy": [
         "current frontend local mode still targets /api/bookings/{id}",
         "strict live /v1 reservation read/update parity is not complete",
-        "auth, tenant, and durable idempotency proof is not complete"
+        "auth, tenant, and durable idempotency proof is not complete",
+        "current-frontend:consumer-install-proof:strict has not passed for a prepared frontend consumer root",
+        "backend-platform:extracted-install-proof:strict has not passed for a prepared extracted backend root"
       ]
     },
     {
@@ -197,12 +227,16 @@
         "sdkDirectParity": false,
         "authTenantIdempotencyProof": false,
         "tests": false,
-        "rollbackDeprecationNotes": true
+        "rollbackDeprecationNotes": true,
+        "current-frontend:consumer-install-proof:strict": false,
+        "backend-platform:extracted-install-proof:strict": false
       },
       "removalBlockedBy": [
         "current frontend local mode still targets /api/seat-maintenance",
         "strict live /v1 resource-maintenance parity is not complete",
-        "auth, tenant, and durable idempotency proof is not complete"
+        "auth, tenant, and durable idempotency proof is not complete",
+        "current-frontend:consumer-install-proof:strict has not passed for a prepared frontend consumer root",
+        "backend-platform:extracted-install-proof:strict has not passed for a prepared extracted backend root"
       ]
     },
     {
@@ -221,11 +255,15 @@
         "sdkDirectParity": false,
         "authTenantIdempotencyProof": true,
         "tests": false,
-        "rollbackDeprecationNotes": true
+        "rollbackDeprecationNotes": true,
+        "current-frontend:consumer-install-proof:strict": false,
+        "backend-platform:extracted-install-proof:strict": false
       },
       "removalBlockedBy": [
         "current platform compatibility mode still supports /api/v1 fallback",
-        "strict live /v1 metadata parity is not complete"
+        "strict live /v1 metadata parity is not complete",
+        "current-frontend:consumer-install-proof:strict has not passed for a prepared frontend consumer root",
+        "backend-platform:extracted-install-proof:strict has not passed for a prepared extracted backend root"
       ]
     },
     {
@@ -244,11 +282,15 @@
         "sdkDirectParity": false,
         "authTenantIdempotencyProof": false,
         "tests": false,
-        "rollbackDeprecationNotes": true
+        "rollbackDeprecationNotes": true,
+        "current-frontend:consumer-install-proof:strict": false,
+        "backend-platform:extracted-install-proof:strict": false
       },
       "removalBlockedBy": [
         "current platform compatibility mode still supports /api/v1 fallback",
-        "strict live /v1 catalog parity is not complete"
+        "strict live /v1 catalog parity is not complete",
+        "current-frontend:consumer-install-proof:strict has not passed for a prepared frontend consumer root",
+        "backend-platform:extracted-install-proof:strict has not passed for a prepared extracted backend root"
       ]
     },
     {
@@ -267,11 +309,15 @@
         "sdkDirectParity": false,
         "authTenantIdempotencyProof": false,
         "tests": false,
-        "rollbackDeprecationNotes": true
+        "rollbackDeprecationNotes": true,
+        "current-frontend:consumer-install-proof:strict": false,
+        "backend-platform:extracted-install-proof:strict": false
       },
       "removalBlockedBy": [
         "current platform compatibility mode still supports /api/v1 fallback",
-        "strict live /v1 catalog read parity is not complete"
+        "strict live /v1 catalog read parity is not complete",
+        "current-frontend:consumer-install-proof:strict has not passed for a prepared frontend consumer root",
+        "backend-platform:extracted-install-proof:strict has not passed for a prepared extracted backend root"
       ]
     },
     {
@@ -290,11 +336,15 @@
         "sdkDirectParity": false,
         "authTenantIdempotencyProof": false,
         "tests": false,
-        "rollbackDeprecationNotes": true
+        "rollbackDeprecationNotes": true,
+        "current-frontend:consumer-install-proof:strict": false,
+        "backend-platform:extracted-install-proof:strict": false
       },
       "removalBlockedBy": [
         "current platform compatibility mode still supports /api/v1 fallback",
-        "strict live /v1 catalog parity is not complete"
+        "strict live /v1 catalog parity is not complete",
+        "current-frontend:consumer-install-proof:strict has not passed for a prepared frontend consumer root",
+        "backend-platform:extracted-install-proof:strict has not passed for a prepared extracted backend root"
       ]
     },
     {
@@ -313,11 +363,15 @@
         "sdkDirectParity": false,
         "authTenantIdempotencyProof": false,
         "tests": false,
-        "rollbackDeprecationNotes": true
+        "rollbackDeprecationNotes": true,
+        "current-frontend:consumer-install-proof:strict": false,
+        "backend-platform:extracted-install-proof:strict": false
       },
       "removalBlockedBy": [
         "current platform compatibility mode still supports /api/v1 fallback",
-        "strict live /v1 catalog read parity is not complete"
+        "strict live /v1 catalog read parity is not complete",
+        "current-frontend:consumer-install-proof:strict has not passed for a prepared frontend consumer root",
+        "backend-platform:extracted-install-proof:strict has not passed for a prepared extracted backend root"
       ]
     },
     {
@@ -336,11 +390,15 @@
         "sdkDirectParity": false,
         "authTenantIdempotencyProof": false,
         "tests": false,
-        "rollbackDeprecationNotes": true
+        "rollbackDeprecationNotes": true,
+        "current-frontend:consumer-install-proof:strict": false,
+        "backend-platform:extracted-install-proof:strict": false
       },
       "removalBlockedBy": [
         "current platform compatibility mode still supports /api/v1 fallback",
-        "strict live /v1 resource parity is not complete"
+        "strict live /v1 resource parity is not complete",
+        "current-frontend:consumer-install-proof:strict has not passed for a prepared frontend consumer root",
+        "backend-platform:extracted-install-proof:strict has not passed for a prepared extracted backend root"
       ]
     },
     {
@@ -359,11 +417,15 @@
         "sdkDirectParity": false,
         "authTenantIdempotencyProof": false,
         "tests": false,
-        "rollbackDeprecationNotes": true
+        "rollbackDeprecationNotes": true,
+        "current-frontend:consumer-install-proof:strict": false,
+        "backend-platform:extracted-install-proof:strict": false
       },
       "removalBlockedBy": [
         "current platform compatibility mode still supports /api/v1 fallback",
-        "strict live /v1 resource read parity is not complete"
+        "strict live /v1 resource read parity is not complete",
+        "current-frontend:consumer-install-proof:strict has not passed for a prepared frontend consumer root",
+        "backend-platform:extracted-install-proof:strict has not passed for a prepared extracted backend root"
       ]
     },
     {
@@ -382,11 +444,15 @@
         "sdkDirectParity": false,
         "authTenantIdempotencyProof": false,
         "tests": false,
-        "rollbackDeprecationNotes": true
+        "rollbackDeprecationNotes": true,
+        "current-frontend:consumer-install-proof:strict": false,
+        "backend-platform:extracted-install-proof:strict": false
       },
       "removalBlockedBy": [
         "current platform compatibility mode still supports /api/v1 fallback",
-        "strict live /v1 resource layout parity is not complete"
+        "strict live /v1 resource layout parity is not complete",
+        "current-frontend:consumer-install-proof:strict has not passed for a prepared frontend consumer root",
+        "backend-platform:extracted-install-proof:strict has not passed for a prepared extracted backend root"
       ]
     },
     {
@@ -405,11 +471,15 @@
         "sdkDirectParity": false,
         "authTenantIdempotencyProof": false,
         "tests": false,
-        "rollbackDeprecationNotes": true
+        "rollbackDeprecationNotes": true,
+        "current-frontend:consumer-install-proof:strict": false,
+        "backend-platform:extracted-install-proof:strict": false
       },
       "removalBlockedBy": [
         "current platform compatibility mode still supports /api/v1 fallback",
-        "strict live /v1 availability parity is not complete"
+        "strict live /v1 availability parity is not complete",
+        "current-frontend:consumer-install-proof:strict has not passed for a prepared frontend consumer root",
+        "backend-platform:extracted-install-proof:strict has not passed for a prepared extracted backend root"
       ]
     },
     {
@@ -428,12 +498,16 @@
         "sdkDirectParity": false,
         "authTenantIdempotencyProof": false,
         "tests": false,
-        "rollbackDeprecationNotes": true
+        "rollbackDeprecationNotes": true,
+        "current-frontend:consumer-install-proof:strict": false,
+        "backend-platform:extracted-install-proof:strict": false
       },
       "removalBlockedBy": [
         "current platform compatibility mode still supports /api/v1 fallback",
         "strict live /v1 reservation create/list parity is not complete",
-        "auth, tenant, and durable idempotency proof is not complete"
+        "auth, tenant, and durable idempotency proof is not complete",
+        "current-frontend:consumer-install-proof:strict has not passed for a prepared frontend consumer root",
+        "backend-platform:extracted-install-proof:strict has not passed for a prepared extracted backend root"
       ]
     },
     {
@@ -452,12 +526,16 @@
         "sdkDirectParity": false,
         "authTenantIdempotencyProof": false,
         "tests": false,
-        "rollbackDeprecationNotes": true
+        "rollbackDeprecationNotes": true,
+        "current-frontend:consumer-install-proof:strict": false,
+        "backend-platform:extracted-install-proof:strict": false
       },
       "removalBlockedBy": [
         "current platform compatibility mode still supports /api/v1 fallback",
         "strict live /v1 reservation read/update parity is not complete",
-        "auth, tenant, and durable idempotency proof is not complete"
+        "auth, tenant, and durable idempotency proof is not complete",
+        "current-frontend:consumer-install-proof:strict has not passed for a prepared frontend consumer root",
+        "backend-platform:extracted-install-proof:strict has not passed for a prepared extracted backend root"
       ]
     },
     {
@@ -476,12 +554,16 @@
         "sdkDirectParity": false,
         "authTenantIdempotencyProof": false,
         "tests": false,
-        "rollbackDeprecationNotes": true
+        "rollbackDeprecationNotes": true,
+        "current-frontend:consumer-install-proof:strict": false,
+        "backend-platform:extracted-install-proof:strict": false
       },
       "removalBlockedBy": [
         "current platform compatibility mode still supports /api/v1 fallback",
         "strict live /v1 cancel parity is not complete",
-        "auth, tenant, and durable idempotency proof is not complete"
+        "auth, tenant, and durable idempotency proof is not complete",
+        "current-frontend:consumer-install-proof:strict has not passed for a prepared frontend consumer root",
+        "backend-platform:extracted-install-proof:strict has not passed for a prepared extracted backend root"
       ]
     },
     {
@@ -500,12 +582,16 @@
         "sdkDirectParity": false,
         "authTenantIdempotencyProof": false,
         "tests": false,
-        "rollbackDeprecationNotes": true
+        "rollbackDeprecationNotes": true,
+        "current-frontend:consumer-install-proof:strict": false,
+        "backend-platform:extracted-install-proof:strict": false
       },
       "removalBlockedBy": [
         "current platform compatibility mode still supports /api/v1 fallback",
         "strict live /v1 reschedule parity is not complete",
-        "auth, tenant, and durable idempotency proof is not complete"
+        "auth, tenant, and durable idempotency proof is not complete",
+        "current-frontend:consumer-install-proof:strict has not passed for a prepared frontend consumer root",
+        "backend-platform:extracted-install-proof:strict has not passed for a prepared extracted backend root"
       ]
     },
     {
@@ -524,12 +610,16 @@
         "sdkDirectParity": false,
         "authTenantIdempotencyProof": false,
         "tests": false,
-        "rollbackDeprecationNotes": true
+        "rollbackDeprecationNotes": true,
+        "current-frontend:consumer-install-proof:strict": false,
+        "backend-platform:extracted-install-proof:strict": false
       },
       "removalBlockedBy": [
         "current platform compatibility mode still supports /api/v1 fallback",
         "strict live /v1 resource-maintenance parity is not complete",
-        "auth, tenant, and durable idempotency proof is not complete"
+        "auth, tenant, and durable idempotency proof is not complete",
+        "current-frontend:consumer-install-proof:strict has not passed for a prepared frontend consumer root",
+        "backend-platform:extracted-install-proof:strict has not passed for a prepared extracted backend root"
       ]
     },
     {
@@ -548,12 +638,16 @@
         "sdkDirectParity": false,
         "authTenantIdempotencyProof": false,
         "tests": false,
-        "rollbackDeprecationNotes": true
+        "rollbackDeprecationNotes": true,
+        "current-frontend:consumer-install-proof:strict": false,
+        "backend-platform:extracted-install-proof:strict": false
       },
       "removalBlockedBy": [
         "current platform compatibility mode still supports /api/v1 fallback",
         "strict live /v1 resource-maintenance end parity is not complete",
-        "auth, tenant, and durable idempotency proof is not complete"
+        "auth, tenant, and durable idempotency proof is not complete",
+        "current-frontend:consumer-install-proof:strict has not passed for a prepared frontend consumer root",
+        "backend-platform:extracted-install-proof:strict has not passed for a prepared extracted backend root"
       ]
     },
     {
@@ -572,11 +666,15 @@
         "sdkDirectParity": false,
         "authTenantIdempotencyProof": false,
         "tests": false,
-        "rollbackDeprecationNotes": true
+        "rollbackDeprecationNotes": true,
+        "current-frontend:consumer-install-proof:strict": false,
+        "backend-platform:extracted-install-proof:strict": false
       },
       "removalBlockedBy": [
         "optional chat module has no live enabled provider proof",
-        "frontend chat cutover is not complete"
+        "frontend chat cutover is not complete",
+        "current-frontend:consumer-install-proof:strict has not passed for a prepared frontend consumer root",
+        "backend-platform:extracted-install-proof:strict has not passed for a prepared extracted backend root"
       ]
     },
     {
@@ -595,11 +693,15 @@
         "sdkDirectParity": false,
         "authTenantIdempotencyProof": false,
         "tests": false,
-        "rollbackDeprecationNotes": true
+        "rollbackDeprecationNotes": true,
+        "current-frontend:consumer-install-proof:strict": false,
+        "backend-platform:extracted-install-proof:strict": false
       },
       "removalBlockedBy": [
         "optional chat module has no live enabled provider proof",
-        "frontend chat cutover is not complete"
+        "frontend chat cutover is not complete",
+        "current-frontend:consumer-install-proof:strict has not passed for a prepared frontend consumer root",
+        "backend-platform:extracted-install-proof:strict has not passed for a prepared extracted backend root"
       ]
     },
     {
@@ -618,11 +720,15 @@
         "sdkDirectParity": false,
         "authTenantIdempotencyProof": false,
         "tests": false,
-        "rollbackDeprecationNotes": true
+        "rollbackDeprecationNotes": true,
+        "current-frontend:consumer-install-proof:strict": false,
+        "backend-platform:extracted-install-proof:strict": false
       },
       "removalBlockedBy": [
         "optional chat module has no live enabled provider proof",
-        "frontend chat cutover is not complete"
+        "frontend chat cutover is not complete",
+        "current-frontend:consumer-install-proof:strict has not passed for a prepared frontend consumer root",
+        "backend-platform:extracted-install-proof:strict has not passed for a prepared extracted backend root"
       ]
     },
     {
@@ -641,11 +747,15 @@
         "sdkDirectParity": false,
         "authTenantIdempotencyProof": false,
         "tests": false,
-        "rollbackDeprecationNotes": true
+        "rollbackDeprecationNotes": true,
+        "current-frontend:consumer-install-proof:strict": false,
+        "backend-platform:extracted-install-proof:strict": false
       },
       "removalBlockedBy": [
         "optional chat module has no live enabled provider proof",
-        "frontend chat cutover is not complete"
+        "frontend chat cutover is not complete",
+        "current-frontend:consumer-install-proof:strict has not passed for a prepared frontend consumer root",
+        "backend-platform:extracted-install-proof:strict has not passed for a prepared extracted backend root"
       ]
     },
     {
@@ -807,13 +917,17 @@
         "sdkDirectParity": false,
         "authTenantIdempotencyProof": false,
         "tests": false,
-        "rollbackDeprecationNotes": true
+        "rollbackDeprecationNotes": true,
+        "current-frontend:consumer-install-proof:strict": false,
+        "backend-platform:extracted-install-proof:strict": false
       },
       "removalBlockedBy": [
         "enabled provider-backed /v1/chat module proof is not complete",
         "current frontend chat cutover from /api/chat to /v1/chat is not complete",
         "SDK/direct parity for chat session, message, stream, and confirm flows is not complete against the real module",
-        "tenant, auth, and idempotency proof for booking-creating chat confirmation is not complete"
+        "tenant, auth, and idempotency proof for booking-creating chat confirmation is not complete",
+        "current-frontend:consumer-install-proof:strict has not passed for a prepared frontend consumer root",
+        "backend-platform:extracted-install-proof:strict has not passed for a prepared extracted backend root"
       ]
     }
   ]

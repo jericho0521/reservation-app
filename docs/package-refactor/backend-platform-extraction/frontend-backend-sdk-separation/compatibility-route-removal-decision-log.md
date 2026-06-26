@@ -7,10 +7,21 @@ This log records the local rollback and deprecation decision for the current
 rollback/deprecation-notes readiness gap. No route is removable in this slice,
 and no route file is deleted or deprecated here.
 
+Route removal is also blocked until both strict prepared-root proof commands
+pass: `current-frontend:consumer-install-proof:strict` for a prepared current
+frontend consumer install/build root and
+`backend-platform:extracted-install-proof:strict` for a prepared extracted
+backend install/build/test root. Safe default commands that report `SKIPPED` or
+metadata-only readiness do not count as route-removal evidence.
+
 The app-owned analytics, blog, and update routes in
 `compatibility-route-inventory.json` are outside reservation-platform route
 removal scope. They remain current-app routes with `keep-app-owned` status and
 do not require rollback/deprecation coverage in this log.
+
+Every non-app-owned route family below therefore retains explicit blockers for
+the two strict prepared-root proofs in the machine-readable inventory until
+those strict commands pass against real prepared roots.
 
 ## Services Catalog
 

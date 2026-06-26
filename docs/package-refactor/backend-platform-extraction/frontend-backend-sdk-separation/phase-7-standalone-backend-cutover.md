@@ -126,6 +126,11 @@ flowchart LR
   auth can still reach the exact disabled `chat_module_disabled` 404 body, and
   injected chat handlers are not called until auth succeeds. No-auth local
   fixture behavior remains unchanged.
+- `backend-platform:verify-extraction-boundary` now exposes a reusable verifier
+  function and focused fixture tests for the `apps/api/src` boundary. The tests
+  prove the standalone backend source rejects React/Next imports, browser
+  Supabase helpers, frontend platform wrappers, and current app page/admin/chat
+  or form imports while the current repository source still passes.
 - This is readiness only. It proves that deployment config can be checked in CI
   without live infrastructure, that strict environments fail closed on missing
   or malformed config, that runtime/deployment env names do not drift locally,
@@ -133,10 +138,11 @@ flowchart LR
   locally, that the claimed standalone route paths are locally present in
   dispatcher/test coverage rather than only auth preflight helpers, and that
   configured standalone auth covers disabled and injected optional chat routes
-  locally. It does not prove live route parity, a live deployment, live Supabase
-  connectivity, database migrations, RLS/tenant isolation, provider chat
-  configuration, live chat behavior, durable idempotency, final standalone
-  cutover, or seeded reservation parity.
+  locally, and that the `apps/api` source boundary is unit-tested against
+  frontend/current-app imports. It does not prove live route parity, a live
+  deployment, live Supabase connectivity, database migrations, RLS/tenant
+  isolation, provider chat configuration, live chat behavior, durable
+  idempotency, final standalone cutover, or seeded reservation parity.
 
 ## Acceptance Criteria
 

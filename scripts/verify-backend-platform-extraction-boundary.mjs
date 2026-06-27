@@ -3,7 +3,6 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 
 const scanTargets = [
-  "app/api/v1",
   "packages/reservations-core/src",
   "packages/reservations-supabase/src",
   "packages/ai-chat/src",
@@ -41,7 +40,7 @@ const importSpecifierPattern =
 
 const forbiddenImportExactSpecifiers = new Map([
   ["next", "Next.js app framework import"],
-  ["next/server", "Next.js route runtime outside app/api/v1 compatibility routes"],
+  ["next/server", "Next.js route runtime import"],
   ["next/navigation", "frontend routing hook"],
   ["next/image", "frontend image component"],
   ["react", "React UI/runtime import"],
@@ -240,10 +239,6 @@ function extractImportSpecifiers(content) {
 }
 
 function getForbiddenImportReason(specifier, importerPath, repoRoot) {
-  if (specifier === "next/server" && isUnderScanSurface(importerPath, "app/api/v1", repoRoot)) {
-    return null;
-  }
-
   if (forbiddenImportExactSpecifiers.has(specifier)) {
     return forbiddenImportExactSpecifiers.get(specifier);
   }

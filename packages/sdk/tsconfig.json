@@ -2,6 +2,7 @@
   "extends": "../../tsconfig.json",
   "compilerOptions": {
     "allowJs": false,
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "noEmit": true,
     "rootDir": "src",
     "types": ["node"]

@@ -11,8 +11,8 @@ export type AvailabilityQuerySearchParamsInput =
   | URL
   | URLSearchParams
   | string
-  | string[][]
-  | Record<string, string>;
+  | Iterable<[string, string]>
+  | Record<string, string | readonly string[]>;
 
 export interface AvailabilityReadInput {
   serviceId: string;

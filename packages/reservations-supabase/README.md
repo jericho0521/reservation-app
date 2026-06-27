@@ -122,10 +122,6 @@ domains used by the modularity planning examples. Current external consumer
 planning lives in
 `docs/package-refactor/backend-platform-extraction/sdk-readiness/phase-7-external-consumer-smoke-tests.md`.
 
-An external tarball smoke fixture lives in
-`../../examples/external-consumer-smoke` and verifies repository construction
-against a mocked Supabase client.
-
 ## Internal Tarball Consumer Install
 
 Until package names and registry publishing are approved, generate internal

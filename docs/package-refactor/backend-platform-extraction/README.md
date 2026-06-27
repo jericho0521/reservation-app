@@ -19,10 +19,11 @@ flowchart LR
 
 ## FYP Branch Strategy
 
-The final-year-project development branch is `platform/backend-modules`. Keep
-`main` stable until this branch is ready to become the final submission branch.
-Use in-repository examples for grading-friendly proofs instead of splitting into
-multiple repositories before submission. See
+The final-year-project backend-modules branch is `platform/backend-modules`.
+Keep `main` stable until this branch is ready to become the final submission
+branch. This branch intentionally excludes frontend app source; consumer demos
+should live on separate branches or repositories and connect through the SDK or
+`/v1` API. See
 [FYP Modular Booking Platform Strategy](../../fyp-modular-booking-platform/README.md).
 
 ## What Plug-And-Play Means Here

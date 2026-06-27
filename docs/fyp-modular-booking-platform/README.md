@@ -1,30 +1,32 @@
 # FYP Modular Booking Platform Strategy
 
-This branch is the working branch for the final year project modular booking
-platform. The product goal is a reusable backend platform that can power
+This branch is the backend-modules branch for the final year project modular
+booking platform. The product goal is a reusable backend platform that can power
 different booking frontends, not a racing-simulator-only application.
 
 ## Branch Strategy
 
 Use this branch as the platform development line:
 
-- `platform/backend-modules`: reusable backend platform, SDK, database bundle,
-  and demo/readiness documentation.
+- `platform/backend-modules`: reusable backend platform, SDK, contracts,
+  database bundle, backend API host, and backend readiness documentation.
 - `main`: remains stable until this branch is ready to become the final FYP
   submission.
+- consumer/demo branches or repos: racing simulator, movie ticketing, and other
+  frontends that use this backend platform.
 
 When the platform branch is runnable, documented, and proven with demos, merge it
 into `main` so the final `main` branch represents the FYP product.
 
-Do not split into multiple repositories before submission. Treat a physical repo
-split as a future extension once the platform contract and examples are stable.
+This branch intentionally excludes frontend application source. Consumer demos
+should be built separately and connect through the SDK or `/v1` API.
 
 ## Product Shape
 
 ```mermaid
 flowchart LR
-  A["Example frontend: racing simulator"] --> S["SDK / HTTP client"]
-  B["Example frontend: movie ticketing"] --> S
+  A["Consumer frontend: racing simulator"] --> S["SDK / HTTP client"]
+  B["Consumer frontend: movie ticketing"] --> S
   C["Future frontend: appointments, courts, rooms"] --> S
   S --> D["Reservation Platform API"]
   D --> E["Reservation domain services"]
@@ -39,8 +41,8 @@ flowchart LR
 - `packages/contract-types`: public API schemas and TypeScript types.
 - `packages/database`: backend-owned migrations, seeds, and migration metadata.
 - `packages/reservations-*`: reusable domain and persistence modules.
-- `examples/*`: frontend/demo proofs that use the backend contract instead of
-  copying database logic.
+- docs describing how external frontend demos should use the backend contract
+  instead of copying database logic.
 
 ## Public Interfaces To Present
 
@@ -55,12 +57,12 @@ The FYP demonstration should focus on these stable integration surfaces:
 - AI chat: current local LangChain chat is a reference/legacy path; backend
   platform chat is a planned module unless fully wired before submission.
 
-## Demo Proofs
+## Consumer Demo Proofs
 
-Use examples to prove the backend is reusable:
+Use separate consumer branches or repositories to prove the backend is reusable:
 
-- `examples/racing-simulator`: assigned-seat/resource booking proof.
-- `examples/movie-ticketing`: second-domain proof using the same backend API/SDK.
+- racing simulator: assigned-seat/resource booking proof.
+- movie ticketing: second-domain proof using the same backend API/SDK.
 
 Each demo should document:
 
@@ -71,7 +73,7 @@ Each demo should document:
 
 ## Readiness Checklist Before Replacing Main
 
-- A fresh frontend example can create a booking through the backend without
+- A fresh consumer frontend can create a booking through the backend without
   Supabase keys.
 - The backend runs with backend-only Supabase env.
 - The SDK can be imported by an external app.

@@ -60,7 +60,6 @@ Example domain fixtures and host-style calls live in:
 
 - `fixtures/domain-examples.ts`
 - `examples/host-consumers.ts`
-- `../../examples/external-consumer-smoke`
 
 The examples cover:
 

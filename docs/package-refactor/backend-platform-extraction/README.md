@@ -17,6 +17,14 @@ flowchart LR
   D --> H["Optional TypeScript SDK"]
 ```
 
+## FYP Branch Strategy
+
+The final-year-project development branch is `platform/backend-modules`. Keep
+`main` stable until this branch is ready to become the final submission branch.
+Use in-repository examples for grading-friendly proofs instead of splitting into
+multiple repositories before submission. See
+[FYP Modular Booking Platform Strategy](../../fyp-modular-booking-platform/README.md).
+
 ## What Plug-And-Play Means Here
 
 Plug-and-play means a frontend can be built in another repository and integrated by configuring:

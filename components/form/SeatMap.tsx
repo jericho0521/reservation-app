@@ -34,6 +34,16 @@ function getFallbackResources(totalSeats: number): ReservableResource[] {
     }));
 }
 
+function isRacingSimulatorResourceSet(resources: Pick<ReservableResource, 'label'>[]) {
+    if (resources.length !== 16) {
+        return false;
+    }
+
+    const labels = new Set(resources.map(resource => resource.label.trim().toLowerCase()));
+    return Array.from({ length: 16 }, (_, index) => `rs${index + 1}`)
+        .every(label => labels.has(label));
+}
+
 export function getSeatNumbersFromLabels(seatLabels: string[], totalSeats: number) {
     return seatLabels
         .map(label => {
@@ -74,11 +84,14 @@ export default function SeatMap({
         () => (resources && resources.length > 0 ? resources : getFallbackResources(totalSeats)),
         [resources, totalSeats],
     );
-    const isRacingFallbackLayout =
-        (!layout || layout.kind === 'none') &&
-        selectableResources.length === 16 &&
-        selectableResources.every((resource, index) => resource.label === getSeatLabel(index + 1));
+    const isRacingSimulatorLayout = isRacingSimulatorResourceSet(selectableResources);
     const resourceNoun = selectableResources[0]?.kind === 'seat' ? 'Seats' : 'Resources';
+    const resourceIndexesByLabel = useMemo(
+        () => new Map(
+            selectableResources.map((resource, index) => [resource.label.trim().toLowerCase(), index + 1]),
+        ),
+        [selectableResources],
+    );
     const maintenanceSeats = useMemo(
         () => getResourceIndexesFromLabels(maintenanceSeatLabels, selectableResources),
         [maintenanceSeatLabels, selectableResources],
@@ -214,42 +227,52 @@ export default function SeatMap({
     };
 
     const renderResourceLayout = () => {
-        if (!isRacingFallbackLayout) {
+        if (!isRacingSimulatorLayout) {
             return layout?.kind === 'custom' ? renderCustomLayout() : renderResourceGrid();
         }
 
-        // Layout per user's diagram:
-        // Island A: Row 1 = RS1,RS2,RS3,RS4 | Row 2 = RS9,RS10,RS11,RS12
-        // Island B: Row 1 = RS5,RS6,RS7,RS8 | Row 2 = RS13,RS14,RS15,RS16
-        const leftIslandRow1 = [1, 2, 3, 4];
-        const leftIslandRow2 = [9, 10, 11, 12];
-        const rightIslandRow1 = [5, 6, 7, 8];
-        const rightIslandRow2 = [13, 14, 15, 16];
+        const seatIndex = (label: string) => resourceIndexesByLabel.get(label.toLowerCase()) ?? 0;
+        const leftIslandRow1 = ['RS1', 'RS2', 'RS3', 'RS4'].map(seatIndex);
+        const leftIslandRow2 = ['RS9', 'RS10', 'RS11', 'RS12'].map(seatIndex);
+        const rightIslandRow1 = ['RS5', 'RS6', 'RS7', 'RS8'].map(seatIndex);
+        const rightIslandRow2 = ['RS13', 'RS14', 'RS15', 'RS16'].map(seatIndex);
+
+        const renderPcRail = () => (
+            <div className="mb-3 w-full px-1">
+                <div className="h-7 rounded-t-2xl border border-neon/30 border-b-0 bg-gradient-to-b from-neon/20 to-transparent shadow-[0_-8px_24px_rgba(185,217,207,0.08)]">
+                    <div className="flex h-full items-center justify-center gap-1.5">
+                        {Array.from({ length: 8 }, (_, index) => (
+                            <span key={index} className="h-2.5 w-8 rounded-sm bg-neon/20 ring-1 ring-neon/25" />
+                        ))}
+                    </div>
+                </div>
+                <div className="text-center text-[10px] font-semibold uppercase tracking-[0.28em] text-neon/70">
+                    PCs
+                </div>
+            </div>
+        );
+
+        const renderIsland = (topRow: number[], bottomRow: number[]) => (
+            <div className="space-y-2">
+                <div className="grid grid-cols-4 gap-2">
+                    {topRow.map(renderSeat)}
+                </div>
+                <div className="grid grid-cols-4 gap-2">
+                    {bottomRow.map(renderSeat)}
+                </div>
+            </div>
+        );
 
         return (
-            <div className="flex justify-center gap-8">
-                <div className="space-y-2">
-                    <div className="text-center text-xs text-gray-500 mb-2">Island A</div>
-                    <div className="grid grid-cols-4 gap-2">
-                        {leftIslandRow1.map(renderSeat)}
+            <div className="mx-auto max-w-[36rem]">
+                {renderPcRail()}
+                <div className="flex flex-col items-center justify-center gap-8 md:flex-row md:items-stretch">
+                    {renderIsland(leftIslandRow1, leftIslandRow2)}
+                    <div className="flex flex-col items-center justify-center text-gray-600">
+                        <div className="hidden h-full w-px bg-white/10 md:block" />
+                        <div className="h-px w-40 bg-white/10 md:hidden" />
                     </div>
-                    <div className="grid grid-cols-4 gap-2">
-                        {leftIslandRow2.map(renderSeat)}
-                    </div>
-                </div>
-
-                <div className="flex flex-col items-center justify-center text-gray-600">
-                    <div className="w-px h-full bg-white/10" />
-                </div>
-
-                <div className="space-y-2">
-                    <div className="text-center text-xs text-gray-500 mb-2">Island B</div>
-                    <div className="grid grid-cols-4 gap-2">
-                        {rightIslandRow1.map(renderSeat)}
-                    </div>
-                    <div className="grid grid-cols-4 gap-2">
-                        {rightIslandRow2.map(renderSeat)}
-                    </div>
+                    {renderIsland(rightIslandRow1, rightIslandRow2)}
                 </div>
             </div>
         );
@@ -263,14 +286,6 @@ export default function SeatMap({
                     Click on available {resourceNoun.toLowerCase()} - {selectedSeats.length} selected
                 </p>
             </div>
-
-            {isRacingFallbackLayout && (
-                <div className="text-center">
-                    <div className="mx-auto w-4/5 h-6 bg-gradient-to-b from-neon/20 to-transparent rounded-t-full flex items-center justify-center border-t border-neon/30">
-                        <span className="text-xs text-neon/70 font-heading uppercase tracking-widest">PCs</span>
-                    </div>
-                </div>
-            )}
 
             {renderResourceLayout()}
 

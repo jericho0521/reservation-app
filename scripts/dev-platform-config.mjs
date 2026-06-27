@@ -94,12 +94,19 @@ export function backendDevEnv(config, env = process.env) {
 }
 
 export function frontendDevEnv(config, env = process.env) {
+  const reservationSupabaseUrl = trim(env.RESERVATION_SUPABASE_URL);
+  const reservationSupabaseAnonKey = trim(env.RESERVATION_SUPABASE_ANON_KEY);
+  const reservationSupabaseServiceRoleKey = trim(env.RESERVATION_SUPABASE_SERVICE_ROLE_KEY);
+
   return {
     ...env,
     PORT: String(config.frontendPort),
     [frontendPlatformEnv.mode]: "platform",
-    [frontendPlatformEnv.chatMode]: "platform",
+    [frontendPlatformEnv.chatMode]: trim(env[frontendPlatformEnv.chatMode]) || "local",
     [frontendPlatformEnv.baseUrl]: config.backendOrigin,
+    NEXT_PUBLIC_SUPABASE_URL: reservationSupabaseUrl || env.NEXT_PUBLIC_SUPABASE_URL,
+    NEXT_PUBLIC_SUPABASE_ANON_KEY: reservationSupabaseAnonKey || env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+    SUPABASE_SERVICE_ROLE_KEY: reservationSupabaseServiceRoleKey || env.SUPABASE_SERVICE_ROLE_KEY,
   };
 }
 

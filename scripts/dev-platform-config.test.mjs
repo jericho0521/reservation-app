@@ -49,17 +49,32 @@ test("local platform dev config rejects optional JWT auth env without required t
   assert.match(formatLocalPlatformDevErrors(config), /RESERVATION_PLATFORM_AUTH_AUDIENCE/u);
 });
 
-test("dev env helpers wire backend CORS and frontend platform mode", () => {
-  const config = readLocalPlatformDevConfig({
+test("dev env helpers wire backend CORS, frontend platform mode, and local chat Supabase env", () => {
+  const env = {
     RESERVATION_SUPABASE_URL: "https://example.supabase.co",
     RESERVATION_SUPABASE_ANON_KEY: "anon",
     RESERVATION_SUPABASE_SERVICE_ROLE_KEY: "service",
-  }, []);
+  };
+  const config = readLocalPlatformDevConfig(env, []);
+  const frontendEnv = frontendDevEnv(config, env);
 
   assert.equal(config.healthOnly, false);
   assert.equal(backendDevEnv(config, {}).PORT, "4100");
   assert.equal(backendDevEnv(config, {}).RESERVATION_PLATFORM_CORS_ALLOWED_ORIGINS, "http://localhost:4000,http://127.0.0.1:4000");
-  assert.equal(frontendDevEnv(config, {}).NEXT_PUBLIC_RESERVATION_API_MODE, "platform");
-  assert.equal(frontendDevEnv(config, {}).NEXT_PUBLIC_RESERVATION_CHAT_MODE, "platform");
-  assert.equal(frontendDevEnv(config, {}).NEXT_PUBLIC_RESERVATION_PLATFORM_BASE_URL, "http://127.0.0.1:4100");
+  assert.equal(frontendEnv.NEXT_PUBLIC_RESERVATION_API_MODE, "platform");
+  assert.equal(frontendEnv.NEXT_PUBLIC_RESERVATION_CHAT_MODE, "local");
+  assert.equal(frontendEnv.NEXT_PUBLIC_RESERVATION_PLATFORM_BASE_URL, "http://127.0.0.1:4100");
+  assert.equal(frontendEnv.NEXT_PUBLIC_SUPABASE_URL, "https://example.supabase.co");
+  assert.equal(frontendEnv.NEXT_PUBLIC_SUPABASE_ANON_KEY, "anon");
+  assert.equal(frontendEnv.SUPABASE_SERVICE_ROLE_KEY, "service");
+});
+
+test("frontend dev env allows explicitly testing disabled platform chat", () => {
+  const env = {
+    NEXT_PUBLIC_RESERVATION_CHAT_MODE: "platform",
+  };
+  const config = readLocalPlatformDevConfig(env, []);
+  const frontendEnv = frontendDevEnv(config, env);
+
+  assert.equal(frontendEnv.NEXT_PUBLIC_RESERVATION_CHAT_MODE, "platform");
 });

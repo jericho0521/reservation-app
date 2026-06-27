@@ -58,6 +58,19 @@ flowchart LR
 7. [Phase 6: Compatibility Cleanup and Release Gate](phase-6-compatibility-cleanup-and-release-gate.md)
 8. [Subagent Handoff Matrix](subagent-handoff-matrix.md)
 
+## Local Development
+
+Use [Local Modular Platform Dev Runbook](local-modular-platform-dev-runbook.md)
+for the current branch's local commands:
+
+- `corepack pnpm run dev:frontend`
+- `corepack pnpm run dev:backend`
+- `corepack pnpm run dev:platform`
+
+These commands make the modular split easier to work on locally. They do not
+replace the strict cross-repo proof chain required for final plug-and-play
+release.
+
 ## Downstream Update Rule
 
 Every phase must update later phase docs when it changes one of these shared

@@ -22,6 +22,8 @@ play" becomes evidence instead of architecture intent.
 - Install SDK and contract types from the approved package source into an
   external frontend root.
 - Configure frontend with backend URL, tenant, venue, auth, and chat settings.
+- Use `corepack pnpm run dev:platform` only as current-repo rehearsal; final
+  proof must still run from separated roots with an approved package source.
 - Run browser smokes for public booking, admin workflows, resource maintenance,
   SDK fixture flow, and chat flow if chat is part of the release.
 - Run SDK/direct HTTP parity against the same backend target.

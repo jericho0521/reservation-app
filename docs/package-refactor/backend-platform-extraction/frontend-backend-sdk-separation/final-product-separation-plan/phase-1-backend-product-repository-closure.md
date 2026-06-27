@@ -30,6 +30,9 @@ on the current frontend app.
   auth, CORS, tenant/venue validation, idempotency storage, database URL,
   provider keys, chat workflow toggles, health checks, and logging.
 - Add or update backend-only build/test/deploy proof commands.
+- Keep local backend development ergonomic through `corepack pnpm run
+  dev:backend`, while treating health-only startup as local confidence rather
+  than deployment proof.
 - Add hosted deployment proof plan or release exception if hosted proof is not
   required for this milestone.
 
@@ -37,6 +40,8 @@ on the current frontend app.
 
 - Updated backend ownership docs.
 - Updated backend deployment/runbook docs.
+- Local backend start docs that state required env, default port, CORS, auth,
+  and health-only limits.
 - Passing backend-only build/test/proof commands.
 - Updated compatibility route decision inputs for any route now proven replaced
   by standalone `/v1`.

@@ -4,12 +4,9 @@ import { spawn } from "node:child_process";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
-import {
-  backendDevEnv,
-  formatLocalPlatformDevErrors,
-  formatLocalPlatformDevSummary,
-  readLocalPlatformDevConfig,
-} from "./dev-platform-config.mjs";
+import { config as loadDotenv } from "dotenv";
+
+const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 
 export function standaloneBackendDevCommand() {
   return {
@@ -22,26 +19,54 @@ export function standaloneBackendDevCommand() {
   };
 }
 
+function backendDevEnv(inputEnv = process.env) {
+  const env = { ...inputEnv };
+
+  env.PORT ??= "4100";
+  env.RESERVATION_SUPABASE_URL ||= env.LOCAL_RESERVATION_SUPABASE_URL ?? "http://localhost:8000";
+  env.RESERVATION_SUPABASE_ANON_KEY ||= env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  env.RESERVATION_SUPABASE_SERVICE_ROLE_KEY ||= env.SUPABASE_SERVICE_ROLE_KEY;
+  env.RESERVATION_PLATFORM_CORS_ALLOWED_ORIGINS ||= [
+    "http://localhost:4000",
+    "http://127.0.0.1:4000",
+    "http://localhost:4200",
+    "http://127.0.0.1:4200",
+    "http://localhost:4201",
+    "http://127.0.0.1:4201",
+    "http://localhost:4202",
+    "http://127.0.0.1:4202",
+  ].join(",");
+
+  return env;
+}
+
+function describeBackendMode(env) {
+  const hasSupabase = Boolean(
+    env.RESERVATION_SUPABASE_URL
+      && env.RESERVATION_SUPABASE_ANON_KEY
+      && env.RESERVATION_SUPABASE_SERVICE_ROLE_KEY,
+  );
+
+  return hasSupabase
+    ? "database-backed backend mode"
+    : "skeleton mode; Supabase env is incomplete";
+}
+
 function main() {
-  const config = readLocalPlatformDevConfig(process.env, process.argv.slice(2));
-  if (!config.ok) {
-    console.error(formatLocalPlatformDevErrors(config));
-    process.exitCode = 1;
-    return;
-  }
+  loadDotenv({ path: join(repoRoot, ".env") });
+
+  const env = backendDevEnv();
+  const { command, args } = standaloneBackendDevCommand();
 
   console.log("Starting standalone reservation backend dev server.");
-  console.log(formatLocalPlatformDevSummary(config));
+  console.log(`Backend origin: http://localhost:${env.PORT}`);
+  console.log(`Backend mode: ${describeBackendMode(env)}`);
+  console.log(`Backend CORS origins: ${env.RESERVATION_PLATFORM_CORS_ALLOWED_ORIGINS}`);
   console.log("Health check: GET /v1/health");
 
-  if (config.checkOnly) {
-    return;
-  }
-
-  const { command, args } = standaloneBackendDevCommand();
   const child = spawn(command, args, {
-    cwd: join(dirname(fileURLToPath(import.meta.url)), ".."),
-    env: backendDevEnv(config),
+    cwd: repoRoot,
+    env,
     stdio: "inherit",
     shell: false,
     windowsHide: true,

@@ -2,7 +2,8 @@ param(
   [string]$SupabaseDockerPath = "~/self-hosted/supabase/docker",
   [string]$TunnelName = "local-supabase",
   [string]$LocalSupabaseUrl = "http://localhost:8000",
-  [string]$PublicSupabaseUrl = "https://supabase.ppbycw.com"
+  [string]$PublicSupabaseUrl = "https://supabase.ppbycw.com",
+  [switch]$StartTunnel
 )
 
 $ErrorActionPreference = "Stop"
@@ -62,29 +63,36 @@ Write-Step "Testing local Supabase API"
 $localStatus = Test-HttpEndpoint $LocalSupabaseUrl
 Write-Host "$LocalSupabaseUrl responded with $localStatus."
 
-Write-Step "Starting Cloudflare Tunnel"
-$existingTunnel = Get-CimInstance Win32_Process -Filter "name = 'cloudflared.exe'" -ErrorAction SilentlyContinue |
-  Where-Object { $_.CommandLine -like "*$TunnelName*" }
+if ($StartTunnel) {
+  Write-Step "Starting Cloudflare Tunnel"
+  $existingTunnel = Get-CimInstance Win32_Process -Filter "name = 'cloudflared.exe'" -ErrorAction SilentlyContinue |
+    Where-Object { $_.CommandLine -like "*$TunnelName*" }
 
-if ($existingTunnel) {
-  Write-Host "Cloudflare Tunnel '$TunnelName' already appears to be running."
+  if ($existingTunnel) {
+    Write-Host "Cloudflare Tunnel '$TunnelName' already appears to be running."
+  } else {
+    $tunnelCommand = "cloudflared tunnel run --url $LocalSupabaseUrl $TunnelName"
+    Start-Process powershell -ArgumentList @("-NoExit", "-Command", $tunnelCommand)
+    Write-Host "Opened a new PowerShell window for Cloudflare Tunnel. Keep it open while testing."
+    Start-Sleep -Seconds 6
+  }
+
+  Write-Step "Testing public Supabase URL"
+  try {
+    $publicStatus = Test-HttpEndpoint $PublicSupabaseUrl
+    Write-Host "$PublicSupabaseUrl responded with $publicStatus."
+  } catch {
+    Write-Warning "Could not reach $PublicSupabaseUrl yet. Check that Cloudflare is active and the tunnel window is connected."
+  }
 } else {
-  $tunnelCommand = "cloudflared tunnel run --url $LocalSupabaseUrl $TunnelName"
-  Start-Process powershell -ArgumentList @("-NoExit", "-Command", $tunnelCommand)
-  Write-Host "Opened a new PowerShell window for Cloudflare Tunnel. Keep it open while testing."
-  Start-Sleep -Seconds 6
-}
-
-Write-Step "Testing public Supabase URL"
-try {
-  $publicStatus = Test-HttpEndpoint $PublicSupabaseUrl
-  Write-Host "$PublicSupabaseUrl responded with $publicStatus."
-} catch {
-  Write-Warning "Could not reach $PublicSupabaseUrl yet. Check that Cloudflare is active and the tunnel window is connected."
+  Write-Step "Skipping Cloudflare Tunnel"
+  Write-Host "Local Supabase is running without public tunnel exposure. Pass -StartTunnel only when external access is needed."
 }
 
 Write-Step "Ready"
 Write-Host "Local Supabase should now be available at:"
 Write-Host "  Local:  $LocalSupabaseUrl"
-Write-Host "  Public: $PublicSupabaseUrl"
+if ($StartTunnel) {
+  Write-Host "  Public: $PublicSupabaseUrl"
+}
 Write-Host "Use your app login page, not the Supabase API URL, for admin login."

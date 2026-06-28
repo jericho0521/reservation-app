@@ -1,0 +1,157 @@
+#!/usr/bin/env node
+
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+
+const root = resolve(import.meta.dirname, "..");
+
+const files = {
+  manifest: "apps/api/deployment.config.json",
+  dockerfile: "Dockerfile",
+  dockerignore: ".dockerignore",
+  envExample: ".env.example",
+  compose: "docker-compose.yml",
+  deploymentDocs: "docs/operations/backend-deployment.md",
+};
+
+function readText(relativePath) {
+  return readFileSync(resolve(root, relativePath), "utf8");
+}
+
+function readJson(relativePath) {
+  return JSON.parse(readText(relativePath));
+}
+
+function assertIncludes(source, expected, message, errors) {
+  if (!source.includes(expected)) {
+    errors.push(message);
+  }
+}
+
+function assertMatches(source, pattern, message, errors) {
+  if (!pattern.test(source)) {
+    errors.push(message);
+  }
+}
+
+function scanForbiddenPublicEnvNames(manifest, deploymentSources, errors) {
+  const forbidden = Array.isArray(manifest.forbiddenPublicEnvPrefixes)
+    ? manifest.forbiddenPublicEnvPrefixes
+    : [];
+
+  for (const [sourceName, source] of Object.entries(deploymentSources)) {
+    for (const prefix of forbidden) {
+      const escaped = prefix.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
+      const pattern = new RegExp(`\\b${escaped}[A-Z0-9_]*\\b`, "u");
+      if (pattern.test(source)) {
+        errors.push(`${sourceName} must not contain forbidden public backend secret env prefix ${prefix}.`);
+      }
+    }
+  }
+}
+
+function verifyDockerDeploymentFiles() {
+  const manifest = readJson(files.manifest);
+  const dockerfile = readText(files.dockerfile);
+  const dockerignore = readText(files.dockerignore);
+  const envExample = readText(files.envExample);
+  const compose = readText(files.compose);
+  const deploymentDocs = readText(files.deploymentDocs);
+  const errors = [];
+
+  assertIncludes(
+    dockerfile,
+    `CMD ["node", "apps/api/dist/server.js"]`,
+    "Dockerfile must use the standalone API start command from apps/api/deployment.config.json.",
+    errors,
+  );
+  assertIncludes(dockerfile, manifest.healthPath, "Dockerfile healthcheck must call the configured health path.", errors);
+  assertIncludes(dockerfile, "USER reservation", "Dockerfile runtime image must run as the non-root reservation user.", errors);
+  assertIncludes(dockerfile, "FROM node:24-alpine AS runtime", "Dockerfile must include a small runtime stage.", errors);
+  assertIncludes(dockerfile, "pnpm run build", "Dockerfile build stage must compile backend packages and apps/api.", errors);
+
+  assertIncludes(dockerignore, ".env", ".dockerignore must exclude local env files.", errors);
+  assertIncludes(dockerignore, "node_modules", ".dockerignore must exclude local node_modules.", errors);
+  assertIncludes(dockerignore, ".git", ".dockerignore must exclude git metadata.", errors);
+  assertIncludes(dockerignore, "dist-packages", ".dockerignore must exclude packaged release artifacts.", errors);
+
+  for (const envName of manifest.requiredSupabaseEnv ?? []) {
+    assertMatches(
+      envExample,
+      new RegExp(`^${envName}=`, "mu"),
+      `.env.example must document required Supabase env ${envName}.`,
+      errors,
+    );
+    assertIncludes(
+      compose,
+      `${envName}: "\${${envName}}"`,
+      `docker-compose.yml must pass backend Supabase env ${envName}.`,
+      errors,
+    );
+  }
+
+  const authAlternatives = Array.isArray(manifest.authEnvAlternatives) ? manifest.authEnvAlternatives : [];
+  const documentedAuthAlternative = authAlternatives.some((alternative) =>
+    alternative.every((envName) => new RegExp(`^${envName}=`, "mu").test(envExample)),
+  );
+  if (!documentedAuthAlternative) {
+    errors.push(".env.example must document at least one complete backend auth option.");
+  }
+
+  assertIncludes(compose, "reservation-api:", "docker-compose.yml must define the reservation-api service.", errors);
+  assertIncludes(compose, 'target: runtime', "docker-compose.yml must build the Dockerfile runtime target.", errors);
+  assertIncludes(compose, '"${PORT:-4100}:4100"', "docker-compose.yml must expose the configured PORT to container port 4100.", errors);
+  assertIncludes(compose, 'PORT: "4100"', "docker-compose.yml must set the container PORT for the API server.", errors);
+  assertIncludes(
+    compose,
+    "RESERVATION_PLATFORM_CORS_ALLOWED_ORIGINS",
+    "docker-compose.yml must pass backend CORS origin config.",
+    errors,
+  );
+  assertIncludes(compose, manifest.healthPath, "docker-compose.yml healthcheck must call the configured health path.", errors);
+
+  assertIncludes(deploymentDocs, manifest.healthPath, "docs/operations/backend-deployment.md must document the health path.", errors);
+  assertMatches(
+    deploymentDocs,
+    /does not apply migrations on startup/iu,
+    "docs/operations/backend-deployment.md must state that migrations are not auto-run at container startup.",
+    errors,
+  );
+  assertIncludes(
+    deploymentDocs,
+    "NEXT_PUBLIC_RESERVATION_PLATFORM_BASE_URL",
+    "docs/operations/backend-deployment.md must document the frontend public backend URL.",
+    errors,
+  );
+  assertIncludes(
+    deploymentDocs,
+    "corepack pnpm run docker:build",
+    "docs/operations/backend-deployment.md must document the Docker build script.",
+    errors,
+  );
+
+  scanForbiddenPublicEnvNames(
+    manifest,
+    {
+      [files.dockerfile]: dockerfile,
+      [files.envExample]: envExample,
+      [files.compose]: compose,
+      [files.deploymentDocs]: deploymentDocs,
+    },
+    errors,
+  );
+
+  return errors;
+}
+
+const errors = verifyDockerDeploymentFiles();
+
+if (errors.length > 0) {
+  console.error("FAILED Docker deployment file verification:");
+  for (const error of errors) {
+    console.error(`- ${error}`);
+  }
+  process.exitCode = 1;
+} else {
+  console.log("Verified Docker deployment files.");
+}

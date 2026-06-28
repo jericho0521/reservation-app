@@ -22,7 +22,6 @@ FROM deps AS build
 COPY . .
 RUN pnpm install --frozen-lockfile
 RUN pnpm run build
-RUN CI=true pnpm prune --prod
 
 FROM node:24-alpine AS runtime
 WORKDIR /app
@@ -37,6 +36,7 @@ COPY --from=build --chown=reservation:reservation /app/package.json ./package.js
 COPY --from=build --chown=reservation:reservation /app/pnpm-workspace.yaml ./pnpm-workspace.yaml
 COPY --from=build --chown=reservation:reservation /app/node_modules ./node_modules
 COPY --from=build --chown=reservation:reservation /app/apps/api/package.json ./apps/api/package.json
+COPY --from=build --chown=reservation:reservation /app/apps/api/node_modules ./apps/api/node_modules
 COPY --from=build --chown=reservation:reservation /app/apps/api/dist ./apps/api/dist
 COPY --from=build --chown=reservation:reservation /app/apps/api/deployment.config.json ./apps/api/deployment.config.json
 COPY --from=build --chown=reservation:reservation /app/packages ./packages

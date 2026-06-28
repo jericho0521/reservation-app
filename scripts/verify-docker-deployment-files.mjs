@@ -69,6 +69,12 @@ function verifyDockerDeploymentFiles() {
   assertIncludes(dockerfile, "USER reservation", "Dockerfile runtime image must run as the non-root reservation user.", errors);
   assertIncludes(dockerfile, "FROM node:24-alpine AS runtime", "Dockerfile must include a small runtime stage.", errors);
   assertIncludes(dockerfile, "pnpm run build", "Dockerfile build stage must compile backend packages and apps/api.", errors);
+  assertIncludes(
+    dockerfile,
+    "/app/apps/api/node_modules ./apps/api/node_modules",
+    "Dockerfile runtime image must copy apps/api/node_modules so workspace package imports resolve.",
+    errors,
+  );
 
   assertIncludes(dockerignore, ".env", ".dockerignore must exclude local env files.", errors);
   assertIncludes(dockerignore, "node_modules", ".dockerignore must exclude local node_modules.", errors);

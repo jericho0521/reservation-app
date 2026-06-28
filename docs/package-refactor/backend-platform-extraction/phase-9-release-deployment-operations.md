@@ -110,7 +110,7 @@ reservation-platform-backend/
     src/health.ts
     src/readiness.ts
   docs/
-    deployment.md
+    operations/backend-deployment.md
     operations.md
     release-process.md
     rollback.md
@@ -269,7 +269,7 @@ reservation-platform-backend/
 
   docs/
     operations.md
-    deployment.md
+    operations/backend-deployment.md
     release-process.md
     rollback.md
     environment.md
@@ -1159,7 +1159,7 @@ Security requirements:
 Write targets:
 
 - `reservation-platform-backend/docs/operations.md`
-- `reservation-platform-backend/docs/deployment.md`
+- `reservation-platform-backend/docs/operations/backend-deployment.md`
 - `reservation-platform-backend/docs/environment.md`
 - `reservation-platform-backend/docs/frontend-integration.md`
 - `reservation-platform-backend/docs/release-process.md`

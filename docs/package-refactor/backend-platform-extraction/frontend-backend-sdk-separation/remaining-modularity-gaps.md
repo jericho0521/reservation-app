@@ -5,65 +5,11 @@ the phase docs. It does not replace the phase plans; it points each gap to the
 phase that owns it so subagents can work from one phase file without losing the
 overall outcome.
 
-The focused execution plan for proving hard frontend/backend separation lives in
-[Frontend and Backend Hard Separation Plan](frontend-backend-hard-separation-plan/README.md).
-Use it when the question is whether the backend platform, SDK, and frontend are
-actually separable products rather than modular packages inside this monorepo.
-
-The focused execution plan for finishing physical product separation lives in
-[Frontend and Backend Physical Separation Plan](frontend-backend-physical-separation-plan/README.md).
-Use it when assigning subagents to turn the current modular monorepo readiness
-into a backend product repository, SDK artifact, frontend consumer repository,
-live backend proof, external adoption proof, and compatibility cleanup.
-
-The concise repo-first execution pack lives in
-[Backend Product, SDK, and Frontend Separation Plan](backend-product-sdk-frontend-separation-plan/README.md).
-Use it when subagents need phase files for the intended product model: the
-backend GitHub repository is the platform product, the SDK is the installable
-contract, and every frontend is a replaceable consumer.
-
-The focused current-state execution pack lives in
-[Current Refactor Separation Gap Plan](current-refactor-separation-gap-plan/README.md).
-Use it when the task is to answer whether the current branch is actually
-frontend/backend separated yet, then close the remaining gaps without relying on
-chat history.
-
-The latest direct answer pack lives in
-[Current Separation Answer Plan](current-separation-answer-plan/README.md).
-Use it when a subagent needs the shortest phase-by-phase path from "the branch
-is modular but not product-separated yet" to backend product boundary
-enforcement, SDK install contract enforcement, frontend consumer detachment
-proof, live cross-repo proof, and compatibility cleanup/release decision.
-
-The current frontend/backend separation plan lives in
-[Current Frontend and Backend Separation Plan](current-frontend-backend-separation-plan/README.md).
-Use it when a subagent needs the latest focused phase pack for the current
-state: partial separation now, then backend product boundary closure, SDK
-install contract, frontend consumer detachment, live external proof, and
-compatibility cleanup/release decisions.
-
-The backend platform product completion plan lives in
-[Backend Platform Product Completion Plan](backend-platform-product-completion-plan/README.md).
-Use it as the current execution pack for the product intent: backend GitHub
-repository as the infrastructure product, SDK as the installable contract, and
-frontend as a replaceable consumer. It is organized for subagents to close the
-remaining product gaps phase by phase while updating downstream phases whenever
-ownership, API, env, proof, or compatibility assumptions change.
-
-The current hard separation completion plan lives in
-[Current Hard Separation Completion Plan](current-hard-separation-completion-plan/README.md).
-Use it as the direct phase pack for finishing the current branch's hard
-frontend/backend split. It starts from the current partially separated state
-and gives subagents focused phases for baseline lock, backend product boundary
-closure, SDK install contract closure, current frontend consumer detachment,
-external live adoption proof, and compatibility cleanup/release decisions.
-
-The final product separation plan lives in
-[Final Product Separation Plan](final-product-separation-plan/README.md).
-Use it as the latest subagent-ready plan when the goal is the product model
-rather than only monorepo modularity: backend platform repository as product,
-SDK as installable contract, frontend apps as replaceable consumers, and
-AI chat/LangChain workflows behind backend-owned service contracts.
+The canonical phase index is [README.md](README.md). Earlier duplicate plan
+packs were removed so the remaining docs have one source of truth. The
+test-referenced [Frontend Backend Separation Completion Plan](frontend-backend-separation-completion-plan/README.md)
+is retained only as a known frontend-planning artifact that backend extraction
+tests must not copy into a backend repository candidate.
 
 ## Gap Ownership
 

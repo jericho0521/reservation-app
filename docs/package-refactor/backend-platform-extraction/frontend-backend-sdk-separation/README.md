@@ -1,57 +1,49 @@
 # Frontend, Backend Modules, and SDK Separation Plan
 
-This plan focuses on the gap in the current branch: the code is modularized
-into packages, but the frontend and backend are not fully separated yet.
+This folder is the canonical planning area for separating the modular booking
+platform into three surfaces:
 
-The target is three separate surfaces:
-
-- Current frontend app: UI, routes/pages, forms, admin screens, chat UI, and
-  analytics UI.
-- Backend platform: `/v1` API, domain services, persistence adapters,
-  migrations, auth/tenant enforcement, idempotency, and AI workflow services.
-- SDK package: installable TypeScript HTTP client for frontends. It calls the
-  backend API and must not contain backend rules, database queries, Supabase
-  clients, LangChain workflows, or UI.
+- Backend platform: standalone `/v1` API, domain services, persistence
+  adapters, migrations, auth/tenant enforcement, idempotency, and backend-owned
+  AI workflow services.
+- SDK package: installable TypeScript HTTP client for frontend and server
+  consumers. It must stay HTTP-only and frontend-safe.
+- Frontend consumers: replaceable apps that use `/v1` or the SDK without
+  importing backend modules or receiving Supabase service-role credentials.
 
 ## Current Versus Target
 
 ```mermaid
 flowchart LR
-  subgraph Current["Current branch"]
-    UI["Next.js frontend"]
-    API["Next.js app/api routes"]
-    Core["packages/reservations-core"]
+  subgraph Current["Current backend branch"]
+    API["apps/api"]
+    Domain["packages/reservations-core"]
+    PlatformAPI["packages/reservation-platform-api"]
     Supabase["packages/reservations-supabase"]
-    AiChat["packages/ai-chat"]
-    ChatCore["packages/reservation-chat-core reference"]
-    AppLib["lib/supabase and lib/langchain"]
+    Database["packages/database"]
+    SDK["packages/sdk"]
   end
 
-  UI --> API
-  API --> Core
-  API --> Supabase
-  API --> AppLib
-  AppLib --> ChatCore
-  ChatCore -.-> AiChat
-
-  subgraph Target["Separated architecture"]
-    Frontend["Frontend app"]
-    SDK["@reservation-platform/sdk"]
+  subgraph Target["Product split"]
+    Frontend["External frontend app"]
+    PublicSDK["@reservation-platform/sdk"]
     Backend["Backend platform /v1 API"]
-    Services["Backend domain modules"]
-    Storage["Backend storage adapters and migrations"]
-    Chat["Backend chat workflow service"]
+    Storage["Backend storage and migrations"]
   end
 
-  Frontend --> SDK
+  API --> PlatformAPI
+  PlatformAPI --> Domain
+  PlatformAPI --> Supabase
+  Supabase --> Database
+  SDK --> API
+
+  Frontend --> PublicSDK
   Frontend --> Backend
-  SDK --> Backend
-  Backend --> Services
+  PublicSDK --> Backend
   Backend --> Storage
-  Backend --> Chat
 ```
 
-## Phase Files
+## Canonical Phase Files
 
 - [Phase 0: Current Coupling Audit](phase-0-current-coupling-audit.md)
 - [Phase 0 Audit Results](phase-0-current-coupling-audit-results.md)
@@ -96,165 +88,34 @@ flowchart LR
 - [Phase 33: SDK and Direct HTTP Parity Proof](phase-33-sdk-direct-parity-proof.md)
 - [Phase 34: Registry Release Proof](phase-34-registry-release-proof.md)
 - [Phase 35: Compatibility Cleanup and Release Decision](phase-35-compatibility-cleanup-release-decision.md)
-- [Remaining Modularity Gaps Index](remaining-modularity-gaps.md)
+
+## Supporting Files
+
+- [Remaining Modularity Gaps](remaining-modularity-gaps.md)
 - [External Separation Proof Results](external-separation-proof-results.md)
-- [Focused Backend Platform, SDK, and Frontend Split Execution Plan](plugin-platform-split/README.md)
-- [Repo Product Split Plan](repo-product-split-plan/README.md)
-- [Frontend and Backend Hard Separation Plan](frontend-backend-hard-separation-plan/README.md)
-- [Frontend and Backend Module Separation Plan](frontend-backend-module-separation-plan/README.md)
-- [Backend SDK Frontend Product Split Plan](backend-sdk-frontend-product-split-plan/README.md)
-- [Backend Product Repo Handoff Plan](backend-product-repo-handoff-plan/README.md)
-- [Frontend, Backend, and SDK Final Separation Plan](frontend-backend-sdk-final-separation-plan/README.md)
-- [Frontend and Backend Physical Separation Plan](frontend-backend-physical-separation-plan/README.md)
-- [Backend Product, SDK, and Frontend Separation Plan](backend-product-sdk-frontend-separation-plan/README.md)
-- [Current Refactor Separation Gap Plan](current-refactor-separation-gap-plan/README.md)
-- [Current Separation Answer Plan](current-separation-answer-plan/README.md)
-- [Backend Product and Frontend Consumer Plan](backend-product-frontend-consumer-plan/README.md)
-- [Current Frontend and Backend Separation Plan](current-frontend-backend-separation-plan/README.md)
-- [Backend Platform Product Completion Plan](backend-platform-product-completion-plan/README.md)
-- [Current Hard Separation Completion Plan](current-hard-separation-completion-plan/README.md)
-- [Final Product Separation Plan](final-product-separation-plan/README.md)
+- [Frontend Consumer Repo Inventory](frontend-consumer-repo-inventory.json)
+- [Compatibility Route Inventory](compatibility-route-inventory.json)
+- [Compatibility Route Removal Decision Log](compatibility-route-removal-decision-log.md)
+- [Frontend Backend Separation Completion Plan](frontend-backend-separation-completion-plan/README.md)
+
+The completion-plan folder is retained because extraction tests use it as a
+known frontend-planning document that must not be materialized into the backend
+repository candidate. Other duplicate plan-pack folders were removed so this
+directory has one obvious source of truth.
 
 ## Separation Rules
 
-- Frontend must not import backend storage adapters, database clients, route
+- Frontends must not import backend storage adapters, database clients, route
   handlers, domain services, LangChain workflows, or service-role secrets.
-- SDK must import only public contract types and use HTTP/fetch to call `/v1`.
+- The SDK must import only public contract types and call `/v1` through HTTP.
 - Backend modules may import domain packages, storage adapters, migrations,
   model providers, and server-only secrets.
-- Direct HTTP must remain equivalent to SDK behavior.
-- The current Next.js app should become one consumer frontend, not the backend
-  owner.
+- Direct HTTP behavior must remain equivalent to SDK behavior.
+- Current or demo frontends should be consumers, not backend owners.
 
 ## Subagent Execution Rule
 
-Each phase is designed for one worker subagent. Give the worker the full phase
-file, the relevant contract docs, and the current files listed in `Inputs To
-Read`. If a phase changes shared assumptions, update later phase docs in this
-folder and the SDK readiness docs before moving on.
-
-Every implementation phase after Phase 0 must read
-`phase-0-current-coupling-audit-results.md` first and carry forward the target
-phase assignments from its migration table.
-
-Every phase after Phase 1 must also read
-`phase-1-backend-module-boundary-results.md` before deciding what can be
-imported by frontend code, SDK code, backend services, or optional chat modules.
-
-Phases 7 through 11 are the core separation plan. They should be executed in
-order: make the standalone backend target real, cut the current frontend over
-as a normal consumer, remove compatibility routes, prove the platform against
-live disposable infrastructure, then extract or release the backend repository.
-
-Phases 12 through 15 are the productization plan. They prove the frontend can
-live as a separate consumer repo, define the backend platform as the product
-repo, make the SDK installable by unrelated frontends, and document release,
-deprecation, rollback, and support rules.
-
-Phases 16 through 19 are the physical repository split plan. They turn the
-monorepo readiness work into separate backend, frontend, and SDK adoption
-proofs, then require a cross-repo release chain before the platform is treated
-as plug-and-play infrastructure.
-
-Phases 20 through 24 are the separation completion plan. They make the repo
-ownership source of truth explicit, materialize backend and frontend repository
-candidates, prove the SDK as the installable contract, and finish with a
-cross-repo adoption proof for a frontend that starts outside this monorepo.
-
-Phases 25 through 29 are the repo-first plug-and-play product plan. They restate
-the intended ownership model in execution-ready terms: the backend GitHub
-repository is the product, the SDK is the only package a new frontend installs,
-the current frontend becomes a replaceable consumer, live proof must use a real
-standalone backend target, and subagents must update downstream phases whenever
-shared assumptions change.
-
-Phases 30 through 35 are the proof-completion plan based on the first real
-external separation proof results. They start with the concrete blocker that
-the SDK and contract packages are not yet available from an approved package
-source, then prove a disposable database, live standalone backend, SDK/direct
-HTTP parity, registry installation, and compatibility route cleanup or
-deprecation from evidence.
-
-The frontend/backend hard separation plan is the focused continuation for the
-practical proof question: whether the current refactor has crossed from
-monorepo modularity into real product separation. It adds audit, boundary,
-backend runtime, frontend detachment, SDK install, cross-repo proof, and
-compatibility cleanup phases that subagents can execute without relying on chat
-history.
-
-The frontend/backend module separation plan is the narrower current-state
-cleanup plan for keeping backend modules, the SDK, and the frontend consumer
-honest while the repo split work continues. Use it when assigning subagents to
-close boundary leaks before treating the backend as the product infrastructure
-repo and the frontend as a replaceable SDK consumer.
-
-The backend SDK frontend product split plan is the clearest plan for the final
-intended plug-and-play model: backend repository as the infrastructure product,
-SDK as the installable integration surface, and any frontend repository as a
-replaceable consumer. Use it when assigning subagents who need phase-by-phase
-instructions without relying on earlier chat history.
-
-The backend product repo handoff plan is the focused subagent execution pack for
-turning that intent into a reviewed handoff sequence. Use it when workers need
-explicit inputs, proof commands, reviewer checklists, and downstream update
-rules for the backend-as-product, SDK-as-install-surface, frontend-as-consumer
-model.
-
-The backend product, SDK, and frontend separation plan is the concise
-repo-first execution pack for the final intended architecture: backend product
-repository, installable SDK, and replaceable frontend consumer. Use it when a
-subagent needs a bounded phase file that explains both the work and which later
-phase docs must be updated if assumptions change.
-
-The frontend/backend physical separation plan is the most direct answer to the
-current-state question: the branch is modular, but it is not fully product-split
-until a backend repo candidate, SDK artifact, frontend repo candidate, live
-backend proof, external frontend adoption proof, and compatibility cleanup all
-pass without relying on monorepo workspace links.
-
-The current refactor separation gap plan is the most direct handoff pack for
-answering whether this branch is separated right now. It starts from the
-current modular state, names what remains coupled, and gives subagents a
-phase-by-phase route to backend product boundary closure, SDK install surface
-closure, frontend consumer detachment, cross-repo proof, and compatibility
-operations cleanup.
-
-The current separation answer plan is the shortest phase pack for the latest
-status question. It states that this branch is currently modular-monorepo
-readiness, not full product separation, then assigns the remaining work to
-backend product boundary enforcement, SDK install contract enforcement,
-frontend consumer detachment proof, live cross-repo proof, and compatibility
-cleanup/release decision phases.
-
-The backend product and frontend consumer plan is the direct execution pack for
-the intended product model: backend repository as infrastructure product, SDK
-as the installable contract, and any frontend as a replaceable consumer. Use it
-when subagents need one focused folder with downstream update rules, AI chat
-ownership, external adoption proof, and compatibility cleanup gates.
-
-The current frontend and backend separation plan is the latest focused answer
-for whether the branch is separated right now. It states that the branch is
-partially separated, then gives subagents phase files for baseline audit,
-backend product boundary closure, SDK install contract, frontend consumer
-detachment, live external proof, and compatibility cleanup/release decisions.
-
-The backend platform product completion plan is the current execution pack for
-finishing the intended product architecture: backend repository as product,
-SDK as installable contract, and frontend as replaceable consumer. Use it when
-subagents need a phase-by-phase plan that starts from the latest proof status
-and continues through deployable backend runtime, SDK install, frontend
-detachment, external adoption proof, and compatibility cleanup.
-
-The current hard separation completion plan is the latest focused execution
-pack for the question "are the frontend and backend modules actually separated
-yet?" It starts from the current partially separated branch and assigns the
-remaining work to baseline lock, backend product boundary closure, SDK install
-contract closure, current frontend consumer detachment, external live adoption
-proof, and compatibility cleanup/release decisions.
-
-The final product separation plan is the current subagent handoff pack for
-turning the modular branch into the intended product model: backend platform
-repository as product, SDK as installable contract, frontend apps as replaceable
-consumers, and AI chat/LangChain workflows behind backend-owned service
-contracts. Use it when assigning the remaining hard-separation work after the
-latest strict proof results.
+Give a worker subagent the relevant phase file, this README, and the supporting
+contract docs. If a phase changes ownership, API, env, proof, or compatibility
+assumptions, update later phase docs and [Remaining Modularity Gaps](remaining-modularity-gaps.md)
+before treating the phase as complete.

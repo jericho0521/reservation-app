@@ -1,12 +1,12 @@
-# Reservation Platform Backend
+# Reservation Platform
 
-Backend modules, API host, database bundle, contracts, and SDK for a modular
-booking platform.
+Backend modules, API host, database bundle, contracts, SDK, React hooks, reusable
+UI components, and forkable examples for a modular booking platform.
 
-This branch is intentionally backend-only. It does not contain the Project Play
-Next.js frontend, React components, public assets, or example frontend apps.
-External frontends should live in their own repository or branch and connect to
-this platform through the `/v1` HTTP API or `@reservation-platform/sdk`.
+This branch is the frontend-and-backend modular platform direction. Backend
+credentials stay in the backend API, while frontends consume the platform through
+`/v1`, `@reservation-platform/sdk`, `@reservation-platform/react`, or
+`@reservation-platform/ui`.
 
 ## Project Intent
 
@@ -15,11 +15,16 @@ different products. The same backend modules should support a racing simulator
 booking frontend, a movie ticketing frontend, a room booking frontend, or any
 other reservation UI without copying database logic into each app.
 
-The frontend is replaceable. The backend platform is the product.
+The frontend is replaceable, but this monorepo now also includes reusable
+frontend modules so a new booking app can start by editing config, theme, copy,
+and images instead of rebuilding booking logic.
 
 ```mermaid
 flowchart LR
-  Frontend["External frontend app"] --> SDK["@reservation-platform/sdk"]
+  Frontend["Frontend app or example"] --> UI["@reservation-platform/ui"]
+  UI --> React["@reservation-platform/react"]
+  React --> SDK["@reservation-platform/sdk"]
+  Frontend --> SDK
   Frontend --> API["/v1 HTTP API"]
   SDK --> API
   API --> Domain["Reservation domain modules"]
@@ -39,21 +44,26 @@ flowchart LR
 | `packages/database` | Backend-owned migrations, seeds, migration index, and database package metadata. |
 | `packages/contract-types` | Public API DTOs, schemas, OpenAPI artifacts, and shared contract types. |
 | `packages/sdk` | TypeScript client package for external frontend and server consumers. |
+| `packages/reservation-react` | Headless React provider and booking hooks. |
+| `packages/reservation-ui` | Tailwind-ready booking components built on the React hooks. |
 | `packages/ai-chat` | Optional backend AI chat module scaffold. |
+| `apps/examples/starter-next` | Minimal forkable Next.js starter using the frontend packages. |
+| `apps/examples/room-booking` | Room booking example using the shared booking UI. |
+| `apps/examples/racing-simulator` | Racing simulator example using the shared booking UI. |
 | `supabase` | Legacy/reference Supabase SQL assets used for compatibility and migration planning. |
 | `scripts` | Backend verification, packaging, database, release, and local-development helpers. |
 | `docs` | Architecture plans, extraction manifests, contract notes, and backend packaging documentation. |
 
-## What Is Not In This Branch
+## What Stays Out Of Frontends
 
-- No `app/` Next.js frontend routes or pages.
-- No `components/` React UI.
-- No `public/` frontend assets.
-- No frontend demo apps under `examples/`.
-- No frontend Supabase client wrappers.
+- No Supabase service-role keys.
+- No direct database clients.
+- No imports from backend adapters such as `packages/reservations-supabase`.
+- No copied booking mutation logic.
 
-Frontend repositories should call the backend API or SDK. They should not import
-backend packages directly and should not receive Supabase service-role keys.
+Frontend repositories should call the backend API, SDK, React hooks, or UI
+package. They should not import backend packages directly and should not receive
+Supabase service-role keys.
 
 ## Requirements
 
@@ -73,12 +83,27 @@ lockfile and does not publish packages or touch production data.
 
 ## Start The Backend
 
+Start the local Supabase/Postgres database first:
+
+```powershell
+corepack pnpm run local:supabase:start
+```
+
+This is safe for local development. It starts the local Supabase Docker stack
+only; it does not expose a Cloudflare tunnel unless `scripts/start-local-supabase.ps1`
+is run manually with `-StartTunnel`.
+
+Then start the standalone backend API:
+
 ```powershell
 corepack pnpm run dev
 ```
 
 This is safe in this branch. It starts only the standalone backend API host from
-`apps/api`; it does not start a Next.js frontend.
+`apps/api`; it does not start a Next.js frontend. The local dev launcher loads
+`.env`, maps existing Supabase env names to backend-only
+`RESERVATION_SUPABASE_*` names, and defaults the local Supabase URL to
+`http://localhost:8000` unless `RESERVATION_SUPABASE_URL` is explicitly set.
 
 The backend exposes platform routes under `/v1`, including:
 
@@ -89,6 +114,29 @@ The backend exposes platform routes under `/v1`, including:
 - `/v1/reservations`
 - `/v1/resource-maintenance`
 - `/v1/chat/*` when the optional chat module is enabled
+
+## Start A Frontend Example
+
+Set the public backend URL and a service id from your local database:
+
+```powershell
+$env:NEXT_PUBLIC_RESERVATION_PLATFORM_BASE_URL="http://localhost:4100"
+$env:NEXT_PUBLIC_RESERVATION_SERVICE_ID="<service-id>"
+corepack pnpm --filter @reservation-platform/example-room-booking run dev
+```
+
+This is safe locally. It starts only the room booking frontend on port 4201 and
+does not start Docker, Supabase, or production services.
+
+The other examples use the same pattern:
+
+```powershell
+corepack pnpm --filter @reservation-platform/example-starter-next run dev
+corepack pnpm --filter @reservation-platform/example-racing-simulator run dev
+```
+
+These are safe locally. They start frontend-only dev servers on ports 4200 and
+4202.
 
 ## Use From Another Frontend
 

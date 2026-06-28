@@ -2,13 +2,13 @@
 
 ## Project Structure & Module Organization
 
-This branch is the backend-only modular booking platform. It intentionally
-excludes the Project Play Next.js frontend, React components, public assets, and
-example frontend apps. Backend runtime code lives in `apps/api`. Reusable
-platform packages live in `packages/`, including reservation domain logic,
-Supabase/Postgres adapters, database migrations, public contract types, the SDK,
-and optional AI chat modules. Backend verification and operational helpers live
-in `scripts/`; SQL compatibility and local Supabase assets live in `supabase/`.
+This branch is the modular booking platform monorepo. Backend runtime code lives
+in `apps/api`. Reusable platform packages live in `packages/`, including
+reservation domain logic, Supabase/Postgres adapters, database migrations, public
+contract types, the SDK, optional AI chat modules, and frontend module packages.
+Forkable frontend examples live in `apps/examples/`. Backend verification and
+operational helpers live in `scripts/`; SQL compatibility and local Supabase
+assets live in `supabase/`.
 
 ## Build, Test, and Development Commands
 
@@ -28,7 +28,8 @@ aliases. Keep backend packages framework-neutral unless a package explicitly own
 a runtime adapter. Use camelCase for functions and variables, PascalCase for
 types/classes, and double-quote imports where the surrounding file uses them.
 Do not add React, Next.js, browser-only APIs, or frontend package dependencies
-to backend modules.
+to backend modules. Frontend module packages should stay browser-safe and must
+not import Supabase clients, database adapters, or backend-only runtime code.
 
 ## Testing Guidelines
 
@@ -41,8 +42,8 @@ and optional AI chat module boundaries.
 ## Commit & Pull Request Guidelines
 
 Use short conventional-style subjects such as `feat:`, `fix:`, `ci:`, `docs:`,
-or `refactor:` followed by a concise imperative summary. This branch should stay
-backend-only; frontend app work belongs in a consumer branch or repository.
+or `refactor:` followed by a concise imperative summary. Keep commits scoped by
+layer: backend modules, frontend modules, docs, or examples.
 Before merging into a release branch, note which backend tests and database
 checks were run and whether live proofs were skipped.
 

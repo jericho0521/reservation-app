@@ -1,0 +1,151 @@
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  margin-bottom: 28px;
+  gap: 24px;
+}
+
+/* Brand */
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  flex-shrink: 0;
+}
+
+.logo {
+  font-size: 1.4rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  color: var(--text);
+}
+
+.dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+  margin-left: 2px;
+  margin-bottom: 8px;
+  box-shadow: 0 0 10px rgba(200, 180, 160, 0.5);
+}
+
+/* Nav links */
+.nav {
+  display: flex;
+  gap: 24px;
+  flex-shrink: 0;
+}
+
+.navLink {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text);
+  cursor: pointer;
+  position: relative;
+}
+
+.navLink::after {
+  content: "";
+  position: absolute;
+  bottom: -4px;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--accent);
+}
+
+.navLinkMuted {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--muted);
+  cursor: pointer;
+  transition: color 0.2s ease;
+}
+
+.navLinkMuted:hover {
+  color: var(--text);
+}
+
+/* Date picker */
+.dates {
+  display: flex;
+  gap: 4px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.dates::-webkit-scrollbar {
+  display: none;
+}
+
+.dateChip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  padding: 6px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: inherit;
+  flex-shrink: 0;
+}
+
+.dateChip:hover {
+  border-color: rgba(255, 255, 255, 0.15);
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.dateChip.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #111113;
+  box-shadow: 0 2px 12px rgba(200, 180, 160, 0.25);
+}
+
+.dayName {
+  font-size: 0.62rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.dayNum {
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+@media (max-width: 960px) {
+  .nav {
+    display: none;
+  }
+}
+
+@media (max-width: 760px) {
+  .header {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  .dates {
+    width: 100%;
+    order: 3;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dateChip,
+  .navLinkMuted {
+    transition: none;
+  }
+}

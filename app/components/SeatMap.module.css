@@ -1,0 +1,257 @@
+.container {
+  background: var(--surface);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 14px;
+  padding: 32px 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 28px;
+}
+
+.empty {
+  background: var(--surface);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 14px;
+  padding: 80px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+  font-size: 0.9rem;
+  text-align: center;
+  min-height: 400px;
+}
+
+.emptyInner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.emptyIcon {
+  opacity: 0.3;
+}
+
+.empty p {
+  margin: 0;
+  max-width: 240px;
+  line-height: 1.5;
+}
+
+/* Screen with breathing glow */
+.screenWrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  max-width: 380px;
+  position: relative;
+}
+
+.screenGlow {
+  position: absolute;
+  top: -20px;
+  left: 10%;
+  right: 10%;
+  height: 50px;
+  background: radial-gradient(ellipse at center bottom, rgba(200, 180, 160, 0.12) 0%, transparent 70%);
+  pointer-events: none;
+  animation: breathe 3s ease-in-out infinite;
+}
+
+.screen {
+  width: 75%;
+  height: 3px;
+  border-radius: 50%;
+  background: linear-gradient(90deg, transparent 0%, var(--accent) 20%, var(--accent) 80%, transparent 100%);
+  opacity: 0.6;
+  box-shadow:
+    0 0 15px rgba(200, 180, 160, 0.35),
+    0 0 40px rgba(200, 180, 160, 0.15),
+    0 0 80px rgba(200, 180, 160, 0.05);
+  animation: breathe 3s ease-in-out infinite;
+}
+
+@keyframes breathe {
+  0%, 100% {
+    opacity: 0.4;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+.screenLabel {
+  font-size: 0.6rem;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  color: var(--muted);
+  opacity: 0.7;
+}
+
+/* 3D perspective wrapper */
+.perspective {
+  perspective: 600px;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+}
+
+/* Seat grid with subtle 3D tilt */
+.grid {
+  display: grid;
+  grid-template-columns: 24px repeat(5, 1fr) 12px repeat(5, 1fr);
+  gap: 6px;
+  width: 100%;
+  max-width: 380px;
+  transform: rotateX(12deg);
+  transform-origin: center top;
+}
+
+.aisle {
+  width: 12px;
+}
+
+.rowLabelSpacer {
+  width: 24px;
+}
+
+.colLabel {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.58rem;
+  color: var(--muted);
+  font-weight: 500;
+  opacity: 0.6;
+}
+
+.rowLabel {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.62rem;
+  color: var(--muted);
+  font-weight: 500;
+  opacity: 0.6;
+}
+
+/* Individual seat */
+.seat {
+  aspect-ratio: 1;
+  border: none;
+  border-radius: 5px;
+  background: var(--seat-available);
+  cursor: pointer;
+  transition: all 0.18s ease;
+  padding: 0;
+  position: relative;
+}
+
+.seat:hover:not(:disabled) {
+  background: rgba(200, 180, 160, 0.25);
+  transform: scale(1.2);
+  box-shadow: 0 0 8px rgba(200, 180, 160, 0.15);
+}
+
+.seat:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.seat.selected {
+  background: var(--accent);
+  transform: scale(1.1);
+  box-shadow: 0 0 12px rgba(200, 180, 160, 0.4);
+  animation: seatPop 0.25s ease;
+}
+
+.seat.occupied {
+  background: var(--muted);
+  opacity: 0.18;
+  cursor: not-allowed;
+  border-radius: 5px;
+}
+
+@keyframes seatPop {
+  0% {
+    transform: scale(0.8);
+  }
+  50% {
+    transform: scale(1.25);
+  }
+  100% {
+    transform: scale(1.1);
+  }
+}
+
+/* Legend */
+.legend {
+  display: flex;
+  gap: 20px;
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+
+.legendItem {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.legendDot {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+}
+
+.legendAvailable {
+  background: var(--seat-available);
+}
+
+.legendSelected {
+  background: var(--accent);
+  box-shadow: 0 0 6px rgba(200, 180, 160, 0.3);
+}
+
+.legendOccupied {
+  background: var(--muted);
+  opacity: 0.18;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .seat,
+  .screen,
+  .screenGlow {
+    transition: none;
+    animation: none;
+  }
+
+  .seat:hover:not(:disabled) {
+    transform: none;
+  }
+
+  .seat.selected {
+    transform: none;
+    animation: none;
+  }
+}
+
+@media (max-width: 760px) {
+  .container {
+    padding: 24px 16px;
+  }
+
+  .grid {
+    gap: 4px;
+    max-width: 100%;
+    transform: rotateX(8deg);
+  }
+
+  .aisle {
+    width: 8px;
+  }
+}

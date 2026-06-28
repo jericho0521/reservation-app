@@ -1,52 +1,111 @@
-const features = [
-    "Movie cards and showtime picker",
-    "Screen indicator and cinema-style seat map",
-    "Mock selected tickets and subtotal summary",
-    "Assigned-seat booking state with no backend calls"
-];
+"use client";
+
+import { useState, useMemo, useRef } from "react";
+import { movies } from "./data";
+import Header from "./components/Header";
+import HeroBanner from "./components/HeroBanner";
+import MovieCard from "./components/MovieCard";
+import SeatMap from "./components/SeatMap";
+import TicketSummary from "./components/TicketSummary";
 
 export default function Home() {
+  const [selectedDate, setSelectedDate] = useState(0);
+  const [selectedMovieId, setSelectedMovieId] = useState<string | null>(null);
+  const [selectedShowtime, setSelectedShowtime] = useState<string | null>(null);
+  const [selectedSeats, setSelectedSeats] = useState<string[]>([]);
+  const bookingRef = useRef<HTMLDivElement>(null);
+
+  const selectedMovie = useMemo(
+    () => movies.find((m) => m.id === selectedMovieId) ?? null,
+    [selectedMovieId]
+  );
+
+  // Hero always shows the selected movie, or the first movie by default
+  const heroMovie = selectedMovie ?? movies[0];
+
+  const dateLabel = useMemo(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + selectedDate);
+    return d.toLocaleDateString("en-US", {
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+    });
+  }, [selectedDate]);
+
+  function handleSelectShowtime(movieId: string, showtime: string) {
+    if (movieId === selectedMovieId && showtime === selectedShowtime) return;
+    setSelectedMovieId(movieId);
+    setSelectedShowtime(showtime);
+    setSelectedSeats([]);
+    // Scroll to booking section
+    setTimeout(() => {
+      bookingRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 100);
+  }
+
+  function handleToggleSeat(seatId: string) {
+    setSelectedSeats((prev) =>
+      prev.includes(seatId)
+        ? prev.filter((s) => s !== seatId)
+        : [...prev, seatId]
+    );
+  }
+
+  function handleDateChange(index: number) {
+    setSelectedDate(index);
+    setSelectedSeats([]);
+  }
+
+  function handleGetTickets() {
+    // Scroll to the movie list / showtime selection
+    const movieSection = document.getElementById("movies-section");
+    movieSection?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
   return (
     <main className="shell">
-      <section className="hero">
-        <p className="eyebrow">Frontend-only design handover</p>
-        <h1>Movie Ticketing Frontend Demo</h1>
-        <p className="lede">Design a polished mocked booking UI for cinema showtime and assigned seat booking.</p>
-        <div className="actions">
-          <span>Mocked data only</span>
-          <span>No Supabase keys</span>
-          <span>Future /v1 or SDK integration</span>
-        </div>
-      </section>
+      <Header selectedDate={selectedDate} onDateChange={handleDateChange} />
 
-      <section className="workspace" aria-label="Design brief">
-        <div className="panel primary">
-          <p className="label">Target scenario</p>
-          <h2>Movie screening with screen, showtimes, and assigned seats</h2>
-          <p>
-            Replace this handover placeholder with the finished first-screen booking experience.
-            Keep it frontend-only and make the backend integration point obvious but inactive.
-          </p>
-        </div>
+      <HeroBanner movie={heroMovie} onGetTickets={handleGetTickets} />
 
-        <div className="panel">
-          <p className="label">Required UI pieces</p>
-          <ul>
-            {features.map((feature) => (
-              <li key={feature}>{feature}</li>
-            ))}
-          </ul>
+      <div id="movies-section">
+        <div className="sectionHeader">
+          <span className="sectionTab">Now Showing</span>
+          <span className="sectionTabInactive">Coming Soon</span>
         </div>
+        <div className="movieList">
+          {movies.map((movie) => (
+            <MovieCard
+              key={movie.id}
+              movie={movie}
+              isSelected={movie.id === selectedMovieId}
+              selectedShowtime={
+                movie.id === selectedMovieId ? selectedShowtime : null
+              }
+              onSelectShowtime={handleSelectShowtime}
+            />
+          ))}
+        </div>
+      </div>
 
-        <div className="panel summary">
-          <p className="label">Future integration placeholder</p>
-          <code>NEXT_PUBLIC_RESERVATION_PLATFORM_BASE_URL</code>
-          <p>
-            The final UI should call the backend branch through /v1 or @reservation-platform/sdk.
-            This demo branch should not contain backend modules or real mutation wiring yet.
-          </p>
+      <div ref={bookingRef}>
+        <p className="sectionLabel">Choose Your Seats</p>
+        <div className="bookingSection">
+          <SeatMap
+            movieId={selectedMovieId}
+            showtime={selectedShowtime}
+            selectedSeats={selectedSeats}
+            onToggleSeat={handleToggleSeat}
+          />
+          <TicketSummary
+            movie={selectedMovie}
+            showtime={selectedShowtime}
+            selectedSeats={selectedSeats}
+            dateLabel={dateLabel}
+          />
         </div>
-      </section>
+      </div>
     </main>
   );
 }

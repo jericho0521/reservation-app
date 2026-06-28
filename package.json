@@ -1,18 +1,18 @@
 {
-  "name": "reservation-platform-backend",
+  "name": "reservation-platform",
   "version": "0.1.0",
   "private": true,
   "packageManager": "pnpm@10.33.2",
-  "description": "Backend modules, API host, database bundle, contracts, and SDK for a modular booking platform.",
+  "description": "Backend modules, API host, SDK, React hooks, UI components, and examples for a modular booking platform.",
   "type": "module",
   "scripts": {
-    "dev": "corepack pnpm --filter @reservation-platform/standalone-api-skeleton run dev",
+    "dev": "node scripts/start-standalone-backend-dev.mjs",
     "dev:backend": "node scripts/start-standalone-backend-dev.mjs",
     "build": "corepack pnpm run packages:build && corepack pnpm --filter @reservation-platform/standalone-api-skeleton run build",
-    "packages:build": "corepack pnpm --filter @project-play/reservations-core run build && corepack pnpm --filter @project-play/reservation-chat-core run build && corepack pnpm --filter @reservation-platform/contract-types run build && corepack pnpm --filter @reservation-platform/ai-chat run build && corepack pnpm --filter @reservation-platform/api run build && corepack pnpm --filter @project-play/reservations-supabase run build && corepack pnpm --filter @reservation-platform/database run build && corepack pnpm --filter @reservation-platform/sdk run build",
-    "packages:test": "corepack pnpm --filter @project-play/reservations-core run test && corepack pnpm --filter @project-play/reservation-chat-core run test && corepack pnpm --filter @reservation-platform/contract-types run test && corepack pnpm --filter @reservation-platform/ai-chat run test && corepack pnpm --filter @reservation-platform/api run test && corepack pnpm --filter @project-play/reservations-supabase run test && corepack pnpm --filter @reservation-platform/database run test && corepack pnpm --filter @reservation-platform/sdk run test",
-    "packages:pack": "corepack pnpm --filter @project-play/reservations-core pack --pack-destination dist-packages && corepack pnpm --filter @project-play/reservation-chat-core pack --pack-destination dist-packages && corepack pnpm --filter @reservation-platform/ai-chat pack --pack-destination dist-packages && corepack pnpm --filter @reservation-platform/contract-types pack --pack-destination dist-packages && corepack pnpm --filter @reservation-platform/api pack --pack-destination dist-packages && corepack pnpm --filter @project-play/reservations-supabase pack --pack-destination dist-packages && corepack pnpm --filter @reservation-platform/database pack --pack-destination dist-packages && corepack pnpm --filter @reservation-platform/sdk pack --pack-destination dist-packages",
-    "packages:verify-boundaries": "node scripts/verify-sdk-package-boundary.mjs",
+    "packages:build": "corepack pnpm --filter @project-play/reservations-core run build && corepack pnpm --filter @project-play/reservation-chat-core run build && corepack pnpm --filter @reservation-platform/contract-types run build && corepack pnpm --filter @reservation-platform/ai-chat run build && corepack pnpm --filter @reservation-platform/api run build && corepack pnpm --filter @project-play/reservations-supabase run build && corepack pnpm --filter @reservation-platform/database run build && corepack pnpm --filter @reservation-platform/sdk run build && corepack pnpm --filter @reservation-platform/react run build && corepack pnpm --filter @reservation-platform/ui run build",
+    "packages:test": "corepack pnpm --filter @project-play/reservations-core run test && corepack pnpm --filter @project-play/reservation-chat-core run test && corepack pnpm --filter @reservation-platform/contract-types run test && corepack pnpm --filter @reservation-platform/ai-chat run test && corepack pnpm --filter @reservation-platform/api run test && corepack pnpm --filter @project-play/reservations-supabase run test && corepack pnpm --filter @reservation-platform/database run test && corepack pnpm --filter @reservation-platform/sdk run test && corepack pnpm --filter @reservation-platform/react run test && corepack pnpm --filter @reservation-platform/ui run test",
+    "packages:pack": "corepack pnpm --filter @project-play/reservations-core pack --pack-destination dist-packages && corepack pnpm --filter @project-play/reservation-chat-core pack --pack-destination dist-packages && corepack pnpm --filter @reservation-platform/ai-chat pack --pack-destination dist-packages && corepack pnpm --filter @reservation-platform/contract-types pack --pack-destination dist-packages && corepack pnpm --filter @reservation-platform/api pack --pack-destination dist-packages && corepack pnpm --filter @project-play/reservations-supabase pack --pack-destination dist-packages && corepack pnpm --filter @reservation-platform/database pack --pack-destination dist-packages && corepack pnpm --filter @reservation-platform/sdk pack --pack-destination dist-packages && corepack pnpm --filter @reservation-platform/react pack --pack-destination dist-packages && corepack pnpm --filter @reservation-platform/ui pack --pack-destination dist-packages",
+    "packages:verify-boundaries": "node scripts/verify-sdk-package-boundary.mjs && node scripts/verify-frontend-package-boundary.mjs",
     "database:migration-index:generate": "node scripts/generate-database-migration-index.mjs",
     "database:migration-index:check": "node scripts/generate-database-migration-index.mjs --check",
     "database:verify-migration-bundle": "corepack pnpm run database:migration-index:check && node scripts/verify-database-migration-bundle.mjs",
@@ -54,10 +54,5 @@
     "dotenv": "^17.2.3",
     "tsx": "^4.21.0",
     "typescript": "^5"
-  },
-  "pnpm": {
-    "overrides": {
-      "zod": "^3.24.0"
-    }
   }
 }

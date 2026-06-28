@@ -1,0 +1,37 @@
+{
+  "name": "@reservation-platform/ui",
+  "version": "0.1.0",
+  "description": "Reusable Tailwind booking UI components for the Reservation Platform.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./styles.css": "./styles.css"
+  },
+  "files": [
+    "dist",
+    "styles.css",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "node --import tsx --test src/*.test.tsx"
+  },
+  "dependencies": {
+    "@reservation-platform/contract-types": "workspace:^",
+    "@reservation-platform/react": "workspace:^"
+  },
+  "peerDependencies": {
+    "react": ">=18"
+  },
+  "devDependencies": {
+    "@types/react": "^19",
+    "tsx": "^4.21.0",
+    "typescript": "^5"
+  }
+}

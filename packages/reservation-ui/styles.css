@@ -1,0 +1,340 @@
+.rp-shell {
+  box-sizing: border-box;
+  width: min(100%, 72rem);
+  margin-inline: auto;
+  border: 1px solid #111827;
+  background: #ffffff;
+  color: #0f172a;
+  padding: clamp(1rem, 2vw, 2rem);
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+.rp-shell button,
+.rp-shell input {
+  font: inherit;
+}
+
+.rp-shell *,
+.rp-shell *::before,
+.rp-shell *::after {
+  box-sizing: border-box;
+}
+
+.rp-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding-bottom: 1.5rem;
+  margin-bottom: 2rem;
+  border-bottom: 1px solid currentColor;
+}
+
+.rp-kicker-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.rp-live-dot {
+  display: inline-block;
+  width: 0.4rem;
+  height: 0.4rem;
+  background: #dc2626;
+}
+
+.rp-kicker,
+.rp-description,
+.rp-shell label,
+.rp-shell dt,
+.rp-shell dd {
+  margin: 0;
+}
+
+.rp-kicker {
+  color: #64748b;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.rp-title {
+  margin: 0.25rem 0 0;
+  font-size: clamp(1.75rem, 4vw, 3rem);
+  line-height: 0.95;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.rp-description {
+  max-width: 65ch;
+  color: #64748b;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.rp-service-ref {
+  color: #94a3b8;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.rp-layout {
+  display: grid;
+  gap: 2rem;
+}
+
+.rp-main,
+.rp-sidebar {
+  display: grid;
+  align-content: start;
+  gap: 1.5rem;
+}
+
+.rp-field,
+.rp-customer-form,
+.rp-service-picker {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.rp-field-label,
+.rp-input-label-text,
+.rp-summary-title,
+.rp-summary-label,
+.rp-status-kicker {
+  color: #64748b;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.rp-panel {
+  border: 1px solid #111827;
+  background: #f8fafc;
+  padding: 1rem;
+}
+
+.rp-service-card,
+.rp-slot,
+.rp-resource {
+  display: flex;
+  min-height: 4rem;
+  flex-direction: column;
+  justify-content: space-between;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #0f172a;
+  padding: 0.75rem;
+  text-align: left;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  transition: border-color 150ms ease, background 150ms ease, color 150ms ease;
+}
+
+.rp-service-card {
+  gap: 0.5rem;
+  padding: 1rem;
+}
+
+.rp-service-card:hover,
+.rp-slot-available:hover,
+.rp-resource-available:hover {
+  border-color: #111827;
+}
+
+.rp-service-card-header,
+.rp-summary-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.rp-service-card-title {
+  font-size: 1rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.rp-service-card-duration,
+.rp-service-card-description,
+.rp-service-card-action,
+.rp-slot-meta,
+.rp-resource-meta,
+.rp-status-id {
+  font-size: 0.68rem;
+}
+
+.rp-service-card-description {
+  color: #64748b;
+  line-height: 1.5;
+}
+
+.rp-service-card-action,
+.rp-slot-time,
+.rp-resource-label {
+  font-weight: 800;
+}
+
+.rp-input {
+  width: 100%;
+  min-height: 2.5rem;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #0f172a;
+  padding: 0.5rem 0.75rem;
+  font: inherit;
+}
+
+.rp-input:focus,
+.rp-service-card:focus,
+.rp-slot:focus,
+.rp-resource:focus,
+.rp-button:focus {
+  outline: 2px solid #111827;
+  outline-offset: 2px;
+}
+
+.rp-button {
+  width: 100%;
+  border: 1px solid #111827;
+  background: #111827;
+  color: #ffffff;
+  padding: 0.75rem 1rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.rp-button:not(:disabled):hover {
+  background: #334155;
+}
+
+.rp-button-disabled {
+  border-color: #cbd5e1;
+  background: #e2e8f0;
+  color: #64748b;
+  cursor: not-allowed;
+}
+
+.rp-selected,
+.rp-slot-selected,
+.rp-resource-selected {
+  border-color: #111827;
+  background: #111827;
+  color: #ffffff;
+}
+
+.rp-slot-disabled,
+.rp-resource-disabled {
+  border-color: #e2e8f0;
+  background: #f8fafc;
+  color: #94a3b8;
+  cursor: not-allowed;
+}
+
+.rp-empty-state {
+  border: 1px dashed #cbd5e1;
+  padding: 1.5rem;
+  color: #64748b;
+  text-align: center;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 0.78rem;
+}
+
+.rp-slot-grid,
+.rp-resource-grid,
+.rp-customer-grid,
+.rp-summary-list {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.rp-slot-grid,
+.rp-resource-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.rp-customer-grid {
+  gap: 1rem;
+}
+
+.rp-input-label {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.rp-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.rp-summary-title {
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.rp-summary-row {
+  padding-bottom: 0.4rem;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.rp-summary-value {
+  text-align: right;
+  font-size: 0.88rem;
+  font-weight: 700;
+}
+
+.rp-summary-value-code {
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+}
+
+.rp-success,
+.rp-error {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.rp-status-text {
+  margin: 0;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.rp-status-id {
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  opacity: 0.85;
+}
+
+@media (min-width: 768px) {
+  .rp-layout {
+    grid-template-columns: minmax(0, 1.5fr) minmax(18rem, 1fr);
+  }
+
+  .rp-main {
+    padding-right: 2rem;
+    border-right: 1px solid #e2e8f0;
+  }
+
+  .rp-slot-grid,
+  .rp-resource-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .rp-customer-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .rp-input-label-wide {
+    grid-column: 1 / -1;
+  }
+}

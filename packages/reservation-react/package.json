@@ -1,15 +1,10 @@
 {
-  "name": "@reservation-platform/sdk",
+  "name": "@reservation-platform/react",
   "version": "0.1.0",
-  "description": "Frontend-safe TypeScript client for the reservation platform API.",
+  "description": "Headless React provider and hooks for the reservation platform.",
   "type": "module",
   "license": "UNLICENSED",
   "author": "Project Play maintainers",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/jericho0521/reservation-app.git",
-    "directory": "packages/sdk"
-  },
   "files": [
     "dist",
     "README.md"
@@ -30,9 +25,15 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@reservation-platform/contract-types": "workspace:^"
+    "@reservation-platform/contract-types": "workspace:^",
+    "@reservation-platform/sdk": "workspace:^"
+  },
+  "peerDependencies": {
+    "react": ">=18"
   },
   "devDependencies": {
+    "@types/react": "^19",
+    "react": "^19.2.3",
     "tsx": "^4.21.0",
     "typescript": "^5"
   }

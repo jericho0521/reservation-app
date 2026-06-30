@@ -31,6 +31,7 @@ flowchart LR
   API --> Adapter["Supabase/Postgres adapter"]
   Adapter --> Database["Postgres database"]
   API --> Chat["Optional AI chat module"]
+  API --> WhatsApp["Optional WhatsApp channel module"]
 ```
 
 ## What Lives In This Branch
@@ -46,7 +47,9 @@ flowchart LR
 | `packages/sdk` | TypeScript client package for external frontend and server consumers. |
 | `packages/reservation-react` | Headless React provider and booking hooks. |
 | `packages/reservation-ui` | Tailwind-ready booking components built on the React hooks. |
-| `packages/ai-chat` | Optional backend AI chat module scaffold. |
+| `packages/ai-chat` | Optional provider-neutral AI workflow and agent runtime package. |
+| `packages/reservation-chat-core` | Core reservation chat workflow contracts and helpers. |
+| `packages/whatsapp` | Optional backend WhatsApp channel module with QR session mode, knowledge/config storage, and AI booking automation. |
 | `apps/examples/starter-next` | Minimal forkable Next.js starter using the frontend packages. |
 | `apps/examples/room-booking` | Room booking example using the shared booking UI. |
 | `apps/examples/racing-simulator` | Racing simulator example using the shared booking UI. |
@@ -114,6 +117,7 @@ The backend exposes platform routes under `/v1`, including:
 - `/v1/reservations`
 - `/v1/resource-maintenance`
 - `/v1/chat/*` when the optional chat module is enabled
+- `/v1/channels/whatsapp/*` when the optional WhatsApp module is enabled
 
 ## Start A Frontend Example
 
@@ -189,6 +193,32 @@ RESERVATION_PLATFORM_AUTH_AUDIENCE=
 Do not expose backend secrets through `NEXT_PUBLIC_*` variables. A frontend can
 know the backend URL; it should not know the Supabase service-role key.
 
+Optional provider-neutral AI agent env for backend automation:
+
+```powershell
+AI_AGENT_PROVIDER=openai-compatible
+AI_AGENT_BASE_URL=
+AI_AGENT_API_KEY=
+AI_AGENT_MODEL=
+```
+
+Optional WhatsApp channel env:
+
+```powershell
+RESERVATION_WHATSAPP_ENABLED=false
+RESERVATION_WHATSAPP_PROVIDER=session_qr
+RESERVATION_WHATSAPP_SESSION_AUTH_DIR=.reservation-whatsapp-sessions
+RESERVATION_WHATSAPP_SESSION_ENCRYPTION_KEY=
+RESERVATION_WHATSAPP_ALLOW_MEMORY_STORE=false
+RESERVATION_WHATSAPP_SIMULATION_ENABLED=false
+```
+
+`session_qr` is a self-hosted WhatsApp linked-device mode. Production WhatsApp
+automation should use Supabase/Postgres storage and a protected persistent
+session auth directory. `RESERVATION_WHATSAPP_ALLOW_MEMORY_STORE=true` and
+`RESERVATION_WHATSAPP_SIMULATION_ENABLED=true` are local development/testing
+helpers, not production defaults.
+
 ## Verification
 
 Build all backend modules:
@@ -224,6 +254,43 @@ These are safe local checks. They validate backend source boundaries, extraction
 metadata, package contents, database migration metadata, and generated SDK
 release docs.
 
+Smoke and e2e checks now live under `tests/`:
+
+```text
+tests/
+  smoke/
+    backend-health.smoke.ts
+    backend-reservation.smoke.ts
+    whatsapp-readiness.smoke.ts
+  e2e/
+    examples-room-booking.e2e.ts
+```
+
+Run backend smoke checks against a running backend:
+
+```powershell
+$env:RESERVATION_SMOKE_BACKEND_BASE_URL="http://localhost:4100"
+corepack pnpm run test:smoke
+```
+
+Safe when pointed at a local or disposable backend. The current smoke tests are
+read-only: health, metadata, services, availability, and WhatsApp readiness.
+If the backend requires service-token auth, also set `RESERVATION_SMOKE_API_KEY`.
+When no backend URL is explicitly configured and `localhost:4100` is not
+running, the smoke tests skip safely. Set `RESERVATION_SMOKE_STRICT=1` when CI
+should fail instead of skip.
+
+Run the room-booking example e2e readiness check:
+
+```powershell
+corepack pnpm run test:e2e
+```
+
+Safe locally. Without `ROOM_BOOKING_E2E_BASE_URL`, it verifies the example app is
+wired to `@reservation-platform/react`, `@reservation-platform/ui`, and public
+backend env config. With `ROOM_BOOKING_E2E_BASE_URL`, it also performs a
+read-only page request.
+
 Live proof scripts such as `database:live-proof:strict`,
 `backend-platform:db-backed-live-parity-proof:strict`, and
 `sdk:registry-install-proof:strict` are opt-in because they may require Docker,
@@ -231,15 +298,18 @@ database access, registry configuration, or external services.
 
 ## Branch Strategy
 
-This branch, `platform/backend-modules`, should contain backend platform code
-only. Frontend work should happen in a separate consumer branch or repository.
+This branch, `platform/frontend-backend-modules`, contains the modular platform
+monorepo direction: backend modules, frontend packages, SDK, database bundle,
+API host, and forkable example apps.
 
 For a final-year-project submission, the clean story is:
 
-1. This repository branch demonstrates the reusable backend platform.
-2. Separate frontend consumers demonstrate that different UIs can reuse the same
-   backend contract.
-3. The SDK and `/v1` API are the integration points between them.
+1. Backend modules provide the reusable reservation infrastructure.
+2. Frontend packages provide a WordPress-like starting point for new booking
+   apps without copying booking logic.
+3. Forkable examples demonstrate that different UIs can reuse the same backend
+   contract and frontend packages.
+4. The SDK, React hooks, UI package, and `/v1` API are the integration points.
 
 ## Current Status
 
@@ -247,4 +317,7 @@ For a final-year-project submission, the clean story is:
 - Standalone API skeleton is present under `apps/api`.
 - Database migration package and migration metadata are present.
 - SDK and contract packages are present for external consumers.
-- Frontend implementation has been removed from this branch by design.
+- React hooks and reusable UI packages are present for frontend consumers.
+- Forkable frontend examples are present under `apps/examples`.
+- Optional AI chat and WhatsApp backend modules are present, with production
+  WhatsApp requiring database-backed storage and real provider/session config.

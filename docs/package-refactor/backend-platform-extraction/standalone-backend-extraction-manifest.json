@@ -180,11 +180,11 @@
     {
       "id": "backend-operations-supabase-smoke",
       "classification": "copy-candidate",
-      "currentPaths": ["scripts/vercel-sandbox-supabase.ts", "scripts/start-local-supabase.ps1", "scripts/stop-local-supabase.ps1"],
+      "currentPaths": ["scripts/start-local-supabase.ps1", "scripts/stop-local-supabase.ps1"],
       "targetBackendPaths": ["scripts"],
       "ownershipCategory": "operations",
       "status": "requires-generalization",
-      "rationale": "Database bootstrap and smoke helpers are backend operations candidates once environment names and current-app assumptions are generalized."
+      "rationale": "Local Supabase lifecycle helpers are backend operations candidates once environment names and current-app assumptions are generalized."
     },
     {
       "id": "backend-root-verifier-scripts",

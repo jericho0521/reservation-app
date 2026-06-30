@@ -396,7 +396,6 @@ as backend platform routes that call `packages/domain`, `packages/database`,
 | `supabase/create-reservation-atomic.sql` | `packages/database/migrations/supabase/**` | Reconcile with package SQL so one canonical atomic create workflow exists. |
 | `supabase/security-hardening.sql` | `packages/database/migrations/supabase/**` | Move applicable backend security hardening after scope review. |
 | `supabase/knowledge.sql`, `supabase/langchain.sql` | `packages/database/migrations/supabase/**` for optional retrieval only | Move only scoped structured retrieval assets; not Project Play content. |
-| `scripts/vercel-sandbox-supabase.ts` | `scripts/smoke-database.ts` or `scripts/bootstrap-supabase.ts` | Move only after generalizing environment names and app assumptions. |
 | `scripts/start-local-supabase.ps1`, `scripts/stop-local-supabase.ps1` | `scripts/` | Move only if the backend repo standardizes local Supabase operations. |
 
 ## Files That Should Not Move
@@ -418,9 +417,7 @@ as backend platform routes that call `packages/domain`, `packages/database`,
 | `supabase/sales-reports.sql` | Reporting/analytics schema outside platform core unless reports are scoped later. |
 | `types/index.ts` | Current frontend compatibility type bridge. Future frontends should consume generated/API SDK types. |
 | `lib/supabase.ts`, `lib/supabase-admin.ts`, `lib/supabase-browser.ts`, `lib/supabase-server.ts` | Current app Supabase client construction and frontend/admin auth helpers. The backend repo needs its own environment-specific clients. |
-| `scripts/pr.mjs` | PR helper for this frontend repository. |
 | `scripts/seed-knowledge.ts` | Project Play knowledge seeding. Backend platform may have tenant knowledge import tooling later, but not this app-specific script. |
-| `scripts/vercel-sandbox-smoke.ts`, `scripts/vercel-sandbox-docker-smoke.ts`, `scripts/vercel-sandbox-utils.ts` | App/sandbox smoke scaffolding unless explicitly generalized for backend platform operations. |
 
 ## Current App Consumption During Migration
 

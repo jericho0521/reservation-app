@@ -92,7 +92,7 @@ directions, brand wording, help text, or local marketing content.
 | AI booking chat contracts | `packages/ai-chat/src/**`, with `packages/reservation-chat-core/src/**`, `lib/langchain/chat-agent.ts`, and `app/api/chat/tool-loop.ts` as migration/reference context | Platform owns provider-neutral serializable chat messages/actions, tool/workflow interfaces, retrieval/checkpoint/audit ports, tenant config, and eventual reservation tool orchestration. `packages/reservation-chat-core` informs compatibility migration but is not the backend-owned optional chat package target. Provider-specific and UI-specific parts stay outside core. |
 | Chat-backed reservation flow | `app/api/chat/route.ts`, `lib/langchain/chat-agent.ts`, backend-facing policy/knowledge retrieval currently surfaced through `lib/knowledge.ts` | Platform should provide API/SDK orchestration for booking chat and may own structured policy/knowledge retrieval used by backend AI tools. Host owns model provider credentials, knowledge source configuration, venue copy, editorial knowledge, and final UI confirmation rendering. |
 | Database migrations and schemas | `packages/reservations-supabase/sql/**`, root `supabase/*.sql` reservation/schema assets, Supabase table/RPC assumptions | Platform owns migrations for `services`, `bookings`, `reservation_items`, `reservable_resources`, `resource_layouts`, resource maintenance, availability rules, RLS/security policies, and atomic RPCs. Phase 5 must reconcile both root Supabase SQL assets and package SQL assets into one backend-owned migration set. |
-| Backend observability and operations | `scripts/vercel-sandbox-supabase.ts`, package READMEs | Platform repo should own backend deployment, SQL bootstrap, smoke tests, and operations docs. Current scripts may be candidates if generalized. |
+| Backend observability and operations | `scripts/start-local-supabase.ps1`, `scripts/stop-local-supabase.ps1`, package READMEs | Platform repo should own backend deployment, SQL bootstrap, smoke tests, and operations docs. Current scripts may be candidates if generalized. |
 
 ## Frontend-Owned Behavior
 
@@ -150,7 +150,6 @@ into platform APIs or adapters rather than moved verbatim.
 | `lib/langchain/prompts.ts` | Prompt builders | Split generic prompt sections into chat platform; host copy stays config. |
 | `lib/langchain/vector-store.ts` | Knowledge retrieval adapter | Candidate only as optional Supabase vector-store adapter; table/RPC names must be config. |
 | `lib/knowledge.ts` backend-facing retrieval path | Structured policy/knowledge retrieval facade | Split before moving: backend-owned only for tenant-configurable retrieval used by AI tools. Brand copy, editorial content, and venue-specific facts remain frontend/content-owned. |
-| `scripts/vercel-sandbox-supabase.ts` | Backend database smoke/bootstrap helper | Candidate for platform operations if generalized and kept free of app-only assumptions. |
 | `scripts/start-local-supabase.ps1`, `scripts/stop-local-supabase.ps1` | Local Supabase operations | Candidate only if platform repo standardizes local Supabase operations. |
 
 ## Current Frontend-Owned Files
@@ -174,9 +173,7 @@ They are not backend platform source.
 | `supabase/sales-reports.sql` | Reporting/analytics schema. Keep outside reservation platform core unless backend analytics becomes an explicit platform module. |
 | `types/index.ts` | Current frontend type bridge and compatibility aliases. Future frontends consume generated/API SDK types instead. |
 | `lib/supabase.ts`, `lib/supabase-admin.ts`, `lib/supabase-browser.ts`, `lib/supabase-server.ts` | Current app's Supabase client construction and auth helpers. Platform repo should have its own environment and client factories. |
-| `scripts/pr.mjs` | Repository PR helper for this app. |
 | `scripts/seed-knowledge.ts` | Project Play knowledge seeding. Candidate only for host/tenant operations, not generic platform core. |
-| `scripts/vercel-sandbox-smoke.ts`, `scripts/vercel-sandbox-docker-smoke.ts`, `scripts/vercel-sandbox-utils.ts` | App/sandbox smoke scaffolding unless generalized for backend platform ops. |
 
 ## Shared Contracts
 

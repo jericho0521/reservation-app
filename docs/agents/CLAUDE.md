@@ -11,7 +11,6 @@ pnpm dev          # Dev server on http://localhost:4000
 pnpm build        # Production build
 pnpm lint         # ESLint (Next.js core web vitals + TypeScript rules)
 pnpm test         # Node built-in test runner via tsx
-pnpm pr           # Push branch + open PR via scripts/pr.mjs
 pnpm seed:knowledge   # Re-embed data/knowledge.md into pgvector
 pnpm local:supabase:start  # Start local Supabase (PowerShell)
 pnpm local:supabase:stop   # Stop local Supabase

@@ -93,6 +93,14 @@
       "scope": "reservation-platform",
       "sha256": "4a3c7a2afcab9aa3ab4fceb0d43d51a538f1a655f6c66673d9f9a57f5581fdcc",
       "bytes": 5463
+    },
+    {
+      "order": 12,
+      "path": "packages/database/migrations/supabase/000012_whatsapp_business_agent.sql",
+      "module": "core",
+      "scope": "reservation-platform",
+      "sha256": "f522cba6dfb583d87474d40f1001877eba5932efa4a53dee392dc6104035324f",
+      "bytes": 5183
     }
   ],
   "optionalMigrations": [

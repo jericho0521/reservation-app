@@ -133,6 +133,17 @@
       ]
     },
     {
+      "kind": "core-migration",
+      "order": 12,
+      "targetPath": "packages/database/migrations/supabase/000012_whatsapp_business_agent.sql",
+      "sourceAssets": [
+        {
+          "path": "packages/database/migrations/supabase/000012_whatsapp_business_agent.sql",
+          "section": "WhatsApp business agent sessions, config, knowledge, conversations, and messages"
+        }
+      ]
+    },
+    {
       "kind": "optional-ai-retrieval",
       "targetPath": "packages/database/migrations/supabase/optional/ai-retrieval/000001_knowledge_chunks.sql",
       "sourceAssets": [

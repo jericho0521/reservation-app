@@ -9,7 +9,7 @@ import {
 
 const indexPath = new URL("../migrations/supabase/migration-index.json", import.meta.url);
 
-test("core plan includes exactly 000001 through 000011 in order", async () => {
+test("core plan includes exactly 000001 through 000012 in order", async () => {
   const index = await readActualIndex();
   const plan = buildSupabaseMigrationPlan(index);
 
@@ -27,9 +27,10 @@ test("core plan includes exactly 000001 through 000011 in order", async () => {
       "000009",
       "000010",
       "000011",
+      "000012",
     ],
   );
-  assert.equal(plan.migrations.length, 11);
+  assert.equal(plan.migrations.length, 12);
   assert.equal(plan.seeds.length, 0);
 });
 
@@ -46,7 +47,7 @@ test("AI retrieval option appends optional AI retrieval migrations after core mi
   const plan = buildSupabaseMigrationPlan(index, { includeAiRetrieval: true });
 
   assert.deepEqual(
-    plan.migrations.slice(11).map((entry) => entry.path),
+    plan.migrations.slice(12).map((entry) => entry.path),
     [
       "packages/database/migrations/supabase/optional/ai-retrieval/000001_knowledge_chunks.sql",
       "packages/database/migrations/supabase/optional/ai-retrieval/000002_langchain_checkpoints.sql",

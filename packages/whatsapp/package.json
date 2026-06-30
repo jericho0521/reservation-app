@@ -1,0 +1,50 @@
+{
+  "name": "@reservation-platform/whatsapp",
+  "version": "0.0.0",
+  "description": "Backend-only WhatsApp channel integration contracts and self-hosted QR session lifecycle for the reservation platform.",
+  "private": true,
+  "type": "module",
+  "license": "UNLICENSED",
+  "author": "Reservation Platform maintainers",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jericho0521/reservation-app.git",
+    "directory": "packages/whatsapp"
+  },
+  "keywords": [
+    "reservations",
+    "booking",
+    "whatsapp",
+    "backend",
+    "typescript"
+  ],
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "prepack": "corepack pnpm run build",
+    "test": "tsc -p tsconfig.build.json && node --import tsx --test \"src/**/*.test.ts\"",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@reservation-platform/ai-chat": "workspace:*",
+    "@reservation-platform/contract-types": "workspace:*",
+    "@whiskeysockets/baileys": "7.0.0-rc13",
+    "qrcode-terminal": "^0.12.0"
+  },
+  "devDependencies": {
+    "tsx": "^4.21.0",
+    "typescript": "^5"
+  }
+}

@@ -136,6 +136,16 @@
       "notes": [
         "Backend-owned durable idempotency table and RPC shape for tenant-scoped claim/store semantics. This is a planning asset only until live route wiring and disposable database proof are completed."
       ]
+    },
+    {
+      "path": "packages/database/migrations/supabase/000012_whatsapp_business_agent.sql",
+      "classification": "core-platform",
+      "intendedBackendDestination": [
+        "packages/database/migrations/supabase/000012_whatsapp_business_agent.sql"
+      ],
+      "notes": [
+        "Backend-owned WhatsApp business agent tables for self-hosted session QR state, business config, text knowledge, conversations, and message audit."
+      ]
     }
   ]
 }

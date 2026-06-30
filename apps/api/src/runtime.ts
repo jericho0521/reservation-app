@@ -1,4 +1,15 @@
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
+import type { MetadataRecord } from "@reservation-platform/contract-types";
+import {
+  createReservation,
+  getPlatformService,
+  listAvailability,
+  listPlatformServices,
+  prepareLegacyReservationCreate,
+  type AvailabilityRepositoryPort,
+  type PlatformCatalogRepository,
+  type ReservationCreateRepositoryPort,
+} from "@reservation-platform/api";
 import {
   createSupabaseAvailabilityRepository,
   createSupabaseIdempotencyRepository,
@@ -9,6 +20,17 @@ import {
   createSupabaseResourceMaintenanceRepository,
   createSupabaseTenantVenueRepository,
 } from "@project-play/reservations-supabase";
+import {
+  BaileysWhatsAppSessionAdapter,
+  createWhatsAppBookingAutomationResponder,
+  createWhatsAppBusinessModuleFromEnv,
+  createWhatsAppAgentRuntimeFromEnv,
+  InMemoryWhatsAppModuleStore,
+  SupabaseWhatsAppModuleStore,
+  type SupabaseWhatsAppClient,
+  type WhatsAppReservationTools,
+  type WhatsAppModuleStore,
+} from "@reservation-platform/whatsapp";
 
 import { createStandaloneJwtJwksBearerTokenVerifier } from "./jwt-verifier.js";
 import type { StandaloneApiDependencies } from "./routes.js";
@@ -30,6 +52,11 @@ export const STANDALONE_SUPABASE_ENV_NAMES = {
   authRolesClaim: "RESERVATION_PLATFORM_AUTH_ROLES_CLAIM",
   authScopesClaim: "RESERVATION_PLATFORM_AUTH_SCOPES_CLAIM",
   corsAllowedOrigins: "RESERVATION_PLATFORM_CORS_ALLOWED_ORIGINS",
+  whatsappEnabled: "RESERVATION_WHATSAPP_ENABLED",
+  whatsappProvider: "RESERVATION_WHATSAPP_PROVIDER",
+  whatsappSessionAuthDir: "RESERVATION_WHATSAPP_SESSION_AUTH_DIR",
+  whatsappSessionEncryptionKey: "RESERVATION_WHATSAPP_SESSION_ENCRYPTION_KEY",
+  whatsappAllowMemoryStore: "RESERVATION_WHATSAPP_ALLOW_MEMORY_STORE",
 } as const;
 
 export interface StandaloneSupabaseConfig {
@@ -56,6 +83,16 @@ export interface StandaloneSupabaseEnv extends Record<string, string | undefined
   RESERVATION_PLATFORM_AUTH_ROLES_CLAIM?: string;
   RESERVATION_PLATFORM_AUTH_SCOPES_CLAIM?: string;
   RESERVATION_PLATFORM_CORS_ALLOWED_ORIGINS?: string;
+  RESERVATION_WHATSAPP_ENABLED?: string;
+  RESERVATION_WHATSAPP_PROVIDER?: string;
+  RESERVATION_WHATSAPP_SESSION_AUTH_DIR?: string;
+  RESERVATION_WHATSAPP_SESSION_ENCRYPTION_KEY?: string;
+  RESERVATION_WHATSAPP_ALLOW_MEMORY_STORE?: string;
+  AI_AGENT_PROVIDER?: string;
+  AI_AGENT_BASE_URL?: string;
+  AI_AGENT_API_KEY?: string;
+  AI_AGENT_MODEL?: string;
+  RESERVATION_WHATSAPP_SIMULATION_ENABLED?: string;
 }
 
 export interface StandaloneSupabaseClient {
@@ -164,9 +201,7 @@ export function createStandaloneSupabaseDependencies(
   );
   const publicAdminClients = { publicClient, adminClient };
   const authDependencies = standaloneServiceAuthDependenciesFromConfig(normalizedConfig);
-
-  return {
-    ...authDependencies,
+  const platformDependencies = {
     catalogRepository: repositoryFactories.createCatalogRepository(publicAdminClients),
     availabilityRepository: repositoryFactories.createAvailabilityRepository(publicAdminClients),
     reservationReadRepository: repositoryFactories.createReservationReadRepository(adminClient),
@@ -175,6 +210,11 @@ export function createStandaloneSupabaseDependencies(
     resourceMaintenanceRepository: repositoryFactories.createResourceMaintenanceRepository(adminClient),
     idempotencyRepository: repositoryFactories.createIdempotencyRepository(adminClient),
     tenantVenueRepository: repositoryFactories.createTenantVenueRepository(adminClient),
+  };
+
+  return {
+    ...authDependencies,
+    ...platformDependencies,
   };
 }
 
@@ -187,12 +227,17 @@ export function createStandaloneSupabaseDependenciesFromEnv(
   const authDependencies = standaloneAuthDependenciesFromEnv(env, normalizedConfig.serviceApiKey, options);
 
   if (!hasAnyStandaloneSupabaseConfig(config)) {
-    return authDependencies;
+    return {
+      ...authDependencies,
+      ...standaloneWhatsAppDependenciesFromEnv(env, options),
+    };
   }
 
+  const supabaseDependencies = createStandaloneSupabaseDependencies(config, options);
   return {
-    ...createStandaloneSupabaseDependencies(config, options),
+    ...supabaseDependencies,
     ...authDependencies,
+    ...standaloneWhatsAppDependenciesFromEnv(env, options, normalizedConfig, supabaseDependencies),
   };
 }
 
@@ -209,6 +254,169 @@ export function createStandaloneCorsOptionsFromEnv(env: StandaloneSupabaseEnv = 
   return {
     allowedOrigins: splitEnvList(env.RESERVATION_PLATFORM_CORS_ALLOWED_ORIGINS),
   };
+}
+
+export function standaloneWhatsAppDependenciesFromEnv(
+  env: StandaloneSupabaseEnv = process.env,
+  options: StandaloneSupabaseRuntimeOptions = {},
+  config?: Required<StandaloneSupabaseConfig>,
+  platformDependencies: Pick<StandaloneApiDependencies, "availabilityRepository" | "catalogRepository" | "reservationCreateRepository"> = {},
+): Pick<StandaloneApiDependencies, "whatsappModule"> {
+  if (!isEnabledEnv(env.RESERVATION_WHATSAPP_ENABLED)) {
+    return {};
+  }
+
+  const provider = env.RESERVATION_WHATSAPP_PROVIDER;
+  const sessionEncryptionKey = env.RESERVATION_WHATSAPP_SESSION_ENCRYPTION_KEY;
+  const allowMemoryStore = isEnabledEnv(env.RESERVATION_WHATSAPP_ALLOW_MEMORY_STORE);
+  if (!config && !allowMemoryStore) {
+    throw new StandaloneSupabaseConfigError([
+      STANDALONE_SUPABASE_ENV_NAMES.url,
+      STANDALONE_SUPABASE_ENV_NAMES.anonKey,
+      STANDALONE_SUPABASE_ENV_NAMES.serviceRoleKey,
+    ]);
+  }
+
+  const createClient = options.createClient ?? defaultStandaloneSupabaseClientFactory;
+  const store: WhatsAppModuleStore = config
+    ? new SupabaseWhatsAppModuleStore(createClient(
+        config.supabaseUrl,
+        config.supabaseServiceRoleKey,
+        standaloneSupabaseClientOptions,
+      ) as unknown as SupabaseWhatsAppClient)
+    : new InMemoryWhatsAppModuleStore();
+  let service: ReturnType<typeof createWhatsAppBusinessModuleFromEnv>;
+  const sessionAdapter = provider === "meta_cloud"
+    ? undefined
+    : new BaileysWhatsAppSessionAdapter({
+        authDirectory: env.RESERVATION_WHATSAPP_SESSION_AUTH_DIR?.trim() || ".reservation-whatsapp-sessions",
+        onInboundMessage: async (message) => {
+          await service.handleInboundMessage(message);
+        },
+        onStatusChange: (status, metadata) => updateWhatsAppSessionConnectionStatus(store, status, metadata),
+      });
+  void sessionEncryptionKey;
+  const agentRuntime = createWhatsAppAgentRuntimeFromEnv(env, { fetch: options.fetch });
+  const reservationTools = platformDependencies.catalogRepository &&
+      platformDependencies.availabilityRepository &&
+      platformDependencies.reservationCreateRepository
+    ? createWhatsAppReservationTools(platformDependencies as {
+        catalogRepository: PlatformCatalogRepository;
+        availabilityRepository: AvailabilityRepositoryPort;
+        reservationCreateRepository: ReservationCreateRepositoryPort;
+      })
+    : undefined;
+  service = createWhatsAppBusinessModuleFromEnv({
+    ...env,
+    RESERVATION_WHATSAPP_PROVIDER: provider,
+  }, {
+    responder: createWhatsAppBookingAutomationResponder({
+      agentRuntime,
+      reservationTools,
+      readiness: {
+        databaseReady: Boolean(config),
+        providerReady: Boolean(agentRuntime),
+      },
+    }),
+    sessionAdapter,
+    store,
+  });
+  return {
+    whatsappModule: {
+      startSession: (input) => service.startSession(input),
+      sessionStatus: () => service.sessionStatus(),
+      sessionQr: () => service.sessionQr(),
+      logoutSession: () => service.logoutSession(),
+      getConfig: () => service.getConfig(),
+      updateConfig: (input) => service.updateConfig(input),
+      listKnowledge: () => service.listKnowledge(),
+      createKnowledge: (input) => service.createKnowledge(input),
+      updateKnowledge: (knowledgeId, input) => service.updateKnowledge(knowledgeId, input),
+      deleteKnowledge: (knowledgeId) => service.deleteKnowledge(knowledgeId),
+      listConversations: () => service.listConversations(),
+      listConversationMessages: (conversationId) => service.listConversationMessages(conversationId),
+      handleInboundMessage: (input) => {
+        if (!isEnabledEnv(env.RESERVATION_WHATSAPP_SIMULATION_ENABLED)) {
+          const error = new Error("WhatsApp inbound simulation is disabled.");
+          error.name = "WhatsAppSimulationDisabledError";
+          throw error;
+        }
+        return service.handleInboundMessage(input);
+      },
+      readiness: async () => ({
+        database_ready: Boolean(config),
+        provider_ready: Boolean(agentRuntime),
+        reservation_tools_ready: Boolean(reservationTools),
+        simulation_enabled: isEnabledEnv(env.RESERVATION_WHATSAPP_SIMULATION_ENABLED),
+      }),
+    },
+  };
+}
+
+function createWhatsAppReservationTools(input: {
+  catalogRepository: PlatformCatalogRepository;
+  availabilityRepository: AvailabilityRepositoryPort;
+  reservationCreateRepository: ReservationCreateRepositoryPort;
+}): WhatsAppReservationTools {
+  return {
+    async listServices() {
+      const result = await listPlatformServices(input.catalogRepository);
+      return "services" in result.body ? result.body.services : [];
+    },
+    async getService(serviceId) {
+      const result = await getPlatformService(input.catalogRepository, serviceId);
+      return "service_id" in result.body ? result.body : undefined;
+    },
+    async checkAvailability({ serviceId, date }) {
+      const result = await listAvailability({
+        repository: input.availabilityRepository,
+        query: new URLSearchParams({ service_id: serviceId, date }),
+      });
+      if (!("slots" in result.body)) {
+        throw new Error(result.body.error.message);
+      }
+      return result.body;
+    },
+    async createReservation(reservation) {
+      const legacy = prepareLegacyReservationCreate(reservation);
+      const result = await createReservation({
+        repository: input.reservationCreateRepository,
+        legacyInput: legacy.legacyInput,
+      });
+      if (!("reservation_id" in result.body)) {
+        throw new Error(result.body.error.message);
+      }
+      return result.body;
+    },
+  };
+}
+
+async function updateWhatsAppSessionConnectionStatus(
+  store: WhatsAppModuleStore,
+  status: "pending_qr" | "connected" | "disconnected" | "expired",
+  metadata: MetadataRecord | undefined,
+) {
+  if (status === "pending_qr") {
+    return;
+  }
+
+  const existing = await store.load();
+  if (!existing) {
+    return;
+  }
+
+  const updatedAt = new Date().toISOString();
+  await store.save({
+    ...existing,
+    status,
+    qr_code: status === "connected" || status === "expired" ? undefined : existing.qr_code,
+    connected_at: status === "connected" ? existing.connected_at ?? updatedAt : existing.connected_at,
+    updated_at: updatedAt,
+    metadata: {
+      ...(existing.metadata ?? {}),
+      ...(metadata ?? {}),
+    },
+  });
 }
 
 function defaultStandaloneSupabaseClientFactory(
@@ -335,6 +543,11 @@ function splitEnvList(value: string | undefined) {
       .map((item) => item.trim())
       .filter(Boolean),
   ));
+}
+
+function isEnabledEnv(value: string | undefined) {
+  const normalized = value?.trim().toLowerCase();
+  return normalized === "1" || normalized === "true" || normalized === "yes" || normalized === "on";
 }
 
 function optionalEnvList(value: string | undefined) {

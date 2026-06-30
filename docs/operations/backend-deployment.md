@@ -52,6 +52,38 @@ Allow demo frontend origins:
 RESERVATION_PLATFORM_CORS_ALLOWED_ORIGINS=http://localhost:4000
 ```
 
+Optional WhatsApp booking automation:
+
+```powershell
+RESERVATION_WHATSAPP_ENABLED=true
+RESERVATION_WHATSAPP_PROVIDER=session_qr
+RESERVATION_WHATSAPP_SESSION_AUTH_DIR=.reservation-whatsapp-sessions
+RESERVATION_WHATSAPP_SESSION_ENCRYPTION_KEY=
+RESERVATION_WHATSAPP_ALLOW_MEMORY_STORE=false
+AI_AGENT_PROVIDER=openai-compatible
+AI_AGENT_BASE_URL=https://openrouter.ai/api/v1
+AI_AGENT_API_KEY=
+AI_AGENT_MODEL=
+```
+
+Safe when used with a disposable or intended backend environment. Keep
+`AI_AGENT_API_KEY`, Supabase keys, and the WhatsApp session encryption key
+backend-only. The session auth directory must be persisted as a protected server
+volume if you want WhatsApp linked-device login to survive container restarts.
+Production WhatsApp automation requires Supabase/Postgres storage. Leave
+`RESERVATION_WHATSAPP_ALLOW_MEMORY_STORE=false` outside local `pnpm dev:memory`
+testing.
+
+Optional dev/test inbound simulation:
+
+```powershell
+RESERVATION_WHATSAPP_SIMULATION_ENABLED=true
+```
+
+Safe only in local development or protected test environments. It enables
+`POST /v1/channels/whatsapp/messages:simulate` so developers can test the
+WhatsApp conversation runtime without sending messages from a phone.
+
 ## Verify Before Building
 
 ```powershell
@@ -134,6 +166,24 @@ corepack pnpm run database:live-proof:strict
 Potentially destructive if pointed at shared data: applies migrations and runs
 database behavior checks against the configured target. Use only with disposable
 or explicitly approved environments.
+
+WhatsApp automation requires the WhatsApp migration bundle, including
+`packages/database/migrations/supabase/000012_whatsapp_business_agent.sql`.
+Production mode should use Supabase/Postgres, not memory mode, because the
+module persists session status, business config, text knowledge, conversations,
+messages, booking drafts, confirmations, and audit metadata.
+
+Configure the owner-facing WhatsApp module through backend APIs:
+
+- `POST /v1/channels/whatsapp/session/start`
+- `GET /v1/channels/whatsapp/session/status`
+- `GET /v1/channels/whatsapp/session/qr`
+- `POST /v1/channels/whatsapp/session/logout`
+- `GET/PATCH /v1/channels/whatsapp/config`
+- `GET/POST/PATCH/DELETE /v1/channels/whatsapp/knowledge`
+- `GET /v1/channels/whatsapp/conversations`
+- `GET /v1/channels/whatsapp/conversations/{id}/messages`
+- `GET /v1/channels/whatsapp/readiness`
 
 ## Hosted Container Deployment
 

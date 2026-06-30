@@ -48,8 +48,21 @@ import {
   type ChatCreateReservationSessionInput,
   type ChatMessageInput,
   type JsonValue,
+  type MetadataRecord,
   type PlatformErrorResponse,
 } from "@reservation-platform/contract-types";
+import type {
+  WhatsAppBusinessConfig,
+  WhatsAppBusinessConfigPatch,
+  WhatsAppConversation,
+  WhatsAppConversationMessage,
+  WhatsAppKnowledgeEntry,
+  WhatsAppKnowledgeInput,
+  WhatsAppKnowledgePatch,
+  WhatsAppSessionSnapshot,
+  WhatsAppSessionStartInput,
+  WhatsAppInboundMessage,
+} from "@reservation-platform/whatsapp";
 
 import { jsonResponse, platformError, type StandaloneApiRequest, type StandaloneApiResponse } from "./http.js";
 
@@ -65,6 +78,7 @@ export interface StandaloneApiDependencies {
   resourceMaintenanceRepository?: ResourceMaintenanceRepositoryPort;
   serviceApiKey?: string;
   tenantVenueRepository?: PlatformTenantVenueRepository;
+  whatsappModule?: StandaloneApiWhatsAppModule;
 }
 
 export interface StandaloneApiChatContext {
@@ -106,6 +120,28 @@ export interface StandaloneApiChatModule {
   confirmReservation(
     input: StandaloneApiChatSessionRequest<ChatConfirmReservationInput>,
   ): StandaloneApiChatModuleResponse | Promise<StandaloneApiChatModuleResponse>;
+}
+
+export interface StandaloneApiWhatsAppModule {
+  startSession(input: WhatsAppSessionStartInput): WhatsAppSessionSnapshot | Promise<WhatsAppSessionSnapshot>;
+  sessionStatus(): WhatsAppSessionSnapshot | Promise<WhatsAppSessionSnapshot>;
+  sessionQr(): WhatsAppSessionSnapshot | Promise<WhatsAppSessionSnapshot>;
+  logoutSession(): WhatsAppSessionSnapshot | Promise<WhatsAppSessionSnapshot>;
+  getConfig(): WhatsAppBusinessConfig | Promise<WhatsAppBusinessConfig>;
+  updateConfig(input: WhatsAppBusinessConfigPatch): WhatsAppBusinessConfig | Promise<WhatsAppBusinessConfig>;
+  listKnowledge(): WhatsAppKnowledgeEntry[] | Promise<WhatsAppKnowledgeEntry[]>;
+  createKnowledge(input: WhatsAppKnowledgeInput): WhatsAppKnowledgeEntry | Promise<WhatsAppKnowledgeEntry>;
+  updateKnowledge(
+    knowledgeId: string,
+    input: WhatsAppKnowledgePatch,
+  ): WhatsAppKnowledgeEntry | undefined | Promise<WhatsAppKnowledgeEntry | undefined>;
+  deleteKnowledge(knowledgeId: string): boolean | Promise<boolean>;
+  listConversations(): WhatsAppConversation[] | Promise<WhatsAppConversation[]>;
+  listConversationMessages(
+    conversationId: string,
+  ): WhatsAppConversationMessage[] | Promise<WhatsAppConversationMessage[]>;
+  handleInboundMessage(input: WhatsAppInboundMessage): unknown | Promise<unknown>;
+  readiness(): unknown | Promise<unknown>;
 }
 
 export interface StandaloneApiAuthConfig {
@@ -152,6 +188,14 @@ const venuePattern = /^\/v1\/venues\/([^/]+)$/;
 const servicePattern = /^\/v1\/services\/([^/]+)$/;
 const resourcePattern = /^\/v1\/resources\/([^/]+)$/;
 const resourceLayoutPattern = /^\/v1\/resource-layouts\/([^/]+)$/;
+const whatsappSessionRoutePattern = /^\/v1\/channels\/whatsapp\/session\/(?:start|status|qr|logout)$/;
+const whatsappConfigPath = "/v1/channels/whatsapp/config";
+const whatsappKnowledgePath = "/v1/channels/whatsapp/knowledge";
+const whatsappReadinessPath = "/v1/channels/whatsapp/readiness";
+const whatsappSimulationPath = "/v1/channels/whatsapp/messages:simulate";
+const whatsappKnowledgePattern = /^\/v1\/channels\/whatsapp\/knowledge\/([^/]+)$/;
+const whatsappConversationsPath = "/v1/channels/whatsapp/conversations";
+const whatsappConversationMessagesPattern = /^\/v1\/channels\/whatsapp\/conversations\/([^/]+)\/messages$/;
 const reservationPattern = /^\/v1\/reservations\/([^/]+)$/;
 const reservationCancelPattern = /^\/v1\/reservations\/([^/]+)\/cancel$/;
 const reservationReschedulePattern = /^\/v1\/reservations\/([^/]+)\/reschedule$/;
@@ -263,6 +307,81 @@ export async function handleStandaloneApiRequest(
 
   if (method === "POST" && path === "/v1/chat/reservation-sessions") {
     return handleChatCreateReservationSessionRequest(request, dependencies.chatModule);
+  }
+
+  if (method === "POST" && path === "/v1/channels/whatsapp/session/start") {
+    return handleWhatsAppSessionStartRequest(request, dependencies.whatsappModule);
+  }
+
+  if (method === "GET" && path === "/v1/channels/whatsapp/session/status") {
+    return handleWhatsAppSessionStatusRequest(dependencies.whatsappModule);
+  }
+
+  if (method === "GET" && path === "/v1/channels/whatsapp/session/qr") {
+    return handleWhatsAppSessionQrRequest(dependencies.whatsappModule);
+  }
+
+  if (method === "POST" && path === "/v1/channels/whatsapp/session/logout") {
+    return handleWhatsAppSessionLogoutRequest(dependencies.whatsappModule);
+  }
+
+  if (method === "GET" && path === whatsappReadinessPath) {
+    return handleWhatsAppReadinessRequest(dependencies.whatsappModule);
+  }
+
+  if (method === "POST" && path === whatsappSimulationPath) {
+    return handleWhatsAppSimulationRequest(request, dependencies.whatsappModule);
+  }
+
+  if (method === "GET" && path === whatsappConfigPath) {
+    return handleWhatsAppConfigReadRequest(dependencies.whatsappModule);
+  }
+
+  if (method === "PATCH" && path === whatsappConfigPath) {
+    return handleWhatsAppConfigUpdateRequest(request, dependencies.whatsappModule);
+  }
+
+  if (method === "GET" && path === whatsappKnowledgePath) {
+    return handleWhatsAppKnowledgeListRequest(dependencies.whatsappModule);
+  }
+
+  if (method === "POST" && path === whatsappKnowledgePath) {
+    return handleWhatsAppKnowledgeCreateRequest(request, dependencies.whatsappModule);
+  }
+
+  if (method === "PATCH") {
+    const knowledgeId = whatsappKnowledgePattern.exec(path)?.[1];
+    if (knowledgeId) {
+      return handleWhatsAppKnowledgeUpdateRequest(
+        request,
+        decodeURIComponent(knowledgeId),
+        dependencies.whatsappModule,
+      );
+    }
+  }
+
+  if (method === "DELETE") {
+    const knowledgeId = whatsappKnowledgePattern.exec(path)?.[1];
+    if (knowledgeId) {
+      return handleWhatsAppKnowledgeDeleteRequest(
+        decodeURIComponent(knowledgeId),
+        dependencies.whatsappModule,
+      );
+    }
+  }
+
+  if (method === "GET" && path === whatsappConversationsPath) {
+    return handleWhatsAppConversationListRequest(dependencies.whatsappModule);
+  }
+
+  if (method === "GET") {
+    const conversationId = whatsappConversationMessagesPattern.exec(path)?.[1];
+    if (conversationId) {
+      return handleWhatsAppConversationMessagesRequest(
+        decodeURIComponent(conversationId),
+        dependencies.whatsappModule,
+      );
+    }
   }
 
   if (method === "POST" && chatSessionMessagePattern.test(path)) {
@@ -396,7 +515,8 @@ function isProtectedPlatformDataRoute(method: string, path: string) {
       || servicePattern.test(path)
       || path === "/v1/resources"
       || resourcePattern.test(path)
-      || resourceLayoutPattern.test(path);
+      || resourceLayoutPattern.test(path)
+      || isWhatsAppOwnerRoute(path);
   }
 
   if (method === "POST") {
@@ -405,14 +525,31 @@ function isProtectedPlatformDataRoute(method: string, path: string) {
       || reservationReschedulePattern.test(path)
       || path === "/v1/resource-maintenance"
       || resourceMaintenanceEndPattern.test(path)
-      || isChatReservationSessionRoute(path);
+      || isChatReservationSessionRoute(path)
+      || isWhatsAppOwnerRoute(path);
   }
 
   if (method === "PATCH") {
-    return reservationPattern.test(path);
+    return reservationPattern.test(path)
+      || isWhatsAppOwnerRoute(path);
+  }
+
+  if (method === "DELETE") {
+    return isWhatsAppOwnerRoute(path);
   }
 
   return false;
+}
+
+function isWhatsAppOwnerRoute(path: string) {
+  return whatsappSessionRoutePattern.test(path)
+    || path === whatsappConfigPath
+    || path === whatsappReadinessPath
+    || path === whatsappSimulationPath
+    || path === whatsappKnowledgePath
+    || whatsappKnowledgePattern.test(path)
+    || path === whatsappConversationsPath
+    || whatsappConversationMessagesPattern.test(path);
 }
 
 function isChatReservationSessionRoute(path: string) {
@@ -518,6 +655,218 @@ async function handleChatCreateReservationSessionRequest(
   return invokeChatModule(() => chatModule.createReservationSession({
     body: body.value,
     context: createChatContext(request),
+  }));
+}
+
+async function handleWhatsAppSessionStartRequest(
+  request: StandaloneApiRequest,
+  whatsappModule: StandaloneApiWhatsAppModule | undefined,
+): Promise<StandaloneApiResponse> {
+  if (!whatsappModule) {
+    return whatsappModuleDisabled();
+  }
+
+  const body = readOptionalRecordBody(request.body);
+  if (!body.ok) {
+    return body.response;
+  }
+
+  return invokeWhatsAppModule(() => whatsappModule.startSession({
+    provider: body.value.provider === "meta_cloud" ? "meta_cloud" : "session_qr",
+    tenant_id: getStringField(body.value, "tenant_id") ?? createChatContext(request).tenantId,
+    venue_id: getStringField(body.value, "venue_id") ?? createChatContext(request).venueId,
+    metadata: readMetadataField(body.value),
+  }));
+}
+
+async function handleWhatsAppSessionStatusRequest(
+  whatsappModule: StandaloneApiWhatsAppModule | undefined,
+): Promise<StandaloneApiResponse> {
+  if (!whatsappModule) {
+    return whatsappModuleDisabled();
+  }
+
+  return invokeWhatsAppModule(() => whatsappModule.sessionStatus());
+}
+
+async function handleWhatsAppSessionQrRequest(
+  whatsappModule: StandaloneApiWhatsAppModule | undefined,
+): Promise<StandaloneApiResponse> {
+  if (!whatsappModule) {
+    return whatsappModuleDisabled();
+  }
+
+  return invokeWhatsAppModule(() => whatsappModule.sessionQr());
+}
+
+async function handleWhatsAppSessionLogoutRequest(
+  whatsappModule: StandaloneApiWhatsAppModule | undefined,
+): Promise<StandaloneApiResponse> {
+  if (!whatsappModule) {
+    return whatsappModuleDisabled();
+  }
+
+  return invokeWhatsAppModule(() => whatsappModule.logoutSession());
+}
+
+async function handleWhatsAppConfigReadRequest(
+  whatsappModule: StandaloneApiWhatsAppModule | undefined,
+): Promise<StandaloneApiResponse> {
+  if (!whatsappModule) {
+    return whatsappModuleDisabled();
+  }
+
+  return invokeWhatsAppModule(() => whatsappModule.getConfig());
+}
+
+async function handleWhatsAppReadinessRequest(
+  whatsappModule: StandaloneApiWhatsAppModule | undefined,
+): Promise<StandaloneApiResponse> {
+  if (!whatsappModule) {
+    return whatsappModuleDisabled();
+  }
+
+  return invokeWhatsAppModule(() => whatsappModule.readiness());
+}
+
+async function handleWhatsAppSimulationRequest(
+  request: StandaloneApiRequest,
+  whatsappModule: StandaloneApiWhatsAppModule | undefined,
+): Promise<StandaloneApiResponse> {
+  if (!whatsappModule) {
+    return whatsappModuleDisabled();
+  }
+
+  const body = request.body && typeof request.body === "object" && !Array.isArray(request.body)
+    ? request.body as Record<string, unknown>
+    : {};
+  const text = getStringField(body, "text");
+  const from = getStringField(body, "from") ?? "dev-whatsapp-customer@s.whatsapp.net";
+  if (!text) {
+    return platformError(400, "validation_failed", "text is required.");
+  }
+
+  return invokeWhatsAppModule(() => whatsappModule.handleInboundMessage({
+    provider: "session_qr",
+    messageId: getStringField(body, "message_id") ?? `sim_${Date.now()}`,
+    from: {
+      id: from,
+      phoneNumber: getStringField(body, "phone") ?? from.split("@")[0],
+      displayName: getStringField(body, "display_name"),
+    },
+    text,
+    timestamp: new Date().toISOString(),
+    raw: { simulated: true },
+  }));
+}
+
+async function handleWhatsAppConfigUpdateRequest(
+  request: StandaloneApiRequest,
+  whatsappModule: StandaloneApiWhatsAppModule | undefined,
+): Promise<StandaloneApiResponse> {
+  if (!whatsappModule) {
+    return whatsappModuleDisabled();
+  }
+
+  const body = readOptionalRecordBody(request.body);
+  if (!body.ok) {
+    return body.response;
+  }
+
+  return invokeWhatsAppModule(() => whatsappModule.updateConfig(readWhatsAppConfigPatch(body.value)));
+}
+
+async function handleWhatsAppKnowledgeListRequest(
+  whatsappModule: StandaloneApiWhatsAppModule | undefined,
+): Promise<StandaloneApiResponse> {
+  if (!whatsappModule) {
+    return whatsappModuleDisabled();
+  }
+
+  return invokeWhatsAppModule(async () => ({ knowledge: await whatsappModule.listKnowledge() }));
+}
+
+async function handleWhatsAppKnowledgeCreateRequest(
+  request: StandaloneApiRequest,
+  whatsappModule: StandaloneApiWhatsAppModule | undefined,
+): Promise<StandaloneApiResponse> {
+  if (!whatsappModule) {
+    return whatsappModuleDisabled();
+  }
+
+  const body = readOptionalRecordBody(request.body);
+  if (!body.ok) {
+    return body.response;
+  }
+
+  const input = readWhatsAppKnowledgeInput(body.value);
+  if (!input.ok) {
+    return input.response;
+  }
+
+  return invokeWhatsAppModule(() => whatsappModule.createKnowledge(input.value));
+}
+
+async function handleWhatsAppKnowledgeUpdateRequest(
+  request: StandaloneApiRequest,
+  knowledgeId: string,
+  whatsappModule: StandaloneApiWhatsAppModule | undefined,
+): Promise<StandaloneApiResponse> {
+  if (!whatsappModule) {
+    return whatsappModuleDisabled();
+  }
+
+  const body = readOptionalRecordBody(request.body);
+  if (!body.ok) {
+    return body.response;
+  }
+
+  return invokeWhatsAppModule(async () => {
+    const updated = await whatsappModule.updateKnowledge(knowledgeId, readWhatsAppKnowledgePatch(body.value));
+    if (!updated) {
+      return platformError(404, "not_found", "WhatsApp knowledge entry not found.");
+    }
+    return updated;
+  });
+}
+
+async function handleWhatsAppKnowledgeDeleteRequest(
+  knowledgeId: string,
+  whatsappModule: StandaloneApiWhatsAppModule | undefined,
+): Promise<StandaloneApiResponse> {
+  if (!whatsappModule) {
+    return whatsappModuleDisabled();
+  }
+
+  return invokeWhatsAppModule(async () => {
+    const deleted = await whatsappModule.deleteKnowledge(knowledgeId);
+    if (!deleted) {
+      return platformError(404, "not_found", "WhatsApp knowledge entry not found.");
+    }
+    return { deleted: true };
+  });
+}
+
+async function handleWhatsAppConversationListRequest(
+  whatsappModule: StandaloneApiWhatsAppModule | undefined,
+): Promise<StandaloneApiResponse> {
+  if (!whatsappModule) {
+    return whatsappModuleDisabled();
+  }
+
+  return invokeWhatsAppModule(async () => ({ conversations: await whatsappModule.listConversations() }));
+}
+
+async function handleWhatsAppConversationMessagesRequest(
+  conversationId: string,
+  whatsappModule: StandaloneApiWhatsAppModule | undefined,
+): Promise<StandaloneApiResponse> {
+  if (!whatsappModule) {
+    return whatsappModuleDisabled();
+  }
+
+  return invokeWhatsAppModule(async () => ({
+    messages: await whatsappModule.listConversationMessages(conversationId),
   }));
 }
 
@@ -998,6 +1347,51 @@ async function invokeChatModule(
   }
 }
 
+async function invokeWhatsAppModule(
+  action: () => unknown | Promise<unknown>,
+): Promise<StandaloneApiResponse> {
+  try {
+    const result = await action();
+    if (isStandaloneApiResponse(result)) {
+      return result;
+    }
+    return jsonResponse(200, result);
+  } catch (error) {
+    if (isNamedError(error, "WhatsAppModuleDisabledError")) {
+      return whatsappModuleDisabled();
+    }
+
+    if (isNamedError(error, "WhatsAppSessionNotReadyError")) {
+      return platformError(409, "conflict", "WhatsApp QR session is not ready.");
+    }
+
+    if (isNamedError(error, "WhatsAppSimulationDisabledError")) {
+      return platformError(403, "forbidden", "WhatsApp inbound simulation is disabled.");
+    }
+
+    console.error("WhatsApp module request failed.", error);
+    return platformError(500, "internal_error", "WhatsApp module request failed.");
+  }
+}
+
+function whatsappModuleDisabled(): StandaloneApiResponse {
+  return platformError(404, "whatsapp_module_disabled", "WhatsApp module is disabled.");
+}
+
+function isNamedError(error: unknown, name: string) {
+  return error instanceof Error && error.name === name;
+}
+
+function isStandaloneApiResponse(value: unknown): value is StandaloneApiResponse {
+  return Boolean(
+    value &&
+      typeof value === "object" &&
+      "status" in value &&
+      typeof (value as { status?: unknown }).status === "number" &&
+      "body" in value,
+  );
+}
+
 function normalizeChatModuleResponse(response: StandaloneApiChatModuleResponse): StandaloneApiResponse {
   const status = isValidHttpStatus(response.status) ? response.status : 200;
   if (status >= 400) {
@@ -1151,6 +1545,126 @@ function readChatBody<TBody>(
   }
 
   return { ok: true, value: parsed.data };
+}
+
+function readOptionalRecordBody(body: unknown):
+  | { ok: true; value: Record<string, unknown> }
+  | { ok: false; response: StandaloneApiResponse } {
+  const value = body ?? {};
+  if (!isPlainRecord(value)) {
+    return {
+      ok: false,
+      response: jsonResponse(400, platformErrorBody("validation_failed", "Invalid WhatsApp request body.", 400)),
+    };
+  }
+
+  return { ok: true, value };
+}
+
+function getStringField(record: Record<string, unknown>, fieldName: string) {
+  const value = record[fieldName];
+  return typeof value === "string" && value.trim().length > 0 ? value.trim() : undefined;
+}
+
+function readMetadataField(record: Record<string, unknown>): MetadataRecord | undefined {
+  const metadata = record.metadata;
+  return isPlainRecord(metadata) ? metadata as MetadataRecord : undefined;
+}
+
+function readWhatsAppConfigPatch(record: Record<string, unknown>): WhatsAppBusinessConfigPatch {
+  const patch: WhatsAppBusinessConfigPatch = {};
+  assignOptionalString(record, patch, "business_name");
+  assignOptionalStringOrNull(record, patch, "default_service_id");
+  assignOptionalString(record, patch, "language");
+  assignOptionalString(record, patch, "tone");
+  assignOptionalString(record, patch, "fallback_message");
+  assignOptionalBoolean(record, patch, "booking_confirmation_required");
+  assignOptionalStringOrNull(record, patch, "opening_hours");
+  const metadata = readMetadataField(record);
+  if (metadata) {
+    patch.metadata = metadata;
+  }
+  return patch;
+}
+
+function readWhatsAppKnowledgeInput(record: Record<string, unknown>):
+  | { ok: true; value: WhatsAppKnowledgeInput }
+  | { ok: false; response: StandaloneApiResponse } {
+  const title = getStringField(record, "title");
+  const content = getStringField(record, "content");
+  if (!title || !content) {
+    return {
+      ok: false,
+      response: jsonResponse(400, platformErrorBody("validation_failed", "Knowledge title and content are required.", 400)),
+    };
+  }
+
+  return {
+    ok: true,
+    value: {
+      title,
+      content,
+      tags: readStringArray(record.tags),
+      active: typeof record.active === "boolean" ? record.active : undefined,
+      metadata: readMetadataField(record),
+    },
+  };
+}
+
+function readWhatsAppKnowledgePatch(record: Record<string, unknown>): WhatsAppKnowledgePatch {
+  const patch: WhatsAppKnowledgePatch = {};
+  assignOptionalString(record, patch, "title");
+  assignOptionalString(record, patch, "content");
+  if (Array.isArray(record.tags)) {
+    patch.tags = readStringArray(record.tags);
+  }
+  assignOptionalBoolean(record, patch, "active");
+  const metadata = readMetadataField(record);
+  if (metadata) {
+    patch.metadata = metadata;
+  }
+  return patch;
+}
+
+function assignOptionalString(
+  source: Record<string, unknown>,
+  target: object,
+  fieldName: string,
+) {
+  const value = getStringField(source, fieldName);
+  if (value !== undefined) {
+    (target as Record<string, unknown>)[fieldName] = value;
+  }
+}
+
+function assignOptionalStringOrNull(
+  source: Record<string, unknown>,
+  target: object,
+  fieldName: string,
+) {
+  if (source[fieldName] === null) {
+    (target as Record<string, unknown>)[fieldName] = null;
+    return;
+  }
+  assignOptionalString(source, target, fieldName);
+}
+
+function assignOptionalBoolean(
+  source: Record<string, unknown>,
+  target: object,
+  fieldName: string,
+) {
+  if (typeof source[fieldName] === "boolean") {
+    (target as Record<string, unknown>)[fieldName] = source[fieldName];
+  }
+}
+
+function readStringArray(value: unknown): string[] | undefined {
+  if (!Array.isArray(value)) {
+    return undefined;
+  }
+
+  return value.filter((entry): entry is string => typeof entry === "string");
 }
 
 function isPlainRecord(value: unknown): value is Record<string, unknown> {

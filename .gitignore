@@ -25,6 +25,7 @@ examples/**/.next/
 packages/*/dist
 /apps/*/dist
 /dist-packages/
+.reservation-whatsapp-sessions/
 
 # misc
 .DS_Store

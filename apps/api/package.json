@@ -14,6 +14,7 @@
     "@project-play/reservations-supabase": "workspace:*",
     "@reservation-platform/api": "workspace:*",
     "@reservation-platform/contract-types": "workspace:*",
+    "@reservation-platform/whatsapp": "workspace:*",
     "@supabase/supabase-js": "^2.90.1"
   },
   "devDependencies": {

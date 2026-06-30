@@ -40,6 +40,51 @@ test("standalone Supabase env factory reads backend service auth without Supabas
   });
 });
 
+test("standalone Supabase env factory fails closed for WhatsApp without database storage", () => {
+  assert.throws(
+    () => createStandaloneSupabaseDependenciesFromEnv({
+      RESERVATION_WHATSAPP_ENABLED: "true",
+      RESERVATION_WHATSAPP_PROVIDER: "session_qr",
+    }, {
+      createClient() {
+        throw new Error("createClient should not be called for missing WhatsApp database config");
+      },
+    }),
+    (error) => {
+      assert.equal(error instanceof StandaloneSupabaseConfigError, true);
+      assert.deepEqual(
+        (error as StandaloneSupabaseConfigError).missingConfigKeys,
+        [
+          "RESERVATION_SUPABASE_URL",
+          "RESERVATION_SUPABASE_ANON_KEY",
+          "RESERVATION_SUPABASE_SERVICE_ROLE_KEY",
+        ],
+      );
+      return true;
+    },
+  );
+});
+
+test("standalone Supabase env factory wires WhatsApp memory store only with explicit dev opt-in", async () => {
+  const dependencies = createStandaloneSupabaseDependenciesFromEnv({
+    RESERVATION_WHATSAPP_ENABLED: "true",
+    RESERVATION_WHATSAPP_PROVIDER: "session_qr",
+    RESERVATION_WHATSAPP_ALLOW_MEMORY_STORE: "true",
+  }, {
+    createClient() {
+      throw new Error("createClient should not be called for WhatsApp session mode only");
+    },
+  });
+
+  assert.equal(typeof dependencies.whatsappModule?.startSession, "function");
+  const status = await dependencies.whatsappModule?.sessionStatus();
+  const config = await dependencies.whatsappModule?.getConfig();
+
+  assert.equal(status?.provider, "session_qr");
+  assert.equal(status?.status, "disconnected");
+  assert.equal(config?.business_name, "Reservation Business");
+});
+
 test("standalone Supabase env factory wires JWT/JWKS verifier without Supabase config", async () => {
   const fixture = createJwtFixture();
   let fetchCalls = 0;

@@ -34,11 +34,27 @@ export const standaloneApiCorsOptionalEnvNames = [
   "RESERVATION_PLATFORM_CORS_ALLOWED_ORIGINS",
 ];
 
+export const standaloneApiWhatsAppEnvNames = [
+  "RESERVATION_WHATSAPP_ENABLED",
+  "RESERVATION_WHATSAPP_PROVIDER",
+  "RESERVATION_WHATSAPP_SESSION_AUTH_DIR",
+  "RESERVATION_WHATSAPP_SESSION_ENCRYPTION_KEY",
+  "RESERVATION_WHATSAPP_ALLOW_MEMORY_STORE",
+  "RESERVATION_WHATSAPP_SIMULATION_ENABLED",
+];
+
 export const standaloneApiAiChatEnvNames = [
   "GOOGLE_GENERATIVE_AI_API_KEY",
   "GOOGLE_GENERATIVE_AI_MODEL",
   "OPENROUTER_API_KEY",
   "OPENROUTER_CHAT_MODEL",
+];
+
+export const standaloneApiAiAgentEnvNames = [
+  "AI_AGENT_PROVIDER",
+  "AI_AGENT_BASE_URL",
+  "AI_AGENT_API_KEY",
+  "AI_AGENT_MODEL",
 ];
 
 export const standaloneApiRuntimeEnvNames = [
@@ -47,11 +63,13 @@ export const standaloneApiRuntimeEnvNames = [
   ...standaloneApiAuthRequiredEnvNames,
   ...standaloneApiAuthOptionalEnvNames,
   ...standaloneApiCorsOptionalEnvNames,
+  ...standaloneApiWhatsAppEnvNames,
 ];
 
 export const standaloneApiDeploymentReadinessOnlyEnvNames = [
   "PORT",
   ...standaloneApiAiChatEnvNames,
+  ...standaloneApiAiAgentEnvNames,
   standaloneApiDeploymentStrictEnvName,
 ];
 
@@ -61,7 +79,7 @@ const standaloneApiKnownEnvNames = [
 ];
 
 const runtimeEnvMemberAccessPattern =
-  /(?<![\w$])env\s*\??\.\s*(RESERVATION_SUPABASE_[A-Z0-9_]+|RESERVATION_PLATFORM_SERVICE_API_KEY|RESERVATION_PLATFORM_AUTH_[A-Z0-9_]+|RESERVATION_PLATFORM_CORS_ALLOWED_ORIGINS)\b/gu;
+  /(?<![\w$])env\s*\??\.\s*(RESERVATION_SUPABASE_[A-Z0-9_]+|RESERVATION_PLATFORM_SERVICE_API_KEY|RESERVATION_PLATFORM_AUTH_[A-Z0-9_]+|RESERVATION_PLATFORM_CORS_ALLOWED_ORIGINS|RESERVATION_WHATSAPP_[A-Z0-9_]+|AI_AGENT_[A-Z0-9_]+)\b/gu;
 
 const scriptDirectory = dirname(fileURLToPath(import.meta.url));
 const defaultRuntimeSourcePath = resolve(scriptDirectory, "../apps/api/src/runtime.ts");
@@ -69,7 +87,7 @@ const defaultDeploymentManifestPath = resolve(scriptDirectory, "../apps/api/depl
 const defaultStandaloneApiPackageJsonPath = resolve(scriptDirectory, "../apps/api/package.json");
 
 const nextPublicBackendSecretPattern =
-  /^NEXT_PUBLIC_(?:RESERVATION_SUPABASE(?:_|$)|RESERVATION_PLATFORM_SERVICE_API_KEY$|RESERVATION_PLATFORM_AUTH_|.*(?:SERVICE_ROLE|OPENROUTER|GOOGLE_GENERATIVE_AI|GEMINI).*)/u;
+  /^NEXT_PUBLIC_(?:RESERVATION_SUPABASE(?:_|$)|RESERVATION_PLATFORM_SERVICE_API_KEY$|RESERVATION_PLATFORM_AUTH_|AI_AGENT|.*(?:SERVICE_ROLE|OPENROUTER|GOOGLE_GENERATIVE_AI|GEMINI).*)/u;
 
 function trimEnvValue(env, name) {
   return typeof env[name] === "string" ? env[name].trim() : "";
@@ -332,6 +350,8 @@ export function verifyStandaloneDeploymentManifest(options = {}) {
       ...standaloneApiAuthOptionalEnvNames,
       ...standaloneApiCorsOptionalEnvNames,
       ...standaloneApiAiChatEnvNames,
+      ...standaloneApiAiAgentEnvNames,
+      ...standaloneApiWhatsAppEnvNames,
     ],
     errors,
   );
@@ -342,6 +362,7 @@ export function verifyStandaloneDeploymentManifest(options = {}) {
       "NEXT_PUBLIC_RESERVATION_SUPABASE",
       "NEXT_PUBLIC_RESERVATION_PLATFORM_SERVICE_API_KEY",
       "NEXT_PUBLIC_RESERVATION_PLATFORM_AUTH_",
+      "NEXT_PUBLIC_AI_AGENT",
       "NEXT_PUBLIC_OPENROUTER",
       "NEXT_PUBLIC_GOOGLE_GENERATIVE_AI",
       "NEXT_PUBLIC_GEMINI",

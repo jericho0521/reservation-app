@@ -36,6 +36,11 @@ export const expectedBackendPackageManifests = [
     category: "backend-package",
   },
   {
+    path: "packages/whatsapp/package.json",
+    packageName: "@reservation-platform/whatsapp",
+    category: "backend-package",
+  },
+  {
     path: "packages/contract-types/package.json",
     packageName: "@reservation-platform/contract-types",
     category: "contract-package",

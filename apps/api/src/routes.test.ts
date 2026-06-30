@@ -38,6 +38,7 @@ import {
   handleStandaloneApiRequest,
   type StandaloneApiChatModule,
   type StandaloneApiHandler,
+  type StandaloneApiWhatsAppModule,
 } from "./routes.js";
 import { createStandaloneNodeServer } from "./server.js";
 
@@ -48,12 +49,352 @@ const disabledChatBody = {
     status: 404,
   },
 };
+const disabledWhatsAppBody = {
+  error: {
+    code: "whatsapp_module_disabled",
+    message: "WhatsApp module is disabled.",
+    status: 404,
+  },
+};
 const standaloneHealthBody = {
   status: "ok",
   service: "standalone-api-skeleton",
   api_version: "v1",
   readiness: "alive",
 };
+
+function fakeWhatsAppModule(
+  overrides: Partial<StandaloneApiWhatsAppModule> = {},
+): StandaloneApiWhatsAppModule {
+  return {
+    startSession: () => ({
+      provider: "session_qr",
+      status: "pending_qr",
+      session_id: "session_123",
+      qr_code: "qr_payload",
+      updated_at: "2026-06-30T00:00:00.000Z",
+    }),
+    sessionStatus: () => ({
+      provider: "session_qr",
+      status: "pending_qr",
+      session_id: "session_123",
+      updated_at: "2026-06-30T00:00:00.000Z",
+    }),
+    sessionQr: () => ({
+      provider: "session_qr",
+      status: "pending_qr",
+      session_id: "session_123",
+      qr_code: "qr_payload",
+      updated_at: "2026-06-30T00:00:00.000Z",
+    }),
+    logoutSession: () => ({
+      provider: "session_qr",
+      status: "disconnected",
+      updated_at: "2026-06-30T00:00:00.000Z",
+    }),
+    getConfig: () => ({
+      business_name: "Reservation Business",
+      language: "en",
+      tone: "friendly_professional",
+      fallback_message: "Please wait while staff checks this for you.",
+      booking_confirmation_required: true,
+      updated_at: "2026-06-30T00:00:00.000Z",
+    }),
+    updateConfig: (input) => ({
+      business_name: input.business_name ?? "Reservation Business",
+      language: input.language ?? "en",
+      tone: input.tone ?? "friendly_professional",
+      fallback_message: input.fallback_message ?? "Please wait while staff checks this for you.",
+      booking_confirmation_required: input.booking_confirmation_required ?? true,
+      updated_at: "2026-06-30T00:00:00.000Z",
+    }),
+    listKnowledge: () => [],
+    createKnowledge: (input) => ({
+      knowledge_id: "knowledge_123",
+      title: input.title,
+      content: input.content,
+      tags: input.tags ?? [],
+      active: input.active ?? true,
+      metadata: input.metadata,
+      created_at: "2026-06-30T00:00:00.000Z",
+      updated_at: "2026-06-30T00:00:00.000Z",
+    }),
+    updateKnowledge: (knowledgeId, input) => ({
+      knowledge_id: knowledgeId,
+      title: input.title ?? "Opening hours",
+      content: input.content ?? "We are open.",
+      tags: input.tags ?? [],
+      active: input.active ?? true,
+      metadata: input.metadata,
+      created_at: "2026-06-30T00:00:00.000Z",
+      updated_at: "2026-06-30T00:00:00.000Z",
+    }),
+    deleteKnowledge: () => true,
+    listConversations: () => [],
+    listConversationMessages: () => [],
+    handleInboundMessage: () => ({ content: "simulated reply" }),
+    readiness: () => ({
+      database_ready: true,
+      provider_ready: true,
+      reservation_tools_ready: true,
+      simulation_enabled: true,
+    }),
+    ...overrides,
+  };
+}
+
+test("disabled WhatsApp session routes return the shared platform error body", async () => {
+  const routes = [
+    { method: "POST", path: "/v1/channels/whatsapp/session/start" },
+    { method: "GET", path: "/v1/channels/whatsapp/session/status" },
+    { method: "GET", path: "/v1/channels/whatsapp/session/qr" },
+    { method: "POST", path: "/v1/channels/whatsapp/session/logout" },
+  ];
+
+  for (const route of routes) {
+    const response = await handleStandaloneApiRequest(route);
+
+    assert.equal(response.status, 404, route.path);
+    assert.deepEqual(response.body, disabledWhatsAppBody, route.path);
+  }
+});
+
+test("enabled WhatsApp session module receives owner lifecycle calls", async () => {
+  const calls: string[] = [];
+  const whatsappModule: StandaloneApiWhatsAppModule = fakeWhatsAppModule({
+    startSession(input) {
+      calls.push(`start:${input.tenant_id}:${input.venue_id}`);
+      return {
+        provider: "session_qr",
+        status: "pending_qr",
+        session_id: "session_123",
+        qr_code: "qr_payload",
+        updated_at: "2026-06-30T00:00:00.000Z",
+      };
+    },
+    sessionStatus() {
+      calls.push("status");
+      return {
+        provider: "session_qr",
+        status: "pending_qr",
+        session_id: "session_123",
+        updated_at: "2026-06-30T00:00:00.000Z",
+      };
+    },
+    sessionQr() {
+      calls.push("qr");
+      return {
+        provider: "session_qr",
+        status: "pending_qr",
+        session_id: "session_123",
+        qr_code: "qr_payload",
+        updated_at: "2026-06-30T00:00:00.000Z",
+      };
+    },
+    logoutSession() {
+      calls.push("logout");
+      return {
+        provider: "session_qr",
+        status: "disconnected",
+        updated_at: "2026-06-30T00:00:00.000Z",
+      };
+    },
+  });
+  const handler = createStandaloneApiHandler({ whatsappModule });
+
+  const start = await handler({
+    method: "POST",
+    path: "/v1/channels/whatsapp/session/start",
+    headers: {
+      "X-Reservation-Tenant-Id": "tenant_1",
+      "X-Reservation-Venue-Id": "venue_1",
+    },
+    body: {},
+  });
+  const status = await handler({ method: "GET", path: "/v1/channels/whatsapp/session/status" });
+  const qr = await handler({ method: "GET", path: "/v1/channels/whatsapp/session/qr" });
+  const logout = await handler({ method: "POST", path: "/v1/channels/whatsapp/session/logout" });
+
+  assert.equal(start.status, 200);
+  assert.equal((start.body as { qr_code?: string }).qr_code, "qr_payload");
+  assert.equal(status.status, 200);
+  assert.equal(qr.status, 200);
+  assert.equal(logout.status, 200);
+  assert.deepEqual(calls, ["start:tenant_1:venue_1", "status", "qr", "logout"]);
+});
+
+test("service-token auth protects WhatsApp owner session routes", async () => {
+  const handler = createStandaloneApiHandler({
+    auth: { serviceApiKey: "platform-service-secret" },
+    whatsappModule: fakeWhatsAppModule({
+      startSession() {
+        throw new Error("unauthorized request should not invoke WhatsApp module");
+      },
+      sessionStatus() {
+        throw new Error("unauthorized request should not invoke WhatsApp module");
+      },
+      sessionQr() {
+        throw new Error("unauthorized request should not invoke WhatsApp module");
+      },
+      logoutSession() {
+        throw new Error("unauthorized request should not invoke WhatsApp module");
+      },
+    }),
+  });
+
+  for (const route of [
+    { method: "POST", path: "/v1/channels/whatsapp/session/start" },
+    { method: "GET", path: "/v1/channels/whatsapp/session/status" },
+    { method: "GET", path: "/v1/channels/whatsapp/session/qr" },
+    { method: "POST", path: "/v1/channels/whatsapp/session/logout" },
+  ]) {
+    const response = await handler(route);
+
+    assert.equal(response.status, 401, route.path);
+    assert.equal((response.body as PlatformErrorResponse).error.message, "Missing bearer token.");
+  }
+});
+
+test("enabled WhatsApp config and knowledge routes delegate to the module", async () => {
+  const calls: string[] = [];
+  const handler = createStandaloneApiHandler({
+    whatsappModule: fakeWhatsAppModule({
+      updateConfig(input) {
+        calls.push(`config:${input.business_name}`);
+        return {
+          business_name: input.business_name ?? "Reservation Business",
+          language: "en",
+          tone: "friendly_professional",
+          fallback_message: "Please wait while staff checks this for you.",
+          booking_confirmation_required: true,
+          updated_at: "2026-06-30T00:00:00.000Z",
+        };
+      },
+      listKnowledge() {
+        calls.push("knowledge:list");
+        return [];
+      },
+      createKnowledge(input) {
+        calls.push(`knowledge:create:${input.title}`);
+        return {
+          knowledge_id: "knowledge_123",
+          title: input.title,
+          content: input.content,
+          tags: input.tags ?? [],
+          active: input.active ?? true,
+          created_at: "2026-06-30T00:00:00.000Z",
+          updated_at: "2026-06-30T00:00:00.000Z",
+        };
+      },
+    }),
+  });
+
+  const config = await handler({
+    method: "PATCH",
+    path: "/v1/channels/whatsapp/config",
+    body: { business_name: "CH Room Booking" },
+  });
+  const knowledgeList = await handler({
+    method: "GET",
+    path: "/v1/channels/whatsapp/knowledge",
+  });
+  const knowledgeCreate = await handler({
+    method: "POST",
+    path: "/v1/channels/whatsapp/knowledge",
+    body: {
+      title: "Opening hours",
+      content: "We are open Monday to Friday.",
+      tags: ["hours"],
+    },
+  });
+
+  assert.equal(config.status, 200);
+  assert.equal((config.body as { business_name?: string }).business_name, "CH Room Booking");
+  assert.deepEqual(knowledgeList.body, { knowledge: [] });
+  assert.equal((knowledgeCreate.body as { title?: string }).title, "Opening hours");
+  assert.deepEqual(calls, [
+    "config:CH Room Booking",
+    "knowledge:list",
+    "knowledge:create:Opening hours",
+  ]);
+});
+
+test("WhatsApp knowledge create validates required title and content", async () => {
+  const response = await createStandaloneApiHandler({
+    whatsappModule: fakeWhatsAppModule(),
+  })({
+    method: "POST",
+    path: "/v1/channels/whatsapp/knowledge",
+    body: { title: "Opening hours" },
+  });
+
+  assert.equal(response.status, 400);
+  assert.equal((response.body as PlatformErrorResponse).error.message, "Knowledge title and content are required.");
+});
+
+test("enabled WhatsApp readiness and simulation routes delegate to the module", async () => {
+  const calls: string[] = [];
+  const handler = createStandaloneApiHandler({
+    whatsappModule: fakeWhatsAppModule({
+      readiness() {
+        calls.push("readiness");
+        return {
+          database_ready: true,
+          provider_ready: true,
+          reservation_tools_ready: true,
+          simulation_enabled: true,
+        };
+      },
+      handleInboundMessage(input) {
+        calls.push(`simulate:${input.text}:${input.from.phoneNumber}`);
+        return { content: "simulated reply" };
+      },
+    }),
+  });
+
+  const readiness = await handler({ method: "GET", path: "/v1/channels/whatsapp/readiness" });
+  const simulation = await handler({
+    method: "POST",
+    path: "/v1/channels/whatsapp/messages:simulate",
+    body: {
+      text: "Book a room tomorrow",
+      phone: "+60111111111",
+    },
+  });
+
+  assert.equal(readiness.status, 200);
+  assert.equal((readiness.body as { simulation_enabled?: boolean }).simulation_enabled, true);
+  assert.equal(simulation.status, 200);
+  assert.deepEqual(simulation.body, { content: "simulated reply" });
+  assert.deepEqual(calls, ["readiness", "simulate:Book a room tomorrow:+60111111111"]);
+});
+
+test("disabled WhatsApp simulation returns a protected setup error", async () => {
+  const handler = createStandaloneApiHandler({
+    whatsappModule: fakeWhatsAppModule({
+      handleInboundMessage() {
+        const error = new Error("WhatsApp inbound simulation is disabled.");
+        error.name = "WhatsAppSimulationDisabledError";
+        throw error;
+      },
+    }),
+  });
+
+  const response = await handler({
+    method: "POST",
+    path: "/v1/channels/whatsapp/messages:simulate",
+    body: { text: "hello" },
+  });
+
+  assert.equal(response.status, 403);
+  assert.deepEqual(response.body, {
+    error: {
+      code: "forbidden",
+      message: "WhatsApp inbound simulation is disabled.",
+      status: 403,
+    },
+  });
+});
 
 test("GET /v1/metadata returns platform metadata from the backend package", async () => {
   const response = await handleStandaloneApiRequest({ method: "GET", path: "/v1/metadata" });
@@ -3404,6 +3745,9 @@ function readSourceTree(directory: string): string {
   const chunks: string[] = [];
 
   for (const entry of readdirSync(directory)) {
+    if (entry === "node_modules" || entry === "dist") {
+      continue;
+    }
     const path = join(directory, entry);
     const stats = statSync(path);
     if (stats.isDirectory()) {

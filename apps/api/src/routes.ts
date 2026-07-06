@@ -773,7 +773,12 @@ async function handleWhatsAppConfigUpdateRequest(
     return body.response;
   }
 
-  return invokeWhatsAppModule(() => whatsappModule.updateConfig(readWhatsAppConfigPatch(body.value)));
+  const patch = readWhatsAppConfigPatch(body.value);
+  if (!patch.ok) {
+    return patch.response;
+  }
+
+  return invokeWhatsAppModule(() => whatsappModule.updateConfig(patch.value));
 }
 
 async function handleWhatsAppKnowledgeListRequest(
@@ -1571,7 +1576,14 @@ function readMetadataField(record: Record<string, unknown>): MetadataRecord | un
   return isPlainRecord(metadata) ? metadata as MetadataRecord : undefined;
 }
 
-function readWhatsAppConfigPatch(record: Record<string, unknown>): WhatsAppBusinessConfigPatch {
+function readWhatsAppConfigPatch(record: Record<string, unknown>):
+  | { ok: true; value: WhatsAppBusinessConfigPatch }
+  | { ok: false; response: StandaloneApiResponse } {
+  const validation = validateWhatsAppConfigPatch(record);
+  if (!validation.ok) {
+    return validation;
+  }
+
   const patch: WhatsAppBusinessConfigPatch = {};
   assignOptionalString(record, patch, "business_name");
   assignOptionalStringOrNull(record, patch, "default_service_id");
@@ -1584,7 +1596,61 @@ function readWhatsAppConfigPatch(record: Record<string, unknown>): WhatsAppBusin
   if (metadata) {
     patch.metadata = metadata;
   }
-  return patch;
+  return { ok: true, value: patch };
+}
+
+function validateWhatsAppConfigPatch(record: Record<string, unknown>):
+  | { ok: true }
+  | { ok: false; response: StandaloneApiResponse } {
+  for (const fieldName of ["business_name", "language", "tone", "fallback_message"] as const) {
+    if (fieldName in record && getStringField(record, fieldName) === undefined) {
+      return {
+        ok: false,
+        response: platformError(400, "validation_failed", `${fieldName} must be a non-empty string.`),
+      };
+    }
+  }
+
+  if (
+    "default_service_id" in record &&
+      record.default_service_id !== null &&
+      getStringField(record, "default_service_id") === undefined
+  ) {
+    return {
+      ok: false,
+      response: platformError(400, "validation_failed", "default_service_id must be a non-empty string or null."),
+    };
+  }
+
+  if (
+    "opening_hours" in record &&
+      record.opening_hours !== null &&
+      getStringField(record, "opening_hours") === undefined
+  ) {
+    return {
+      ok: false,
+      response: platformError(400, "validation_failed", "opening_hours must be a non-empty string or null."),
+    };
+  }
+
+  if (
+    "booking_confirmation_required" in record &&
+      typeof record.booking_confirmation_required !== "boolean"
+  ) {
+    return {
+      ok: false,
+      response: platformError(400, "validation_failed", "booking_confirmation_required must be a boolean."),
+    };
+  }
+
+  if ("metadata" in record && record.metadata !== undefined && !isPlainRecord(record.metadata)) {
+    return {
+      ok: false,
+      response: platformError(400, "validation_failed", "metadata must be an object."),
+    };
+  }
+
+  return { ok: true };
 }
 
 function readWhatsAppKnowledgeInput(record: Record<string, unknown>):

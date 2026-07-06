@@ -343,12 +343,41 @@ export function standaloneWhatsAppDependenciesFromEnv(
         }
         return service.handleInboundMessage(input);
       },
-      readiness: async () => ({
-        database_ready: Boolean(config),
-        provider_ready: Boolean(agentRuntime),
-        reservation_tools_ready: Boolean(reservationTools),
-        simulation_enabled: isEnabledEnv(env.RESERVATION_WHATSAPP_SIMULATION_ENABLED),
-      }),
+      readiness: async () => {
+        const session = await service.sessionStatus().catch(() => undefined);
+        const businessConfig = await service.getConfig().catch(() => undefined);
+        const databaseReady = Boolean(config);
+        const providerReady = Boolean(agentRuntime);
+        const reservationToolsReady = Boolean(reservationTools);
+        const businessConfigValid = Boolean(
+          businessConfig?.business_name?.trim() &&
+            businessConfig?.fallback_message?.trim(),
+        );
+        const defaultServiceConfigured = Boolean(businessConfig?.default_service_id?.trim());
+        const whatsappConnected = session?.status === "connected";
+        const missingRequirements = [
+          databaseReady ? undefined : "database",
+          providerReady ? undefined : "ai_provider",
+          reservationToolsReady ? undefined : "reservation_tools",
+          businessConfigValid ? undefined : "business_config",
+          defaultServiceConfigured ? undefined : "default_service_id",
+          whatsappConnected ? undefined : "whatsapp_connected",
+        ].filter((requirement): requirement is string => Boolean(requirement));
+
+        return {
+          enabled: true,
+          provider: provider === "meta_cloud" ? "meta_cloud" : "session_qr",
+          database_ready: databaseReady,
+          provider_ready: providerReady,
+          reservation_tools_ready: reservationToolsReady,
+          business_config_valid: businessConfigValid,
+          default_service_configured: defaultServiceConfigured,
+          whatsapp_connected: whatsappConnected,
+          simulation_enabled: isEnabledEnv(env.RESERVATION_WHATSAPP_SIMULATION_ENABLED),
+          production_ready: missingRequirements.length === 0,
+          missing_requirements: missingRequirements,
+        };
+      },
     },
   };
 }

@@ -332,6 +332,28 @@ test("WhatsApp knowledge create validates required title and content", async () 
   assert.equal((response.body as PlatformErrorResponse).error.message, "Knowledge title and content are required.");
 });
 
+test("WhatsApp config update rejects malformed owner settings", async () => {
+  let updateCalls = 0;
+  const response = await createStandaloneApiHandler({
+    whatsappModule: fakeWhatsAppModule({
+      updateConfig() {
+        updateCalls += 1;
+        throw new Error("invalid config should not reach WhatsApp module");
+      },
+    }),
+  })({
+    method: "PATCH",
+    path: "/v1/channels/whatsapp/config",
+    body: {
+      business_name: " ",
+    },
+  });
+
+  assert.equal(response.status, 400);
+  assert.equal((response.body as PlatformErrorResponse).error.message, "business_name must be a non-empty string.");
+  assert.equal(updateCalls, 0);
+});
+
 test("enabled WhatsApp readiness and simulation routes delegate to the module", async () => {
   const calls: string[] = [];
   const handler = createStandaloneApiHandler({

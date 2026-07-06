@@ -185,6 +185,10 @@ Configure the owner-facing WhatsApp module through backend APIs:
 - `GET /v1/channels/whatsapp/conversations/{id}/messages`
 - `GET /v1/channels/whatsapp/readiness`
 
+Use readiness before exposing the channel to customers. Production readiness
+requires database storage, AI provider config, reservation tools, a valid
+business config/default service id, and a connected WhatsApp session.
+
 ## Hosted Container Deployment
 
 Any container host should use:

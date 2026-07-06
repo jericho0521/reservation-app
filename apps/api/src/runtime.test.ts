@@ -70,6 +70,7 @@ test("standalone Supabase env factory wires WhatsApp memory store only with expl
     RESERVATION_WHATSAPP_ENABLED: "true",
     RESERVATION_WHATSAPP_PROVIDER: "session_qr",
     RESERVATION_WHATSAPP_ALLOW_MEMORY_STORE: "true",
+    RESERVATION_WHATSAPP_SIMULATION_ENABLED: "true",
   }, {
     createClient() {
       throw new Error("createClient should not be called for WhatsApp session mode only");
@@ -79,10 +80,24 @@ test("standalone Supabase env factory wires WhatsApp memory store only with expl
   assert.equal(typeof dependencies.whatsappModule?.startSession, "function");
   const status = await dependencies.whatsappModule?.sessionStatus();
   const config = await dependencies.whatsappModule?.getConfig();
+  const readiness = await dependencies.whatsappModule?.readiness() as {
+    production_ready?: boolean;
+    simulation_enabled?: boolean;
+    missing_requirements?: string[];
+  };
 
   assert.equal(status?.provider, "session_qr");
   assert.equal(status?.status, "disconnected");
   assert.equal(config?.business_name, "Reservation Business");
+  assert.equal(readiness.production_ready, false);
+  assert.equal(readiness.simulation_enabled, true);
+  assert.deepEqual(readiness.missing_requirements, [
+    "database",
+    "ai_provider",
+    "reservation_tools",
+    "default_service_id",
+    "whatsapp_connected",
+  ]);
 });
 
 test("standalone Supabase env factory wires JWT/JWKS verifier without Supabase config", async () => {

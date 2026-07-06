@@ -264,8 +264,8 @@ export function useBookingFlow({
       ...(selectedSlot?.taken_resource_labels ?? []),
       ...(selectedSlot?.maintenance_resource_labels ?? []),
     ]);
-    const availableResourceIds = new Set((availability.data?.resources ?? []).map((resource) => resource.resource_id));
-    const next = selectedResources.filter((resource) => (
+    const availableResourceIds = new Set((availability.data?.resources ?? []).map((resource: ResourceResponse) => resource.resource_id));
+    const next = selectedResources.filter((resource: ResourceResponse) => (
       availableResourceIds.has(resource.resource_id)
         && resource.is_active
         && !unavailable.has(resource.label)
@@ -293,8 +293,8 @@ export function useBookingFlow({
     date,
     selectedSlot,
     quantity,
-    selectedResourceIds: selectedResources.map((resource) => resource.resource_id),
-    selectedResourceLabels: selectedResources.map((resource) => resource.label),
+    selectedResourceIds: selectedResources.map((resource: ResourceResponse) => resource.resource_id),
+    selectedResourceLabels: selectedResources.map((resource: ResourceResponse) => resource.label),
     customer,
     purpose,
     submitting,

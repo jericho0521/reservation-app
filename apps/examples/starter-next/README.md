@@ -3,6 +3,9 @@
 Frontend-only starter that consumes the modular booking platform through
 `@reservation-platform/ui`.
 
+This is the canonical forkable starter. Edit `reservation.config.ts` to point at
+your backend and service.
+
 Required env:
 
 ```powershell

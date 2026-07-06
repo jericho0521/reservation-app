@@ -2,6 +2,8 @@
 
 Forkable room booking frontend powered by `@reservation-platform/ui`.
 
+Edit `reservation.config.ts` for labels, theme, backend URL, and service id.
+
 Required env:
 
 ```powershell

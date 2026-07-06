@@ -2,6 +2,9 @@
 
 Forkable racing simulator frontend powered by `@reservation-platform/ui`.
 
+Edit `reservation.config.ts` for racing-specific labels, theme, backend URL,
+and service id.
+
 Required env:
 
 ```powershell

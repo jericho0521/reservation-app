@@ -25,13 +25,16 @@ import {
 } from "./types.js";
 
 export interface BookingFlowProps {
-  serviceId: string;
+  serviceId?: string;
   baseUrl?: string;
   labels?: Partial<BookingLabels>;
   theme?: ThemeClasses;
   className?: string;
   initialDate?: string;
   initialQuantity?: number;
+  useExistingProvider?: boolean;
+  setupErrorTitle?: string;
+  setupErrorMessage?: string;
 }
 
 function mergeLabels(labels?: Partial<BookingLabels>): BookingLabels {
@@ -73,7 +76,20 @@ export function BookingFlow({
   className,
   initialDate,
   initialQuantity,
+  useExistingProvider = false,
+  setupErrorTitle = "Reservation backend configuration required",
+  setupErrorMessage = "Set the backend base URL and service id, or wrap BookingFlow in ReservationProvider and pass a service id.",
 }: BookingFlowProps) {
+  if (!serviceId || (!baseUrl && !useExistingProvider)) {
+    return (
+      <BookingSetupError
+        title={setupErrorTitle}
+        message={setupErrorMessage}
+        className={className}
+      />
+    );
+  }
+
   const content = (
     <BookingFlowInner
       serviceId={serviceId}
@@ -88,6 +104,23 @@ export function BookingFlow({
   return baseUrl ? <ReservationProvider baseUrl={baseUrl}>{content}</ReservationProvider> : content;
 }
 
+export function BookingSetupError({
+  title,
+  message,
+  className,
+}: {
+  title: string;
+  message: string;
+  className?: string;
+}) {
+  return (
+    <section className={cn("rp-setup-error border border-red-600 bg-red-50 p-6 text-red-800 rounded-none", className)}>
+      <h2 className="rp-setup-error-title text-lg font-bold">{title}</h2>
+      <p className="rp-setup-error-message mt-2 text-sm">{message}</p>
+    </section>
+  );
+}
+
 function BookingFlowInner({
   serviceId,
   labels,
@@ -95,7 +128,7 @@ function BookingFlowInner({
   className,
   initialDate,
   initialQuantity,
-}: Omit<BookingFlowProps, "baseUrl">) {
+}: Omit<BookingFlowProps, "baseUrl" | "serviceId"> & { serviceId: string }) {
   const mergedLabels = mergeLabels(labels);
   const mergedTheme = mergeTheme(theme);
   const flow = useBookingFlow({ serviceId, initialDate, initialQuantity });

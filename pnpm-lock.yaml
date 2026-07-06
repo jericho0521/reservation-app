@@ -253,13 +253,13 @@ importers:
       '@reservation-platform/react':
         specifier: workspace:^
         version: link:../reservation-react
-      react:
-        specifier: '>=18'
-        version: 19.2.7
     devDependencies:
       '@types/react':
         specifier: ^19
         version: 19.2.17
+      react:
+        specifier: ^19.2.3
+        version: 19.2.7
       tsx:
         specifier: ^4.21.0
         version: 4.21.0

@@ -46,7 +46,7 @@ flowchart LR
 | `packages/contract-types` | Public API DTOs, schemas, OpenAPI artifacts, and shared contract types. |
 | `packages/sdk` | TypeScript client package for external frontend and server consumers. |
 | `packages/reservation-react` | Headless React provider and booking hooks. |
-| `packages/reservation-ui` | Tailwind-ready booking components built on the React hooks. |
+| `packages/reservation-ui` | Plug-and-play booking UI, config helper, and Tailwind-ready components built on the React hooks. |
 | `packages/ai-chat` | Optional provider-neutral AI workflow and agent runtime package. |
 | `packages/reservation-chat-core` | Core reservation chat workflow contracts and helpers. |
 | `packages/whatsapp` | Optional backend WhatsApp channel module with QR session mode, knowledge/config storage, and AI booking automation. |
@@ -141,6 +141,23 @@ corepack pnpm --filter @reservation-platform/example-racing-simulator run dev
 
 These are safe locally. They start frontend-only dev servers on ports 4200 and
 4202.
+
+Each example uses `reservation.config.ts` and `createBookingFlowConfig()` from
+`@reservation-platform/ui`. A new frontend can start with:
+
+```tsx
+import "@reservation-platform/ui/styles.css";
+import { BookingFlow, createBookingFlowConfig } from "@reservation-platform/ui";
+
+const config = createBookingFlowConfig({
+  apiBaseUrl: process.env.NEXT_PUBLIC_RESERVATION_PLATFORM_BASE_URL,
+  serviceId: process.env.NEXT_PUBLIC_RESERVATION_SERVICE_ID,
+});
+
+export default function Page() {
+  return <BookingFlow {...config.booking} />;
+}
+```
 
 ## Use From Another Frontend
 

@@ -1,4 +1,6 @@
-const config = {
+import { createBookingFlowConfig } from "@reservation-platform/ui";
+
+const config = createBookingFlowConfig({
   apiBaseUrl: process.env.NEXT_PUBLIC_RESERVATION_PLATFORM_BASE_URL,
   serviceId: process.env.NEXT_PUBLIC_RESERVATION_SERVICE_ID,
   labels: {
@@ -16,6 +18,6 @@ const config = {
     selected: "border-amber-400 bg-amber-400 text-slate-950",
     muted: "text-sm text-slate-400",
   },
-};
+});
 
 export default config;

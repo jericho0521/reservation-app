@@ -5,11 +5,14 @@ import type { AvailabilitySlot, ResourceResponse } from "@reservation-platform/c
 
 import {
   AvailabilityTimeline,
+  BookingFlow,
+  BookingSetupError,
   ReservationError,
   ResourceSelector,
   getBookingControlVisibility,
   shouldSyncQuantityToSelectedResources,
 } from "./components.js";
+import { createBookingFlowConfig } from "./config.js";
 import { defaultThemeClasses } from "./types.js";
 
 function childrenOf(node: unknown): unknown[] {
@@ -104,6 +107,24 @@ test("ReservationError renders a safe fallback message", () => {
   const element = ReservationError({});
 
   assert.match(flattenText(element), /Reservation request failed/);
+});
+
+test("BookingFlow renders setup guidance when config is incomplete", () => {
+  const element = BookingFlow(createBookingFlowConfig({
+    apiBaseUrl: "",
+    serviceId: "",
+  }).booking);
+
+  assert.equal((element as { type?: unknown }).type, BookingSetupError);
+});
+
+test("BookingSetupError explains missing backend configuration", () => {
+  const element = BookingSetupError({
+    title: "Reservation backend configuration required",
+    message: "Set the backend base URL and service id.",
+  });
+
+  assert.match(flattenText(element), /backend configuration required/i);
 });
 
 test("getBookingControlVisibility keeps quantity services as capacity booking", () => {

@@ -1,0 +1,1377 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Backend Modules Developer and User Manual</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f4f6f8;
+      --panel: #ffffff;
+      --ink: #172033;
+      --muted: #5b667a;
+      --line: #d9dee8;
+      --accent: #176b87;
+      --accent-strong: #0f4f67;
+      --accent-soft: #dff3f7;
+      --secondary: #7a4e12;
+      --secondary-soft: #fff1d6;
+      --code-bg: #101827;
+      --code-ink: #f3f7ff;
+      --warn-bg: #fff7df;
+      --warn-line: #d8a928;
+      --ok-bg: #edf9f1;
+      --ok-line: #39a464;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: linear-gradient(180deg, #eef3f6 0, var(--bg) 360px);
+      color: var(--ink);
+      font: 16px/1.55 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    a {
+      color: var(--accent-strong);
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 280px minmax(0, 1fr);
+      min-height: 100vh;
+    }
+
+    nav {
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      overflow: auto;
+      padding: 28px 22px;
+      background: #eef2f6;
+      border-right: 1px solid var(--line);
+    }
+
+    nav h1 {
+      margin: 0 0 6px;
+      font-size: 20px;
+      line-height: 1.2;
+    }
+
+    nav p {
+      margin: 0 0 18px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    nav a {
+      display: block;
+      padding: 7px 0;
+      color: #233044;
+      text-decoration: none;
+      font-size: 14px;
+    }
+
+    nav a:hover {
+      color: var(--accent);
+      text-decoration: underline;
+    }
+
+    main {
+      max-width: 1180px;
+      padding: 42px 48px 80px;
+    }
+
+    header {
+      margin-bottom: 36px;
+      padding: 34px;
+      border: 1px solid #c9d7df;
+      border-radius: 10px;
+      background:
+        radial-gradient(circle at 92% 12%, rgba(23, 107, 135, .18), transparent 34%),
+        linear-gradient(135deg, #ffffff 0%, #eef7f9 100%);
+      box-shadow: 0 18px 42px rgba(21, 36, 54, .08);
+    }
+
+    header h1 {
+      margin: 0 0 10px;
+      font-size: clamp(34px, 5vw, 52px);
+      line-height: 1.05;
+    }
+
+    header p {
+      max-width: 820px;
+      margin: 0 0 18px;
+      color: var(--muted);
+      font-size: 18px;
+    }
+
+    section {
+      margin: 36px 0;
+      padding: 28px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      box-shadow: 0 8px 24px rgba(21, 36, 54, .05);
+    }
+
+    h2 {
+      margin: 0 0 16px;
+      font-size: 28px;
+      line-height: 1.2;
+    }
+
+    h3 {
+      margin: 26px 0 10px;
+      font-size: 20px;
+    }
+
+    h4 {
+      margin: 20px 0 8px;
+      font-size: 16px;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+      color: var(--muted);
+    }
+
+    p {
+      margin: 0 0 14px;
+    }
+
+    ul,
+    ol {
+      margin: 0 0 16px 22px;
+      padding: 0;
+    }
+
+    li {
+      margin: 6px 0;
+    }
+
+    code {
+      padding: 2px 5px;
+      background: #edf0f5;
+      border-radius: 4px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: .92em;
+    }
+
+    pre {
+      overflow: auto;
+      margin: 14px 0 20px;
+      padding: 18px;
+      background: var(--code-bg);
+      color: var(--code-ink);
+      border-radius: 8px;
+      font-size: 14px;
+      line-height: 1.45;
+    }
+
+    pre code {
+      padding: 0;
+      background: transparent;
+      color: inherit;
+      border-radius: 0;
+    }
+
+    table {
+      width: 100%;
+      margin: 14px 0 22px;
+      border-collapse: collapse;
+      font-size: 14px;
+    }
+
+    th,
+    td {
+      padding: 10px 12px;
+      text-align: left;
+      vertical-align: top;
+      border: 1px solid var(--line);
+    }
+
+    th {
+      background: #f1f4f8;
+    }
+
+    .callout {
+      margin: 18px 0;
+      padding: 14px 16px;
+      border-left: 4px solid var(--accent);
+      background: #edf7fa;
+      border-radius: 6px;
+    }
+
+    .callout.warning {
+      border-left-color: var(--warn-line);
+      background: var(--warn-bg);
+    }
+
+    .callout.success {
+      border-left-color: var(--ok-line);
+      background: var(--ok-bg);
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 16px;
+    }
+
+    .tile {
+      padding: 16px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fbfcfe;
+    }
+
+    .tile h3 {
+      margin-top: 0;
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      margin: 0 0 14px;
+      color: var(--accent-strong);
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+
+    .hero-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 20px;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      min-height: 30px;
+      padding: 5px 10px;
+      border: 1px solid #b8d6df;
+      border-radius: 999px;
+      background: var(--accent-soft);
+      color: #123f50;
+      font-size: 13px;
+      font-weight: 650;
+    }
+
+    .badge.secondary {
+      border-color: #e2c47f;
+      background: var(--secondary-soft);
+      color: var(--secondary);
+    }
+
+    .diagram {
+      margin: 20px 0 26px;
+      padding: 18px;
+      border: 1px solid #cad8df;
+      border-radius: 10px;
+      background: #fbfdfe;
+    }
+
+    .diagram h3 {
+      margin-top: 0;
+    }
+
+    .diagram svg {
+      display: block;
+      width: 100%;
+      height: auto;
+    }
+
+    .flow-label {
+      font: 600 14px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      fill: #172033;
+    }
+
+    .flow-small {
+      font: 12px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      fill: #5b667a;
+    }
+
+    .timeline {
+      display: grid;
+      gap: 12px;
+      margin: 16px 0 22px;
+      counter-reset: step;
+    }
+
+    .step {
+      position: relative;
+      padding: 14px 16px 14px 52px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fbfcfe;
+    }
+
+    .step::before {
+      counter-increment: step;
+      content: counter(step);
+      position: absolute;
+      left: 16px;
+      top: 14px;
+      display: grid;
+      place-items: center;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: var(--accent);
+      color: white;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .step strong {
+      display: block;
+      margin-bottom: 3px;
+    }
+
+    @media (max-width: 860px) {
+      .layout {
+        display: block;
+      }
+
+      nav {
+        position: static;
+        height: auto;
+      }
+
+      main {
+        padding: 28px 18px 56px;
+      }
+
+      section {
+        padding: 20px;
+      }
+
+      .grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <nav aria-label="Table of contents">
+      <h1>Backend Modules Manual</h1>
+      <p>Developer implementation and owner/staff usage guide.</p>
+      <a href="#overview">Overview</a>
+      <a href="#prerequisites">Prerequisites</a>
+      <a href="#repo-map">Repository Map</a>
+      <a href="#install-setup">Install and First Run</a>
+      <a href="#mental-model">Mental Model</a>
+      <a href="#developer-quick-start">Developer Quick Start</a>
+      <a href="#manifest">Module Manifest</a>
+      <a href="#environment">Environment Variables</a>
+      <a href="#docker">Docker Implementation</a>
+      <a href="#database">Database and Migrations</a>
+      <a href="#whatsapp-dev">WhatsApp Developer Setup</a>
+      <a href="#api-reference">API Reference</a>
+      <a href="#staff-user-manual">Staff User Manual</a>
+      <a href="#readiness">Readiness Checklist</a>
+      <a href="#troubleshooting">Troubleshooting</a>
+      <a href="#extension-guide">Adding Modules Later</a>
+    </nav>
+
+    <main>
+      <header>
+        <div class="eyebrow">Reservation Platform Backend</div>
+        <h1>Backend Modules Developer and User Manual</h1>
+        <p>
+          This manual explains how the modular reservation backend is configured,
+          deployed, and operated. It covers the developer workflow for enabling
+          modules and the staff workflow for using WhatsApp automation, knowledge
+          base replies, and manual takeover.
+        </p>
+        <div class="hero-actions" aria-label="Manual summary">
+          <span class="badge">One business per backend</span>
+          <span class="badge">Manifest-driven modules</span>
+          <span class="badge secondary">Secrets stay in env</span>
+          <span class="badge secondary">WhatsApp and in-app chat are separate</span>
+        </div>
+      </header>
+
+      <section id="overview">
+        <h2>Overview</h2>
+        <p>
+          The backend is designed as a one-business-per-backend reservation
+          platform. A backend can enable reservation APIs, backend AI provider
+          infrastructure, and WhatsApp booking automation through a runtime
+          module manifest. The in-app reservation chat is primarily a
+          frontend-owned experience and remains a reserved integration point in
+          this backend manifest. The manifest answers "which modules should this
+          backend run?" while environment variables answer "what secrets and
+          infrastructure should this backend use?"
+        </p>
+        <div class="diagram" aria-label="Module architecture diagram">
+          <h3>Module Architecture</h3>
+          <svg viewBox="0 0 960 330" role="img" aria-labelledby="module-diagram-title module-diagram-desc">
+            <title id="module-diagram-title">Backend module architecture</title>
+            <desc id="module-diagram-desc">The manifest and environment configure the API runtime, which wires reservations, AI infrastructure, WhatsApp automation, and future frontend chat integration.</desc>
+            <defs>
+              <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+                <path d="M0,0 L0,6 L9,3 z" fill="#176b87"></path>
+              </marker>
+            </defs>
+            <rect x="30" y="40" width="180" height="86" rx="10" fill="#dff3f7" stroke="#8fc8d8"></rect>
+            <text x="120" y="76" text-anchor="middle" class="flow-label">Manifest JSON</text>
+            <text x="120" y="101" text-anchor="middle" class="flow-small">module selection</text>
+
+            <rect x="30" y="190" width="180" height="86" rx="10" fill="#fff1d6" stroke="#e2c47f"></rect>
+            <text x="120" y="226" text-anchor="middle" class="flow-label">Environment</text>
+            <text x="120" y="251" text-anchor="middle" class="flow-small">secrets and infra</text>
+
+            <rect x="310" y="115" width="230" height="92" rx="12" fill="#ffffff" stroke="#9fb5c1" stroke-width="2"></rect>
+            <text x="425" y="153" text-anchor="middle" class="flow-label">Standalone API Runtime</text>
+            <text x="425" y="180" text-anchor="middle" class="flow-small">validates and wires modules</text>
+
+            <rect x="650" y="30" width="230" height="58" rx="10" fill="#edf9f1" stroke="#93cfa7"></rect>
+            <text x="765" y="65" text-anchor="middle" class="flow-label">Reservations</text>
+
+            <rect x="650" y="106" width="230" height="58" rx="10" fill="#edf7fa" stroke="#91c8d6"></rect>
+            <text x="765" y="141" text-anchor="middle" class="flow-label">Backend AI Runtime</text>
+
+            <rect x="650" y="182" width="230" height="58" rx="10" fill="#fff7df" stroke="#d8bd73"></rect>
+            <text x="765" y="217" text-anchor="middle" class="flow-label">WhatsApp Automation</text>
+
+            <rect x="650" y="258" width="230" height="58" rx="10" fill="#f2f3f6" stroke="#cbd3dd" stroke-dasharray="6 5"></rect>
+            <text x="765" y="292" text-anchor="middle" class="flow-label">Future In-App Chat API</text>
+
+            <line x1="210" y1="83" x2="310" y2="145" stroke="#176b87" stroke-width="2.5" marker-end="url(#arrow)"></line>
+            <line x1="210" y1="233" x2="310" y2="178" stroke="#176b87" stroke-width="2.5" marker-end="url(#arrow)"></line>
+            <line x1="540" y1="145" x2="650" y2="59" stroke="#176b87" stroke-width="2.5" marker-end="url(#arrow)"></line>
+            <line x1="540" y1="156" x2="650" y2="135" stroke="#176b87" stroke-width="2.5" marker-end="url(#arrow)"></line>
+            <line x1="540" y1="169" x2="650" y2="211" stroke="#176b87" stroke-width="2.5" marker-end="url(#arrow)"></line>
+            <line x1="540" y1="185" x2="650" y2="287" stroke="#9aa5b1" stroke-width="2.5" stroke-dasharray="6 5" marker-end="url(#arrow)"></line>
+          </svg>
+        </div>
+        <div class="grid">
+          <div class="tile">
+            <h3>For developers</h3>
+            <p>
+              Create a JSON manifest, keep secrets in environment variables,
+              run migrations, start the backend, and use readiness endpoints to
+              verify the channel before exposing it.
+            </p>
+          </div>
+          <div class="tile">
+            <h3>For owners and staff</h3>
+            <p>
+              Connect the WhatsApp account by QR, configure business settings,
+              add knowledge base entries, monitor readiness, and take over
+              conversations when a human response is needed.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section id="prerequisites">
+        <h2>Prerequisites</h2>
+        <p>
+          Install and prepare these before implementing or running backend
+          modules. This project is a pnpm TypeScript monorepo with a Node-based
+          backend and optional Docker deployment.
+        </p>
+
+        <table>
+          <thead>
+            <tr>
+              <th>Requirement</th>
+              <th>Why it is needed</th>
+              <th>How to check</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Git</td>
+              <td>Clone the repository, create branches, and commit module changes.</td>
+              <td><code>git --version</code></td>
+            </tr>
+            <tr>
+              <td>Node.js 24 or a compatible modern Node runtime</td>
+              <td>Runs the standalone API, repository scripts, TypeScript builds, and tests.</td>
+              <td><code>node --version</code></td>
+            </tr>
+            <tr>
+              <td>Corepack</td>
+              <td>Activates the pinned package manager used by the repo.</td>
+              <td><code>corepack --version</code></td>
+            </tr>
+            <tr>
+              <td>pnpm 10.33.2</td>
+              <td>Installs workspace dependencies and runs package scripts.</td>
+              <td><code>corepack pnpm --version</code></td>
+            </tr>
+            <tr>
+              <td>Docker and Docker Compose</td>
+              <td>Builds and runs the backend container and mounted runtime config.</td>
+              <td><code>docker --version</code> and <code>docker compose version</code></td>
+            </tr>
+            <tr>
+              <td>Supabase/Postgres project</td>
+              <td>Required for production persistence: reservations, WhatsApp sessions, knowledge, conversations, messages, and audit metadata.</td>
+              <td>Confirm you have a Supabase URL, anon key, and service-role key.</td>
+            </tr>
+            <tr>
+              <td>Backend auth decision</td>
+              <td>Owner/staff routes should be protected by either service-token auth or JWT/JWKS auth.</td>
+              <td>Prepare <code>RESERVATION_PLATFORM_SERVICE_API_KEY</code> or JWKS issuer/audience values.</td>
+            </tr>
+            <tr>
+              <td>AI provider account</td>
+              <td>Required when <code>modules.ai.enabled=true</code> or WhatsApp automation is enabled.</td>
+              <td>Prepare an API key, base URL, and model name.</td>
+            </tr>
+            <tr>
+              <td>Business WhatsApp account or test phone</td>
+              <td>Required to scan the linked-device QR code for the WhatsApp module.</td>
+              <td>Confirm the WhatsApp app can link a device.</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div class="callout warning">
+          <strong>Production requirement:</strong> do not rely on memory storage
+          outside local testing. Production needs Supabase/Postgres, applied
+          migrations, backend auth, AI credentials, and a persistent WhatsApp
+          session auth directory.
+        </div>
+      </section>
+
+      <section id="repo-map">
+        <h2>Repository Map</h2>
+        <p>
+          Developers install and run this repository as the backend platform.
+          Frontend applications can be separate repositories; they should call
+          this backend through <code>/v1</code> routes or the SDK instead of
+          importing backend-only packages.
+        </p>
+
+        <table>
+          <thead>
+            <tr>
+              <th>Path</th>
+              <th>What it contains</th>
+              <th>When to edit it</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>apps/api</code></td>
+              <td>Standalone API server, route handlers, runtime module wiring, deployment config.</td>
+              <td>Edit when adding API routes, changing runtime env handling, or wiring modules.</td>
+            </tr>
+            <tr>
+              <td><code>packages/platform-config</code></td>
+              <td>Strict parser and validator for backend module manifests.</td>
+              <td>Edit when adding module keys, manifest defaults, or dependency validation.</td>
+            </tr>
+            <tr>
+              <td><code>packages/whatsapp</code></td>
+              <td>WhatsApp session service, storage adapters, business module, booking automation, and staff takeover behavior.</td>
+              <td>Edit when changing WhatsApp connection, replies, knowledge use, storage, or manual takeover.</td>
+            </tr>
+            <tr>
+              <td><code>packages/database/migrations/supabase</code></td>
+              <td>Package-owned Supabase migrations.</td>
+              <td>Edit when a backend module needs new persistent schema.</td>
+            </tr>
+            <tr>
+              <td><code>configs</code></td>
+              <td>Example backend module manifests.</td>
+              <td>Copy or edit when creating a module selection for a business.</td>
+            </tr>
+            <tr>
+              <td><code>Dockerfile</code> and <code>docker-compose.yml</code></td>
+              <td>Container build, runtime env, mounted manifest, and WhatsApp session volume.</td>
+              <td>Edit when deployment paths, volumes, or runtime package copies change.</td>
+            </tr>
+            <tr>
+              <td><code>.env.example</code></td>
+              <td>Documented environment variables for local and Docker runs.</td>
+              <td>Edit when adding runtime env vars or changing defaults.</td>
+            </tr>
+            <tr>
+              <td><code>scripts</code></td>
+              <td>Verification scripts for deployment, migrations, package boundaries, and extraction checks.</td>
+              <td>Edit when adding guardrails for new module behavior.</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h3>Workspace packages involved</h3>
+        <ul>
+          <li><code>@reservation-platform/standalone-api-skeleton</code>: runnable API app in <code>apps/api</code>.</li>
+          <li><code>@reservation-platform/platform-config</code>: manifest loading and validation.</li>
+          <li><code>@reservation-platform/whatsapp</code>: WhatsApp automation and staff takeover.</li>
+          <li><code>@reservation-platform/ai-chat</code>: provider-neutral AI runtime used by WhatsApp automation.</li>
+          <li><code>@reservation-platform/api</code>: reservation service contracts and orchestration.</li>
+          <li><code>@project-play/reservations-supabase</code>: Supabase repository adapters.</li>
+          <li><code>@reservation-platform/database</code>: database migration bundle ownership.</li>
+        </ul>
+      </section>
+
+      <section id="install-setup">
+        <h2>Install and First Run</h2>
+        <div class="timeline" aria-label="Install and first-run sequence">
+          <div class="step">
+            <strong>Clone the backend repository.</strong>
+            Pull the monorepo that contains <code>apps/api</code>, backend packages, Docker files, and docs.
+          </div>
+          <div class="step">
+            <strong>Activate pnpm through Corepack.</strong>
+            Use the package manager version pinned by the repository.
+          </div>
+          <div class="step">
+            <strong>Install workspace dependencies.</strong>
+            This installs all packages used by the API runtime and module tests.
+          </div>
+          <div class="step">
+            <strong>Create local environment config.</strong>
+            Copy <code>.env.example</code>, then add secrets and runtime settings.
+          </div>
+          <div class="step">
+            <strong>Verify and run.</strong>
+            Build packages, run deployment checks, then start the backend locally or with Docker.
+          </div>
+        </div>
+
+        <h3>1. Clone the repository</h3>
+        <pre><code>git clone &lt;repository-url&gt;
+cd reservation-app</code></pre>
+
+        <h3>2. Enable the pinned package manager</h3>
+        <pre><code>corepack enable
+corepack prepare pnpm@10.33.2 --activate
+corepack pnpm --version</code></pre>
+
+        <h3>3. Install dependencies</h3>
+        <pre><code>corepack pnpm install</code></pre>
+
+        <h3>4. Create a local environment file</h3>
+        <pre><code>cp .env.example .env</code></pre>
+        <p>
+          Fill in Supabase keys, backend auth, and AI credentials. Keep
+          <code>.env</code> local and never commit real secrets.
+        </p>
+
+        <h3>5. Verify the workspace</h3>
+        <pre><code>corepack pnpm run packages:build
+corepack pnpm run deploy:verify
+corepack pnpm run database:verify-migration-bundle</code></pre>
+
+        <h3>6. Run the backend locally</h3>
+        <pre><code>corepack pnpm dev</code></pre>
+        <p>Check the health endpoint:</p>
+        <pre><code>curl http://localhost:4100/v1/health</code></pre>
+
+        <h3>7. Run the backend with Docker Compose</h3>
+        <pre><code>corepack pnpm run docker:compose:up</code></pre>
+        <p>
+          Compose mounts <code>configs/racing-sim.platform.json</code> into the
+          container, but does not load it by default. To opt in, set this in
+          <code>.env</code>:
+        </p>
+        <pre><code>RESERVATION_PLATFORM_CONFIG_PATH=/app/config/platform.json</code></pre>
+        <p>
+          If that manifest enables AI and WhatsApp automation, also provide
+          <code>AI_AGENT_API_KEY</code> and complete Supabase settings.
+        </p>
+      </section>
+
+      <section id="mental-model">
+        <h2>Mental Model</h2>
+        <p>The system has four important layers.</p>
+        <table>
+          <thead>
+            <tr>
+              <th>Layer</th>
+              <th>Purpose</th>
+              <th>Examples</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Manifest</td>
+              <td>Selects enabled backend modules and non-secret model settings.</td>
+              <td><code>configs/racing-sim.platform.json</code>, <code>RESERVATION_PLATFORM_CONFIG_PATH</code></td>
+            </tr>
+            <tr>
+              <td>Environment</td>
+              <td>Provides secrets, database URLs, auth config, and local dev toggles.</td>
+              <td><code>AI_AGENT_API_KEY</code>, Supabase keys, service API key</td>
+            </tr>
+            <tr>
+              <td>Runtime</td>
+              <td>Loads the manifest, validates dependencies, wires repositories and modules.</td>
+              <td><code>apps/api/src/runtime.ts</code></td>
+            </tr>
+            <tr>
+              <td>Owner APIs</td>
+              <td>Let staff configure WhatsApp, knowledge, sessions, and manual takeover.</td>
+              <td><code>/v1/channels/whatsapp/*</code></td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="callout">
+          <strong>Important:</strong> customers should not see AI-specific UI or
+          labels. The AI is an internal automation mechanism behind the business
+          WhatsApp channel.
+        </div>
+      </section>
+
+      <section id="developer-quick-start">
+        <h2>Developer Quick Start</h2>
+        <p>
+          Choose the path that matches what you are trying to prove. Do not use
+          local memory mode as a production shortcut.
+        </p>
+
+        <div class="diagram" aria-label="Implementation path diagram">
+          <h3>Implementation Path</h3>
+          <svg viewBox="0 0 960 210" role="img" aria-labelledby="implementation-path-title implementation-path-desc">
+            <title id="implementation-path-title">Developer implementation path</title>
+            <desc id="implementation-path-desc">The path from installing the repository through manifest setup, environment setup, database migrations, Docker deployment, readiness, and staff operations.</desc>
+            <defs>
+              <marker id="arrow3" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+                <path d="M0,0 L0,6 L9,3 z" fill="#176b87"></path>
+              </marker>
+            </defs>
+            <rect x="24" y="62" width="118" height="72" rx="10" fill="#ffffff" stroke="#9fb5c1"></rect>
+            <text x="83" y="92" text-anchor="middle" class="flow-label">Install</text>
+            <text x="83" y="115" text-anchor="middle" class="flow-small">pnpm workspace</text>
+
+            <rect x="176" y="62" width="128" height="72" rx="10" fill="#dff3f7" stroke="#8fc8d8"></rect>
+            <text x="240" y="92" text-anchor="middle" class="flow-label">Manifest</text>
+            <text x="240" y="115" text-anchor="middle" class="flow-small">choose modules</text>
+
+            <rect x="338" y="62" width="128" height="72" rx="10" fill="#fff1d6" stroke="#e2c47f"></rect>
+            <text x="402" y="92" text-anchor="middle" class="flow-label">Env</text>
+            <text x="402" y="115" text-anchor="middle" class="flow-small">secrets and auth</text>
+
+            <rect x="500" y="62" width="128" height="72" rx="10" fill="#edf9f1" stroke="#93cfa7"></rect>
+            <text x="564" y="92" text-anchor="middle" class="flow-label">Database</text>
+            <text x="564" y="115" text-anchor="middle" class="flow-small">apply migrations</text>
+
+            <rect x="662" y="62" width="128" height="72" rx="10" fill="#f2f3f6" stroke="#cbd3dd"></rect>
+            <text x="726" y="92" text-anchor="middle" class="flow-label">Run</text>
+            <text x="726" y="115" text-anchor="middle" class="flow-small">local or Docker</text>
+
+            <rect x="824" y="62" width="112" height="72" rx="10" fill="#edf7fa" stroke="#91c8d6"></rect>
+            <text x="880" y="92" text-anchor="middle" class="flow-label">Operate</text>
+            <text x="880" y="115" text-anchor="middle" class="flow-small">readiness/staff</text>
+
+            <line x1="142" y1="98" x2="176" y2="98" stroke="#176b87" stroke-width="2.5" marker-end="url(#arrow3)"></line>
+            <line x1="304" y1="98" x2="338" y2="98" stroke="#176b87" stroke-width="2.5" marker-end="url(#arrow3)"></line>
+            <line x1="466" y1="98" x2="500" y2="98" stroke="#176b87" stroke-width="2.5" marker-end="url(#arrow3)"></line>
+            <line x1="628" y1="98" x2="662" y2="98" stroke="#176b87" stroke-width="2.5" marker-end="url(#arrow3)"></line>
+            <line x1="790" y1="98" x2="824" y2="98" stroke="#176b87" stroke-width="2.5" marker-end="url(#arrow3)"></line>
+          </svg>
+        </div>
+
+        <h3>Path A: inspect or develop backend code without WhatsApp</h3>
+        <ol>
+          <li>Install dependencies with <code>corepack pnpm install</code>.</li>
+          <li>Leave <code>RESERVATION_PLATFORM_CONFIG_PATH</code> blank.</li>
+          <li>Run <code>corepack pnpm dev</code>.</li>
+          <li>Confirm <code>GET /v1/health</code> returns <code>status: ok</code>.</li>
+        </ol>
+
+        <h3>Path B: test manifest parsing and module wiring locally</h3>
+        <ol>
+          <li>Start from <code>configs/racing-sim.platform.json</code>.</li>
+          <li>Set a local manifest path.</li>
+          <li>Provide <code>AI_AGENT_API_KEY</code> if <code>ai.enabled=true</code>.</li>
+          <li>Use memory store only for local testing if no Supabase config is available.</li>
+        </ol>
+        <pre><code>RESERVATION_PLATFORM_CONFIG_PATH=configs/racing-sim.platform.json</code></pre>
+
+        <h3>Path C: run the intended Docker backend</h3>
+        <ol>
+          <li>Copy <code>.env.example</code> to <code>.env</code>.</li>
+          <li>Fill Supabase, backend auth, and AI env vars.</li>
+          <li>Set <code>RESERVATION_PLATFORM_CONFIG_PATH=/app/config/platform.json</code>.</li>
+          <li>Run <code>corepack pnpm run docker:compose:up</code>.</li>
+          <li>Confirm health and WhatsApp readiness.</li>
+        </ol>
+        <pre><code>curl http://localhost:4100/v1/health
+curl -H "Authorization: Bearer $RESERVATION_PLATFORM_SERVICE_API_KEY" \
+  http://localhost:4100/v1/channels/whatsapp/readiness</code></pre>
+
+        <h3>Path D: prepare production</h3>
+        <ol>
+          <li>Apply the package-owned database migrations to the intended Supabase/Postgres project.</li>
+          <li>Use Supabase/Postgres storage, not memory mode.</li>
+          <li>Mount a persistent WhatsApp auth directory.</li>
+          <li>Protect owner routes with service-token or JWT/JWKS auth.</li>
+          <li>Run readiness before giving customers the WhatsApp number.</li>
+        </ol>
+
+        <h3>Core verification commands before merging</h3>
+        <pre><code>corepack pnpm run deploy:verify
+corepack pnpm run database:verify-migration-bundle
+corepack pnpm test</code></pre>
+      </section>
+
+      <section id="manifest">
+        <h2>Module Manifest</h2>
+        <p>
+          The manifest is strict JSON. It must use <code>version: 1</code>,
+          a non-empty <code>app</code> name, and the supported module keys.
+          Unknown modules fail validation so a typo does not silently disable
+          a feature.
+        </p>
+
+        <h3>Supported v1 module keys</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>Module</th>
+              <th>Status</th>
+              <th>Purpose</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>reservations</code></td>
+              <td><span class="badge">Supported</span></td>
+              <td>Reservation catalog, availability, booking, mutation, idempotency, and maintenance APIs.</td>
+            </tr>
+            <tr>
+              <td><code>ai</code></td>
+              <td><span class="badge">Supported</span></td>
+              <td>Backend AI provider runtime used by automations such as WhatsApp. This is infrastructure, not the frontend chat UI.</td>
+            </tr>
+            <tr>
+              <td><code>whatsapp</code></td>
+              <td><span class="badge">Supported</span></td>
+              <td>Self-hosted linked-device QR WhatsApp channel for one business backend.</td>
+            </tr>
+            <tr>
+              <td><code>inAppChat</code></td>
+              <td><span class="badge secondary">Reserved</span></td>
+              <td>Frontend-owned reservation chat experience. The backend manifest keeps this as a future integration point; enabling it currently fails validation.</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h3>Example manifest</h3>
+        <pre><code>{
+  "version": 1,
+  "app": "Racing Sim",
+  "modules": {
+    "reservations": {
+      "enabled": true
+    },
+    "ai": {
+      "enabled": true,
+      "provider": "openai-compatible",
+      "baseUrl": "https://openrouter.ai/api/v1",
+      "model": "openai/gpt-4.1-mini"
+    },
+    "whatsapp": {
+      "enabled": true,
+      "provider": "session_qr",
+      "automation": {
+        "enabled": true,
+        "mode": "booking_assistant",
+        "staffTakeover": {
+          "enabled": true,
+          "autoMessageOnTakeover": false
+        }
+      }
+    },
+    "inAppChat": {
+      "enabled": false
+    }
+  }
+}</code></pre>
+
+        <h3>Validation rules</h3>
+        <ul>
+          <li><code>version</code> must be <code>1</code>.</li>
+          <li><code>app</code> must be a non-empty string.</li>
+          <li>Allowed module keys are <code>reservations</code>, <code>ai</code>, <code>whatsapp</code>, and <code>inAppChat</code>.</li>
+          <li>Omitted modules default to disabled.</li>
+          <li>Secret-like keys such as <code>apiKey</code>, <code>secret</code>, <code>token</code>, and <code>password</code> are rejected.</li>
+          <li><code>whatsapp.automation.enabled=true</code> requires <code>ai.enabled=true</code>.</li>
+          <li><code>whatsapp.automation.mode=booking_assistant</code> requires <code>reservations.enabled=true</code>.</li>
+          <li><code>whatsapp.provider</code> must be <code>session_qr</code>. <code>meta_cloud</code> is reserved but not implemented.</li>
+          <li><code>inAppChat.enabled=true</code> fails in v1 because it is a separate future chatbot runtime.</li>
+        </ul>
+      </section>
+
+      <section id="environment">
+        <h2>Environment Variables</h2>
+        <p>
+          Environment variables carry secrets and deployment-specific wiring.
+          Do not put API keys, service-role keys, passwords, private keys, or
+          tokens in the manifest.
+        </p>
+
+        <h3>Required for Supabase-backed production</h3>
+        <pre><code>RESERVATION_SUPABASE_URL=
+RESERVATION_SUPABASE_ANON_KEY=
+RESERVATION_SUPABASE_SERVICE_ROLE_KEY=</code></pre>
+
+        <h3>Choose one backend auth mode</h3>
+        <pre><code># Simple service-token mode
+RESERVATION_PLATFORM_SERVICE_API_KEY=
+
+# Or JWT/JWKS mode
+RESERVATION_PLATFORM_AUTH_JWKS_URL=
+RESERVATION_PLATFORM_AUTH_ISSUER=
+RESERVATION_PLATFORM_AUTH_AUDIENCE=</code></pre>
+
+        <h3>AI automation secrets</h3>
+        <pre><code>AI_AGENT_API_KEY=</code></pre>
+        <p>
+          The manifest can set <code>provider</code>, <code>baseUrl</code>, and
+          <code>model</code>. The API key stays in env. If the manifest enables
+          <code>ai</code>, startup requires the API key and a complete provider
+          configuration.
+        </p>
+
+        <h3>WhatsApp local and production settings</h3>
+        <pre><code>RESERVATION_WHATSAPP_SESSION_AUTH_DIR=/app/.reservation-whatsapp-sessions
+RESERVATION_WHATSAPP_SESSION_ENCRYPTION_KEY=
+RESERVATION_WHATSAPP_SIMULATION_ENABLED=false
+RESERVATION_WHATSAPP_ALLOW_MEMORY_STORE=false</code></pre>
+        <div class="callout warning">
+          <strong>Production warning:</strong> memory store is for local dev and
+          tests only. Production should use Supabase/Postgres so sessions,
+          conversations, knowledge, messages, and audit history survive restarts.
+        </div>
+      </section>
+
+      <section id="docker">
+        <h2>Docker Implementation</h2>
+        <p>
+          Docker Compose mounts the example manifest and a persistent WhatsApp
+          auth directory. The manifest is opt-in by default to avoid requiring
+          AI credentials for a plain backend boot.
+        </p>
+
+        <h3>Default Compose behavior</h3>
+        <pre><code>RESERVATION_PLATFORM_CONFIG_PATH="${RESERVATION_PLATFORM_CONFIG_PATH:-}"</code></pre>
+        <p>
+          With the default blank value, the backend starts with legacy env-driven
+          module behavior. To load the mounted example manifest, set:
+        </p>
+        <pre><code>RESERVATION_PLATFORM_CONFIG_PATH=/app/config/platform.json</code></pre>
+
+        <h3>Mounted files and volumes</h3>
+        <pre><code>./configs/racing-sim.platform.json:/app/config/platform.json:ro
+./data/whatsapp-sessions:/app/.reservation-whatsapp-sessions</code></pre>
+
+        <h3>Run with Compose</h3>
+        <pre><code>corepack pnpm run docker:compose:up</code></pre>
+        <p>Stop the container with:</p>
+        <pre><code>corepack pnpm run docker:compose:down</code></pre>
+      </section>
+
+      <section id="database">
+        <h2>Database and Migrations</h2>
+        <p>
+          The backend container does not apply migrations at startup. Operators
+          must apply the package-owned Supabase migration bundle intentionally
+          before production traffic.
+        </p>
+        <pre><code>corepack pnpm run database:verify-migration-bundle</code></pre>
+        <h3>Production database setup steps</h3>
+        <ol>
+          <li>Create or select the Supabase/Postgres project for this one business backend.</li>
+          <li>Apply the core SQL files under <code>packages/database/migrations/supabase</code> in order.</li>
+          <li>Confirm the WhatsApp migrations are included if WhatsApp is enabled.</li>
+          <li>Put the matching Supabase URL, anon key, and service-role key in backend env.</li>
+          <li>Start the backend and verify readiness before taking traffic.</li>
+        </ol>
+        <p>
+          The repository currently verifies the migration bundle and metadata.
+          Applying SQL to a live database is an operator action through the
+          team's approved Supabase CLI, dashboard SQL editor, or deployment
+          migration runner.
+        </p>
+        <p>WhatsApp requires the business-agent and staff-takeover migrations:</p>
+        <ul>
+          <li><code>packages/database/migrations/supabase/000012_whatsapp_business_agent.sql</code></li>
+          <li><code>packages/database/migrations/supabase/000013_whatsapp_staff_takeover.sql</code></li>
+        </ul>
+        <p>
+          These migrations persist WhatsApp session state, business config,
+          knowledge entries, conversations, message audit history, and
+          per-conversation automation status.
+        </p>
+      </section>
+
+      <section id="whatsapp-dev">
+        <h2>WhatsApp Developer Setup</h2>
+        <div class="diagram" aria-label="WhatsApp automation flow diagram">
+          <h3>WhatsApp Automation Flow</h3>
+          <svg viewBox="0 0 960 390" role="img" aria-labelledby="whatsapp-flow-title whatsapp-flow-desc">
+            <title id="whatsapp-flow-title">WhatsApp automation and staff takeover flow</title>
+            <desc id="whatsapp-flow-desc">Customer messages enter WhatsApp, the backend stores messages, uses knowledge and reservation tools, sends automated replies, and staff can switch conversations to manual mode.</desc>
+            <defs>
+              <marker id="arrow2" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+                <path d="M0,0 L0,6 L9,3 z" fill="#176b87"></path>
+              </marker>
+            </defs>
+            <rect x="35" y="55" width="150" height="70" rx="10" fill="#edf9f1" stroke="#93cfa7"></rect>
+            <text x="110" y="84" text-anchor="middle" class="flow-label">Customer</text>
+            <text x="110" y="106" text-anchor="middle" class="flow-small">WhatsApp message</text>
+
+            <rect x="260" y="55" width="160" height="70" rx="10" fill="#fff7df" stroke="#d8bd73"></rect>
+            <text x="340" y="84" text-anchor="middle" class="flow-label">WhatsApp</text>
+            <text x="340" y="106" text-anchor="middle" class="flow-small">linked device</text>
+
+            <rect x="500" y="45" width="190" height="90" rx="12" fill="#ffffff" stroke="#9fb5c1" stroke-width="2"></rect>
+            <text x="595" y="80" text-anchor="middle" class="flow-label">Backend Module</text>
+            <text x="595" y="104" text-anchor="middle" class="flow-small">store, decide, reply</text>
+
+            <rect x="770" y="35" width="150" height="56" rx="10" fill="#dff3f7" stroke="#8fc8d8"></rect>
+            <text x="845" y="69" text-anchor="middle" class="flow-label">AI Runtime</text>
+
+            <rect x="770" y="112" width="150" height="56" rx="10" fill="#edf9f1" stroke="#93cfa7"></rect>
+            <text x="845" y="146" text-anchor="middle" class="flow-label">Reservations</text>
+
+            <rect x="770" y="189" width="150" height="56" rx="10" fill="#f2f3f6" stroke="#cbd3dd"></rect>
+            <text x="845" y="223" text-anchor="middle" class="flow-label">Knowledge</text>
+
+            <rect x="500" y="250" width="190" height="78" rx="12" fill="#fff1d6" stroke="#e2c47f"></rect>
+            <text x="595" y="282" text-anchor="middle" class="flow-label">Manual Mode</text>
+            <text x="595" y="306" text-anchor="middle" class="flow-small">AI stops until resume</text>
+
+            <rect x="260" y="250" width="160" height="78" rx="10" fill="#edf7fa" stroke="#91c8d6"></rect>
+            <text x="340" y="282" text-anchor="middle" class="flow-label">Staff</text>
+            <text x="340" y="306" text-anchor="middle" class="flow-small">reply or resume</text>
+
+            <line x1="185" y1="90" x2="260" y2="90" stroke="#176b87" stroke-width="2.5" marker-end="url(#arrow2)"></line>
+            <line x1="420" y1="90" x2="500" y2="90" stroke="#176b87" stroke-width="2.5" marker-end="url(#arrow2)"></line>
+            <line x1="690" y1="73" x2="770" y2="63" stroke="#176b87" stroke-width="2.5" marker-end="url(#arrow2)"></line>
+            <line x1="690" y1="95" x2="770" y2="140" stroke="#176b87" stroke-width="2.5" marker-end="url(#arrow2)"></line>
+            <line x1="690" y1="118" x2="770" y2="217" stroke="#176b87" stroke-width="2.5" marker-end="url(#arrow2)"></line>
+            <line x1="500" y1="118" x2="420" y2="250" stroke="#176b87" stroke-width="2.5" marker-end="url(#arrow2)"></line>
+            <line x1="500" y1="289" x2="420" y2="289" stroke="#176b87" stroke-width="2.5" marker-end="url(#arrow2)"></line>
+            <line x1="340" y1="250" x2="520" y2="135" stroke="#7a4e12" stroke-width="2.5" stroke-dasharray="7 5" marker-end="url(#arrow2)"></line>
+            <text x="442" y="228" class="flow-small">resume automation</text>
+          </svg>
+        </div>
+        <h3>1. Enable the modules</h3>
+        <p>
+          In the manifest, enable <code>reservations</code>, <code>ai</code>,
+          and <code>whatsapp</code>. For booking automation, keep
+          <code>automation.mode</code> as <code>booking_assistant</code>.
+        </p>
+
+        <h3>2. Provide AI and database env</h3>
+        <p>
+          Set <code>AI_AGENT_API_KEY</code> and Supabase values. For OpenRouter,
+          the example manifest already uses <code>https://openrouter.ai/api/v1</code>.
+        </p>
+
+        <h3>3. Start the backend</h3>
+        <pre><code>corepack pnpm dev
+# or
+corepack pnpm run docker:compose:up</code></pre>
+
+        <h3>4. Connect WhatsApp</h3>
+        <p>
+          Start a QR session through the owner API, scan the QR code with the
+          business WhatsApp account, then check readiness.
+        </p>
+
+        <h3>5. Configure knowledge</h3>
+        <p>
+          Add active knowledge entries for opening hours, services, booking
+          rules, pricing, cancellation policy, location, and staff escalation.
+          In v1 the WhatsApp responder can use all active business knowledge.
+        </p>
+      </section>
+
+      <section id="api-reference">
+        <h2>Owner API Reference</h2>
+        <p>
+          Owner routes should be protected by the configured backend auth mode.
+          With service-token auth, send <code>Authorization: Bearer &lt;token&gt;</code>.
+        </p>
+
+        <h3>Session lifecycle</h3>
+        <table>
+          <thead>
+            <tr><th>Method</th><th>Path</th><th>Use</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>POST</td><td><code>/v1/channels/whatsapp/session/start</code></td><td>Start a linked-device QR session.</td></tr>
+            <tr><td>GET</td><td><code>/v1/channels/whatsapp/session/status</code></td><td>Check whether the session is disabled, disconnected, pending QR, connected, or expired.</td></tr>
+            <tr><td>GET</td><td><code>/v1/channels/whatsapp/session/qr</code></td><td>Fetch the current QR payload while pending.</td></tr>
+            <tr><td>POST</td><td><code>/v1/channels/whatsapp/session/logout</code></td><td>Disconnect and clear the current session.</td></tr>
+          </tbody>
+        </table>
+
+        <h3>Business config</h3>
+        <pre><code>PATCH /v1/channels/whatsapp/config
+{
+  "business_name": "Racing Sim",
+  "default_service_id": "service_racing_sim",
+  "fallback_message": "Please wait while staff checks this for you.",
+  "booking_confirmation_required": true,
+  "opening_hours": "Daily 10 AM to 10 PM"
+}</code></pre>
+
+        <h3>Knowledge base</h3>
+        <pre><code>POST /v1/channels/whatsapp/knowledge
+{
+  "title": "Opening hours",
+  "content": "We are open daily from 10 AM to 10 PM.",
+  "tags": ["hours", "operations"],
+  "active": true
+}</code></pre>
+        <table>
+          <thead>
+            <tr><th>Method</th><th>Path</th><th>Use</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>GET</td><td><code>/v1/channels/whatsapp/knowledge</code></td><td>List knowledge entries.</td></tr>
+            <tr><td>POST</td><td><code>/v1/channels/whatsapp/knowledge</code></td><td>Create a knowledge entry.</td></tr>
+            <tr><td>PATCH</td><td><code>/v1/channels/whatsapp/knowledge/{id}</code></td><td>Update title, content, tags, active state, or metadata.</td></tr>
+            <tr><td>DELETE</td><td><code>/v1/channels/whatsapp/knowledge/{id}</code></td><td>Delete a knowledge entry.</td></tr>
+          </tbody>
+        </table>
+
+        <h3>Conversations and staff takeover</h3>
+        <table>
+          <thead>
+            <tr><th>Method</th><th>Path</th><th>Use</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>GET</td><td><code>/v1/channels/whatsapp/conversations</code></td><td>List conversations.</td></tr>
+            <tr><td>GET</td><td><code>/v1/channels/whatsapp/conversations/{id}/messages</code></td><td>Read message history.</td></tr>
+            <tr><td>POST</td><td><code>/v1/channels/whatsapp/conversations/{id}/messages</code></td><td>Send a staff reply and switch to manual mode.</td></tr>
+            <tr><td>PATCH</td><td><code>/v1/channels/whatsapp/conversations/{id}</code></td><td>Set <code>automation_status</code> to <code>manual</code> or <code>automated</code>.</td></tr>
+          </tbody>
+        </table>
+        <pre><code>PATCH /v1/channels/whatsapp/conversations/conversation_123
+{
+  "automation_status": "automated"
+}</code></pre>
+        <div class="callout">
+          Staff takeover routes are exposed only when
+          <code>modules.whatsapp.automation.staffTakeover.enabled=true</code>.
+        </div>
+
+        <h3>Readiness</h3>
+        <pre><code>GET /v1/channels/whatsapp/readiness</code></pre>
+        <p>
+          Readiness reports database, AI provider, reservation tools, business
+          config, default service, session connection, simulation status, and
+          production readiness.
+        </p>
+      </section>
+
+      <section id="staff-user-manual">
+        <h2>Staff User Manual</h2>
+        <h3>What staff need before using it</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>Role</th>
+              <th>Needs access to</th>
+              <th>Main responsibility</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Owner or manager</td>
+              <td>Backend owner dashboard or authenticated API client.</td>
+              <td>Connect WhatsApp, configure business settings, approve readiness, manage knowledge.</td>
+            </tr>
+            <tr>
+              <td>Support staff</td>
+              <td>Conversation dashboard with permission to send staff replies.</td>
+              <td>Monitor conversations, take over when needed, and resume automation after resolving issues.</td>
+            </tr>
+            <tr>
+              <td>Developer/operator</td>
+              <td>Server env, deployment logs, database project, and migration process.</td>
+              <td>Keep the backend running, apply migrations, configure secrets, and troubleshoot readiness failures.</td>
+            </tr>
+          </tbody>
+        </table>
+        <p>
+          Staff should not need direct access to Supabase service-role keys,
+          AI provider API keys, server files, or the module manifest. Those are
+          operator responsibilities.
+        </p>
+
+        <h3>Daily operating workflow</h3>
+        <ol>
+          <li>Open the owner/staff dashboard or API client provided by your frontend.</li>
+          <li>Check WhatsApp readiness before business hours.</li>
+          <li>Confirm the WhatsApp session is connected.</li>
+          <li>Review recent conversations for manual handoffs or unresolved questions.</li>
+          <li>Keep knowledge entries updated when prices, opening hours, services, or policies change.</li>
+        </ol>
+
+        <h3>Connecting WhatsApp</h3>
+        <ol>
+          <li>Start the session from the staff tool.</li>
+          <li>Display the QR code.</li>
+          <li>Open WhatsApp on the business phone and link a device.</li>
+          <li>Scan the QR code.</li>
+          <li>Wait until status becomes <code>connected</code>.</li>
+        </ol>
+
+        <h3>Maintaining the knowledge base</h3>
+        <p>
+          Knowledge entries should be short, factual, and written as business
+          policy. Good entries include:
+        </p>
+        <ul>
+          <li>Opening hours and holiday closures.</li>
+          <li>Available services and default booking duration.</li>
+          <li>Pricing rules and deposits.</li>
+          <li>Cancellation and rescheduling policy.</li>
+          <li>Location, parking, and arrival instructions.</li>
+          <li>Escalation rules for staff help.</li>
+        </ul>
+
+        <h3>How automated replies work</h3>
+        <p>
+          When a customer messages the WhatsApp number, the backend stores the
+          inbound message, checks whether the conversation is automated, gathers
+          active knowledge, and asks the AI agent to produce a business reply.
+          If booking tools are ready, the agent can help with reservation
+          workflows. The customer receives the business reply in WhatsApp.
+        </p>
+
+        <h3>When staff should take over</h3>
+        <ul>
+          <li>The customer is angry, confused, or asking for an exception.</li>
+          <li>The AI answer is incomplete or unsafe to continue automatically.</li>
+          <li>The customer asks about payment, refunds, private data, or special arrangements.</li>
+          <li>The booking requires human judgment.</li>
+        </ul>
+
+        <h3>Manual mode behavior</h3>
+        <p>
+          Sending a staff reply switches the conversation to <code>manual</code>.
+          While manual, the AI does not reply to new customer messages. Manual
+          mode stays active until staff explicitly resumes automation.
+        </p>
+
+        <h3>Resuming automation</h3>
+        <p>
+          Resume only after the customer issue is resolved and it is safe for
+          automation to continue. Set the conversation status back to
+          <code>automated</code>. The next customer message can then receive an
+          automated reply.
+        </p>
+
+        <h3>What customers see</h3>
+        <p>
+          Customers see normal WhatsApp messages from the business. They should
+          not see labels saying an AI is replying, internal metadata, readiness
+          status, or staff takeover audit events.
+        </p>
+      </section>
+
+      <section id="readiness">
+        <h2>Production Readiness Checklist</h2>
+        <ul>
+          <li>Supabase URL, anon key, and service-role key are configured server-side only.</li>
+          <li>Backend auth is configured through service token or JWT/JWKS.</li>
+          <li>Required migrations have been applied.</li>
+          <li><code>RESERVATION_PLATFORM_CONFIG_PATH</code> points to the intended manifest.</li>
+          <li>The manifest enables only supported modules.</li>
+          <li><code>AI_AGENT_API_KEY</code> is set when <code>ai.enabled=true</code>.</li>
+          <li>WhatsApp session auth directory is mounted as persistent storage.</li>
+          <li>Business config includes business name, fallback message, and default service id.</li>
+          <li>Knowledge base entries are active and current.</li>
+          <li><code>GET /v1/channels/whatsapp/readiness</code> reports <code>production_ready=true</code>.</li>
+        </ul>
+      </section>
+
+      <section id="troubleshooting">
+        <h2>Troubleshooting</h2>
+        <table>
+          <thead>
+            <tr><th>Symptom</th><th>Likely Cause</th><th>Fix</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Backend fails at startup with manifest validation error.</td>
+              <td>Unknown module, unsupported provider, missing AI settings, or secret-like key in JSON.</td>
+              <td>Fix the manifest. Move secrets to env. Keep v1 keys only.</td>
+            </tr>
+            <tr>
+              <td>Docker Compose starts without WhatsApp enabled.</td>
+              <td>Manifest loading is opt-in and <code>RESERVATION_PLATFORM_CONFIG_PATH</code> is blank.</td>
+              <td>Set <code>RESERVATION_PLATFORM_CONFIG_PATH=/app/config/platform.json</code>.</td>
+            </tr>
+            <tr>
+              <td>Session status is disabled.</td>
+              <td>WhatsApp is not enabled through manifest or legacy env.</td>
+              <td>Enable <code>modules.whatsapp.enabled=true</code> or set <code>RESERVATION_WHATSAPP_ENABLED=true</code>.</td>
+            </tr>
+            <tr>
+              <td>Readiness says <code>ai_provider</code> is missing.</td>
+              <td>AI provider settings or <code>AI_AGENT_API_KEY</code> are missing.</td>
+              <td>Set the API key and confirm manifest <code>baseUrl</code> and <code>model</code>.</td>
+            </tr>
+            <tr>
+              <td>Readiness says <code>reservation_tools</code> is missing.</td>
+              <td>Reservation repositories are not wired, often because Supabase config is absent or reservations are disabled.</td>
+              <td>Configure Supabase and keep <code>reservations.enabled=true</code>.</td>
+            </tr>
+            <tr>
+              <td>Staff reply endpoint returns module disabled.</td>
+              <td>Staff takeover is disabled in the manifest.</td>
+              <td>Set <code>staffTakeover.enabled=true</code> if manual takeover is required.</td>
+            </tr>
+            <tr>
+              <td>AI does not reply in an existing conversation.</td>
+              <td>The conversation is in manual mode.</td>
+              <td>Resume automation by setting <code>automation_status</code> to <code>automated</code>.</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section id="extension-guide">
+        <h2>Adding Modules Later</h2>
+        <p>
+          Future backend modules should follow the same separation of concerns:
+          the manifest selects modules, env carries secrets, runtime wiring
+          owns dependency validation, and owner APIs expose configuration.
+        </p>
+        <h3>Recommended implementation steps</h3>
+        <ol>
+          <li>Add the new module key to <code>@reservation-platform/platform-config</code>.</li>
+          <li>Define strict validation rules and safe defaults.</li>
+          <li>Reject secret-like manifest fields and keep credentials in env.</li>
+          <li>Wire the module in <code>apps/api/src/runtime.ts</code>.</li>
+          <li>Add API routes only for the module's owner/user surface.</li>
+          <li>Add migrations if the module owns persistent backend data.</li>
+          <li>Update Docker docs, deployment verifiers, and readiness checks.</li>
+          <li>Add tests for manifest parsing, runtime wiring, route behavior, and disabled-module behavior.</li>
+        </ol>
+        <div class="callout success">
+          <strong>Design rule:</strong> in-app AI chat and WhatsApp automation
+          are separate modules. They may share provider-neutral AI infrastructure,
+          but their configuration, user experience, and conversation state should
+          remain separate.
+        </div>
+      </section>
+    </main>
+  </div>
+</body>
+</html>

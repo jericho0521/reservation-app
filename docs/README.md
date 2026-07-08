@@ -32,6 +32,7 @@ large historical plan trees.
 | Goal | Document |
 | --- | --- |
 | Understand the backend product branch | [Repository README](../README.md) |
+| Implement or operate backend modules | [Backend Modules Developer and User Manual](manuals/backend-modules-dev-user-manual.html) |
 | Deploy or run the backend container | [Operations: Backend Deployment](operations/backend-deployment.md) |
 | Understand the public API and SDK contract | [Package Refactor Overview](package-refactor/README.md) |
 | Continue backend extraction work | [Backend Platform Extraction](package-refactor/backend-platform-extraction/README.md) |
@@ -43,6 +44,7 @@ large historical plan trees.
 | Area | Path | Purpose |
 | --- | --- | --- |
 | Operations | [operations](operations) | Deployment, hosting URLs, and restart runbooks. |
+| Manuals | [manuals](manuals) | Long-form developer and user manuals. |
 | Supabase | [supabase](supabase) | Local/self-hosted Supabase setup and troubleshooting notes. |
 | Backend platform plans | [package-refactor/backend-platform-extraction](package-refactor/backend-platform-extraction) | Backend product boundary, contracts, SDK readiness, and extraction manifests. |
 | Agents | [agents](agents) | Repository instructions for coding agents. |

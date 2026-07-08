@@ -60,8 +60,9 @@ RESERVATION_PLATFORM_CONFIG_PATH=/app/config/platform.json
 
 Safe: the manifest chooses modules such as reservations, WhatsApp, and AI
 automation for one backend/business. Docker Compose mounts
-`configs/racing-sim.platform.json` to this path read-only. Keep API keys and
-session secrets in env vars, not the JSON manifest.
+`configs/racing-sim.platform.json` to this path read-only, but does not load it
+unless `RESERVATION_PLATFORM_CONFIG_PATH` is set. Keep API keys and session
+secrets in env vars, not the JSON manifest.
 
 Optional WhatsApp booking automation:
 

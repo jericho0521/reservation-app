@@ -336,8 +336,12 @@ export function standaloneWhatsAppDependenciesFromEnv(
         reservationCreateRepository: ReservationCreateRepositoryPort;
       })
     : undefined;
+  const staffTakeoverEnabled = platformConfig
+    ? whatsappConfig?.automation.staffTakeover.enabled !== false
+    : true;
   service = createWhatsAppBusinessModuleFromEnv({
     ...env,
+    RESERVATION_WHATSAPP_ENABLED: whatsappEnabled ? "true" : "false",
     RESERVATION_WHATSAPP_PROVIDER: provider,
   }, {
     responder: createWhatsAppBookingAutomationResponder({
@@ -370,10 +374,10 @@ export function standaloneWhatsAppDependenciesFromEnv(
       deleteKnowledge: (knowledgeId) => service.deleteKnowledge(knowledgeId),
       listConversations: () => service.listConversations(),
       listConversationMessages: (conversationId) => service.listConversationMessages(conversationId),
-      ...(platformConfig && whatsappConfig?.automation.staffTakeover.enabled === false ? {} : {
+      ...(staffTakeoverEnabled ? {
         updateConversationAutomationStatus: (input) => service.updateConversationAutomationStatus(input),
-      }),
-      sendConversationMessage: (input) => service.sendConversationMessage(input),
+        sendConversationMessage: (input) => service.sendConversationMessage(input),
+      } : {}),
       handleInboundMessage: (input) => {
         if (!isEnabledEnv(env.RESERVATION_WHATSAPP_SIMULATION_ENABLED)) {
           const error = new Error("WhatsApp inbound simulation is disabled.");

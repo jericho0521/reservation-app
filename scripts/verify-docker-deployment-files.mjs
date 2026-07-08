@@ -122,8 +122,8 @@ function verifyDockerDeploymentFiles() {
   );
   assertIncludes(
     compose,
-    'RESERVATION_PLATFORM_CONFIG_PATH: "${RESERVATION_PLATFORM_CONFIG_PATH:-/app/config/platform.json}"',
-    "docker-compose.yml must mount and point at the backend module manifest.",
+    'RESERVATION_PLATFORM_CONFIG_PATH: "${RESERVATION_PLATFORM_CONFIG_PATH:-}"',
+    "docker-compose.yml must keep the backend module manifest opt-in.",
     errors,
   );
   assertIncludes(

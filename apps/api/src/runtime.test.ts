@@ -120,13 +120,45 @@ test("standalone Supabase env factory wires manifest-enabled WhatsApp without le
 
   assert.equal(typeof dependencies.whatsappModule?.sendConversationMessage, "function");
   assert.equal(typeof dependencies.whatsappModule?.updateConversationAutomationStatus, "function");
+  const sessionStatus = await dependencies.whatsappModule?.sessionStatus();
   const readiness = await dependencies.whatsappModule?.readiness() as {
     provider_ready?: boolean;
     simulation_enabled?: boolean;
   };
 
+  assert.equal(sessionStatus?.status, "disconnected");
   assert.equal(readiness.provider_ready, true);
   assert.equal(readiness.simulation_enabled, true);
+});
+
+test("standalone Supabase env factory hides staff reply routes when manifest disables staff takeover", () => {
+  const dependencies = createStandaloneSupabaseDependenciesFromEnv({
+    RESERVATION_WHATSAPP_ALLOW_MEMORY_STORE: "true",
+    AI_AGENT_API_KEY: "agent-key",
+  }, {
+    platformConfig: {
+      ...racingSimPlatformConfig(),
+      modules: {
+        ...racingSimPlatformConfig().modules,
+        whatsapp: {
+          ...racingSimPlatformConfig().modules.whatsapp,
+          automation: {
+            ...racingSimPlatformConfig().modules.whatsapp.automation,
+            staffTakeover: {
+              enabled: false,
+              autoMessageOnTakeover: false,
+            },
+          },
+        },
+      },
+    },
+    createClient() {
+      throw new Error("createClient should not be called for WhatsApp memory store");
+    },
+  });
+
+  assert.equal(dependencies.whatsappModule?.updateConversationAutomationStatus, undefined);
+  assert.equal(dependencies.whatsappModule?.sendConversationMessage, undefined);
 });
 
 test("standalone Supabase env factory wires JWT/JWKS verifier without Supabase config", async () => {

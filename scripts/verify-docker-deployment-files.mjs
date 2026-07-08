@@ -114,9 +114,39 @@ function verifyDockerDeploymentFiles() {
     "docker-compose.yml must pass backend CORS origin config.",
     errors,
   );
+  assertIncludes(
+    envExample,
+    "RESERVATION_PLATFORM_CONFIG_PATH=",
+    ".env.example must document the backend module manifest path.",
+    errors,
+  );
+  assertIncludes(
+    compose,
+    'RESERVATION_PLATFORM_CONFIG_PATH: "${RESERVATION_PLATFORM_CONFIG_PATH:-/app/config/platform.json}"',
+    "docker-compose.yml must mount and point at the backend module manifest.",
+    errors,
+  );
+  assertIncludes(
+    compose,
+    "./configs/racing-sim.platform.json:/app/config/platform.json:ro",
+    "docker-compose.yml must mount the example platform config read-only.",
+    errors,
+  );
+  assertIncludes(
+    compose,
+    "./data/whatsapp-sessions:/app/.reservation-whatsapp-sessions",
+    "docker-compose.yml must persist WhatsApp session auth state.",
+    errors,
+  );
   assertIncludes(compose, manifest.healthPath, "docker-compose.yml healthcheck must call the configured health path.", errors);
 
   assertIncludes(deploymentDocs, manifest.healthPath, "docs/operations/backend-deployment.md must document the health path.", errors);
+  assertIncludes(
+    deploymentDocs,
+    "RESERVATION_PLATFORM_CONFIG_PATH",
+    "docs/operations/backend-deployment.md must document the backend module manifest path.",
+    errors,
+  );
   assertMatches(
     deploymentDocs,
     /does not apply migrations on startup/iu,

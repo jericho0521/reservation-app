@@ -144,6 +144,17 @@
       ]
     },
     {
+      "kind": "core-migration",
+      "order": 13,
+      "targetPath": "packages/database/migrations/supabase/000013_whatsapp_staff_takeover.sql",
+      "sourceAssets": [
+        {
+          "path": "packages/database/migrations/supabase/000013_whatsapp_staff_takeover.sql",
+          "section": "WhatsApp per-conversation automation status and staff takeover audit support"
+        }
+      ]
+    },
+    {
       "kind": "optional-ai-retrieval",
       "targetPath": "packages/database/migrations/supabase/optional/ai-retrieval/000001_knowledge_chunks.sql",
       "sourceAssets": [

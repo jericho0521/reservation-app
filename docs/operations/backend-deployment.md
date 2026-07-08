@@ -52,6 +52,17 @@ Allow demo frontend origins:
 RESERVATION_PLATFORM_CORS_ALLOWED_ORIGINS=http://localhost:4000
 ```
 
+Select backend modules with a manifest:
+
+```powershell
+RESERVATION_PLATFORM_CONFIG_PATH=/app/config/platform.json
+```
+
+Safe: the manifest chooses modules such as reservations, WhatsApp, and AI
+automation for one backend/business. Docker Compose mounts
+`configs/racing-sim.platform.json` to this path read-only. Keep API keys and
+session secrets in env vars, not the JSON manifest.
+
 Optional WhatsApp booking automation:
 
 ```powershell
@@ -69,7 +80,8 @@ AI_AGENT_MODEL=
 Safe when used with a disposable or intended backend environment. Keep
 `AI_AGENT_API_KEY`, Supabase keys, and the WhatsApp session encryption key
 backend-only. The session auth directory must be persisted as a protected server
-volume if you want WhatsApp linked-device login to survive container restarts.
+volume if you want WhatsApp linked-device login to survive container restarts;
+Compose persists it at `./data/whatsapp-sessions`.
 Production WhatsApp automation requires Supabase/Postgres storage. Leave
 `RESERVATION_WHATSAPP_ALLOW_MEMORY_STORE=false` outside local `pnpm dev:memory`
 testing.
@@ -168,7 +180,8 @@ database behavior checks against the configured target. Use only with disposable
 or explicitly approved environments.
 
 WhatsApp automation requires the WhatsApp migration bundle, including
-`packages/database/migrations/supabase/000012_whatsapp_business_agent.sql`.
+`packages/database/migrations/supabase/000012_whatsapp_business_agent.sql` and
+`packages/database/migrations/supabase/000013_whatsapp_staff_takeover.sql`.
 Production mode should use Supabase/Postgres, not memory mode, because the
 module persists session status, business config, text knowledge, conversations,
 messages, booking drafts, confirmations, and audit metadata.
@@ -182,6 +195,8 @@ Configure the owner-facing WhatsApp module through backend APIs:
 - `GET/PATCH /v1/channels/whatsapp/config`
 - `GET/POST/PATCH/DELETE /v1/channels/whatsapp/knowledge`
 - `GET /v1/channels/whatsapp/conversations`
+- `PATCH /v1/channels/whatsapp/conversations/{id}`
+- `POST /v1/channels/whatsapp/conversations/{id}/messages`
 - `GET /v1/channels/whatsapp/conversations/{id}/messages`
 - `GET /v1/channels/whatsapp/readiness`
 

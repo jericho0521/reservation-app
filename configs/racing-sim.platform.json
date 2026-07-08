@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "app": "Racing Sim",
+  "modules": {
+    "reservations": {
+      "enabled": true
+    },
+    "ai": {
+      "enabled": true,
+      "provider": "openai-compatible",
+      "baseUrl": "https://openrouter.ai/api/v1",
+      "model": "openai/gpt-4.1-mini"
+    },
+    "whatsapp": {
+      "enabled": true,
+      "provider": "session_qr",
+      "automation": {
+        "enabled": true,
+        "mode": "booking_assistant",
+        "staffTakeover": {
+          "enabled": true,
+          "autoMessageOnTakeover": false
+        }
+      }
+    },
+    "inAppChat": {
+      "enabled": false
+    }
+  }
+}

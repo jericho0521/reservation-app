@@ -52,6 +52,18 @@ export interface WhatsAppSessionAdapter {
   logout(input: { session_id: string }): Promise<void>;
 }
 
+export interface WhatsAppSessionRestoreAdapter {
+  restore(input: {
+    session_id: string;
+    metadata?: MetadataRecord;
+  }): Promise<{
+    status: Exclude<WhatsAppSessionStatus, "disabled">;
+    qr_code?: string;
+    encrypted_credentials?: string;
+    metadata?: MetadataRecord;
+  }>;
+}
+
 export interface WhatsAppSessionServiceOptions {
   enabled?: boolean;
   provider?: WhatsAppProviderMode;
@@ -223,6 +235,40 @@ export class WhatsAppSessionService {
     };
   }
 
+  async restoreConnection(): Promise<WhatsAppSessionSnapshot> {
+    this.assertEnabled();
+    const record = await this.store.load();
+    if (!record) {
+      return {
+        provider: this.provider,
+        status: "disconnected",
+        updated_at: this.nowIso(),
+      };
+    }
+    if (!isRestoreAdapter(this.adapter)) {
+      return sessionSnapshot(record);
+    }
+
+    const restored = await this.adapter.restore({
+      session_id: record.session_id,
+      metadata: record.metadata,
+    });
+    const updated: WhatsAppEncryptedSessionRecord = {
+      ...record,
+      status: restored.status,
+      qr_code: restored.qr_code,
+      encrypted_credentials: restored.encrypted_credentials ?? record.encrypted_credentials,
+      connected_at: restored.status === "connected" ? record.connected_at ?? this.nowIso() : record.connected_at,
+      updated_at: this.nowIso(),
+      metadata: {
+        ...(record.metadata ?? {}),
+        ...(restored.metadata ?? {}),
+      },
+    };
+    await this.store.save(updated);
+    return sessionSnapshot(updated);
+  }
+
   private assertEnabled() {
     if (!this.enabled) {
       throw new WhatsAppModuleDisabledError();
@@ -232,6 +278,10 @@ export class WhatsAppSessionService {
   private nowIso() {
     return this.now().toISOString();
   }
+}
+
+function isRestoreAdapter(adapter: WhatsAppSessionAdapter): adapter is WhatsAppSessionAdapter & WhatsAppSessionRestoreAdapter {
+  return "restore" in adapter && typeof (adapter as { restore?: unknown }).restore === "function";
 }
 
 export function createWhatsAppSessionServiceFromEnv(

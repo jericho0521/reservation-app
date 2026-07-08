@@ -63,10 +63,15 @@ export interface WhatsAppConversation {
   customer: WhatsAppContact;
   chat_session_id?: string;
   status: "active" | "closed";
+  automation_status: WhatsAppConversationAutomationStatus;
+  automation_paused_at?: string;
+  automation_paused_by?: string;
   created_at: string;
   updated_at: string;
   metadata?: MetadataRecord;
 }
+
+export type WhatsAppConversationAutomationStatus = "automated" | "manual";
 
 export interface WhatsAppConversationMessage {
   message_id: string;
@@ -96,12 +101,18 @@ export interface WhatsAppModuleStore extends WhatsAppSessionStore {
   updateKnowledge(knowledgeId: string, patch: WhatsAppKnowledgePatch): Promise<WhatsAppKnowledgeEntry | undefined>;
   deleteKnowledge(knowledgeId: string): Promise<boolean>;
   listConversations(): Promise<WhatsAppConversation[]>;
+  getConversation(conversationId: string): Promise<WhatsAppConversation | undefined>;
   getOrCreateConversation(input: {
     provider: WhatsAppProviderMode;
     customer: WhatsAppContact;
     chat_session_id?: string;
     metadata?: MetadataRecord;
   }): Promise<WhatsAppConversation>;
+  updateConversationAutomationStatus(input: {
+    conversation_id: string;
+    automation_status: WhatsAppConversationAutomationStatus;
+    changed_by?: string;
+  }): Promise<WhatsAppConversation | undefined>;
   listConversationMessages(conversationId: string): Promise<WhatsAppConversationMessage[]>;
   appendConversationMessage(input: WhatsAppConversationMessageInput): Promise<WhatsAppConversationMessage>;
 }
@@ -199,6 +210,11 @@ export class InMemoryWhatsAppModuleStore implements WhatsAppModuleStore {
     return [...this.conversations.values()].map(clone);
   }
 
+  async getConversation(conversationId: string) {
+    const conversation = this.conversations.get(conversationId);
+    return conversation ? clone(conversation) : undefined;
+  }
+
   async getOrCreateConversation(input: {
     provider: WhatsAppProviderMode;
     customer: WhatsAppContact;
@@ -219,6 +235,7 @@ export class InMemoryWhatsAppModuleStore implements WhatsAppModuleStore {
       customer: input.customer,
       chat_session_id: input.chat_session_id,
       status: "active",
+      automation_status: "automated",
       created_at: now,
       updated_at: now,
       metadata: input.metadata,
@@ -226,6 +243,28 @@ export class InMemoryWhatsAppModuleStore implements WhatsAppModuleStore {
     this.conversations.set(conversation.conversation_id, conversation);
     this.messages.set(conversation.conversation_id, []);
     return clone(conversation);
+  }
+
+  async updateConversationAutomationStatus(input: {
+    conversation_id: string;
+    automation_status: WhatsAppConversationAutomationStatus;
+    changed_by?: string;
+  }) {
+    const conversation = this.conversations.get(input.conversation_id);
+    if (!conversation) {
+      return undefined;
+    }
+
+    const now = this.nowIso();
+    const updated: WhatsAppConversation = {
+      ...conversation,
+      automation_status: input.automation_status,
+      automation_paused_at: input.automation_status === "manual" ? now : undefined,
+      automation_paused_by: input.automation_status === "manual" ? input.changed_by ?? "system" : undefined,
+      updated_at: now,
+    };
+    this.conversations.set(input.conversation_id, updated);
+    return clone(updated);
   }
 
   async listConversationMessages(conversationId: string) {

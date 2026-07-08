@@ -11,6 +11,7 @@ COPY apps/api/package.json apps/api/package.json
 COPY packages/ai-chat/package.json packages/ai-chat/package.json
 COPY packages/contract-types/package.json packages/contract-types/package.json
 COPY packages/database/package.json packages/database/package.json
+COPY packages/platform-config/package.json packages/platform-config/package.json
 COPY packages/reservation-chat-core/package.json packages/reservation-chat-core/package.json
 COPY packages/reservation-platform-api/package.json packages/reservation-platform-api/package.json
 COPY packages/reservations-core/package.json packages/reservations-core/package.json

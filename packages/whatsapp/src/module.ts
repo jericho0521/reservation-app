@@ -7,6 +7,8 @@ import { WhatsAppSessionService } from "./session.js";
 import {
   InMemoryWhatsAppModuleStore,
   type WhatsAppBusinessConfigPatch,
+  type WhatsAppConversation,
+  type WhatsAppConversationAutomationStatus,
   type WhatsAppConversationMessage,
   type WhatsAppKnowledgeInput,
   type WhatsAppKnowledgePatch,
@@ -36,6 +38,7 @@ export interface WhatsAppOutboundSender {
 
 export interface WhatsAppBusinessModuleOptions {
   enabled?: boolean;
+  automationEnabled?: boolean;
   store?: WhatsAppModuleStore;
   sessionAdapter?: WhatsAppSessionAdapter & Partial<WhatsAppOutboundSender>;
   responder?: WhatsAppAgentResponder;
@@ -47,6 +50,7 @@ export class WhatsAppBusinessModule {
   private readonly sessionService: WhatsAppSessionService;
   private readonly sender?: WhatsAppOutboundSender;
   private readonly responder: WhatsAppAgentResponder;
+  private readonly automationEnabled: boolean;
 
   constructor(options: WhatsAppBusinessModuleOptions = {}) {
     this.store = options.store ?? new InMemoryWhatsAppModuleStore({ now: options.now });
@@ -58,6 +62,7 @@ export class WhatsAppBusinessModule {
     });
     this.sender = isOutboundSender(options.sessionAdapter) ? options.sessionAdapter : undefined;
     this.responder = options.responder ?? defaultResponder;
+    this.automationEnabled = options.automationEnabled ?? true;
   }
 
   startSession(input: WhatsAppSessionStartInput): Promise<WhatsAppSessionSnapshot> {
@@ -74,6 +79,10 @@ export class WhatsAppBusinessModule {
 
   logoutSession(): Promise<WhatsAppSessionSnapshot> {
     return this.sessionService.logout();
+  }
+
+  restoreSessionConnection(): Promise<WhatsAppSessionSnapshot> {
+    return this.sessionService.restoreConnection();
   }
 
   getConfig() {
@@ -108,6 +117,52 @@ export class WhatsAppBusinessModule {
     return this.store.listConversationMessages(conversationId);
   }
 
+  async updateConversationAutomationStatus(input: {
+    conversation_id: string;
+    automation_status: WhatsAppConversationAutomationStatus;
+    changed_by?: string;
+  }) {
+    const updated = await this.store.updateConversationAutomationStatus(input);
+    if (updated && input.automation_status === "manual") {
+      await this.appendAutomationAuditMessage(updated.conversation_id, "automation_takeover", input.changed_by);
+    } else if (updated) {
+      await this.appendAutomationAuditMessage(updated.conversation_id, "automation_resumed", input.changed_by);
+    }
+    return updated;
+  }
+
+  async sendConversationMessage(input: {
+    conversation_id: string;
+    text: string;
+    changed_by?: string;
+  }) {
+    const conversation = await this.store.getConversation(input.conversation_id);
+    if (!conversation) {
+      return undefined;
+    }
+    const text = input.text.trim();
+    if (!text) {
+      throw new Error("Message text is required.");
+    }
+    if (!this.sender) {
+      throw new Error("WhatsApp session is not connected.");
+    }
+    await this.sendOutboundMessage(conversation, text, { staff_reply: true });
+    const message = await this.store.appendConversationMessage({
+      conversation_id: conversation.conversation_id,
+      direction: "outbound",
+      content: text,
+      metadata: { staff_reply: true },
+    });
+    await this.store.updateConversationAutomationStatus({
+      conversation_id: conversation.conversation_id,
+      automation_status: "manual",
+      changed_by: input.changed_by,
+    });
+    await this.appendAutomationAuditMessage(conversation.conversation_id, "automation_takeover", input.changed_by);
+    return message;
+  }
+
   async handleInboundMessage(input: WhatsAppInboundMessage) {
     const normalized = normalizeWhatsAppInboundTextMessage(input);
     if (!normalized) {
@@ -128,6 +183,16 @@ export class WhatsAppBusinessModule {
     });
 
     const config = await this.store.getConfig();
+    if (!this.automationEnabled || conversation.automation_status === "manual") {
+      return {
+        content: "",
+        metadata: {
+          responder: "manual_handoff",
+          automation_status: conversation.automation_status,
+        },
+      };
+    }
+
     const messages = await this.store.listConversationMessages(conversation.conversation_id);
     const knowledge = (await this.store.listKnowledge())
       .filter((entry) => entry.active)
@@ -150,12 +215,7 @@ export class WhatsAppBusinessModule {
       content: response.content,
       metadata: response.metadata,
     });
-    await this.sender?.sendMessage({
-      provider: input.provider,
-      to: input.from.id,
-      text: response.content,
-      metadata: response.metadata,
-    });
+    await this.sendOutboundMessage(conversation, response.content, response.metadata);
 
     return response;
   }
@@ -176,17 +236,53 @@ export class WhatsAppBusinessModule {
         unsupported: true,
       },
     });
+    if (!this.automationEnabled || conversation.automation_status === "manual") {
+      return {
+        content: "",
+        metadata: {
+          responder: "manual_handoff",
+          automation_status: conversation.automation_status,
+          unsupported: true,
+        },
+      };
+    }
     await this.store.appendConversationMessage({
       conversation_id: conversation.conversation_id,
       direction: "outbound",
       content: config.fallback_message,
     });
-    await this.sender?.sendMessage({
-      provider: input.provider,
-      to: input.from.id,
-      text: config.fallback_message,
-    });
+    await this.sendOutboundMessage(conversation, config.fallback_message);
     return { content: config.fallback_message };
+  }
+
+  private async sendOutboundMessage(
+    conversation: WhatsAppConversation,
+    text: string,
+    metadata?: MetadataRecord,
+  ) {
+    await this.sender?.sendMessage({
+      provider: conversation.provider,
+      to: conversation.customer.id,
+      text,
+      metadata,
+    });
+  }
+
+  private async appendAutomationAuditMessage(
+    conversationId: string,
+    event: "automation_takeover" | "automation_resumed",
+    changedBy: string | undefined,
+  ) {
+    await this.store.appendConversationMessage({
+      conversation_id: conversationId,
+      direction: "outbound",
+      content: "",
+      metadata: {
+        system_event: event,
+        ...(event === "automation_takeover" ? { draft_status: "failed", reason: "staff_takeover" } : {}),
+        changed_by: changedBy ?? "system",
+      },
+    });
   }
 }
 

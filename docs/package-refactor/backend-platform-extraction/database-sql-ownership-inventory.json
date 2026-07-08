@@ -146,6 +146,16 @@
       "notes": [
         "Backend-owned WhatsApp business agent tables for self-hosted session QR state, business config, text knowledge, conversations, and message audit."
       ]
+    },
+    {
+      "path": "packages/database/migrations/supabase/000013_whatsapp_staff_takeover.sql",
+      "classification": "core-platform",
+      "intendedBackendDestination": [
+        "packages/database/migrations/supabase/000013_whatsapp_staff_takeover.sql"
+      ],
+      "notes": [
+        "Backend-owned WhatsApp conversation automation state for staff takeover and explicit automation resume."
+      ]
     }
   ]
 }

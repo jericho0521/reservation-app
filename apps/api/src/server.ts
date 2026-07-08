@@ -1,5 +1,6 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { fileURLToPath } from "node:url";
+import { loadPlatformRuntimeConfigFromEnv } from "@reservation-platform/platform-config";
 
 import { platformError, type StandaloneApiRequest, type StandaloneApiResponse } from "./http.js";
 import {
@@ -81,7 +82,11 @@ export function createStandaloneNodeServerFromEnv(
   options: StandaloneNodeServerEnvBootstrapOptions = {},
 ) {
   const { env = process.env, ...runtimeOptions } = options;
-  const dependencies = createStandaloneSupabaseDependenciesFromEnv(env, runtimeOptions);
+  const platformConfig = runtimeOptions.platformConfig ?? loadPlatformRuntimeConfigFromEnv(env);
+  const dependencies = createStandaloneSupabaseDependenciesFromEnv(env, {
+    ...runtimeOptions,
+    platformConfig,
+  });
 
   return createStandaloneNodeServer(createStandaloneApiHandler(dependencies), {
     cors: createStandaloneCorsOptionsFromEnv(env),

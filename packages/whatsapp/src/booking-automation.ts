@@ -27,7 +27,7 @@ export interface WhatsAppReservationTools {
 }
 
 export interface WhatsAppBookingAutomationOptions {
-  agentRuntime?: AgentRuntime;
+  agentRuntime?: AgentRuntime | ((input: WhatsAppAgentResponderInput) => AgentRuntime | undefined | Promise<AgentRuntime | undefined>);
   reservationTools?: WhatsAppReservationTools;
   readiness?: WhatsAppAutomationReadiness;
   now?: () => Date;
@@ -50,7 +50,8 @@ export function createWhatsAppBookingAutomationResponder(
       return readinessFailure;
     }
 
-    if (!options.agentRuntime || !options.reservationTools) {
+    const agentRuntime = await resolveAgentRuntime(options.agentRuntime, input);
+    if (!agentRuntime || !options.reservationTools) {
       return fallback(input, "automation_not_configured");
     }
 
@@ -73,7 +74,7 @@ export function createWhatsAppBookingAutomationResponder(
       agentMessages.push({ role: "user", content: input.message.message });
     }
 
-    const agent = await options.agentRuntime.run({
+    const agent = await agentRuntime.run({
       scope: {
         tenant_id: String(input.config.metadata?.tenant_id ?? "self-host"),
         venue_id: input.config.metadata?.venue_id ? String(input.config.metadata.venue_id) : undefined,
@@ -161,6 +162,13 @@ export function createWhatsAppBookingAutomationResponder(
   };
 }
 
+async function resolveAgentRuntime(
+  runtime: WhatsAppBookingAutomationOptions["agentRuntime"],
+  input: WhatsAppAgentResponderInput,
+) {
+  return typeof runtime === "function" ? await runtime(input) : runtime;
+}
+
 interface PendingDraft {
   draft_id: string;
   service_id: string;
@@ -217,6 +225,9 @@ function latestPendingDraft(messages: WhatsAppConversationMessage[]): PendingDra
   );
 
   for (const message of [...messages].reverse()) {
+    if (message.metadata?.system_event === "automation_takeover") {
+      return undefined;
+    }
     if (message.direction !== "outbound" || message.metadata?.draft_status !== "pending_confirmation") {
       continue;
     }

@@ -391,6 +391,88 @@ test("enabled WhatsApp readiness and simulation routes delegate to the module", 
   assert.deepEqual(calls, ["readiness", "simulate:Book a room tomorrow:+60111111111"]);
 });
 
+test("enabled WhatsApp conversation routes update automation and send staff replies", async () => {
+  const calls: string[] = [];
+  const handler = createStandaloneApiHandler({
+    auth: { serviceApiKey: "platform-service-secret" },
+    whatsappModule: fakeWhatsAppModule({
+      updateConversationAutomationStatus(input) {
+        calls.push(`status:${input.conversation_id}:${input.automation_status}:${input.changed_by}`);
+        return {
+          conversation_id: input.conversation_id,
+          provider: "session_qr",
+          customer: { id: "60111111111@s.whatsapp.net" },
+          status: "active",
+          automation_status: input.automation_status,
+          created_at: "2026-06-30T00:00:00.000Z",
+          updated_at: "2026-06-30T00:00:00.000Z",
+        };
+      },
+      sendConversationMessage(input) {
+        calls.push(`send:${input.conversation_id}:${input.text}:${input.changed_by}`);
+        return {
+          message_id: "message_123",
+          conversation_id: input.conversation_id,
+          direction: "outbound",
+          content: input.text,
+          created_at: "2026-06-30T00:00:00.000Z",
+        };
+      },
+    }),
+  });
+
+  const takeover = await handler({
+    method: "PATCH",
+    path: "/v1/channels/whatsapp/conversations/conversation_123",
+    headers: { Authorization: "Bearer platform-service-secret" },
+    body: { automation_status: "manual" },
+  });
+  const send = await handler({
+    method: "POST",
+    path: "/v1/channels/whatsapp/conversations/conversation_123/messages",
+    headers: { Authorization: "Bearer platform-service-secret" },
+    body: { text: "Staff reply" },
+  });
+
+  assert.equal(takeover.status, 200);
+  assert.equal((takeover.body as { automation_status?: string }).automation_status, "manual");
+  assert.equal(send.status, 200);
+  assert.equal((send.body as { content?: string }).content, "Staff reply");
+  assert.deepEqual(calls, [
+    "status:conversation_123:manual:authenticated-owner",
+    "send:conversation_123:Staff reply:authenticated-owner",
+  ]);
+});
+
+test("WhatsApp conversation routes validate automation status and staff reply text", async () => {
+  const handler = createStandaloneApiHandler({
+    whatsappModule: fakeWhatsAppModule({
+      updateConversationAutomationStatus() {
+        throw new Error("invalid automation status should not reach WhatsApp module");
+      },
+      sendConversationMessage() {
+        throw new Error("invalid staff reply should not reach WhatsApp module");
+      },
+    }),
+  });
+
+  const invalidStatus = await handler({
+    method: "PATCH",
+    path: "/v1/channels/whatsapp/conversations/conversation_123",
+    body: { automation_status: "paused" },
+  });
+  const invalidMessage = await handler({
+    method: "POST",
+    path: "/v1/channels/whatsapp/conversations/conversation_123/messages",
+    body: { text: " " },
+  });
+
+  assert.equal(invalidStatus.status, 400);
+  assert.equal((invalidStatus.body as PlatformErrorResponse).error.message, "automation_status must be automated or manual.");
+  assert.equal(invalidMessage.status, 400);
+  assert.equal((invalidMessage.body as PlatformErrorResponse).error.message, "text must be a non-empty string.");
+});
+
 test("disabled WhatsApp simulation returns a protected setup error", async () => {
   const handler = createStandaloneApiHandler({
     whatsappModule: fakeWhatsAppModule({

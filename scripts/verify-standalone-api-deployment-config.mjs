@@ -34,6 +34,10 @@ export const standaloneApiCorsOptionalEnvNames = [
   "RESERVATION_PLATFORM_CORS_ALLOWED_ORIGINS",
 ];
 
+export const standaloneApiPlatformConfigOptionalEnvNames = [
+  "RESERVATION_PLATFORM_CONFIG_PATH",
+];
+
 export const standaloneApiWhatsAppEnvNames = [
   "RESERVATION_WHATSAPP_ENABLED",
   "RESERVATION_WHATSAPP_PROVIDER",
@@ -63,6 +67,7 @@ export const standaloneApiRuntimeEnvNames = [
   ...standaloneApiAuthRequiredEnvNames,
   ...standaloneApiAuthOptionalEnvNames,
   ...standaloneApiCorsOptionalEnvNames,
+  ...standaloneApiPlatformConfigOptionalEnvNames,
   ...standaloneApiWhatsAppEnvNames,
 ];
 
@@ -79,7 +84,7 @@ const standaloneApiKnownEnvNames = [
 ];
 
 const runtimeEnvMemberAccessPattern =
-  /(?<![\w$])env\s*\??\.\s*(RESERVATION_SUPABASE_[A-Z0-9_]+|RESERVATION_PLATFORM_SERVICE_API_KEY|RESERVATION_PLATFORM_AUTH_[A-Z0-9_]+|RESERVATION_PLATFORM_CORS_ALLOWED_ORIGINS|RESERVATION_WHATSAPP_[A-Z0-9_]+|AI_AGENT_[A-Z0-9_]+)\b/gu;
+  /(?<![\w$])env\s*\??\.\s*(RESERVATION_SUPABASE_[A-Z0-9_]+|RESERVATION_PLATFORM_SERVICE_API_KEY|RESERVATION_PLATFORM_AUTH_[A-Z0-9_]+|RESERVATION_PLATFORM_CORS_ALLOWED_ORIGINS|RESERVATION_PLATFORM_CONFIG_PATH|RESERVATION_WHATSAPP_[A-Z0-9_]+|AI_AGENT_[A-Z0-9_]+)\b/gu;
 
 const scriptDirectory = dirname(fileURLToPath(import.meta.url));
 const defaultRuntimeSourcePath = resolve(scriptDirectory, "../apps/api/src/runtime.ts");
@@ -349,6 +354,7 @@ export function verifyStandaloneDeploymentManifest(options = {}) {
     [
       ...standaloneApiAuthOptionalEnvNames,
       ...standaloneApiCorsOptionalEnvNames,
+      ...standaloneApiPlatformConfigOptionalEnvNames,
       ...standaloneApiAiChatEnvNames,
       ...standaloneApiAiAgentEnvNames,
       ...standaloneApiWhatsAppEnvNames,

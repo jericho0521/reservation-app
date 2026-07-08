@@ -145,6 +145,126 @@ export class BaileysWhatsAppSessionAdapter implements WhatsAppSessionAdapter {
     });
   }
 
+  async restore(input: { session_id: string; metadata?: MetadataRecord }) {
+    const baileys = await import("@whiskeysockets/baileys");
+    const makeWASocket = (baileys.default ?? baileys.makeWASocket) as unknown as (options: Record<string, unknown>) => BaileysSocket;
+    const useMultiFileAuthState = baileys.useMultiFileAuthState as unknown as (
+      folder: string,
+    ) => Promise<{ state: unknown; saveCreds: () => Promise<void> }>;
+
+    const sessionDirectory = path.join(this.authDirectory, input.session_id);
+    await mkdir(sessionDirectory, { recursive: true });
+    const { state, saveCreds } = await useMultiFileAuthState(sessionDirectory);
+
+    return new Promise<{
+      status: "pending_qr" | "connected" | "disconnected" | "expired";
+      qr_code?: string;
+      encrypted_credentials?: string;
+      metadata?: MetadataRecord;
+    }>((resolve) => {
+      let settled = false;
+      const timeout = setTimeout(() => {
+        if (!settled) {
+          settled = true;
+          resolve({
+            status: "disconnected",
+            metadata: { adapter: "baileys", auth_directory: sessionDirectory, restore_timeout: true },
+          });
+        }
+      }, this.qrTimeoutMs);
+
+      const connect = (attempt = 0) => {
+        const socket = makeWASocket({
+          auth: state,
+          browser: ["Reservation Platform", "Chrome", "1.0.0"],
+        });
+        this.socket = socket;
+
+        socket.ev.on("creds.update", saveCreds);
+        socket.ev.on("connection.update", async (update: BaileysConnectionUpdate) => {
+          if (update.qr && !settled) {
+            settled = true;
+            clearTimeout(timeout);
+            await this.emitStatusChange("pending_qr", { session_id: input.session_id });
+            resolve({
+              status: "pending_qr",
+              qr_code: update.qr,
+              encrypted_credentials: JSON.stringify({ auth_directory: sessionDirectory }),
+              metadata: { adapter: "baileys", auth_directory: sessionDirectory, ...input.metadata },
+            });
+            return;
+          }
+
+          if (update.connection === "open") {
+            await this.emitStatusChange("connected", { session_id: input.session_id });
+            if (!settled) {
+              settled = true;
+              clearTimeout(timeout);
+              resolve({
+                status: "connected",
+                encrypted_credentials: JSON.stringify({ auth_directory: sessionDirectory }),
+                metadata: { adapter: "baileys", auth_directory: sessionDirectory, restored: true, ...input.metadata },
+              });
+            }
+            return;
+          }
+
+          if (update.connection === "close") {
+            const disconnectStatus = readDisconnectStatus(update);
+            if (disconnectStatus === 401) {
+              clearTimeout(timeout);
+              await this.emitStatusChange("expired", { session_id: input.session_id, disconnect_status: disconnectStatus });
+              if (!settled) {
+                settled = true;
+                resolve({
+                  status: "expired",
+                  metadata: { adapter: "baileys", auth_directory: sessionDirectory, disconnect_status: disconnectStatus },
+                });
+              }
+              return;
+            }
+
+            if (attempt < this.maxReconnectAttempts) {
+              const nextAttempt = attempt + 1;
+              setTimeout(() => connect(nextAttempt), reconnectDelayMs(nextAttempt));
+              return;
+            }
+
+            if (!settled) {
+              settled = true;
+              clearTimeout(timeout);
+              await this.emitStatusChange("disconnected", {
+                session_id: input.session_id,
+                ...(disconnectStatus === undefined ? {} : { disconnect_status: disconnectStatus }),
+                reconnect_attempts: attempt,
+              });
+              resolve({
+                status: "disconnected",
+                metadata: {
+                  adapter: "baileys",
+                  auth_directory: sessionDirectory,
+                  ...(disconnectStatus === undefined ? {} : { disconnect_status: disconnectStatus }),
+                  reconnect_attempts: attempt,
+                },
+              });
+            }
+          }
+        });
+
+        socket.ev.on("messages.upsert", async (event: BaileysMessagesUpsert) => {
+          for (const message of event.messages ?? []) {
+            const normalized = normalizeBaileysMessage(message);
+            if (normalized) {
+              await this.onInboundMessage?.(normalized);
+            }
+          }
+        });
+      };
+
+      connect();
+    });
+  }
+
   async sendMessage(input: WhatsAppOutboundMessage) {
     const socket = this.socket as BaileysSocket | undefined;
     if (!socket) {

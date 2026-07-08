@@ -101,6 +101,14 @@
       "scope": "reservation-platform",
       "sha256": "f522cba6dfb583d87474d40f1001877eba5932efa4a53dee392dc6104035324f",
       "bytes": 5183
+    },
+    {
+      "order": 13,
+      "path": "packages/database/migrations/supabase/000013_whatsapp_staff_takeover.sql",
+      "module": "core",
+      "scope": "reservation-platform",
+      "sha256": "bcd2980eff0512dc9456b88c1952e576e4a769a8e6efbf53769f7fdb4b282740",
+      "bytes": 771
     }
   ],
   "optionalMigrations": [

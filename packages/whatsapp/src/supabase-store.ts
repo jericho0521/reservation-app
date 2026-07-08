@@ -6,6 +6,7 @@ import type {
   WhatsAppBusinessConfig,
   WhatsAppBusinessConfigPatch,
   WhatsAppConversation,
+  WhatsAppConversationAutomationStatus,
   WhatsAppConversationMessage,
   WhatsAppConversationMessageInput,
   WhatsAppKnowledgeEntry,
@@ -78,9 +79,20 @@ export class SupabaseWhatsAppModuleStore implements WhatsAppModuleStore {
   }
 
   async updateConfig(patch: WhatsAppBusinessConfigPatch) {
+    const existing = await this.getConfig();
     const result = await this.client
       .from("platform_whatsapp_config")
-      .upsert(configPatchToRow({ ...patch, id: true }), { onConflict: "id" })
+      .upsert(configPatchToRow({
+        ...existing,
+        ...patch,
+        default_service_id: patch.default_service_id === null ? undefined : patch.default_service_id ?? existing.default_service_id,
+        opening_hours: patch.opening_hours === null ? undefined : patch.opening_hours ?? existing.opening_hours,
+        metadata: {
+          ...(existing.metadata ?? {}),
+          ...(patch.metadata ?? {}),
+        },
+        id: true,
+      }), { onConflict: "id" })
       .select("*")
       .single();
     assertNoError(result);
@@ -137,6 +149,16 @@ export class SupabaseWhatsAppModuleStore implements WhatsAppModuleStore {
     return asArray((await result).data).map((row) => conversationFromRow(asRecord(row)));
   }
 
+  async getConversation(conversationId: string) {
+    const result = await this.client
+      .from("platform_whatsapp_conversations")
+      .select("*")
+      .eq("id", conversationId)
+      .maybeSingle();
+    assertNoError(result);
+    return result.data ? conversationFromRow(asRecord(result.data)) : undefined;
+  }
+
   async getOrCreateConversation(input: {
     provider: "meta_cloud" | "session_qr";
     customer: WhatsAppContact;
@@ -161,6 +183,27 @@ export class SupabaseWhatsAppModuleStore implements WhatsAppModuleStore {
       .single();
     assertNoError(created);
     return conversationFromRow(asRecord(created.data));
+  }
+
+  async updateConversationAutomationStatus(input: {
+    conversation_id: string;
+    automation_status: WhatsAppConversationAutomationStatus;
+    changed_by?: string;
+  }) {
+    const now = new Date().toISOString();
+    const result = await this.client
+      .from("platform_whatsapp_conversations")
+      .update({
+        automation_status: input.automation_status,
+        automation_paused_at: input.automation_status === "manual" ? now : null,
+        automation_paused_by: input.automation_status === "manual" ? input.changed_by ?? "system" : null,
+        updated_at: now,
+      })
+      .eq("id", input.conversation_id)
+      .select("*")
+      .maybeSingle();
+    assertNoError(result);
+    return result.data ? conversationFromRow(asRecord(result.data)) : undefined;
   }
 
   async listConversationMessages(conversationId: string) {
@@ -285,6 +328,7 @@ function conversationInputToRow(input: {
     customer_phone: input.customer.phoneNumber,
     customer_display_name: input.customer.displayName,
     chat_session_id: input.chat_session_id,
+    automation_status: "automated",
     metadata: input.metadata ?? {},
   };
 }
@@ -300,6 +344,9 @@ function conversationFromRow(row: Record<string, unknown>): WhatsAppConversation
     },
     chat_session_id: stringOrUndefined(row.chat_session_id),
     status: row.status === "closed" ? "closed" : "active",
+    automation_status: row.automation_status === "manual" ? "manual" : "automated",
+    automation_paused_at: stringOrUndefined(row.automation_paused_at),
+    automation_paused_by: stringOrUndefined(row.automation_paused_by),
     metadata: metadataOrUndefined(row.metadata),
     created_at: String(row.created_at),
     updated_at: String(row.updated_at),

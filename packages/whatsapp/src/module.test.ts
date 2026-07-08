@@ -74,3 +74,152 @@ test("business module returns fallback for unsupported inbound messages", async 
   assert.equal(response.content, "Please wait while staff checks this for you.");
   assert.deepEqual(sent, ["Please wait while staff checks this for you."]);
 });
+
+test("business module can answer from any active business knowledge", async () => {
+  const module = new WhatsAppBusinessModule({ enabled: true });
+  await module.updateConfig({
+    business_name: "Racing Sim",
+  });
+  await module.createKnowledge({
+    title: "Opening hours",
+    content: "We open at 9 AM.",
+  });
+
+  const response = await module.handleInboundMessage({
+    provider: "session_qr",
+    messageId: "wamid_3",
+    from: { id: "60123456789@s.whatsapp.net", phoneNumber: "60123456789" },
+    text: "What are your opening hours?",
+  });
+
+  assert.match(response.content, /We open at 9 AM/u);
+});
+
+test("manual takeover keeps conversation manual until explicit resume", async () => {
+  const sent: string[] = [];
+  const module = new WhatsAppBusinessModule({
+    enabled: true,
+    sessionAdapter: {
+      async sendMessage(input) {
+        sent.push(input.text);
+      },
+    },
+  });
+  await module.createKnowledge({
+    title: "Opening hours",
+    content: "We open at 9 AM.",
+  });
+
+  const first = await module.handleInboundMessage({
+    provider: "session_qr",
+    messageId: "wamid_4",
+    from: { id: "60123456789@s.whatsapp.net" },
+    text: "What are your opening hours?",
+  });
+  const [conversation] = await module.listConversations();
+  await module.updateConversationAutomationStatus({
+    conversation_id: conversation.conversation_id,
+    automation_status: "manual",
+    changed_by: "staff_1",
+  });
+  const manual = await module.handleInboundMessage({
+    provider: "session_qr",
+    messageId: "wamid_5",
+    from: { id: "60123456789@s.whatsapp.net" },
+    text: "Are you there?",
+  });
+  await module.updateConversationAutomationStatus({
+    conversation_id: conversation.conversation_id,
+    automation_status: "automated",
+    changed_by: "staff_1",
+  });
+  const resumed = await module.handleInboundMessage({
+    provider: "session_qr",
+    messageId: "wamid_6",
+    from: { id: "60123456789@s.whatsapp.net" },
+    text: "Opening hours again?",
+  });
+
+  assert.match(first.content, /We open at 9 AM/u);
+  assert.equal(manual.content, "");
+  assert.equal(manual.metadata?.responder, "manual_handoff");
+  assert.match(resumed.content, /We open at 9 AM/u);
+  assert.deepEqual(sent, [
+    "Reservation Business: We open at 9 AM.",
+    "Reservation Business: We open at 9 AM.",
+  ]);
+});
+
+test("manual takeover suppresses unsupported inbound fallback replies", async () => {
+  const sent: string[] = [];
+  const module = new WhatsAppBusinessModule({
+    enabled: true,
+    sessionAdapter: {
+      async sendMessage(input) {
+        sent.push(input.text);
+      },
+    },
+  });
+  await module.handleInboundMessage({
+    provider: "session_qr",
+    messageId: "wamid_7",
+    from: { id: "60123456789@s.whatsapp.net" },
+    text: "hello",
+  });
+  const [conversation] = await module.listConversations();
+  await module.updateConversationAutomationStatus({
+    conversation_id: conversation.conversation_id,
+    automation_status: "manual",
+    changed_by: "staff_1",
+  });
+
+  const response = await module.handleInboundMessage({
+    provider: "session_qr",
+    messageId: "wamid_8",
+    from: { id: "60123456789@s.whatsapp.net" },
+  });
+
+  assert.equal(response.content, "");
+  assert.equal(response.metadata?.responder, "manual_handoff");
+  assert.deepEqual(sent, ["Please wait while staff checks this for you."]);
+});
+
+test("staff replies send outbound and switch conversation to manual", async () => {
+  const sent: Array<{ to: string; text: string }> = [];
+  const module = new WhatsAppBusinessModule({
+    enabled: true,
+    sessionAdapter: {
+      async sendMessage(input) {
+        sent.push({ to: input.to, text: input.text });
+      },
+    },
+  });
+  await module.handleInboundMessage({
+    provider: "session_qr",
+    messageId: "wamid_9",
+    from: { id: "60123456789@s.whatsapp.net" },
+    text: "hello",
+  });
+  const [conversation] = await module.listConversations();
+
+  const reply = await module.sendConversationMessage({
+    conversation_id: conversation.conversation_id,
+    text: "A staff member will help you now.",
+    changed_by: "staff_2",
+  });
+  const messages = await module.listConversationMessages(conversation.conversation_id);
+  const afterStaffReply = await module.handleInboundMessage({
+    provider: "session_qr",
+    messageId: "wamid_10",
+    from: { id: "60123456789@s.whatsapp.net" },
+    text: "thanks",
+  });
+
+  assert.equal(reply?.content, "A staff member will help you now.");
+  assert.equal(afterStaffReply.content, "");
+  assert.equal(messages.at(-1)?.metadata?.system_event, "automation_takeover");
+  assert.deepEqual(sent.at(-1), {
+    to: "60123456789@s.whatsapp.net",
+    text: "A staff member will help you now.",
+  });
+});

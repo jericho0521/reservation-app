@@ -100,6 +100,35 @@ test("standalone Supabase env factory wires WhatsApp memory store only with expl
   ]);
 });
 
+test("standalone Supabase env factory wires manifest-enabled WhatsApp without legacy enable env", async () => {
+  const dependencies = createStandaloneSupabaseDependenciesFromEnv({
+    RESERVATION_WHATSAPP_ALLOW_MEMORY_STORE: "true",
+    RESERVATION_WHATSAPP_SIMULATION_ENABLED: "true",
+    AI_AGENT_API_KEY: "agent-key",
+  }, {
+    platformConfig: racingSimPlatformConfig(),
+    createClient() {
+      throw new Error("createClient should not be called for WhatsApp memory store");
+    },
+    fetch: async () => new Response(JSON.stringify({
+      choices: [{ message: { content: "AI reply" } }],
+    }), {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    }),
+  });
+
+  assert.equal(typeof dependencies.whatsappModule?.sendConversationMessage, "function");
+  assert.equal(typeof dependencies.whatsappModule?.updateConversationAutomationStatus, "function");
+  const readiness = await dependencies.whatsappModule?.readiness() as {
+    provider_ready?: boolean;
+    simulation_enabled?: boolean;
+  };
+
+  assert.equal(readiness.provider_ready, true);
+  assert.equal(readiness.simulation_enabled, true);
+});
+
 test("standalone Supabase env factory wires JWT/JWKS verifier without Supabase config", async () => {
   const fixture = createJwtFixture();
   let fetchCalls = 0;
@@ -260,6 +289,46 @@ test("standalone Supabase runtime wires public and admin clients to repository f
   assert.equal(Boolean(dependencies.resourceMaintenanceRepository), true);
   assert.equal(Boolean(dependencies.idempotencyRepository), true);
   assert.equal(Boolean(dependencies.tenantVenueRepository), true);
+});
+
+test("standalone Supabase runtime skips reservation repositories when manifest disables reservations", () => {
+  const factoryCalls: Array<{
+    name: keyof StandaloneSupabaseRepositoryFactories;
+    publicClient?: FakeSupabaseClient;
+    adminClient: FakeSupabaseClient;
+  }> = [];
+  const dependencies = createStandaloneSupabaseDependencies({
+    supabaseUrl: "https://example.supabase.co",
+    supabaseAnonKey: "anon-key",
+    supabaseServiceRoleKey: "service-role-key",
+  }, {
+    createClient: (_url, key) => fakeSupabaseClient(key),
+    repositoryFactories: recordingRepositoryFactories(factoryCalls),
+    platformConfig: {
+      ...racingSimPlatformConfig(),
+      modules: {
+        ...racingSimPlatformConfig().modules,
+        reservations: { enabled: false },
+        ai: { enabled: false },
+        whatsapp: {
+          enabled: false,
+          provider: "session_qr",
+          automation: {
+            enabled: false,
+            mode: "booking_assistant",
+            staffTakeover: {
+              enabled: true,
+              autoMessageOnTakeover: false,
+            },
+          },
+        },
+      },
+    },
+  });
+
+  assert.deepEqual(factoryCalls, []);
+  assert.equal(dependencies.catalogRepository, undefined);
+  assert.equal(dependencies.reservationCreateRepository, undefined);
 });
 
 test("standalone Supabase runtime carries service auth beside complete Supabase repositories", () => {
@@ -429,4 +498,33 @@ function createJwtFixture() {
 
 function base64UrlJson(value: unknown) {
   return Buffer.from(JSON.stringify(value)).toString("base64url");
+}
+
+function racingSimPlatformConfig() {
+  return {
+    version: 1 as const,
+    app: "Racing Sim",
+    modules: {
+      reservations: { enabled: true },
+      ai: {
+        enabled: true,
+        provider: "openai-compatible" as const,
+        baseUrl: "https://openrouter.ai/api/v1",
+        model: "openai/gpt-4.1-mini",
+      },
+      whatsapp: {
+        enabled: true,
+        provider: "session_qr" as const,
+        automation: {
+          enabled: true,
+          mode: "booking_assistant" as const,
+          staffTakeover: {
+            enabled: true,
+            autoMessageOnTakeover: false,
+          },
+        },
+      },
+      inAppChat: { enabled: false },
+    },
+  };
 }

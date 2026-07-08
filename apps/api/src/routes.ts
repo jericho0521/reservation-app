@@ -140,6 +140,16 @@ export interface StandaloneApiWhatsAppModule {
   listConversationMessages(
     conversationId: string,
   ): WhatsAppConversationMessage[] | Promise<WhatsAppConversationMessage[]>;
+  updateConversationAutomationStatus?(input: {
+    conversation_id: string;
+    automation_status: "automated" | "manual";
+    changed_by?: string;
+  }): WhatsAppConversation | undefined | Promise<WhatsAppConversation | undefined>;
+  sendConversationMessage?(input: {
+    conversation_id: string;
+    text: string;
+    changed_by?: string;
+  }): WhatsAppConversationMessage | undefined | Promise<WhatsAppConversationMessage | undefined>;
   handleInboundMessage(input: WhatsAppInboundMessage): unknown | Promise<unknown>;
   readiness(): unknown | Promise<unknown>;
 }
@@ -195,6 +205,7 @@ const whatsappReadinessPath = "/v1/channels/whatsapp/readiness";
 const whatsappSimulationPath = "/v1/channels/whatsapp/messages:simulate";
 const whatsappKnowledgePattern = /^\/v1\/channels\/whatsapp\/knowledge\/([^/]+)$/;
 const whatsappConversationsPath = "/v1/channels/whatsapp/conversations";
+const whatsappConversationPattern = /^\/v1\/channels\/whatsapp\/conversations\/([^/]+)$/;
 const whatsappConversationMessagesPattern = /^\/v1\/channels\/whatsapp\/conversations\/([^/]+)\/messages$/;
 const reservationPattern = /^\/v1\/reservations\/([^/]+)$/;
 const reservationCancelPattern = /^\/v1\/reservations\/([^/]+)\/cancel$/;
@@ -374,6 +385,28 @@ export async function handleStandaloneApiRequest(
     return handleWhatsAppConversationListRequest(dependencies.whatsappModule);
   }
 
+  if (method === "PATCH") {
+    const conversationId = whatsappConversationPattern.exec(path)?.[1];
+    if (conversationId) {
+      return handleWhatsAppConversationUpdateRequest(
+        request,
+        decodeURIComponent(conversationId),
+        dependencies.whatsappModule,
+      );
+    }
+  }
+
+  if (method === "POST") {
+    const conversationId = whatsappConversationMessagesPattern.exec(path)?.[1];
+    if (conversationId) {
+      return handleWhatsAppConversationSendMessageRequest(
+        request,
+        decodeURIComponent(conversationId),
+        dependencies.whatsappModule,
+      );
+    }
+  }
+
   if (method === "GET") {
     const conversationId = whatsappConversationMessagesPattern.exec(path)?.[1];
     if (conversationId) {
@@ -549,6 +582,7 @@ function isWhatsAppOwnerRoute(path: string) {
     || path === whatsappKnowledgePath
     || whatsappKnowledgePattern.test(path)
     || path === whatsappConversationsPath
+    || whatsappConversationPattern.test(path)
     || whatsappConversationMessagesPattern.test(path);
 }
 
@@ -778,7 +812,7 @@ async function handleWhatsAppConfigUpdateRequest(
     return patch.response;
   }
 
-  return invokeWhatsAppModule(() => whatsappModule.updateConfig(patch.value));
+  return invokeWhatsAppModule(() => whatsappModule.updateConfig(withWhatsAppOwnerContext(patch.value, request)));
 }
 
 async function handleWhatsAppKnowledgeListRequest(
@@ -809,7 +843,7 @@ async function handleWhatsAppKnowledgeCreateRequest(
     return input.response;
   }
 
-  return invokeWhatsAppModule(() => whatsappModule.createKnowledge(input.value));
+  return invokeWhatsAppModule(() => whatsappModule.createKnowledge(withWhatsAppOwnerContext(input.value, request)));
 }
 
 async function handleWhatsAppKnowledgeUpdateRequest(
@@ -827,7 +861,10 @@ async function handleWhatsAppKnowledgeUpdateRequest(
   }
 
   return invokeWhatsAppModule(async () => {
-    const updated = await whatsappModule.updateKnowledge(knowledgeId, readWhatsAppKnowledgePatch(body.value));
+    const updated = await whatsappModule.updateKnowledge(
+      knowledgeId,
+      withWhatsAppOwnerContext(readWhatsAppKnowledgePatch(body.value), request),
+    );
     if (!updated) {
       return platformError(404, "not_found", "WhatsApp knowledge entry not found.");
     }
@@ -873,6 +910,73 @@ async function handleWhatsAppConversationMessagesRequest(
   return invokeWhatsAppModule(async () => ({
     messages: await whatsappModule.listConversationMessages(conversationId),
   }));
+}
+
+async function handleWhatsAppConversationUpdateRequest(
+  request: StandaloneApiRequest,
+  conversationId: string,
+  whatsappModule: StandaloneApiWhatsAppModule | undefined,
+): Promise<StandaloneApiResponse> {
+  if (!whatsappModule?.updateConversationAutomationStatus) {
+    return whatsappModuleDisabled();
+  }
+
+  const body = readOptionalRecordBody(request.body);
+  if (!body.ok) {
+    return body.response;
+  }
+
+  const automationStatus = body.value.automation_status;
+  if (automationStatus !== "automated" && automationStatus !== "manual") {
+    return platformError(400, "validation_failed", "automation_status must be automated or manual.");
+  }
+
+  return invokeWhatsAppModule(async () => {
+    const updated = await whatsappModule.updateConversationAutomationStatus?.({
+      conversation_id: conversationId,
+      automation_status: automationStatus,
+      changed_by: readWhatsAppChangedBy(request),
+    });
+    if (!updated) {
+      return platformError(404, "not_found", "WhatsApp conversation not found.");
+    }
+    return updated;
+  });
+}
+
+async function handleWhatsAppConversationSendMessageRequest(
+  request: StandaloneApiRequest,
+  conversationId: string,
+  whatsappModule: StandaloneApiWhatsAppModule | undefined,
+): Promise<StandaloneApiResponse> {
+  if (!whatsappModule?.sendConversationMessage) {
+    return whatsappModuleDisabled();
+  }
+
+  const body = readOptionalRecordBody(request.body);
+  if (!body.ok) {
+    return body.response;
+  }
+
+  const text = getStringField(body.value, "text");
+  if (!text) {
+    return platformError(400, "validation_failed", "text must be a non-empty string.");
+  }
+  if (text.length > 4096) {
+    return platformError(400, "validation_failed", "text must be 4096 characters or fewer.");
+  }
+
+  return invokeWhatsAppModule(async () => {
+    const message = await whatsappModule.sendConversationMessage?.({
+      conversation_id: conversationId,
+      text,
+      changed_by: readWhatsAppChangedBy(request),
+    });
+    if (!message) {
+      return platformError(404, "not_found", "WhatsApp conversation not found.");
+    }
+    return message;
+  });
 }
 
 async function handleChatSendMessageRequest(
@@ -1374,6 +1478,10 @@ async function invokeWhatsAppModule(
       return platformError(403, "forbidden", "WhatsApp inbound simulation is disabled.");
     }
 
+    if (error instanceof Error && error.message === "WhatsApp session is not connected.") {
+      return platformError(409, "conflict", "WhatsApp session is not connected.");
+    }
+
     console.error("WhatsApp module request failed.", error);
     return platformError(500, "internal_error", "WhatsApp module request failed.");
   }
@@ -1690,6 +1798,26 @@ function readWhatsAppKnowledgePatch(record: Record<string, unknown>): WhatsAppKn
     patch.metadata = metadata;
   }
   return patch;
+}
+
+function withWhatsAppOwnerContext<T extends { metadata?: MetadataRecord }>(
+  input: T,
+  request: StandaloneApiRequest,
+): T {
+  const context = createChatContext(request);
+  const metadata: MetadataRecord = { ...(input.metadata ?? {}) };
+  if (context.tenantId) {
+    metadata.tenant_id = context.tenantId;
+  }
+  if (context.venueId) {
+    metadata.venue_id = context.venueId;
+  }
+  return Object.keys(metadata).length > 0 ? { ...input, metadata } : input;
+}
+
+function readWhatsAppChangedBy(request: StandaloneApiRequest) {
+  const context = createChatContext(request);
+  return context.bearerToken ? "authenticated-owner" : "system";
 }
 
 function assignOptionalString(

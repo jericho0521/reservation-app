@@ -622,10 +622,10 @@ Expected demonstration: create bookings through web and simulated WhatsApp, show
 
 **Produces:** One command restores three flagship businesses, realistic reservations/conversations, analytics history, maintenance, and channel simulation state.
 
-- [ ] Make reset refuse non-local/non-allowlisted database targets.
-- [ ] Test configuration parsing and destructive-operation guards.
-- [ ] Document exact environment prerequisites.
-- [ ] Commit as `feat(demo): add deterministic reset and readiness tooling`.
+- [x] Make reset refuse non-local/non-allowlisted database targets.
+- [x] Test configuration parsing and destructive-operation guards.
+- [x] Document exact environment prerequisites.
+- [x] Commit as `feat(demo): add deterministic reset and readiness tooling`.
 
 ### Task 6.2: Complete security and privacy review
 
@@ -635,10 +635,10 @@ Expected demonstration: create bookings through web and simulated WhatsApp, show
 
 **Produces:** Evidence for tenant isolation, owner/public route separation, service-secret containment, WhatsApp credential encryption, QR secrecy, token safety, idempotency, and log redaction.
 
-- [ ] Search tracked source and generated client bundles for credential names and sample secrets.
-- [ ] Add negative tests for cross-tenant object IDs on every new owner route.
-- [ ] Verify public responses exclude private profile, draft, knowledge source metadata, and channel credentials.
-- [ ] Commit as `test(security): prove final platform boundaries`.
+- [x] Search tracked source and generated client bundles for credential names and sample secrets.
+- [x] Add negative tests for cross-tenant object IDs on every new owner route.
+- [x] Verify public responses exclude private profile, draft, knowledge source metadata, and channel credentials.
+- [x] Commit as `test(security): prove final platform boundaries`.
 
 ### Task 6.3: Add complete end-to-end journeys
 
@@ -651,8 +651,8 @@ Expected demonstration: create bookings through web and simulated WhatsApp, show
 **Produces:** Automated proofs for the four presentation-critical journeys, with simulation substituting for external WhatsApp/AI services.
 
 - [ ] Run each test from a freshly reset demo database.
-- [ ] Capture failure diagnostics without credentials or QR data.
-- [ ] Commit as `test(e2e): cover final demonstration journeys`.
+- [x] Capture failure diagnostics without credentials or QR data.
+- [x] Commit as `test(e2e): cover final demonstration journeys`.
 
 ### Task 6.4: Polish UX and accessibility
 
@@ -664,8 +664,8 @@ Expected demonstration: create bookings through web and simulated WhatsApp, show
 
 - [ ] Walk every primary journey at 375px, 768px, and desktop width.
 - [ ] Complete keyboard-only flow and inspect headings, labels, contrast, and focus.
-- [ ] Fix only presentation-blocking inconsistencies; no new feature work.
-- [ ] Commit as `fix(ui): polish final customer and owner journeys`.
+- [x] Fix only presentation-blocking inconsistencies; no new feature work.
+- [x] Commit as `fix(ui): polish final customer and owner journeys`.
 
 ### Task 6.5: Finish project documentation
 
@@ -678,10 +678,10 @@ Expected demonstration: create bookings through web and simulated WhatsApp, show
 
 **Produces:** Setup, architecture, package responsibilities, environment matrix, migrations, test commands, demo flow, fallback flow, limitations, and mapping from project objectives to evidence.
 
-- [ ] Include Mermaid system, booking sequence, Studio lifecycle, and deployment diagrams.
-- [ ] Clearly distinguish live integrations from deterministic simulation.
-- [ ] Record deliberate non-goals and future work.
-- [ ] Commit as `docs: complete final platform documentation`.
+- [x] Include Mermaid system, booking sequence, Studio lifecycle, and deployment diagrams.
+- [x] Clearly distinguish live integrations from deterministic simulation.
+- [x] Record deliberate non-goals and future work.
+- [x] Commit as `docs: complete final platform documentation`.
 
 ### Task 6.6: Prepare presentation and final demo
 
@@ -694,15 +694,15 @@ Expected demonstration: create bookings through web and simulated WhatsApp, show
 
 - [ ] Rehearse the exact script three times with a timer.
 - [ ] Record a backup video using deterministic simulation.
-- [ ] Prepare one architecture slide, one shared-engine proof, one security slide, and one evaluation/results slide.
-- [ ] Prepare answers for Baileys trade-offs, modular package value, tenancy, AI safety, database concurrency, and scope decisions.
-- [ ] Commit as `docs: add final presentation runbook`.
+- [x] Prepare one architecture slide, one shared-engine proof, one security slide, and one evaluation/results slide.
+- [x] Prepare answers for Baileys trade-offs, modular package value, tenancy, AI safety, database concurrency, and scope decisions.
+- [x] Commit as `docs: add final presentation runbook`.
 
 ### Task 6.7: Run the release candidate gate
 
 - [ ] Freeze features at least 48 hours before submission.
-- [ ] Reset the demo environment and run all commands below from a clean checkout.
-- [ ] Fix only release-blocking defects; rerun the failing focused suite and the full gate.
+- [x] Reset the demo environment and run all commands below from a clean checkout.
+- [x] Fix only release-blocking defects; rerun the failing focused suite and the full gate.
 - [ ] Tag the accepted revision only after the working tree is clean and evidence is recorded.
 
 ```bash
@@ -721,6 +721,20 @@ git status --short
 ```
 
 Expected: every command passes, `git status --short` prints nothing, and both live-configured and deterministic-fallback demo checklists are complete.
+
+### Release-candidate evidence — 2026-07-12
+
+Verified code revision: `06a6df349bf65641e1a9bde4e03c2c0a103d995c`.
+
+- All eleven commands above passed using pnpm 10.33.2 after a frozen-lockfile install.
+- `pnpm test:e2e` passed 24 tests; two optional live-page URL probes skipped because no hosted URLs were configured.
+- `pnpm test:smoke` passed with its three documented no-backend skips. An additional strict in-memory proof passed health and WhatsApp readiness; catalog correctly remained unavailable because skeleton memory mode has no catalog repository.
+- `pnpm demo:reset` and `pnpm demo:verify` passed static validation. Database mutation/readiness proof skipped because `FINAL_DEMO_DATABASE_URL` was unset.
+- `pnpm deploy:verify` passed source/client security scanning and Docker verification; live deployment configuration proof skipped because deployment environment values were unset.
+- The security scanner initially reported its own committed detection fixtures, was narrowed to exclude only those two fixture files, gained an integration regression test, and the complete gate passed again.
+- `git status --short` printed nothing after the verified gate.
+
+Remaining unchecked items require the final deployed environment or human presentation sign-off: live database E2E reset, responsive/keyboard walkthrough on deployed URLs, three timed rehearsals, backup recording, 48-hour feature freeze, screenshot approval, and release tag selection.
 
 ---
 

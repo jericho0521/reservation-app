@@ -2,7 +2,7 @@
   "service": "reservation-platform-standalone-api",
   "packageName": "@reservation-platform/standalone-api-skeleton",
   "runtime": "node",
-  "buildCommand": "corepack pnpm --filter @reservation-platform/standalone-api-skeleton run build",
+  "buildCommand": "pnpm --filter @reservation-platform/standalone-api-skeleton run build",
   "startCommand": "node apps/api/dist/server.js",
   "healthPath": "/v1/health",
   "portEnv": "PORT",

@@ -35,8 +35,8 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
-    "prepack": "corepack pnpm --filter @project-play/reservations-core run build && corepack pnpm --filter @reservation-platform/contract-types run build && corepack pnpm --filter @reservation-platform/api run build && corepack pnpm run build",
-    "test": "corepack pnpm --filter @project-play/reservations-core run build && corepack pnpm --filter @reservation-platform/contract-types run build && corepack pnpm --filter @reservation-platform/api run build && tsc -p tsconfig.build.json && node --import tsx --test",
+    "prepack": "pnpm --filter @project-play/reservations-core run build && pnpm --filter @reservation-platform/contract-types run build && pnpm --filter @reservation-platform/api run build && pnpm run build",
+    "test": "pnpm --filter @project-play/reservations-core run build && pnpm --filter @reservation-platform/contract-types run build && pnpm --filter @reservation-platform/api run build && tsc -p tsconfig.build.json && node --import tsx --test",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {

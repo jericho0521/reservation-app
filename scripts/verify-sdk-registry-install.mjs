@@ -446,7 +446,7 @@ async function findPackageTarball(name, version) {
   }
 
   throw new Error(
-    `Packed tarball for ${name}@${version} was not found. Run corepack pnpm run packages:pack before disposable registry proof.`,
+    `Packed tarball for ${name}@${version} was not found. Run pnpm run packages:pack before disposable registry proof.`,
   );
 }
 
@@ -474,7 +474,7 @@ async function addLocalZodPackage(packages) {
   const zodPackageDir = path.join(repoRoot, "node_modules", "zod");
   const zodPackageJsonPath = path.join(zodPackageDir, "package.json");
   if (!existsSync(zodPackageJsonPath)) {
-    throw new Error("Disposable registry proof requires local node_modules/zod. Run corepack pnpm install first.");
+    throw new Error("Disposable registry proof requires local node_modules/zod. Run pnpm install first.");
   }
 
   const zodPackageJson = JSON.parse(await readFile(zodPackageJsonPath, "utf8"));

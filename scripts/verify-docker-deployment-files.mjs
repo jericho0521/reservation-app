@@ -161,7 +161,7 @@ function verifyDockerDeploymentFiles() {
   );
   assertIncludes(
     deploymentDocs,
-    "corepack pnpm run docker:build",
+    "pnpm run docker:build",
     "docs/operations/backend-deployment.md must document the Docker build script.",
     errors,
   );

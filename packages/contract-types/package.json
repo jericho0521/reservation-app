@@ -30,8 +30,8 @@
     "build": "tsc -p tsconfig.build.json",
     "contracts:generate": "tsx scripts/generate-contract-artifacts.ts",
     "contracts:check": "tsx scripts/generate-contract-artifacts.ts --check",
-    "prepack": "corepack pnpm run build",
-    "test": "tsc -p tsconfig.build.json && node --import tsx --test \"src/**/*.test.ts\" && corepack pnpm run contracts:check",
+    "prepack": "pnpm run build",
+    "test": "tsc -p tsconfig.build.json && node --import tsx --test \"src/**/*.test.ts\" && pnpm run contracts:check",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {

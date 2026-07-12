@@ -501,9 +501,9 @@ async function createGeneratedBackendWorkspaceMetadata({
         "packages:build": createFilteredPackageScript(buildPackages, "build"),
         "packages:test": createFilteredPackageScript(testPackages, "test"),
         "backend-platform:verify-extraction-boundary": "node scripts/verify-backend-platform-extraction-boundary.mjs --backend-candidate",
-        "backend-platform:verify-standalone-api-skeleton": "corepack pnpm --filter @reservation-platform/api run build && corepack pnpm --filter @reservation-platform/contract-types run build && corepack pnpm --filter @reservation-platform/standalone-api-skeleton run test",
+        "backend-platform:verify-standalone-api-skeleton": "pnpm --filter @reservation-platform/api run build && pnpm --filter @reservation-platform/contract-types run build && pnpm --filter @reservation-platform/standalone-api-skeleton run test",
         "database:migration-index:check": "node scripts/generate-database-migration-index.mjs --check",
-        "phase-11:verify-generated-backend-workspace": "corepack pnpm run backend-platform:verify-extraction-boundary && corepack pnpm run packages:build && corepack pnpm run packages:test && corepack pnpm run backend-platform:verify-standalone-api-skeleton && corepack pnpm run database:migration-index:check",
+        "phase-11:verify-generated-backend-workspace": "pnpm run backend-platform:verify-extraction-boundary && pnpm run packages:build && pnpm run packages:test && pnpm run backend-platform:verify-standalone-api-skeleton && pnpm run database:migration-index:check",
       },
     },
     pnpmWorkspaceYaml: "packages:\n  - apps/*\n  - packages/*\n",
@@ -580,11 +580,11 @@ function createFilteredPackageScript(expectedPackages, scriptName) {
     .filter(isNonBlankString);
 
   if (packageNames.length === 0) {
-    return `corepack pnpm --filter './apps/*' --filter './packages/*' run ${scriptName}`;
+    return `pnpm --filter './apps/*' --filter './packages/*' run ${scriptName}`;
   }
 
   return packageNames
-    .map((packageName) => `corepack pnpm --filter ${packageName} run ${scriptName}`)
+    .map((packageName) => `pnpm --filter ${packageName} run ${scriptName}`)
     .join(" && ");
 }
 
@@ -687,7 +687,7 @@ function validateGeneratedPhase11ScriptComposition(context, scripts) {
   }
 
   for (const scriptName of requiredGeneratedPhase11ScriptInvocations) {
-    if (!command.includes(`corepack pnpm run ${scriptName}`)) {
+    if (!command.includes(`pnpm run ${scriptName}`)) {
       context.failures.push(
         `package.json: generated backend root script phase-11:verify-generated-backend-workspace must run ${scriptName}`,
       );
@@ -992,7 +992,7 @@ function isNodeBuiltinSpecifier(specifier) {
 }
 
 function getFilteredPackageScriptReferences(command) {
-  return [...command.matchAll(/(?:^|[\s;&|])corepack\s+pnpm\s+--filter\s+(?:"([^"]+)"|'([^']+)'|([^\s;&|]+))\s+run\s+([A-Za-z0-9:_-]+)(?=$|[\s;&|])/g)]
+  return [...command.matchAll(/(?:^|[\s;&|])pnpm\s+--filter\s+(?:"([^"]+)"|'([^']+)'|([^\s;&|]+))\s+run\s+([A-Za-z0-9:_-]+)(?=$|[\s;&|])/g)]
     .map((match) => ({
       packageFilter: match[1] ?? match[2] ?? match[3],
       scriptName: match[4],

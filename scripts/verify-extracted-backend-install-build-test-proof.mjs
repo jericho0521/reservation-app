@@ -13,7 +13,7 @@ export const extractedBackendProofAllowInstallEnvName = "RESERVATION_EXTRACTED_B
 export const extractedBackendProofStrictEnvName = "RESERVATION_EXTRACTED_BACKEND_PROOF_STRICT";
 
 export const expectedGeneratedBackendWorkspaceScript =
-  "corepack pnpm run backend-platform:verify-extraction-boundary && corepack pnpm run packages:build && corepack pnpm run packages:test && corepack pnpm run backend-platform:verify-standalone-api-skeleton && corepack pnpm run database:migration-index:check";
+  "pnpm run backend-platform:verify-extraction-boundary && pnpm run packages:build && pnpm run packages:test && pnpm run backend-platform:verify-standalone-api-skeleton && pnpm run database:migration-index:check";
 const defaultModeBackendSafetyMessage =
   "Default mode does not install dependencies, call the network, publish packages, or execute generated backend commands.";
 

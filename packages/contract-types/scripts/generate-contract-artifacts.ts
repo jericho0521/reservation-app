@@ -66,7 +66,7 @@ async function checkArtifacts(expectedArtifacts: Artifact[]) {
   }
 
   if (failures.length > 0) {
-    throw new Error(`Contract artifacts are not up to date:\n${failures.map((failure) => `- ${failure}`).join("\n")}\nRun: corepack pnpm --filter @reservation-platform/contract-types run contracts:generate`);
+    throw new Error(`Contract artifacts are not up to date:\n${failures.map((failure) => `- ${failure}`).join("\n")}\nRun: pnpm --filter @reservation-platform/contract-types run contracts:generate`);
   }
 }
 

@@ -61,7 +61,7 @@ function rootPackageFixture(overrides = {}) {
       "backend-platform:verify-extracted-workspace-readiness": "node scripts/verify-extracted-backend-workspace-readiness.mjs",
       "backend-platform:verify-standalone-api-skeleton": "echo ok",
       "database:verify-migration-bundle": "echo ok",
-      "sdk:release-gate": "corepack pnpm run backend-platform:verify-extracted-workspace-readiness",
+      "sdk:release-gate": "pnpm run backend-platform:verify-extracted-workspace-readiness",
     },
     ...overrides,
   };

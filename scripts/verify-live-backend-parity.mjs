@@ -335,7 +335,7 @@ async function importSdk() {
     return import(pathToFileURL(distPath).href);
   }
 
-  throw new Error("Could not import @reservation-platform/sdk. Run corepack pnpm run packages:build first.");
+  throw new Error("Could not import @reservation-platform/sdk. Run pnpm run packages:build first.");
 }
 
 function disabledChatCases(client, config) {

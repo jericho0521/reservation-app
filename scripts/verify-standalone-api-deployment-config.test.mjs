@@ -37,7 +37,7 @@ function validDeploymentManifest(overrides = {}) {
     service: "reservation-platform-standalone-api",
     packageName: "@reservation-platform/standalone-api-skeleton",
     runtime: "node",
-    buildCommand: "corepack pnpm --filter @reservation-platform/standalone-api-skeleton run build",
+    buildCommand: "pnpm --filter @reservation-platform/standalone-api-skeleton run build",
     startCommand: "node apps/api/dist/server.js",
     healthPath: "/v1/health",
     portEnv: "PORT",
@@ -102,7 +102,7 @@ test("standalone deployment manifest rejects package-name drift", () => {
 test("standalone deployment manifest rejects shell control operators in commands", () => {
   const result = verifyStandaloneDeploymentManifest({
     manifest: validDeploymentManifest({
-      buildCommand: "corepack pnpm --filter @reservation-platform/standalone-api-skeleton run build && echo leaked",
+      buildCommand: "pnpm --filter @reservation-platform/standalone-api-skeleton run build && echo leaked",
     }),
     packageJson: { name: "@reservation-platform/standalone-api-skeleton" },
   });

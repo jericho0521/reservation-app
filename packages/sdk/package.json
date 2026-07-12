@@ -25,7 +25,7 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
-    "prepack": "corepack pnpm run build",
+    "prepack": "pnpm run build",
     "test": "tsc -p tsconfig.build.json && node --import tsx --test \"src/**/*.test.ts\"",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },

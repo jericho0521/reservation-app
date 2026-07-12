@@ -322,7 +322,7 @@ export function verifyStandaloneDeploymentManifest(options = {}) {
   }
   validateCommand(manifest.buildCommand, "buildCommand", errors);
   validateCommand(manifest.startCommand, "startCommand", errors);
-  if (manifest.buildCommand !== "corepack pnpm --filter @reservation-platform/standalone-api-skeleton run build") {
+  if (manifest.buildCommand !== "pnpm --filter @reservation-platform/standalone-api-skeleton run build") {
     errors.push("Standalone deployment manifest buildCommand must build the standalone API workspace package.");
   }
   if (manifest.startCommand !== "node apps/api/dist/server.js") {

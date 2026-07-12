@@ -25,10 +25,10 @@
     "index:check": "node ../../scripts/generate-database-migration-index.mjs --check",
     "live-proof": "node ../../scripts/verify-database-live-proof.mjs",
     "live-proof:strict": "node ../../scripts/verify-database-live-proof.mjs --strict",
-    "prepack": "corepack pnpm run build",
+    "prepack": "pnpm run build",
     "test": "tsc -p tsconfig.build.json && node --import tsx --test \"src/**/*.test.ts\"",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "verify": "corepack pnpm run index:check && node ../../scripts/verify-database-migration-bundle.mjs"
+    "verify": "pnpm run index:check && node ../../scripts/verify-database-migration-bundle.mjs"
   },
   "devDependencies": {
     "tsx": "^4.21.0",

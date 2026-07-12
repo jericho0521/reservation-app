@@ -27,7 +27,7 @@
 
 ## 1. Delivery Strategy
 
-This roadmap is the master plan. Phase 1 already has a line-by-line implementation plan at `docs/superpowers/plans/2026-07-12-experience-platform-phase-1-foundation.md`. Each later phase below defines an independently testable outcome and exact work packages. Before executing a later phase, expand its work packages into the same step-level TDD format as the Phase 1 plan if implementation is delegated across separate sessions.
+This roadmap is the master plan for all six phases. Phase 1 also has a line-by-line implementation plan at `docs/superpowers/plans/2026-07-12-experience-platform-phase-1-foundation.md`. Each later phase below defines an independently testable outcome, exact work packages, file ownership, focused commits, and a phase gate. Expand an individual work package into the same step-level TDD format as the Phase 1 plan only when a separate implementation session needs that additional detail.
 
 ```mermaid
 gantt
@@ -399,7 +399,7 @@ sequenceDiagram
 ### Task 4.1: Add normalized conversation persistence
 
 **Files:**
-- Create migration `000018_unified_conversations.sql`
+- Create migration `000019_unified_conversations.sql` (`000018` is already reserved for customer reservation management tokens).
 - Create `packages/reservation-platform-api/src/conversations.ts`
 - Create `packages/reservations-supabase/src/conversations.ts`
 - Extend contracts, API, SDK, migration metadata, and tests.
@@ -509,7 +509,7 @@ Expected demonstration: ask for a booking through chat or simulation, review pro
 ### Task 5.1: Add operational summary queries
 
 **Files:**
-- Create migration `000019_operations_analytics_rpc.sql`
+- Create migration `000020_operations_analytics_rpc.sql`
 - Create `packages/reservation-platform-api/src/operations-overview.ts`
 - Create `packages/reservations-supabase/src/operations-overview.ts`
 - Extend contracts, API, SDK, migration metadata, and tests.
@@ -555,7 +555,7 @@ Expected demonstration: ask for a booking through chat or simulation, review pro
 **Files:**
 - Create `packages/reservation-platform-api/src/analytics.ts`
 - Create `packages/reservations-supabase/src/analytics.ts`
-- Extend `000019_operations_analytics_rpc.sql`
+- Extend `000020_operations_analytics_rpc.sql`
 - Extend contracts, API, SDK, and tests.
 
 **Produces:** Date-range aggregates for reservations by day/status/channel/service, popular slots, conversion funnel, cancellation rate, AI containment, and staff takeover rate.
@@ -811,6 +811,6 @@ Update this table at each weekly gate.
 | 1. Foundation | 2026-07-19 | Complete | Full Phase 1 gate passed; 2 optional live-URL E2E checks skipped with documented env requirements. | None |
 | 2. Experience Studio | 2026-07-26 | Complete | Contract types 21, API package 158, database 13, Supabase adapter 50, SDK 19, UI 13, console 9, standalone API 125; console production build, package boundary, packed-package, and migration-bundle gates passed. | None |
 | 3. Customer Experiences | 2026-08-02 | Complete | React 14, UI 18, root E2E 15 passed with 2 documented optional live-URL skips; booking production build and package/frontend boundaries passed. Flagship builds and focused API, database, SDK, Supabase, security-token, concurrency, and all-eight-preset proofs also passed. | None |
-| 4. Omnichannel AI | 2026-08-09 | Not started | — | — |
+| 4. Omnichannel AI | 2026-08-09 | In progress | Task 4.1 unified conversation contracts, persistence, API routes, and adapters are being implemented; focused and phase gates remain outstanding. | None |
 | 5. Operations and Analytics | 2026-08-16 | Not started | — | — |
 | 6. Hardening and Presentation | 2026-08-23 | Not started | — | — |

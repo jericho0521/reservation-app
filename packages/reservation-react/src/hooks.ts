@@ -20,6 +20,7 @@ import {
   isSlotBookable,
   submitBookingFlowOnce,
   validateBookingFlow,
+  localDateInputValue,
   type BookingFlowState,
 } from "./booking-flow.js";
 
@@ -220,7 +221,7 @@ export interface UseBookingFlowOptions {
 
 export function useBookingFlow({
   serviceId,
-  initialDate = new Date().toISOString().slice(0, 10),
+  initialDate = localDateInputValue(),
   initialQuantity = 1,
   initialCustomer = {},
 }: UseBookingFlowOptions) {

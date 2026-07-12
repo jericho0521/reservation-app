@@ -19,7 +19,7 @@ export function standaloneBackendDevCommand() {
   };
 }
 
-function backendDevEnv(inputEnv = process.env, options = {}) {
+export function backendDevEnv(inputEnv = process.env, options = {}) {
   const env = { ...inputEnv };
 
   env.PORT ??= "4100";
@@ -48,6 +48,10 @@ function backendDevEnv(inputEnv = process.env, options = {}) {
     "http://127.0.0.1:4201",
     "http://localhost:4202",
     "http://127.0.0.1:4202",
+    "http://localhost:4300",
+    "http://127.0.0.1:4300",
+    "http://localhost:4400",
+    "http://127.0.0.1:4400",
   ].join(",");
 
   return env;

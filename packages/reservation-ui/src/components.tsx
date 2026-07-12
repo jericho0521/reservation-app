@@ -407,7 +407,7 @@ export function DatePicker({
   className?: string;
 }) {
   return (
-    <div className="rp-field grid gap-1.5">
+    <label className="rp-field grid gap-1.5">
       <span className="rp-field-label text-[11px] font-bold uppercase tracking-widest text-neutral-500 font-mono">
         01 / {label}
       </span>
@@ -417,7 +417,7 @@ export function DatePicker({
         className={cn(className, "focus:ring-1 focus:ring-black dark:focus:ring-white")}
         onChange={(event) => onChange(event.currentTarget.value)}
       />
-    </div>
+    </label>
   );
 }
 

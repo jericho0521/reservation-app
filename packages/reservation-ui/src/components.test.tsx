@@ -7,6 +7,7 @@ import {
   AvailabilityTimeline,
   BookingFlow,
   BookingSetupError,
+  DatePicker,
   ReservationError,
   ReservationSuccess,
   ResourceSelector,
@@ -70,6 +71,12 @@ test("AvailabilityTimeline explains unavailable slots", () => {
 
   assert.match(flattenText(element), /Sold Out/);
   assert.equal(collectProps(element, (props) => props.disabled === true ? true : undefined).length, 1);
+});
+
+test("DatePicker associates its visible caption with the date input", () => {
+  const element = DatePicker({ label: "Date", value: "2026-07-13", onChange: () => undefined });
+  assert.equal((element as { type?: unknown }).type, "label");
+  assert.match(flattenText(element), /Date/u);
 });
 
 test("AvailabilityTimeline shows loading before empty availability", () => {

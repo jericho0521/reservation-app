@@ -6,6 +6,7 @@ import {
   canAdvanceBookingJourney,
   createReservationPayload,
   nextBookingJourneyStep,
+  localDateInputValue,
   previousBookingJourneyStep,
   submitBookingFlowOnce,
   submitLabelForMissing,
@@ -34,6 +35,10 @@ const baseState: BookingFlowState = {
   purpose: "Planning",
   submitting: false,
 };
+
+test("booking date defaults use the customer's local calendar day instead of UTC", () => {
+  assert.equal(localDateInputValue(new Date(2026, 6, 13, 0, 30)), "2026-07-13");
+});
 
 test("validateBookingFlow accepts complete quantity booking state", () => {
   const validation = validateBookingFlow(baseState);

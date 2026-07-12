@@ -808,7 +808,7 @@ Update this table at each weekly gate.
 
 | Phase | Planned end | Status | Gate evidence | Scope cuts |
 | --- | --- | --- | --- | --- |
-| 1. Foundation | 2026-07-19 | Not started | — | — |
+| 1. Foundation | 2026-07-19 | Complete | Full Phase 1 gate passed; 2 optional live-URL E2E checks skipped with documented env requirements. | None |
 | 2. Experience Studio | 2026-07-26 | Not started | — | — |
 | 3. Customer Experiences | 2026-08-02 | Not started | — | — |
 | 4. Omnichannel AI | 2026-08-09 | Not started | — | — |

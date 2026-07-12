@@ -35,6 +35,7 @@ const expectedCoreTargets = [
   "packages/database/migrations/supabase/000016_experience_availability_rules.sql",
   "packages/database/migrations/supabase/000017_experience_knowledge.sql",
   "packages/database/migrations/supabase/000018_reservation_management_tokens.sql",
+  "packages/database/migrations/supabase/000019_unified_conversations.sql",
 ];
 
 const optionalAiPrefix = "packages/database/migrations/supabase/optional/ai-retrieval/";

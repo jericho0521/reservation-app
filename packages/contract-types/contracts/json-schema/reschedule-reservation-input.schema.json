@@ -275,6 +275,187 @@
       ],
       "type": "object"
     },
+    "ConversationAutomationInput": {
+      "additionalProperties": false,
+      "properties": {
+        "automation_state": {
+          "$ref": "#/$defs/ConversationAutomationState"
+        }
+      },
+      "required": [
+        "automation_state"
+      ],
+      "type": "object"
+    },
+    "ConversationAutomationState": {
+      "enum": [
+        "automated",
+        "manual"
+      ],
+      "type": "string"
+    },
+    "ConversationChannel": {
+      "enum": [
+        "web_chat",
+        "whatsapp",
+        "simulation"
+      ],
+      "type": "string"
+    },
+    "ConversationDeliveryState": {
+      "enum": [
+        "pending",
+        "sent",
+        "delivered",
+        "failed"
+      ],
+      "type": "string"
+    },
+    "ConversationMessageResponse": {
+      "additionalProperties": false,
+      "properties": {
+        "channel": {
+          "$ref": "#/$defs/ConversationChannel"
+        },
+        "content": {
+          "type": "string"
+        },
+        "conversation_id": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "string"
+        },
+        "delivery_state": {
+          "$ref": "#/$defs/ConversationDeliveryState"
+        },
+        "direction": {
+          "enum": [
+            "inbound",
+            "outbound"
+          ],
+          "type": "string"
+        },
+        "message_id": {
+          "type": "string"
+        },
+        "reservation_id": {
+          "type": "string"
+        },
+        "sender_type": {
+          "enum": [
+            "customer",
+            "automation",
+            "staff",
+            "system"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "message_id",
+        "conversation_id",
+        "channel",
+        "direction",
+        "sender_type",
+        "delivery_state",
+        "content",
+        "created_at"
+      ],
+      "type": "object"
+    },
+    "ConversationParticipantResponse": {
+      "additionalProperties": false,
+      "properties": {
+        "contact_hint": {
+          "type": "string"
+        },
+        "display_name": {
+          "type": "string"
+        },
+        "participant_id": {
+          "type": "string"
+        },
+        "role": {
+          "enum": [
+            "customer",
+            "staff",
+            "automation"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "participant_id",
+        "role"
+      ],
+      "type": "object"
+    },
+    "ConversationResponse": {
+      "additionalProperties": false,
+      "properties": {
+        "automation_state": {
+          "$ref": "#/$defs/ConversationAutomationState"
+        },
+        "channel": {
+          "$ref": "#/$defs/ConversationChannel"
+        },
+        "conversation_id": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "string"
+        },
+        "last_message_at": {
+          "type": "string"
+        },
+        "participant": {
+          "$ref": "#/$defs/ConversationParticipantResponse"
+        },
+        "reservation_id": {
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "active",
+            "closed"
+          ],
+          "type": "string"
+        },
+        "tenant_id": {
+          "type": "string"
+        },
+        "updated_at": {
+          "type": "string"
+        },
+        "venue_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "conversation_id",
+        "tenant_id",
+        "venue_id",
+        "channel",
+        "status",
+        "automation_state",
+        "created_at",
+        "updated_at"
+      ],
+      "type": "object"
+    },
+    "ConversationStaffReplyInput": {
+      "additionalProperties": false,
+      "properties": {
+        "content": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "content"
+      ],
+      "type": "object"
+    },
     "CreateReservationInput": {
       "additionalProperties": false,
       "properties": {
@@ -1079,6 +1260,74 @@
           "type": "object"
         }
       ]
+    },
+    "ListConversationMessagesQuery": {
+      "additionalProperties": false,
+      "properties": {
+        "before": {
+          "type": "string"
+        },
+        "limit": {
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "type": "object"
+    },
+    "ListConversationMessagesResponse": {
+      "additionalProperties": false,
+      "properties": {
+        "messages": {
+          "items": {
+            "$ref": "#/$defs/ConversationMessageResponse"
+          },
+          "type": "array"
+        },
+        "next_cursor": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "messages"
+      ],
+      "type": "object"
+    },
+    "ListConversationsQuery": {
+      "additionalProperties": false,
+      "properties": {
+        "channel": {
+          "$ref": "#/$defs/ConversationChannel"
+        },
+        "limit": {
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "status": {
+          "enum": [
+            "active",
+            "closed"
+          ],
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "ListConversationsResponse": {
+      "additionalProperties": false,
+      "properties": {
+        "conversations": {
+          "items": {
+            "$ref": "#/$defs/ConversationResponse"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "conversations"
+      ],
+      "type": "object"
     },
     "ListExperienceKnowledgeResponse": {
       "additionalProperties": false,

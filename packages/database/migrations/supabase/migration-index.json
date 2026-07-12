@@ -149,6 +149,14 @@
       "scope": "reservation-platform",
       "sha256": "0004a563e8c867728ac53d37c32e8478fb29587f4c289ae40c16cc6a59481db9",
       "bytes": 5094
+    },
+    {
+      "order": 19,
+      "path": "packages/database/migrations/supabase/000019_unified_conversations.sql",
+      "module": "core",
+      "scope": "reservation-platform",
+      "sha256": "28766e690e7c3b37601c187f489d581b56ce440bd54df34b4652fb461c7719af",
+      "bytes": 6841
     }
   ],
   "optionalMigrations": [

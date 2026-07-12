@@ -17,6 +17,8 @@ import {
   resourceMaintenanceResponseSchema,
   type AvailabilityResponse,
   type BusinessProfileResponse,
+  type ConversationMessageResponse,
+  type ConversationResponse,
   type ExperienceConfigurationResponse,
   type ExperienceWorkspaceResponse,
   type PlatformErrorResponse,
@@ -31,6 +33,7 @@ import type {
   IdempotencyRepository,
   ExperienceStudioRepository,
   ExperienceKnowledgeRepository,
+  ConversationRepository,
   OperatingHoursRepository,
   PlatformCatalogRepository,
   PlatformTenantVenueRepository,
@@ -554,6 +557,59 @@ test("experience channel route separates desired settings from readiness", async
     web_chat: { desired_enabled: true, configured: false, ready: false, state: "not_configured", message: "Configure the AI chat module." },
     whatsapp: { desired_enabled: true, configured: false, ready: false, state: "not_configured", message: "Configure the WhatsApp module." },
   });
+});
+
+test("conversation owner routes preserve scope, filters, chronology, replies, and takeover", async () => {
+  const observed: unknown[] = [];
+  const repository = conversationRepository({
+    async list(scope, query) {
+      observed.push({ operation: "list", scope, query });
+      return { data: [conversationFixture()] };
+    },
+    async listMessages(scope, conversationId, query) {
+      observed.push({ operation: "messages", scope, conversationId, query });
+      return { data: [conversationMessageFixture({ message_id: "message_2", created_at: "2026-08-01T10:01:00.000Z" }), conversationMessageFixture()] };
+    },
+    async append(scope, conversationId, input) {
+      observed.push({ operation: "append", scope, conversationId, input });
+      return { data: conversationMessageFixture({ message_id: "staff_1", direction: "outbound", sender_type: "staff", content: input.content }) };
+    },
+    async updateAutomation(scope, conversationId, input) {
+      observed.push({ operation: "automation", scope, conversationId, input });
+      return { data: conversationFixture({ automation_state: input.automation_state }) };
+    },
+  });
+  const headers = {
+    authorization: "Bearer secret",
+    "x-reservation-tenant-id": "tenant_1",
+    "x-reservation-venue-id": "venue_1",
+  };
+
+  const listed = await handleStandaloneApiRequest({ method: "GET", path: "/v1/conversations?channel=whatsapp&status=active&limit=25", headers }, { serviceApiKey: "secret", conversationRepository: repository });
+  const messages = await handleStandaloneApiRequest({ method: "GET", path: "/v1/conversations/conversation%2F1/messages?limit=10", headers }, { serviceApiKey: "secret", conversationRepository: repository });
+  const replied = await handleStandaloneApiRequest({ method: "POST", path: "/v1/conversations/conversation%2F1/messages", headers, body: { content: "A staff reply" } }, { serviceApiKey: "secret", conversationRepository: repository });
+  const takeover = await handleStandaloneApiRequest({ method: "PUT", path: "/v1/conversations/conversation%2F1/automation", headers, body: { automation_state: "manual" } }, { serviceApiKey: "secret", conversationRepository: repository });
+
+  assert.equal(listed.status, 200);
+  assert.deepEqual((messages.body as { messages: Array<{ message_id: string }> }).messages.map(({ message_id }) => message_id), ["message_1", "message_2"]);
+  assert.equal((replied.body as { sender_type: string }).sender_type, "staff");
+  assert.equal((takeover.body as { automation_state: string }).automation_state, "manual");
+  assert.deepEqual(observed, [
+    { operation: "list", scope: { tenantId: "tenant_1", venueId: "venue_1" }, query: { channel: "whatsapp", status: "active", limit: 25 } },
+    { operation: "messages", scope: { tenantId: "tenant_1", venueId: "venue_1" }, conversationId: "conversation/1", query: { limit: 10 } },
+    { operation: "append", scope: { tenantId: "tenant_1", venueId: "venue_1" }, conversationId: "conversation/1", input: { channel: "whatsapp", direction: "outbound", senderType: "staff", content: "A staff reply" } },
+    { operation: "automation", scope: { tenantId: "tenant_1", venueId: "venue_1" }, conversationId: "conversation/1", input: { automation_state: "manual", changedBy: "staff" } },
+  ]);
+});
+
+test("conversation owner routes reject missing authentication before repository access", async () => {
+  let called = false;
+  const response = await handleStandaloneApiRequest({ method: "GET", path: "/v1/conversations", headers: {} }, {
+    serviceApiKey: "secret",
+    conversationRepository: conversationRepository({ async list() { called = true; return { data: [] }; } }),
+  });
+  assert.equal(response.status, 401);
+  assert.equal(called, false);
 });
 
 test("experience validation blocks publication until required sections pass", async () => {
@@ -4708,6 +4764,52 @@ function reservationManagementRepository(overrides: Partial<ReservationManagemen
     read: async () => ({ data: { ok: false, error_code: "not_found" } }),
     cancel: async () => ({ data: { ok: false, error_code: "not_found" } }),
     ...overrides,
+  };
+}
+
+function conversationRepository(overrides: Partial<ConversationRepository> = {}): ConversationRepository {
+  return {
+    list: async () => ({ data: [] }),
+    get: async () => ({ data: conversationFixture() }),
+    getOrCreate: async () => ({ data: conversationFixture() }),
+    listMessages: async () => ({ data: [] }),
+    append: async () => ({ data: conversationMessageFixture() }),
+    updateAutomation: async () => ({ data: conversationFixture() }),
+    ...overrides,
+  };
+}
+
+function conversationFixture(overrides: Partial<ConversationResponse> = {}): ConversationResponse {
+  return { ...conversationFixtureBase(), ...overrides };
+}
+
+function conversationFixtureBase(): ConversationResponse {
+  return {
+    conversation_id: "conversation/1",
+    tenant_id: "tenant_1",
+    venue_id: "venue_1",
+    channel: "whatsapp" as const,
+    status: "active" as const,
+    automation_state: "automated" as const,
+    created_at: "2026-08-01T10:00:00.000Z",
+    updated_at: "2026-08-01T10:00:00.000Z",
+  };
+}
+
+function conversationMessageFixture(overrides: Partial<ConversationMessageResponse> = {}): ConversationMessageResponse {
+  return { ...conversationMessageFixtureBase(), ...overrides };
+}
+
+function conversationMessageFixtureBase(): ConversationMessageResponse {
+  return {
+    message_id: "message_1",
+    conversation_id: "conversation/1",
+    channel: "whatsapp" as const,
+    direction: "inbound" as const,
+    sender_type: "customer" as const,
+    delivery_state: "delivered" as const,
+    content: "Can I book?",
+    created_at: "2026-08-01T10:00:00.000Z",
   };
 }
 

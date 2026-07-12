@@ -210,6 +210,17 @@
       ]
     },
     {
+      "kind": "core-migration",
+      "order": 19,
+      "targetPath": "packages/database/migrations/supabase/000019_unified_conversations.sql",
+      "sourceAssets": [
+        {
+          "path": "packages/database/migrations/supabase/000019_unified_conversations.sql",
+          "section": "Venue-scoped unified channel conversations, participants, messages, takeover state, and idempotent append RPC"
+        }
+      ]
+    },
+    {
       "kind": "optional-ai-retrieval",
       "targetPath": "packages/database/migrations/supabase/optional/ai-retrieval/000001_knowledge_chunks.sql",
       "sourceAssets": [

@@ -14,3 +14,4 @@ export * from "./platform-adapters.js";
 export * from "./resource-maintenance.js";
 export * from "./reservations.js";
 export * from "./reservation-management.js";
+export * from "./conversations.js";

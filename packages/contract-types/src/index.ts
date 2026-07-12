@@ -258,6 +258,71 @@ export interface ExperienceChannelSettingsResponse {
   };
 }
 
+export type ConversationChannel = "web_chat" | "whatsapp" | "simulation";
+export type ConversationAutomationState = "automated" | "manual";
+export type ConversationDeliveryState = "pending" | "sent" | "delivered" | "failed";
+
+export interface ConversationParticipantResponse {
+  participant_id: string;
+  role: "customer" | "staff" | "automation";
+  display_name?: string;
+  contact_hint?: string;
+}
+
+export interface ConversationResponse {
+  conversation_id: string;
+  tenant_id: string;
+  venue_id: string;
+  channel: ConversationChannel;
+  status: "active" | "closed";
+  automation_state: ConversationAutomationState;
+  participant?: ConversationParticipantResponse;
+  reservation_id?: string;
+  last_message_at?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ConversationMessageResponse {
+  message_id: string;
+  conversation_id: string;
+  channel: ConversationChannel;
+  direction: "inbound" | "outbound";
+  sender_type: "customer" | "automation" | "staff" | "system";
+  delivery_state: ConversationDeliveryState;
+  content: string;
+  reservation_id?: string;
+  created_at: string;
+}
+
+export interface ListConversationsQuery {
+  channel?: ConversationChannel;
+  status?: "active" | "closed";
+  limit?: number;
+}
+
+export interface ListConversationsResponse {
+  conversations: ConversationResponse[];
+}
+
+export interface ListConversationMessagesQuery {
+  before?: string;
+  limit?: number;
+}
+
+export interface ListConversationMessagesResponse {
+  messages: ConversationMessageResponse[];
+  next_cursor?: string;
+}
+
+export interface ConversationAutomationInput {
+  automation_state: ConversationAutomationState;
+}
+
+export interface ConversationStaffReplyInput {
+  content: string;
+}
+
 export interface ListServicesResponse {
   services: ServiceResponse[];
 }

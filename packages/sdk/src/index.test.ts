@@ -252,6 +252,37 @@ test("customer management SDK methods encode opaque token paths and stay public"
   requests.forEach((request) => assert.equal(new Headers(request.init?.headers).has("Authorization"), false));
 });
 
+test("conversation SDK methods preserve scoped owner paths, filters, and bodies", async () => {
+  const requests: Array<{ url: string; init?: RequestInit }> = [];
+  const client = createReservationPlatformClient({
+    baseUrl: "https://platform.example",
+    tenantId: "tenant_1",
+    venueId: "venue_1",
+    fetch: async (url, init) => {
+      requests.push({ url: String(url), init });
+      return jsonResponse({ conversations: [], messages: [] });
+    },
+  });
+
+  await client.listConversations({ channel: "whatsapp", status: "active", limit: 25 });
+  await client.getConversation("conversation/1");
+  await client.listConversationMessages("conversation/1", { before: "2026-08-01T00:00:00.000Z", limit: 10 });
+  await client.sendConversationStaffReply("conversation/1", { content: "I can help with that." });
+  await client.updateConversationAutomation("conversation/1", { automation_state: "manual" });
+
+  assert.deepEqual(requests.map(({ url, init }) => [new URL(url).pathname, init?.method]), [
+    ["/v1/conversations", "GET"],
+    ["/v1/conversations/conversation%2F1", "GET"],
+    ["/v1/conversations/conversation%2F1/messages", "GET"],
+    ["/v1/conversations/conversation%2F1/messages", "POST"],
+    ["/v1/conversations/conversation%2F1/automation", "PUT"],
+  ]);
+  assert.equal(new URL(requests[0]!.url).search, "?channel=whatsapp&status=active&limit=25");
+  assert.equal(new URL(requests[2]!.url).search, "?before=2026-08-01T00%3A00%3A00.000Z&limit=10");
+  assert.deepEqual(JSON.parse(String(requests[3]!.init?.body)), { content: "I can help with that." });
+  assert.deepEqual(JSON.parse(String(requests[4]!.init?.body)), { automation_state: "manual" });
+});
+
 test("experience knowledge and channel SDK methods preserve owner paths", async () => {
   const requests: Array<{ url: string; init?: RequestInit }> = [];
   const knowledge = { question: "Where should I park?", answer: "Use the north entrance." };

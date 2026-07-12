@@ -9,15 +9,15 @@ import {
 
 const indexPath = new URL("../migrations/supabase/migration-index.json", import.meta.url);
 
-test("core plan includes exactly 000001 through 000018 in order", async () => {
+test("core plan includes exactly 000001 through 000019 in order", async () => {
   const index = await readActualIndex();
   const plan = buildSupabaseMigrationPlan(index);
 
   assert.deepEqual(
     plan.migrations.map((entry) => entry.path.match(/\/(\d{6})_[^/]+\.sql$/)?.[1]),
-    Array.from({ length: 18 }, (_, index) => String(index + 1).padStart(6, "0")),
+    Array.from({ length: 19 }, (_, index) => String(index + 1).padStart(6, "0")),
   );
-  assert.equal(plan.migrations.length, 18);
+  assert.equal(plan.migrations.length, 19);
   assert.equal(plan.seeds.length, 0);
 });
 
@@ -62,6 +62,19 @@ test("reservation management migration hashes tokens and scopes read/cancel by p
   assert.match(sql, /revoke all on table public\.platform_reservation_management_tokens from public, anon, authenticated/);
 });
 
+test("unified conversation migration scopes channels, deduplicates messages, and protects identifiers", async () => {
+  const sql = (await readFile(new URL("../migrations/supabase/000019_unified_conversations.sql", import.meta.url), "utf8")).toLowerCase();
+  assert.match(sql, /create table if not exists public\.platform_conversations/);
+  assert.match(sql, /create table if not exists public\.platform_conversation_participants/);
+  assert.match(sql, /channel_identifier text/);
+  assert.match(sql, /identifier_hash text/);
+  assert.match(sql, /create table if not exists public\.platform_conversation_messages/);
+  assert.match(sql, /unique index[\s\S]*\(conversation_id, channel, external_message_id\)/);
+  assert.match(sql, /create or replace function public\.append_platform_conversation_message/);
+  assert.match(sql, /automation_state text not null default 'automated'/);
+  assert.match(sql, /revoke all on table public\.platform_conversation_participants from public, anon, authenticated/);
+});
+
 test("default plan excludes optional AI retrieval and development seed entries", async () => {
   const index = await readActualIndex();
   const plan = buildSupabaseMigrationPlan(index);
@@ -75,7 +88,7 @@ test("AI retrieval option appends optional AI retrieval migrations after core mi
   const plan = buildSupabaseMigrationPlan(index, { includeAiRetrieval: true });
 
   assert.deepEqual(
-    plan.migrations.slice(18).map((entry) => entry.path),
+    plan.migrations.slice(19).map((entry) => entry.path),
     [
       "packages/database/migrations/supabase/optional/ai-retrieval/000001_knowledge_chunks.sql",
       "packages/database/migrations/supabase/optional/ai-retrieval/000002_langchain_checkpoints.sql",

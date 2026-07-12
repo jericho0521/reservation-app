@@ -197,6 +197,16 @@
       "notes": [
         "Backend-owned hashed, expiring, slug-scoped customer reservation management and cancellation tokens."
       ]
+    },
+    {
+      "path": "packages/database/migrations/supabase/000019_unified_conversations.sql",
+      "classification": "core-platform",
+      "intendedBackendDestination": [
+        "packages/database/migrations/supabase/000019_unified_conversations.sql"
+      ],
+      "notes": [
+        "Backend-owned venue-scoped conversation, participant, message, delivery, reservation-link, and staff-takeover persistence shared by web chat, WhatsApp, and simulation."
+      ]
     }
   ]
 }

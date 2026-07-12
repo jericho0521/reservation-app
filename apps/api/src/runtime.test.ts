@@ -305,6 +305,7 @@ test("standalone Supabase runtime wires public and admin clients to repository f
   assert.deepEqual(factoryCalls, [
     { name: "createCatalogRepository", publicClient: clients[0], adminClient: clients[1] },
     { name: "createAvailabilityRepository", publicClient: clients[0], adminClient: clients[1] },
+    { name: "createConversationRepository", adminClient: clients[1] },
     { name: "createReservationReadRepository", adminClient: clients[1] },
     { name: "createReservationCreateRepository", adminClient: clients[1] },
     { name: "createReservationMutationRepository", adminClient: clients[1] },
@@ -319,6 +320,7 @@ test("standalone Supabase runtime wires public and admin clients to repository f
 
   assert.equal(Boolean(dependencies.catalogRepository), true);
   assert.equal(Boolean(dependencies.availabilityRepository), true);
+  assert.equal(Boolean(dependencies.conversationRepository), true);
   assert.equal(Boolean(dependencies.reservationReadRepository), true);
   assert.equal(Boolean(dependencies.reservationCreateRepository), true);
   assert.equal(Boolean(dependencies.reservationManagementRepository), true);
@@ -449,6 +451,10 @@ function recordingRepositoryFactories(
     createAvailabilityRepository(input) {
       recordPublicAdminFactoryCall(calls, "createAvailabilityRepository", input);
       return repository as NonNullable<StandaloneApiDependencies["availabilityRepository"]>;
+    },
+    createConversationRepository(client) {
+      recordAdminFactoryCall(calls, "createConversationRepository", client);
+      return repository as NonNullable<StandaloneApiDependencies["conversationRepository"]>;
     },
     createReservationReadRepository(client) {
       recordAdminFactoryCall(calls, "createReservationReadRepository", client);

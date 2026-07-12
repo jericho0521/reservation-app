@@ -3,6 +3,10 @@ import type {
   AvailabilityResponse,
   ArchiveCatalogItemInput,
   CancelReservationInput,
+  ConversationAutomationInput,
+  ConversationMessageResponse,
+  ConversationResponse,
+  ConversationStaffReplyInput,
   ChatCreateReservationSessionInput,
   ChatConfirmReservationInput,
   ChatMessageInput,
@@ -18,6 +22,10 @@ import type {
   ExperienceKnowledgeInput,
   ExperienceKnowledgeEntryResponse,
   ListExperienceKnowledgeResponse,
+  ListConversationMessagesQuery,
+  ListConversationMessagesResponse,
+  ListConversationsQuery,
+  ListConversationsResponse,
   ExperienceChannelSettingsResponse,
   ExperienceChannels,
   ExperienceResourceInput,
@@ -173,6 +181,11 @@ export interface ReservationPlatformClient {
   createReservation(input: CreateReservationInput, options?: RequestOptions): Promise<ReservationResponse>;
   getReservation(reservationId: string, options?: RequestOptions): Promise<ReservationResponse>;
   listReservations(input?: ListReservationsQuery, options?: RequestOptions): Promise<ListReservationsResponse>;
+  listConversations(input?: ListConversationsQuery, options?: RequestOptions): Promise<ListConversationsResponse>;
+  getConversation(conversationId: string, options?: RequestOptions): Promise<ConversationResponse>;
+  listConversationMessages(conversationId: string, input?: ListConversationMessagesQuery, options?: RequestOptions): Promise<ListConversationMessagesResponse>;
+  sendConversationStaffReply(conversationId: string, input: ConversationStaffReplyInput, options?: RequestOptions): Promise<ConversationMessageResponse>;
+  updateConversationAutomation(conversationId: string, input: ConversationAutomationInput, options?: RequestOptions): Promise<ConversationResponse>;
   updateReservation(reservationId: string, patch: UpdateReservationPatch, options?: RequestOptions): Promise<ReservationResponse>;
   cancelReservation(reservationId: string, input?: CancelReservationInput, options?: RequestOptions): Promise<ReservationResponse>;
   rescheduleReservation(reservationId: string, input: RescheduleReservationInput, options?: RequestOptions): Promise<ReservationResponse>;
@@ -289,6 +302,11 @@ export function createReservationPlatformClient(
     createReservation: (input, options) => request({ method: "POST", path: "/reservations", body: input, options }),
     getReservation: (reservationId, options) => request({ method: "GET", path: `/reservations/${encodeURIComponent(reservationId)}`, options }),
     listReservations: (input, options) => request({ method: "GET", path: "/reservations", query: input, options }),
+    listConversations: (input, options) => request({ method: "GET", path: "/conversations", query: input, options }),
+    getConversation: (conversationId, options) => request({ method: "GET", path: `/conversations/${encodeURIComponent(conversationId)}`, options }),
+    listConversationMessages: (conversationId, input, options) => request({ method: "GET", path: `/conversations/${encodeURIComponent(conversationId)}/messages`, query: input, options }),
+    sendConversationStaffReply: (conversationId, input, options) => request({ method: "POST", path: `/conversations/${encodeURIComponent(conversationId)}/messages`, body: input, options }),
+    updateConversationAutomation: (conversationId, input, options) => request({ method: "PUT", path: `/conversations/${encodeURIComponent(conversationId)}/automation`, body: input, options }),
     updateReservation: (reservationId, patch, options) => request({ method: "PATCH", path: `/reservations/${encodeURIComponent(reservationId)}`, body: patch, options }),
     cancelReservation: (reservationId, input, options) => request({ method: "POST", path: `/reservations/${encodeURIComponent(reservationId)}/cancel`, body: input ?? {}, options }),
     rescheduleReservation: (reservationId, input, options) => request({ method: "POST", path: `/reservations/${encodeURIComponent(reservationId)}/reschedule`, body: input, options }),

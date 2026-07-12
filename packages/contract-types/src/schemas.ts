@@ -323,6 +323,60 @@ export const experienceChannelSettingsResponseSchema = strictObject({
   }),
 });
 
+export const conversationChannelSchema = z.enum(["web_chat", "whatsapp", "simulation"]);
+export const conversationAutomationStateSchema = z.enum(["automated", "manual"]);
+export const conversationDeliveryStateSchema = z.enum(["pending", "sent", "delivered", "failed"]);
+
+export const conversationParticipantResponseSchema = strictObject({
+  participant_id: z.string(),
+  role: z.enum(["customer", "staff", "automation"]),
+  display_name: z.string().optional(),
+  contact_hint: z.string().optional(),
+});
+
+export const conversationResponseSchema = strictObject({
+  conversation_id: z.string(),
+  tenant_id: z.string(),
+  venue_id: z.string(),
+  channel: conversationChannelSchema,
+  status: z.enum(["active", "closed"]),
+  automation_state: conversationAutomationStateSchema,
+  participant: conversationParticipantResponseSchema.optional(),
+  reservation_id: z.string().optional(),
+  last_message_at: z.string().optional(),
+  created_at: z.string(),
+  updated_at: z.string(),
+});
+
+export const conversationMessageResponseSchema = strictObject({
+  message_id: z.string(),
+  conversation_id: z.string(),
+  channel: conversationChannelSchema,
+  direction: z.enum(["inbound", "outbound"]),
+  sender_type: z.enum(["customer", "automation", "staff", "system"]),
+  delivery_state: conversationDeliveryStateSchema,
+  content: z.string(),
+  reservation_id: z.string().optional(),
+  created_at: z.string(),
+});
+
+export const listConversationsQuerySchema = strictObject({
+  channel: conversationChannelSchema.optional(),
+  status: z.enum(["active", "closed"]).optional(),
+  limit: z.number().int().min(1).max(100).optional(),
+});
+export const listConversationsResponseSchema = strictObject({ conversations: z.array(conversationResponseSchema) });
+export const listConversationMessagesQuerySchema = strictObject({
+  before: z.string().optional(),
+  limit: z.number().int().min(1).max(100).optional(),
+});
+export const listConversationMessagesResponseSchema = strictObject({
+  messages: z.array(conversationMessageResponseSchema),
+  next_cursor: z.string().optional(),
+});
+export const conversationAutomationInputSchema = strictObject({ automation_state: conversationAutomationStateSchema });
+export const conversationStaffReplyInputSchema = strictObject({ content: z.string().trim().min(1).max(4000) });
+
 export const listServicesResponseSchema = strictObject({
   services: z.array(serviceResponseSchema),
 });

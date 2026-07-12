@@ -6,6 +6,9 @@ import {
   chatCreateReservationSessionInputSchema,
   chatMessageResponseSchema,
   createReservationInputSchema,
+  conversationAutomationInputSchema,
+  conversationResponseSchema,
+  conversationStaffReplyInputSchema,
   experienceDraftInputSchema,
   experienceIdentityInputSchema,
   experienceOperatingHoursInputSchema,
@@ -74,6 +77,25 @@ test("public experience rejects draft state and private metadata", () => {
     },
     private_metadata: { secret: "no" },
   }));
+});
+
+test("conversation contracts expose display-safe participants and strict takeover inputs", () => {
+  const conversation = {
+    conversation_id: "conversation_1",
+    tenant_id: "tenant_1",
+    venue_id: "venue_1",
+    channel: "whatsapp",
+    status: "active",
+    automation_state: "automated",
+    participant: { participant_id: "participant_1", role: "customer", display_name: "Alex", contact_hint: "***1234" },
+    created_at: "2026-08-01T00:00:00.000Z",
+    updated_at: "2026-08-01T00:00:00.000Z",
+  };
+  assert.equal(conversationResponseSchema.safeParse(conversation).success, true);
+  assert.equal(conversationResponseSchema.safeParse({ ...conversation, participant: { ...conversation.participant, channel_identifier: "+60123456789" } }).success, false);
+  assert.equal(conversationAutomationInputSchema.safeParse({ automation_state: "manual" }).success, true);
+  assert.equal(conversationAutomationInputSchema.safeParse({ automation_state: "manual", unexpected: true }).success, false);
+  assert.equal(conversationStaffReplyInputSchema.safeParse({ content: "  " }).success, false);
 });
 
 test("experience draft rejects unknown preset ids", () => {

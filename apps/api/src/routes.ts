@@ -1,4 +1,5 @@
 import {
+  appendStaffReply,
   authorizePlatformContext,
   archivePlatformResource,
   archivePlatformService,
@@ -31,6 +32,8 @@ import {
   getPlatformMetadata,
   listExperiencePresets,
   listExperienceKnowledge,
+  listConversationMessages,
+  listConversations,
   listPlatformResources,
   listPlatformServices,
   listReservations,
@@ -38,6 +41,7 @@ import {
   readExperienceOperatingHours,
   readExperienceChannelSettings,
   readExperienceWorkspace,
+  readConversation,
   readPublicExperience,
   readReservationById,
   readManagedReservation,
@@ -45,6 +49,7 @@ import {
   rescheduleReservationWithLegacyPatch,
   saveExperienceDraft,
   updateExperienceIdentity,
+  updateConversationAutomation,
   replaceExperienceOperatingHours,
   updateExperienceChannelSettings,
   updateExperienceKnowledge,
@@ -59,6 +64,7 @@ import {
   type ExperienceKnowledgeRepository,
   type ExperienceChannelRuntimeReadiness,
   type ExperienceValidationDependencies,
+  type ConversationRepository,
   type OperatingHoursRepository,
   type PlatformCatalogRepository,
   type PlatformRequestContext,
@@ -86,6 +92,7 @@ import {
   type ChatCreateReservationSessionInput,
   type ChatMessageInput,
   type JsonValue,
+  type ListConversationsQuery,
   type ListServicesResponse,
   type MetadataRecord,
   type PlatformErrorResponse,
@@ -110,6 +117,7 @@ export interface StandaloneApiDependencies {
   auth?: StandaloneApiAuthConfig;
   availabilityRepository?: AvailabilityRepositoryPort;
   catalogRepository?: PlatformCatalogRepository;
+  conversationRepository?: ConversationRepository;
   chatModule?: StandaloneApiChatModule;
   idempotencyRepository?: IdempotencyRepository;
   experienceStudioRepository?: ExperienceStudioRepository;
@@ -254,6 +262,9 @@ const whatsappConversationMessagesPattern = /^\/v1\/channels\/whatsapp\/conversa
 const reservationPattern = /^\/v1\/reservations\/([^/]+)$/;
 const reservationCancelPattern = /^\/v1\/reservations\/([^/]+)\/cancel$/;
 const reservationReschedulePattern = /^\/v1\/reservations\/([^/]+)\/reschedule$/;
+const conversationPattern = /^\/v1\/conversations\/([^/]+)$/;
+const conversationMessagesPattern = /^\/v1\/conversations\/([^/]+)\/messages$/;
+const conversationAutomationPattern = /^\/v1\/conversations\/([^/]+)\/automation$/;
 const resourceMaintenanceEndPattern = /^\/v1\/resource-maintenance\/([^/]+)\/end$/;
 const publicExperiencePattern = /^\/v1\/public\/experiences\/([^/]+)$/;
 const publicExperienceServicesPattern = /^\/v1\/public\/experiences\/([^/]+)\/services$/;
@@ -489,6 +500,36 @@ export async function handleStandaloneApiRequest(
     if (encodedSlug) {
       return handlePublicExperienceReadRequest(encodedSlug, dependencies.experienceStudioRepository);
     }
+  }
+
+  if (method === "GET" && path === "/v1/conversations") {
+    const scoped = readExperienceScope(request);
+    if (!scoped.ok) return scoped.response;
+    if (!dependencies.conversationRepository) return platformError(503, "bad_request", "Conversation repository is not configured.");
+    const result = await listConversations({
+      scope: scoped.scope,
+      query: {
+        ...(url.searchParams.get("channel") ? { channel: url.searchParams.get("channel") } : {}),
+        ...(url.searchParams.get("status") ? { status: url.searchParams.get("status") } : {}),
+        ...(url.searchParams.get("limit") ? { limit: Number(url.searchParams.get("limit")) } : {}),
+      } as ListConversationsQuery,
+      repository: dependencies.conversationRepository,
+    });
+    return jsonResponse(result.status, result.body);
+  }
+  if (method === "GET") {
+    const messageMatch = conversationMessagesPattern.exec(path);
+    if (messageMatch) return handleConversationMessagesRead(request, url, messageMatch[1]!, dependencies);
+    const conversationMatch = conversationPattern.exec(path);
+    if (conversationMatch) return handleConversationRead(request, conversationMatch[1]!, dependencies);
+  }
+  if (method === "POST") {
+    const messageMatch = conversationMessagesPattern.exec(path);
+    if (messageMatch) return handleConversationStaffReply(request, messageMatch[1]!, dependencies);
+  }
+  if (method === "PUT") {
+    const automationMatch = conversationAutomationPattern.exec(path);
+    if (automationMatch) return handleConversationAutomationUpdate(request, automationMatch[1]!, dependencies);
   }
 
   if (method === "GET" && path === "/v1/availability") {
@@ -785,6 +826,7 @@ const protectedRouteMetadata: Readonly<Record<string, readonly RouteMatcher[]>> 
     "/v1/experience/services", "/v1/experience/resources", "/v1/experience/operating-hours",
     "/v1/experience/knowledge", "/v1/experience/channels",
     "/v1/availability", "/v1/reservations", reservationPattern,
+    "/v1/conversations", conversationPattern, conversationMessagesPattern,
     "/v1/resource-maintenance", "/v1/venues", venuePattern,
     "/v1/services", servicePattern, "/v1/resources", resourcePattern,
     resourceLayoutPattern, isWhatsAppOwnerRoute,
@@ -796,10 +838,11 @@ const protectedRouteMetadata: Readonly<Record<string, readonly RouteMatcher[]>> 
     experienceKnowledgeArchivePattern,
     "/v1/reservations", reservationCancelPattern, reservationReschedulePattern,
     "/v1/resource-maintenance", resourceMaintenanceEndPattern,
+    conversationMessagesPattern,
     isChatReservationSessionRoute, isWhatsAppOwnerRoute,
   ],
   PATCH: ["/v1/experience/identity", reservationPattern, isWhatsAppOwnerRoute],
-  PUT: ["/v1/experience/draft", "/v1/experience/operating-hours", "/v1/experience/channels", experienceServicePattern, experienceResourcePattern, experienceKnowledgePattern],
+  PUT: ["/v1/experience/draft", "/v1/experience/operating-hours", "/v1/experience/channels", experienceServicePattern, experienceResourcePattern, experienceKnowledgePattern, conversationAutomationPattern],
   DELETE: [isWhatsAppOwnerRoute],
 };
 
@@ -1221,6 +1264,86 @@ async function handlePublicReservationManagementRequest(
   const result = operation === "read"
     ? await readManagedReservation({ repository: dependencies.reservationManagementRepository, publicSlug, token })
     : await cancelManagedReservation({ repository: dependencies.reservationManagementRepository, publicSlug, token });
+  return jsonResponse(result.status, result.body);
+}
+
+function decodeConversationId(encodedId: string) {
+  try {
+    const value = decodeURIComponent(encodedId).trim();
+    return value || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+async function handleConversationRead(
+  request: StandaloneApiRequest,
+  encodedId: string,
+  dependencies: StandaloneApiDependencies,
+) {
+  const scoped = readExperienceScope(request);
+  if (!scoped.ok) return scoped.response;
+  const conversationId = decodeConversationId(encodedId);
+  if (!conversationId) return platformError(400, "validation_failed", "Invalid conversation id.");
+  if (!dependencies.conversationRepository) return platformError(503, "bad_request", "Conversation repository is not configured.");
+  const result = await readConversation({ scope: scoped.scope, conversationId, repository: dependencies.conversationRepository });
+  return jsonResponse(result.status, result.body);
+}
+
+async function handleConversationMessagesRead(
+  request: StandaloneApiRequest,
+  url: URL,
+  encodedId: string,
+  dependencies: StandaloneApiDependencies,
+) {
+  const scoped = readExperienceScope(request);
+  if (!scoped.ok) return scoped.response;
+  const conversationId = decodeConversationId(encodedId);
+  if (!conversationId) return platformError(400, "validation_failed", "Invalid conversation id.");
+  if (!dependencies.conversationRepository) return platformError(503, "bad_request", "Conversation repository is not configured.");
+  const result = await listConversationMessages({
+    scope: scoped.scope,
+    conversationId,
+    query: {
+      ...(url.searchParams.get("before") ? { before: url.searchParams.get("before")! } : {}),
+      ...(url.searchParams.get("limit") ? { limit: Number(url.searchParams.get("limit")) } : {}),
+    },
+    repository: dependencies.conversationRepository,
+  });
+  return jsonResponse(result.status, result.body);
+}
+
+async function handleConversationStaffReply(
+  request: StandaloneApiRequest,
+  encodedId: string,
+  dependencies: StandaloneApiDependencies,
+) {
+  const scoped = readExperienceScope(request);
+  if (!scoped.ok) return scoped.response;
+  const conversationId = decodeConversationId(encodedId);
+  if (!conversationId) return platformError(400, "validation_failed", "Invalid conversation id.");
+  if (!dependencies.conversationRepository) return platformError(503, "bad_request", "Conversation repository is not configured.");
+  const result = await appendStaffReply({ scope: scoped.scope, conversationId, value: request.body, repository: dependencies.conversationRepository });
+  return jsonResponse(result.status, result.body);
+}
+
+async function handleConversationAutomationUpdate(
+  request: StandaloneApiRequest,
+  encodedId: string,
+  dependencies: StandaloneApiDependencies,
+) {
+  const scoped = readExperienceScope(request);
+  if (!scoped.ok) return scoped.response;
+  const conversationId = decodeConversationId(encodedId);
+  if (!conversationId) return platformError(400, "validation_failed", "Invalid conversation id.");
+  if (!dependencies.conversationRepository) return platformError(503, "bad_request", "Conversation repository is not configured.");
+  const result = await updateConversationAutomation({
+    scope: scoped.scope,
+    conversationId,
+    value: request.body,
+    changedBy: "staff",
+    repository: dependencies.conversationRepository,
+  });
   return jsonResponse(result.status, result.body);
 }
 

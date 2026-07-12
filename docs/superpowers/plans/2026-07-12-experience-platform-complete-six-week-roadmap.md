@@ -516,9 +516,9 @@ Expected demonstration: ask for a booking through chat or simulation, review pro
 
 **Produces:** Server-computed counts for today's bookings, pending/confirmed/cancelled status, available/maintenance resources, open conversations, staff takeover, and channel readiness.
 
-- [ ] Test venue/timezone boundaries and empty datasets.
-- [ ] Return bounded aggregate DTOs, not raw database rows.
-- [ ] Commit as `feat(operations): add command center summaries`.
+- [x] Test venue/timezone boundaries and empty datasets.
+- [x] Return bounded aggregate DTOs, not raw database rows.
+- [x] Commit as `feat(operations): add command center summaries`.
 
 ### Task 5.2: Build the operations overview
 
@@ -531,9 +531,9 @@ Expected demonstration: ask for a booking through chat or simulation, review pro
 
 **Produces:** Scannable daily dashboard with actions linking to reservations, conversations, maintenance, and channel setup.
 
-- [ ] Test empty, partial outage, slow backend, and populated states.
-- [ ] Prioritize attention items over decorative metrics.
-- [ ] Commit as `feat(console): add operations command center`.
+- [x] Test empty, partial outage, slow backend, and populated states.
+- [x] Prioritize attention items over decorative metrics.
+- [x] Commit as `feat(console): add operations command center`.
 
 ### Task 5.3: Add reservations and resource operations
 
@@ -546,9 +546,9 @@ Expected demonstration: ask for a booking through chat or simulation, review pro
 
 **Produces:** Search/filter reservations, inspect details/channel origin, cancel according to policy, and create/end maintenance windows.
 
-- [ ] Test maintenance conflicts and future-reservation warnings.
-- [ ] Make destructive actions explicit and auditable.
-- [ ] Commit as `feat(console): manage reservations and resources`.
+- [x] Test maintenance conflicts and future-reservation warnings.
+- [x] Make destructive actions explicit and auditable.
+- [x] Commit as `feat(console): manage reservations and resources`.
 
 ### Task 5.4: Add analytics contracts and queries
 
@@ -560,10 +560,10 @@ Expected demonstration: ask for a booking through chat or simulation, review pro
 
 **Produces:** Date-range aggregates for reservations by day/status/channel/service, popular slots, conversion funnel, cancellation rate, AI containment, and staff takeover rate.
 
-- [ ] Define conversion as conversation started → proposal shown → confirmation requested → reservation created.
-- [ ] Test timezone bucketing, zero denominators, excluded test/simulation traffic toggle, and bounded date ranges.
-- [ ] Keep analytics descriptive; do not add prediction.
-- [ ] Commit as `feat(analytics): add reservation and channel metrics`.
+- [x] Define conversion as conversation started → proposal shown → confirmation requested → reservation created.
+- [x] Test timezone bucketing, zero denominators, excluded test/simulation traffic toggle, and bounded date ranges.
+- [x] Keep analytics descriptive; do not add prediction.
+- [x] Commit as `feat(analytics): add reservation and channel metrics`.
 
 ### Task 5.5: Build the analytics experience
 
@@ -576,9 +576,9 @@ Expected demonstration: ask for a booking through chat or simulation, review pro
 
 **Produces:** Clear, responsive analytics with accessible tables alongside charts and explanations of metric definitions.
 
-- [ ] Test date filters, no-data states, one-channel data, and simulation inclusion toggle.
-- [ ] Use the smallest charting dependency already available; otherwise use CSS/SVG primitives.
-- [ ] Commit as `feat(console): visualize operational analytics`.
+- [x] Test date filters, no-data states, one-channel data, and simulation inclusion toggle.
+- [x] Use the smallest charting dependency already available; otherwise use CSS/SVG primitives.
+- [x] Commit as `feat(console): visualize operational analytics`.
 
 ### Task 5.6: Add lightweight live refresh and notifications
 
@@ -589,9 +589,9 @@ Expected demonstration: ask for a booking through chat or simulation, review pro
 
 **Produces:** Visible last-updated state, pause-on-hidden-tab, retry backoff, and manual refresh. Supabase realtime is optional only if it can be proven without destabilizing the demo.
 
-- [ ] Unit-test interval/backoff policy.
-- [ ] Ensure refresh cannot duplicate mutations.
-- [ ] Commit as `feat(console): add resilient live updates`.
+- [x] Unit-test interval/backoff policy.
+- [x] Ensure refresh cannot duplicate mutations.
+- [x] Commit as `feat(console): add resilient live updates`.
 
 ### Phase 5 gate
 
@@ -812,5 +812,5 @@ Update this table at each weekly gate.
 | 2. Experience Studio | 2026-07-26 | Complete | Contract types 21, API package 158, database 13, Supabase adapter 50, SDK 19, UI 13, console 9, standalone API 125; console production build, package boundary, packed-package, and migration-bundle gates passed. | None |
 | 3. Customer Experiences | 2026-08-02 | Complete | React 14, UI 18, root E2E 15 passed with 2 documented optional live-URL skips; booking production build and package/frontend boundaries passed. Flagship builds and focused API, database, SDK, Supabase, security-token, concurrency, and all-eight-preset proofs also passed. | None |
 | 4. Omnichannel AI | 2026-08-09 | Complete | Chat core 38, AI chat 21, WhatsApp 29, standalone API 135, SDK 25, contract types 23, and console 12 passed; console production build passed. Root smoke command passed with 3 documented live-backend skips to be exercised in Phase 6. | None |
-| 5. Operations and Analytics | 2026-08-16 | Not started | — | — |
+| 5. Operations and Analytics | 2026-08-16 | Complete | Supabase adapter 56, SDK 27, standalone API 137, console 23, and console production build passed; migration bundle verified with 20 ordered core migrations and 18 inventoried SQL assets. | None |
 | 6. Hardening and Presentation | 2026-08-23 | Not started | — | — |

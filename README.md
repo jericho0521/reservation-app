@@ -39,6 +39,7 @@ flowchart LR
 | Path | Purpose |
 | --- | --- |
 | `apps/api` | Standalone backend HTTP API host for `/v1` routes. |
+| `apps/console` | Server-authenticated owner console and Experience Studio. |
 | `packages/reservation-platform-api` | Framework-neutral route handlers, request validation, auth context, idempotency, and response mapping. |
 | `packages/reservations-core` | Headless reservation domain logic for capacity, assigned resources, availability, and validation. |
 | `packages/reservations-supabase` | Supabase/Postgres adapter for catalog, availability, reservations, idempotency, and maintenance storage. |
@@ -70,15 +71,14 @@ Supabase service-role keys.
 
 ## Requirements
 
-- Node.js with Corepack enabled.
-- pnpm through the repository package manager setting: `pnpm@10.33.2`.
+- Node.js and pnpm `10.33.2` through the repository package manager setting.
 - Supabase/Postgres credentials only when running database-backed or live proof
   flows.
 
 Install dependencies:
 
 ```powershell
-corepack pnpm install
+pnpm install
 ```
 
 This is safe for local development. It installs workspace dependencies from the
@@ -89,7 +89,7 @@ lockfile and does not publish packages or touch production data.
 Start the local Supabase/Postgres database first:
 
 ```powershell
-corepack pnpm run local:supabase:start
+pnpm run local:supabase:start
 ```
 
 This is safe for local development. It starts the local Supabase Docker stack
@@ -99,7 +99,7 @@ is run manually with `-StartTunnel`.
 Then start the standalone backend API:
 
 ```powershell
-corepack pnpm run dev
+pnpm run dev
 ```
 
 This is safe in this branch. It starts only the standalone backend API host from
@@ -116,6 +116,8 @@ The backend exposes platform routes under `/v1`, including:
 - `/v1/availability`
 - `/v1/reservations`
 - `/v1/resource-maintenance`
+- `/v1/experience/*` for authenticated Studio operations
+- `/v1/public/experiences/{slug}` for published browser-safe configuration
 - `/v1/chat/*` when the optional chat module is enabled
 - `/v1/channels/whatsapp/*` when the optional WhatsApp module is enabled
 
@@ -126,7 +128,7 @@ Set the public backend URL and a service id from your local database:
 ```powershell
 $env:NEXT_PUBLIC_RESERVATION_PLATFORM_BASE_URL="http://localhost:4100"
 $env:NEXT_PUBLIC_RESERVATION_SERVICE_ID="<service-id>"
-corepack pnpm --filter @reservation-platform/example-room-booking run dev
+pnpm --filter @reservation-platform/example-room-booking run dev
 ```
 
 This is safe locally. It starts only the room booking frontend on port 4201 and
@@ -135,8 +137,8 @@ does not start Docker, Supabase, or production services.
 The other examples use the same pattern:
 
 ```powershell
-corepack pnpm --filter @reservation-platform/example-starter-next run dev
-corepack pnpm --filter @reservation-platform/example-racing-simulator run dev
+pnpm --filter @reservation-platform/example-starter-next run dev
+pnpm --filter @reservation-platform/example-racing-simulator run dev
 ```
 
 These are safe locally. They start frontend-only dev servers on ports 4200 and
@@ -159,6 +161,28 @@ export default function Page() {
 }
 ```
 
+## Start The Owner Console
+
+The owner console runs on port `4300` and calls the standalone API from Next.js
+server components. Configure these server-only values in the local environment:
+
+```env
+RESERVATION_PLATFORM_BASE_URL=http://localhost:4100
+RESERVATION_PLATFORM_SERVICE_API_KEY=replace-with-local-service-key
+RESERVATION_CONSOLE_TENANT_ID=platform_default
+RESERVATION_CONSOLE_VENUE_ID=00000000-0000-0000-0000-000000000001
+```
+
+Start it with:
+
+```powershell
+pnpm run dev:console
+```
+
+`RESERVATION_PLATFORM_SERVICE_API_KEY` is read only by server-guarded console
+code. It must never be renamed to a `NEXT_PUBLIC_*` variable or sent to the
+browser bundle.
+
 ## Use From Another Frontend
 
 An external frontend should install the SDK package once it is packed or
@@ -167,7 +191,7 @@ published, then point it at the backend URL.
 Local tarball packaging:
 
 ```powershell
-corepack pnpm run packages:pack
+pnpm run packages:pack
 ```
 
 This is safe locally. It writes package tarballs under ignored
@@ -241,7 +265,7 @@ helpers, not production defaults.
 Build all backend modules:
 
 ```powershell
-corepack pnpm run build
+pnpm run build
 ```
 
 This is safe locally. It compiles backend packages and the standalone API
@@ -250,7 +274,7 @@ skeleton.
 Run the main backend test suite:
 
 ```powershell
-corepack pnpm run test
+pnpm run test
 ```
 
 This is safe locally. It runs package tests, standalone API skeleton tests, and
@@ -260,11 +284,11 @@ unless you explicitly use the strict live-proof scripts.
 Useful focused checks:
 
 ```powershell
-corepack pnpm run backend-platform:verify-extraction-boundary
-corepack pnpm run backend-platform:verify-extraction-manifest
-corepack pnpm run packages:verify-boundaries
-corepack pnpm run database:verify-migration-bundle
-corepack pnpm run sdk:release-artifacts:check
+pnpm run backend-platform:verify-extraction-boundary
+pnpm run backend-platform:verify-extraction-manifest
+pnpm run packages:verify-boundaries
+pnpm run database:verify-migration-bundle
+pnpm run sdk:release-artifacts:check
 ```
 
 These are safe local checks. They validate backend source boundaries, extraction
@@ -287,7 +311,7 @@ Run backend smoke checks against a running backend:
 
 ```powershell
 $env:RESERVATION_SMOKE_BACKEND_BASE_URL="http://localhost:4100"
-corepack pnpm run test:smoke
+pnpm run test:smoke
 ```
 
 Safe when pointed at a local or disposable backend. The current smoke tests are
@@ -300,7 +324,7 @@ should fail instead of skip.
 Run the room-booking example e2e readiness check:
 
 ```powershell
-corepack pnpm run test:e2e
+pnpm run test:e2e
 ```
 
 Safe locally. Without `ROOM_BOOKING_E2E_BASE_URL`, it verifies the example app is

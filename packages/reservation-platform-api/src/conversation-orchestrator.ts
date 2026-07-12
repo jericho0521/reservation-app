@@ -182,6 +182,16 @@ export async function confirmConversationBooking(input: {
     if (proposal.status === "confirmed" && proposal.reservation) {
       return { status: 200, body: { conversation, proposal, reservation: proposal.reservation } };
     }
+    const confirmationRequest = await input.dependencies.conversations.append(scope, conversation.conversation_id, {
+      channel: conversation.channel,
+      direction: "inbound",
+      senderType: "system",
+      deliveryState: "delivered",
+      externalMessageId: `confirmation:${proposal.proposalId}`,
+      content: "Booking confirmation requested.",
+      metadata: { event: "booking.confirmation_requested", proposal_id: proposal.proposalId },
+    });
+    if (confirmationRequest.error || !confirmationRequest.data) throw confirmationRequest.error ?? new Error("confirmation request unavailable");
     const rebound = await revalidateProposal(scope, proposal.booking, input.dependencies.tools);
     if (!rebound) return failure(409, "conflict", "The proposed slot is no longer available.");
     const claim = await input.dependencies.state.claim(scope, proposal.proposalId);

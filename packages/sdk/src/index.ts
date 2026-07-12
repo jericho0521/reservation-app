@@ -1,6 +1,8 @@
 import type {
   AvailabilityQuery,
   AvailabilityResponse,
+  AnalyticsQuery,
+  AnalyticsResponse,
   ArchiveCatalogItemInput,
   CancelReservationInput,
   ConversationAutomationInput,
@@ -194,6 +196,7 @@ export interface ReservationPlatformClient {
   listReservations(input?: ListReservationsQuery, options?: RequestOptions): Promise<ListReservationsResponse>;
   listConversations(input?: ListConversationsQuery, options?: RequestOptions): Promise<ListConversationsResponse>;
   getOperationsOverview(options?: RequestOptions): Promise<OperationsOverviewResponse>;
+  getAnalytics(input: AnalyticsQuery, options?: RequestOptions): Promise<AnalyticsResponse>;
   getConversation(conversationId: string, options?: RequestOptions): Promise<ConversationResponse>;
   listConversationMessages(conversationId: string, input?: ListConversationMessagesQuery, options?: RequestOptions): Promise<ListConversationMessagesResponse>;
   sendConversationStaffReply(conversationId: string, input: ConversationStaffReplyInput, options?: RequestOptions): Promise<ConversationMessageResponse>;
@@ -343,6 +346,7 @@ export function createReservationPlatformClient(
     listReservations: (input, options) => request({ method: "GET", path: "/reservations", query: input, options }),
     listConversations: (input, options) => request({ method: "GET", path: "/conversations", query: input, options }),
     getOperationsOverview: (options) => request({ method: "GET", path: "/operations/overview", options }),
+    getAnalytics: (input, options) => request({ method: "GET", path: "/analytics", query: input, options }),
     getConversation: (conversationId, options) => request({ method: "GET", path: `/conversations/${encodeURIComponent(conversationId)}`, options }),
     listConversationMessages: (conversationId, input, options) => request({ method: "GET", path: `/conversations/${encodeURIComponent(conversationId)}/messages`, query: input, options }),
     sendConversationStaffReply: (conversationId, input, options) => request({ method: "POST", path: `/conversations/${encodeURIComponent(conversationId)}/messages`, body: input, options }),

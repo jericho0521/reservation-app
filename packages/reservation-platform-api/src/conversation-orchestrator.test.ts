@@ -8,7 +8,7 @@ import {
   type ConversationBookingTools,
   type ConversationOrchestratorDependencies,
 } from "./conversation-orchestrator.js";
-import type { ConversationRepository } from "./conversations.js";
+import type { ConversationAppendInput, ConversationRepository } from "./conversations.js";
 
 const scope = { tenantId: "tenant_1", venueId: "venue_1" };
 const preparedBooking = {
@@ -55,6 +55,7 @@ test("a proposal waits for explicit confirmation and confirmation replays idempo
   assert.equal(first.status, 200);
   assert.equal(replay.status, 200);
   assert.equal(fixture.createCalls.length, 1);
+  assert.equal(fixture.appendInputs.filter((input) => input.metadata?.event === "booking.confirmation_requested").length, 1);
   assert.equal(fixture.createCalls[0]?.idempotencyKey, "conversation-confirm-proposal_1");
   assert.equal("reservation" in replay.body && replay.body.reservation?.reservation_id, "reservation_1");
 });
@@ -97,6 +98,7 @@ function createFixture(options: {
   const state = new InMemoryConversationBookingStateStore();
   const messages: ConversationMessageResponse[] = [];
   const createCalls: Array<{ input: unknown; idempotencyKey: string }> = [];
+  const appendInputs: ConversationAppendInput[] = [];
   const audits: Array<{ type: string }> = [];
   let responderCalls = 0;
   let available = true;
@@ -116,6 +118,7 @@ function createFixture(options: {
     getOrCreate: async () => ({ data: conversation }),
     listMessages: async () => ({ data: [...messages].reverse() }),
     append: async (_scope, conversationId, input) => {
+      appendInputs.push(input);
       const message: ConversationMessageResponse = {
         message_id: `message_${messages.length + 1}`,
         conversation_id: conversationId,
@@ -159,6 +162,7 @@ function createFixture(options: {
     state,
     messages,
     createCalls,
+    appendInputs,
     audits,
     get responderCalls() { return responderCalls; },
     get available() { return available; },

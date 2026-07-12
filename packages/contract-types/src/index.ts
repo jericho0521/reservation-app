@@ -291,6 +291,29 @@ export interface OperationsOverviewResponse extends OperationsOverviewData {
   channel_readiness: ExperienceChannelSettingsResponse["readiness"];
 }
 
+export interface AnalyticsQuery {
+  from: string;
+  to: string;
+  include_simulation?: boolean;
+}
+
+export interface AnalyticsResponse {
+  generated_at: string;
+  timezone: string;
+  from_date: string;
+  to_date: string;
+  include_simulation: boolean;
+  totals: { reservations: number; cancelled: number; cancellation_rate: number };
+  reservations_by_day: Array<{ date: string; total: number; confirmed: number; completed: number; cancelled: number }>;
+  reservations_by_status: Array<{ status: string; count: number }>;
+  reservations_by_channel: Array<{ channel: OperationsReservationChannel; count: number }>;
+  channel_performance: Array<{ channel: Exclude<OperationsReservationChannel, "web_booking">; conversations_started: number; proposal_shown: number; confirmation_requested: number; reservations_created: number; conversion_rate: number }>;
+  reservations_by_service: Array<{ service_id: string; service_name: string; count: number }>;
+  popular_slots: Array<{ day_of_week: number; start_time: string; count: number }>;
+  funnel: { conversations_started: number; proposal_shown: number; confirmation_requested: number; reservations_created: number };
+  automation: { automated_conversations: number; staff_takeovers: number; containment_rate: number; takeover_rate: number };
+}
+
 export type ConversationChannel = "web_chat" | "whatsapp" | "simulation";
 export type ConversationAutomationState = "automated" | "manual";
 export type ConversationDeliveryState = "pending" | "sent" | "delivered" | "failed";

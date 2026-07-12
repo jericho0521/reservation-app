@@ -293,6 +293,15 @@ test("operations overview SDK uses the scoped owner endpoint", async () => {
   assert.equal(new URL(requests[0]!).pathname, "/v1/operations/overview");
 });
 
+test("analytics SDK serializes the bounded range and simulation toggle", async () => {
+  let requested = "";
+  const client = createReservationPlatformClient({ baseUrl: "https://platform.example", fetch: async (url) => { requested = String(url); return jsonResponse({}); } });
+  await client.getAnalytics({ from: "2026-08-01", to: "2026-08-31", include_simulation: true });
+  const url = new URL(requested);
+  assert.equal(url.pathname, "/v1/analytics");
+  assert.equal(url.search, "?from=2026-08-01&to=2026-08-31&include_simulation=true");
+});
+
 test("WhatsApp owner SDK methods keep readiness, QR, and simulation behind scoped authenticated routes", async () => {
   const requests: Array<{ url: string; init?: RequestInit }> = [];
   const client = createReservationPlatformClient({

@@ -2746,8 +2746,8 @@
       "type": "object"
     }
   },
-  "$id": "https://reservation-platform.local/contracts/json-schema/experience-preset-id.schema.json",
-  "$ref": "#/$defs/ExperiencePresetId",
+  "$id": "https://reservation-platform.local/contracts/json-schema/analytics-query.schema.json",
+  "$ref": "#/$defs/AnalyticsQuery",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "ExperiencePresetId"
+  "title": "AnalyticsQuery"
 }

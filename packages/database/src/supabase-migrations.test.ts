@@ -24,6 +24,9 @@ test("core plan includes exactly 000001 through 000020 in order", async () => {
 test("operations overview migration is venue scoped, timezone aware, and bounded", async () => {
   const sql = (await readFile(new URL("../migrations/supabase/000020_operations_analytics_rpc.sql", import.meta.url), "utf8")).toLowerCase();
   assert.match(sql, /create or replace function public\.read_platform_operations_overview/);
+  assert.match(sql, /create or replace function public\.read_platform_analytics/);
+  assert.match(sql, /booking\.confirmation_requested/);
+  assert.match(sql, /p_include_simulation/);
   assert.match(sql, /add column if not exists cancellation_reason text/);
   assert.match(sql, /add column if not exists cancelled_by text/);
   assert.match(sql, /add column if not exists cancelled_at timestamptz/);

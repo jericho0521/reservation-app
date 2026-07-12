@@ -423,6 +423,7 @@ test("contract artifact registry covers current public /v1 API and SDK paths", (
     "GET /v1/availability",
     "GET /v1/reservations",
     "GET /v1/operations/overview",
+    "GET /v1/analytics",
     "POST /v1/reservations",
     "GET /v1/reservations/{reservation_id}",
     "PATCH /v1/reservations/{reservation_id}",

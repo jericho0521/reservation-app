@@ -358,6 +358,22 @@ export const operationsOverviewResponseSchema = operationsOverviewDataSchema.ext
   }),
 });
 
+const analyticsDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
+const analyticsRateSchema = z.number().min(0).max(1);
+export const analyticsQuerySchema = strictObject({ from: analyticsDateSchema, to: analyticsDateSchema, include_simulation: z.boolean().optional() });
+export const analyticsResponseSchema = strictObject({
+  generated_at: z.string(), timezone: z.string().min(1), from_date: analyticsDateSchema, to_date: analyticsDateSchema, include_simulation: z.boolean(),
+  totals: strictObject({ reservations: boundedCountSchema, cancelled: boundedCountSchema, cancellation_rate: analyticsRateSchema }),
+  reservations_by_day: z.array(strictObject({ date: analyticsDateSchema, total: boundedCountSchema, confirmed: boundedCountSchema, completed: boundedCountSchema, cancelled: boundedCountSchema })).max(366),
+  reservations_by_status: z.array(strictObject({ status: z.string(), count: boundedCountSchema })).max(20),
+  reservations_by_channel: z.array(strictObject({ channel: operationsReservationChannelSchema, count: boundedCountSchema })).max(4),
+  channel_performance: z.array(strictObject({ channel: z.enum(["web_chat", "whatsapp", "simulation"]), conversations_started: boundedCountSchema, proposal_shown: boundedCountSchema, confirmation_requested: boundedCountSchema, reservations_created: boundedCountSchema, conversion_rate: analyticsRateSchema })).max(3),
+  reservations_by_service: z.array(strictObject({ service_id: z.string(), service_name: z.string(), count: boundedCountSchema })).max(20),
+  popular_slots: z.array(strictObject({ day_of_week: z.number().int().min(1).max(7), start_time: z.string(), count: boundedCountSchema })).max(20),
+  funnel: strictObject({ conversations_started: boundedCountSchema, proposal_shown: boundedCountSchema, confirmation_requested: boundedCountSchema, reservations_created: boundedCountSchema }),
+  automation: strictObject({ automated_conversations: boundedCountSchema, staff_takeovers: boundedCountSchema, containment_rate: analyticsRateSchema, takeover_rate: analyticsRateSchema }),
+});
+
 export const conversationChannelSchema = z.enum(["web_chat", "whatsapp", "simulation"]);
 export const conversationAutomationStateSchema = z.enum(["automated", "manual"]);
 export const conversationDeliveryStateSchema = z.enum(["pending", "sent", "delivered", "failed"]);

@@ -27,6 +27,7 @@ import {
 } from "@reservation-platform/api";
 import {
   createSupabaseAvailabilityRepository,
+  createSupabaseAnalyticsRepository,
   createSupabaseConversationRepository,
   createSupabaseExperienceStudioRepository,
   createSupabaseExperienceKnowledgeRepository,
@@ -45,6 +46,7 @@ import {
   type ReservationManagementSupabaseClient,
   type ConversationSupabaseClient,
   type OperationsOverviewSupabaseClient,
+  type AnalyticsSupabaseClient,
 } from "@project-play/reservations-supabase";
 import {
   BaileysWhatsAppSessionAdapter,
@@ -158,6 +160,7 @@ export type StandaloneSupabaseClientFactory = (
 export interface StandaloneSupabaseRepositoryFactories {
   createCatalogRepository(input: StandaloneSupabasePublicAdminClients): NonNullable<StandaloneApiDependencies["catalogRepository"]>;
   createAvailabilityRepository(input: StandaloneSupabasePublicAdminClients): NonNullable<StandaloneApiDependencies["availabilityRepository"]>;
+  createAnalyticsRepository(client: StandaloneSupabaseClient): NonNullable<StandaloneApiDependencies["analyticsRepository"]>;
   createConversationRepository(client: StandaloneSupabaseClient): NonNullable<StandaloneApiDependencies["conversationRepository"]>;
   createReservationReadRepository(client: StandaloneSupabaseClient): NonNullable<StandaloneApiDependencies["reservationReadRepository"]>;
   createReservationCreateRepository(client: StandaloneSupabaseClient): NonNullable<StandaloneApiDependencies["reservationCreateRepository"]>;
@@ -204,6 +207,7 @@ const standaloneSupabaseClientOptions = {
 const defaultRepositoryFactories: StandaloneSupabaseRepositoryFactories = {
   createCatalogRepository: createSupabasePlatformCatalogRepository,
   createAvailabilityRepository: createSupabaseAvailabilityRepository,
+  createAnalyticsRepository: (client) => createSupabaseAnalyticsRepository(client as unknown as AnalyticsSupabaseClient),
   createConversationRepository: (client) => createSupabaseConversationRepository(client as unknown as ConversationSupabaseClient),
   createReservationReadRepository: createSupabaseReservationReadRepository,
   createReservationCreateRepository: createSupabaseReservationRepository,
@@ -257,6 +261,7 @@ export function createStandaloneSupabaseDependencies(
     ? {
         catalogRepository: repositoryFactories.createCatalogRepository(publicAdminClients),
         availabilityRepository: repositoryFactories.createAvailabilityRepository(publicAdminClients),
+        analyticsRepository: repositoryFactories.createAnalyticsRepository(adminClient),
         conversationRepository: repositoryFactories.createConversationRepository(adminClient),
         reservationReadRepository: repositoryFactories.createReservationReadRepository(adminClient),
         reservationCreateRepository: repositoryFactories.createReservationCreateRepository(adminClient),

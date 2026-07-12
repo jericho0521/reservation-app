@@ -1,5 +1,6 @@
 import {
   appendStaffReply,
+  readAnalytics,
   confirmConversationBooking,
   authorizePlatformContext,
   archivePlatformResource,
@@ -61,6 +62,7 @@ import {
   updatePlatformService,
   updateReservationWithLegacyPatch,
   type AvailabilityRepositoryPort,
+  type AnalyticsRepository,
   type AuthenticatedPlatformPrincipal,
   type IdempotencyRepository,
   type ExperienceStudioRepository,
@@ -126,6 +128,7 @@ import { jsonResponse, platformError, type StandaloneApiRequest, type Standalone
 export interface StandaloneApiDependencies {
   auth?: StandaloneApiAuthConfig;
   availabilityRepository?: AvailabilityRepositoryPort;
+  analyticsRepository?: AnalyticsRepository;
   catalogRepository?: PlatformCatalogRepository;
   conversationRepository?: ConversationRepository;
   conversationOrchestrator?: ConversationOrchestratorDependencies;
@@ -450,6 +453,18 @@ export async function handleStandaloneApiRequest(
       if (settings.status === 200 && "readiness" in settings.body) channelReadiness = settings.body.readiness;
     }
     const result = await readOperationsOverview({ scope: scoped.scope, repository: dependencies.operationsOverviewRepository, channelReadiness });
+    return jsonResponse(result.status, result.body);
+  }
+  if (method === "GET" && path === "/v1/analytics") {
+    const scoped = readExperienceScope(request);
+    if (!scoped.ok) return scoped.response;
+    if (!dependencies.analyticsRepository) return platformError(503, "bad_request", "Analytics repository is not configured.");
+    const includeSimulation = url.searchParams.get("include_simulation");
+    const result = await readAnalytics({
+      scope: scoped.scope,
+      value: { from: url.searchParams.get("from"), to: url.searchParams.get("to"), ...(includeSimulation === "true" || includeSimulation === "false" ? { include_simulation: includeSimulation === "true" } : {}) },
+      repository: dependencies.analyticsRepository,
+    });
     return jsonResponse(result.status, result.body);
   }
 
@@ -867,6 +882,7 @@ const protectedRouteMetadata: Readonly<Record<string, readonly RouteMatcher[]>> 
     "/v1/experience/services", "/v1/experience/resources", "/v1/experience/operating-hours",
     "/v1/experience/knowledge", "/v1/experience/channels",
     "/v1/operations/overview",
+    "/v1/analytics",
     "/v1/availability", "/v1/reservations", reservationPattern,
     "/v1/conversations", conversationPattern, conversationMessagesPattern,
     "/v1/resource-maintenance", "/v1/venues", venuePattern,

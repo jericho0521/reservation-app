@@ -43,6 +43,7 @@ export * from "./operating-hours.js";
 export * from "./reservation-management.js";
 export * from "./conversations.js";
 export * from "./operations-overview.js";
+export * from "./analytics.js";
 
 export const RESERVATION_SUPABASE_TABLES = {
   platformTenants: "tenants",

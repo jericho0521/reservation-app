@@ -29,6 +29,7 @@ import { InMemoryConversationBookingStateStore } from "@reservation-platform/api
 import type {
   AuthenticatedPlatformPrincipal,
   AvailabilityRepositoryPort,
+  AnalyticsRepository,
   IdempotencyCommitRecord,
   IdempotencyRecord,
   IdempotencyRepository,
@@ -581,6 +582,21 @@ test("operations overview route preserves owner scope and merges channel readine
   assert.equal(response.status, 200);
   assert.deepEqual(observed, { scope: { tenantId: "tenant_1", venueId: "venue_1" }, validNow: true });
   assert.equal((response.body as { channel_readiness: { web_booking: { desired_enabled: boolean } } }).channel_readiness.web_booking.desired_enabled, true);
+});
+
+test("analytics route validates and forwards a scoped descriptive query", async () => {
+  let observed: unknown;
+  const repository: AnalyticsRepository = { async read(scope, query) { observed = { scope, query }; return { data: {
+    generated_at: "2026-08-31T00:00:00Z", timezone: "UTC", from_date: query.from, to_date: query.to, include_simulation: query.include_simulation,
+    totals: { reservations: 0, cancelled: 0, cancellation_rate: 0 }, reservations_by_day: [], reservations_by_status: [], reservations_by_channel: [], channel_performance: [], reservations_by_service: [], popular_slots: [],
+    funnel: { conversations_started: 0, proposal_shown: 0, confirmation_requested: 0, reservations_created: 0 }, automation: { automated_conversations: 0, staff_takeovers: 0, containment_rate: 0, takeover_rate: 0 },
+  } }; } };
+  const headers = { authorization: "Bearer secret", "x-reservation-tenant-id": "tenant_1", "x-reservation-venue-id": "venue_1" };
+  const response = await handleStandaloneApiRequest({ method: "GET", path: "/v1/analytics?from=2026-08-01&to=2026-08-31&include_simulation=true", headers }, { serviceApiKey: "secret", analyticsRepository: repository });
+  assert.equal(response.status, 200);
+  assert.deepEqual(observed, { scope: { tenantId: "tenant_1", venueId: "venue_1" }, query: { from: "2026-08-01", to: "2026-08-31", include_simulation: true } });
+  const invalid = await handleStandaloneApiRequest({ method: "GET", path: "/v1/analytics?from=2026-09-01&to=2026-08-01", headers }, { serviceApiKey: "secret", analyticsRepository: repository });
+  assert.equal(invalid.status, 400);
 });
 
 test("conversation owner routes preserve scope, filters, chronology, replies, and takeover", async () => {

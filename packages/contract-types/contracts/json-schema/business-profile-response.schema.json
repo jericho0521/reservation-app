@@ -1,5 +1,315 @@
 {
   "$defs": {
+    "AnalyticsQuery": {
+      "additionalProperties": false,
+      "properties": {
+        "from": {
+          "type": "string"
+        },
+        "include_simulation": {
+          "type": "boolean"
+        },
+        "to": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "from",
+        "to"
+      ],
+      "type": "object"
+    },
+    "AnalyticsResponse": {
+      "additionalProperties": false,
+      "properties": {
+        "automation": {
+          "additionalProperties": false,
+          "properties": {
+            "automated_conversations": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "containment_rate": {
+              "maximum": 1,
+              "minimum": 0,
+              "type": "number"
+            },
+            "staff_takeovers": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "takeover_rate": {
+              "maximum": 1,
+              "minimum": 0,
+              "type": "number"
+            }
+          },
+          "required": [
+            "automated_conversations",
+            "staff_takeovers",
+            "containment_rate",
+            "takeover_rate"
+          ],
+          "type": "object"
+        },
+        "channel_performance": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "channel": {
+                "$ref": "#/$defs/ConversationChannel"
+              },
+              "confirmation_requested": {
+                "minimum": 0,
+                "type": "integer"
+              },
+              "conversations_started": {
+                "minimum": 0,
+                "type": "integer"
+              },
+              "conversion_rate": {
+                "maximum": 1,
+                "minimum": 0,
+                "type": "number"
+              },
+              "proposal_shown": {
+                "minimum": 0,
+                "type": "integer"
+              },
+              "reservations_created": {
+                "minimum": 0,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "channel",
+              "conversations_started",
+              "proposal_shown",
+              "confirmation_requested",
+              "reservations_created",
+              "conversion_rate"
+            ],
+            "type": "object"
+          },
+          "maxItems": 3,
+          "type": "array"
+        },
+        "from_date": {
+          "type": "string"
+        },
+        "funnel": {
+          "additionalProperties": false,
+          "properties": {
+            "confirmation_requested": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "conversations_started": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "proposal_shown": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "reservations_created": {
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "conversations_started",
+            "proposal_shown",
+            "confirmation_requested",
+            "reservations_created"
+          ],
+          "type": "object"
+        },
+        "generated_at": {
+          "type": "string"
+        },
+        "include_simulation": {
+          "type": "boolean"
+        },
+        "popular_slots": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "count": {
+                "minimum": 0,
+                "type": "integer"
+              },
+              "day_of_week": {
+                "maximum": 7,
+                "minimum": 1,
+                "type": "integer"
+              },
+              "start_time": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "day_of_week",
+              "start_time",
+              "count"
+            ],
+            "type": "object"
+          },
+          "maxItems": 20,
+          "type": "array"
+        },
+        "reservations_by_channel": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "channel": {
+                "$ref": "#/$defs/OperationsReservationChannel"
+              },
+              "count": {
+                "minimum": 0,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "channel",
+              "count"
+            ],
+            "type": "object"
+          },
+          "maxItems": 4,
+          "type": "array"
+        },
+        "reservations_by_day": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "cancelled": {
+                "minimum": 0,
+                "type": "integer"
+              },
+              "completed": {
+                "minimum": 0,
+                "type": "integer"
+              },
+              "confirmed": {
+                "minimum": 0,
+                "type": "integer"
+              },
+              "date": {
+                "type": "string"
+              },
+              "total": {
+                "minimum": 0,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "date",
+              "total",
+              "confirmed",
+              "completed",
+              "cancelled"
+            ],
+            "type": "object"
+          },
+          "maxItems": 366,
+          "type": "array"
+        },
+        "reservations_by_service": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "count": {
+                "minimum": 0,
+                "type": "integer"
+              },
+              "service_id": {
+                "type": "string"
+              },
+              "service_name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "service_id",
+              "service_name",
+              "count"
+            ],
+            "type": "object"
+          },
+          "maxItems": 20,
+          "type": "array"
+        },
+        "reservations_by_status": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "count": {
+                "minimum": 0,
+                "type": "integer"
+              },
+              "status": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "status",
+              "count"
+            ],
+            "type": "object"
+          },
+          "maxItems": 20,
+          "type": "array"
+        },
+        "timezone": {
+          "type": "string"
+        },
+        "to_date": {
+          "type": "string"
+        },
+        "totals": {
+          "additionalProperties": false,
+          "properties": {
+            "cancellation_rate": {
+              "maximum": 1,
+              "minimum": 0,
+              "type": "number"
+            },
+            "cancelled": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "reservations": {
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "reservations",
+            "cancelled",
+            "cancellation_rate"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "generated_at",
+        "timezone",
+        "from_date",
+        "to_date",
+        "include_simulation",
+        "totals",
+        "reservations_by_day",
+        "reservations_by_status",
+        "reservations_by_channel",
+        "channel_performance",
+        "reservations_by_service",
+        "popular_slots",
+        "funnel",
+        "automation"
+      ],
+      "type": "object"
+    },
     "ArchiveCatalogItemInput": {
       "additionalProperties": false,
       "properties": {

@@ -6,6 +6,7 @@ export * from "./errors.js";
 export * from "./experience-presets.js";
 export * from "./experience-knowledge.js";
 export * from "./experience-studio.js";
+export * from "./experience-validation.js";
 export * from "./idempotency.js";
 export * from "./metadata.js";
 export * from "./operating-hours.js";

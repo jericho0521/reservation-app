@@ -11,8 +11,9 @@ import {
   ResourceSelector,
   getBookingControlVisibility,
   shouldSyncQuantityToSelectedResources,
+  ExperiencePreview,
 } from "./components.js";
-import { createBookingFlowConfig } from "./config.js";
+import { createBookingFlowConfig, createExperiencePreviewConfig } from "./config.js";
 import { defaultThemeClasses } from "./types.js";
 
 function childrenOf(node: unknown): unknown[] {
@@ -152,4 +153,19 @@ test("shouldSyncQuantityToSelectedResources only syncs assigned-resource booking
   assert.equal(shouldSyncQuantityToSelectedResources("assigned_resource"), true);
   assert.equal(shouldSyncQuantityToSelectedResources("hybrid"), false);
   assert.equal(shouldSyncQuantityToSelectedResources("quantity"), false);
+});
+
+test("ExperiencePreview renders draft branding, terminology, channels, and services", () => {
+  const element = ExperiencePreview(createExperiencePreviewConfig({
+    preset_id: "racing_gaming",
+    branding: { brand_name: "Apex Racing", primary_color: "#f59e0b" },
+    terminology: { customer: "Driver", resource: "Simulator", booking: "Session" },
+    channels: { web_booking: true, web_chat: true, whatsapp: false },
+  }, [{ service_id: "service_1", name: "Sprint Session", duration_minutes: 60 }]));
+
+  assert.match(flattenText(element), /Apex Racing/);
+  assert.match(flattenText(element), /AI chat/);
+  assert.match(flattenText(element), /Sprint Session/);
+  assert.match(flattenText(element), /Continue to Session/);
+  assert.doesNotMatch(flattenText(element), /WhatsApp/);
 });

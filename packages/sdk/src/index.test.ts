@@ -52,6 +52,7 @@ test("experience SDK methods use scoped owner and public routes", async () => {
   });
 
   await client.getExperienceWorkspace();
+  await client.validateExperienceWorkspace();
   await client.saveExperienceDraft({
     preset_id: "racing_gaming",
     branding: { brand_name: "Apex Racing" },
@@ -69,24 +70,25 @@ test("experience SDK methods use scoped owner and public routes", async () => {
 
   assert.equal(requests[0].url, "https://platform.example/v1/experience/workspace");
   assert.equal(new Headers(requests[0].init?.headers).get("X-Reservation-Tenant-Id"), "tenant_1");
-  assert.equal(requests[1].init?.method, "PUT");
-  assert.deepEqual(JSON.parse(String(requests[1].init?.body)), {
+  assert.equal(requests[1].url, "https://platform.example/v1/experience/validation");
+  assert.equal(requests[2].init?.method, "PUT");
+  assert.deepEqual(JSON.parse(String(requests[2].init?.body)), {
     preset_id: "racing_gaming",
     branding: { brand_name: "Apex Racing" },
     terminology: { customer: "Driver", resource: "Simulator", booking: "Session" },
     channels: { web_booking: true, web_chat: false, whatsapp: false },
   });
-  assert.equal(requests[2].init?.method, "POST");
-  assert.deepEqual(JSON.parse(String(requests[2].init?.body)), {
+  assert.equal(requests[3].init?.method, "POST");
+  assert.deepEqual(JSON.parse(String(requests[3].init?.body)), {
     configuration_id: "configuration_1",
   });
   assert.equal(
-    requests[4].url,
+    requests[5].url,
     "https://platform.example/v1/public/experiences/apex%20racing",
   );
-  assert.equal(requests[3].init?.method, "PATCH");
-  assert.equal(new Headers(requests[4].init?.headers).get("Authorization"), null);
-  assert.equal(new Headers(requests[4].init?.headers).get("X-Reservation-Tenant-Id"), null);
+  assert.equal(requests[4].init?.method, "PATCH");
+  assert.equal(new Headers(requests[5].init?.headers).get("Authorization"), null);
+  assert.equal(new Headers(requests[5].init?.headers).get("X-Reservation-Tenant-Id"), null);
 });
 
 test("experience catalog SDK methods preserve mutation paths and bodies", async () => {

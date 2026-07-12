@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { ConsoleShell } from "../components/console-shell";
 import "./globals.css";
+import "@reservation-platform/ui/styles.css";
 
 export const metadata: Metadata = {
   title: "Reservation Experience Platform",

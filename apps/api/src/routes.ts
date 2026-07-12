@@ -45,6 +45,7 @@ import {
   replaceExperienceOperatingHours,
   updateExperienceChannelSettings,
   updateExperienceKnowledge,
+  validateExperienceWorkspace,
   updatePlatformResource,
   updatePlatformService,
   updateReservationWithLegacyPatch,
@@ -54,6 +55,7 @@ import {
   type ExperienceStudioRepository,
   type ExperienceKnowledgeRepository,
   type ExperienceChannelRuntimeReadiness,
+  type ExperienceValidationDependencies,
   type OperatingHoursRepository,
   type PlatformCatalogRepository,
   type PlatformRequestContext,
@@ -302,12 +304,16 @@ export async function handleStandaloneApiRequest(
     return handleExperienceWorkspaceReadRequest(request, dependencies.experienceStudioRepository);
   }
 
+  if (method === "GET" && path === "/v1/experience/validation") {
+    return handleExperienceValidationRequest(request, dependencies);
+  }
+
   if (method === "PUT" && path === "/v1/experience/draft") {
     return handleExperienceDraftSaveRequest(request, dependencies.experienceStudioRepository);
   }
 
   if (method === "POST" && path === "/v1/experience/publish") {
-    return handleExperienceDraftPublishRequest(request, dependencies.experienceStudioRepository);
+    return handleExperienceDraftPublishRequest(request, dependencies);
   }
 
   if (method === "PATCH" && path === "/v1/experience/identity") {
@@ -732,7 +738,7 @@ type RouteMatcher = string | RegExp | ((path: string) => boolean);
 
 const protectedRouteMetadata: Readonly<Record<string, readonly RouteMatcher[]>> = {
   GET: [
-    "/v1/experience/presets", "/v1/experience/workspace",
+    "/v1/experience/presets", "/v1/experience/workspace", "/v1/experience/validation",
     "/v1/experience/services", "/v1/experience/resources", "/v1/experience/operating-hours",
     "/v1/experience/knowledge", "/v1/experience/channels",
     "/v1/availability", "/v1/reservations", reservationPattern,
@@ -837,7 +843,7 @@ async function handleExperienceDraftSaveRequest(
 
 async function handleExperienceDraftPublishRequest(
   request: StandaloneApiRequest,
-  repository: ExperienceStudioRepository | undefined,
+  dependencies: StandaloneApiDependencies,
 ): Promise<StandaloneApiResponse> {
   const scopeResult = readExperienceScope(request);
   if (!scopeResult.ok) {
@@ -847,15 +853,66 @@ async function handleExperienceDraftPublishRequest(
   if (!parsed.success) {
     return platformError(400, "validation_failed", "Invalid experience publish body.");
   }
-  if (!repository) {
-    return experienceRepositoryUnavailable();
+  const validation = await runExperienceValidation(scopeResult.scope, dependencies);
+  if (validation.status !== 200 || !("valid" in validation.body)) {
+    return jsonResponse(validation.status, validation.body);
+  }
+  if (!validation.body.valid) {
+    return jsonResponse(409, platformErrorBody(
+      "conflict",
+      "Experience validation must pass before publication.",
+      409,
+      validation.body.issues,
+    ));
   }
   const result = await publishExperienceDraft({
     scope: scopeResult.scope,
     configurationId: parsed.data.configuration_id,
-    repository,
+    repository: dependencies.experienceStudioRepository!,
   });
   return jsonResponse(result.status, result.body);
+}
+
+async function handleExperienceValidationRequest(
+  request: StandaloneApiRequest,
+  dependencies: StandaloneApiDependencies,
+) {
+  const scopeResult = readExperienceScope(request);
+  if (!scopeResult.ok) return scopeResult.response;
+  const result = await runExperienceValidation(scopeResult.scope, dependencies);
+  return jsonResponse(result.status, result.body);
+}
+
+async function runExperienceValidation(
+  scope: { tenantId: string; venueId: string },
+  dependencies: StandaloneApiDependencies,
+) {
+  const validationDependencies = await resolveExperienceValidationDependencies(dependencies);
+  if (!validationDependencies) {
+    return {
+      status: 503,
+      body: platformErrorBody("bad_request", "Experience validation repositories are not configured.", 503),
+    };
+  }
+  return validateExperienceWorkspace({ scope, dependencies: validationDependencies });
+}
+
+async function resolveExperienceValidationDependencies(
+  dependencies: StandaloneApiDependencies,
+): Promise<ExperienceValidationDependencies | null> {
+  if (
+    !dependencies.experienceStudioRepository
+    || !dependencies.catalogRepository
+    || !dependencies.operatingHoursRepository
+    || !dependencies.experienceKnowledgeRepository
+  ) return null;
+  return {
+    studioRepository: dependencies.experienceStudioRepository,
+    catalogRepository: dependencies.catalogRepository,
+    operatingHoursRepository: dependencies.operatingHoursRepository,
+    knowledgeRepository: dependencies.experienceKnowledgeRepository,
+    channelReadiness: await readChannelRuntimeReadiness(dependencies),
+  };
 }
 
 async function handleExperienceIdentityUpdateRequest(

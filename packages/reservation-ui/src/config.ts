@@ -1,4 +1,6 @@
 import type { BookingFlowProps } from "./components.js";
+import type { ExperiencePreviewProps } from "./components.js";
+import type { ExperienceDraftInput, ServiceResponse } from "@reservation-platform/contract-types";
 import type { BookingLabels, ThemeClasses } from "./types.js";
 
 export interface BookingFlowConfigInput {
@@ -28,6 +30,22 @@ export function createBookingFlowConfig(input: BookingFlowConfigInput): BookingF
       initialQuantity: input.initialQuantity,
       useExistingProvider: input.useExistingProvider,
     },
+  };
+}
+
+export function createExperiencePreviewConfig(
+  draft: ExperienceDraftInput,
+  services: ServiceResponse[],
+): ExperiencePreviewProps {
+  return {
+    brandName: draft.branding.brand_name,
+    description: draft.branding.description,
+    primaryColor: draft.branding.primary_color,
+    secondaryColor: draft.branding.secondary_color,
+    bookingLabel: draft.terminology.booking,
+    resourceLabel: draft.terminology.resource,
+    channels: draft.channels,
+    services,
   };
 }
 

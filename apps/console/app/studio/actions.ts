@@ -153,6 +153,28 @@ export async function saveChannelSettingsAction(
   }
 }
 
+export async function publishExperienceAction(
+  _previous: StudioActionState,
+  formData: FormData,
+): Promise<StudioActionState> {
+  try {
+    if (formData.get("confirm_publish") !== "on") {
+      return { status: "error", message: "Confirm that you want to replace the live experience." };
+    }
+    const client = createConsolePlatformClient();
+    const validation = await client.validateExperienceWorkspace();
+    if (!validation.valid) {
+      return { status: "error", message: `Resolve ${validation.issues.length} validation issue${validation.issues.length === 1 ? "" : "s"} before publishing.` };
+    }
+    await client.publishExperienceDraft(requiredField(formData, "configuration_id"));
+    revalidatePath("/studio/publish");
+    revalidatePath("/studio");
+    return { status: "success", message: "Experience published successfully." };
+  } catch (error) {
+    return actionError(error, "The experience could not be published.");
+  }
+}
+
 async function updateIdentityFromForm(formData: FormData, source: "profile" | "branding") {
   try {
     const client = createConsolePlatformClient();

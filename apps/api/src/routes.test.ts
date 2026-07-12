@@ -425,6 +425,77 @@ test("experience channel route separates desired settings from readiness", async
   });
 });
 
+test("experience validation blocks publication until required sections pass", async () => {
+  let publishCalls = 0;
+  const dependencies = {
+    serviceApiKey: "secret",
+    experienceStudioRepository: fakeExperienceRepository({
+      publishDraft: async () => {
+        publishCalls += 1;
+        return experienceWorkspaceFixture();
+      },
+    }),
+    catalogRepository: catalogRepository({
+      listServices: async () => ({ data: [] }),
+      listResources: async () => ({ data: [] }),
+    }),
+    operatingHoursRepository: {
+      read: async () => ({ data: null }),
+      replace: async () => ({ data: null }),
+    } satisfies OperatingHoursRepository,
+    experienceKnowledgeRepository: {
+      list: async () => ({ data: [] }),
+      create: async () => ({ data: null }),
+      update: async () => ({ data: null }),
+      archive: async () => ({ data: null }),
+    } satisfies ExperienceKnowledgeRepository,
+    availabilityRepository: availabilityRepository(),
+  };
+  const headers = {
+    authorization: "Bearer secret",
+    "x-reservation-tenant-id": "tenant_1",
+    "x-reservation-venue-id": "venue_1",
+  };
+
+  const validation = await handleStandaloneApiRequest({
+    method: "GET",
+    path: "/v1/experience/validation",
+    headers,
+  }, dependencies);
+  const publication = await handleStandaloneApiRequest({
+    method: "POST",
+    path: "/v1/experience/publish",
+    headers,
+    body: { configuration_id: "draft_1" },
+  }, dependencies);
+  const validDependencies = {
+    ...dependencies,
+    catalogRepository: catalogRepository(),
+    operatingHoursRepository: {
+      read: async () => ({
+        data: {
+          tenant_id: "tenant_1",
+          venue_id: "venue_1",
+          ...operatingHoursFixture(),
+        },
+      }),
+      replace: async () => ({ data: null }),
+    } satisfies OperatingHoursRepository,
+  };
+  const successfulPublication = await handleStandaloneApiRequest({
+    method: "POST",
+    path: "/v1/experience/publish",
+    headers,
+    body: { configuration_id: "draft_1" },
+  }, validDependencies);
+
+  assert.equal(validation.status, 200);
+  assert.equal((validation.body as { valid: boolean }).valid, false);
+  assert.equal(publication.status, 409);
+  assert.equal(successfulPublication.status, 200);
+  assert.equal(publishCalls, 1);
+});
+
 function operatingHoursFixture() {
   return {
     timezone: "Asia/Kuala_Lumpur",

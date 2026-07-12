@@ -64,13 +64,14 @@ export function calculateStudioProgress(input: {
   };
 }
 
-function sectionForValidationPath(path: string): StudioSectionId {
+export function sectionForValidationPath(path: string): StudioSectionId {
   if (path.startsWith("preset")) return "preset";
   if (path.startsWith("profile")) return "profile";
   if (path.startsWith("services")) return "services";
   if (path.startsWith("resources")) return "resources";
   if (path.startsWith("availability")) return "availability";
   if (path.startsWith("knowledge")) return "knowledge";
+  if (path.startsWith("channels")) return "knowledge";
   if (path.startsWith("branding") || path.startsWith("terminology")) return "branding";
   return "publish";
 }

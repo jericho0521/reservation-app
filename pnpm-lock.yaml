@@ -63,6 +63,9 @@ importers:
       '@reservation-platform/sdk':
         specifier: workspace:*
         version: link:../../packages/sdk
+      '@reservation-platform/ui':
+        specifier: workspace:*
+        version: link:../../packages/reservation-ui
       next:
         specifier: ^16.1.1
         version: 16.2.9(react-dom@19.2.7(react@19.2.7))(react@19.2.7)

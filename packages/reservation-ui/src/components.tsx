@@ -14,7 +14,7 @@ import {
   type BookingStrategy,
   type BookingFlowState,
 } from "@reservation-platform/react";
-import { useState, type ReactNode } from "react";
+import { useState, type CSSProperties, type ReactNode } from "react";
 
 import { cn } from "./class-names.js";
 import {
@@ -35,6 +35,62 @@ export interface BookingFlowProps {
   useExistingProvider?: boolean;
   setupErrorTitle?: string;
   setupErrorMessage?: string;
+}
+
+export interface ExperiencePreviewProps {
+  brandName: string;
+  description?: string;
+  primaryColor?: string;
+  secondaryColor?: string;
+  bookingLabel: string;
+  resourceLabel: string;
+  channels: { web_booking: boolean; web_chat: boolean; whatsapp: boolean };
+  services: ServiceResponse[];
+}
+
+export function ExperiencePreview({
+  brandName,
+  description,
+  primaryColor = "#2563eb",
+  secondaryColor = "#0f172a",
+  bookingLabel,
+  resourceLabel,
+  channels,
+  services,
+}: ExperiencePreviewProps) {
+  const style = {
+    "--rp-preview-primary": primaryColor,
+    "--rp-preview-secondary": secondaryColor,
+  } as CSSProperties;
+  return <section className="rp-experience-preview" style={style}>
+    <header className="rp-preview-hero">
+      <span className="rp-preview-kicker">Book with confidence</span>
+      <h2>{brandName}</h2>
+      <p>{description ?? `Choose a ${bookingLabel.toLowerCase()} that works for you.`}</p>
+      <div className="rp-preview-channels" aria-label="Available booking channels">
+        {channels.web_booking ? <span>Web booking</span> : null}
+        {channels.web_chat ? <span>AI chat</span> : null}
+        {channels.whatsapp ? <span>WhatsApp</span> : null}
+      </div>
+    </header>
+    <div className="rp-preview-content">
+      <div className="rp-preview-service-list">
+        <h3>Choose your {bookingLabel.toLowerCase()}</h3>
+        {services.length > 0 ? services.map((service) => <article key={service.service_id}>
+          <div><strong>{service.name}</strong><span>{service.duration_minutes ? `${service.duration_minutes} min` : resourceLabel}</span></div>
+          <p>{service.description ?? `${resourceLabel} availability is checked live.`}</p>
+          <button type="button">Select</button>
+        </article>) : <div className="rp-preview-empty">Your services will appear here.</div>}
+      </div>
+      <aside className="rp-preview-booking-card">
+        <span>Live availability</span>
+        <strong>Select a date and time</strong>
+        <div className="rp-preview-date-row"><span>Tomorrow</span><span>Next week</span></div>
+        <div className="rp-preview-time-row"><span>09:00</span><span>10:30</span><span>14:00</span></div>
+        <button type="button">Continue to {bookingLabel}</button>
+      </aside>
+    </div>
+  </section>;
 }
 
 function mergeLabels(labels?: Partial<BookingLabels>): BookingLabels {

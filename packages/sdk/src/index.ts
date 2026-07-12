@@ -24,6 +24,7 @@ import type {
   ExperienceServiceInput,
   ExperiencePresetSummary,
   ExperienceWorkspaceResponse,
+  ExperienceValidationResponse,
   ListReservationsQuery,
   ListReservationsResponse,
   ListResourceMaintenanceQuery,
@@ -133,6 +134,7 @@ export function createIdempotencyKey(prefix = "reservation-platform") {
 export interface ReservationPlatformClient {
   listExperiencePresets(options?: RequestOptions): Promise<{ presets: ExperiencePresetSummary[] }>;
   getExperienceWorkspace(options?: RequestOptions): Promise<ExperienceWorkspaceResponse>;
+  validateExperienceWorkspace(options?: RequestOptions): Promise<ExperienceValidationResponse>;
   saveExperienceDraft(input: ExperienceDraftInput, options?: RequestOptions): Promise<ExperienceWorkspaceResponse>;
   publishExperienceDraft(configurationId: string, options?: RequestOptions): Promise<ExperienceWorkspaceResponse>;
   updateExperienceIdentity(input: ExperienceIdentityInput, options?: RequestOptions): Promise<ExperienceWorkspaceResponse>;
@@ -200,6 +202,7 @@ export function createReservationPlatformClient(
   return {
     listExperiencePresets: (options) => request({ method: "GET", path: "/experience/presets", options }),
     getExperienceWorkspace: (options) => request({ method: "GET", path: "/experience/workspace", options }),
+    validateExperienceWorkspace: (options) => request({ method: "GET", path: "/experience/validation", options }),
     saveExperienceDraft: (input, options) => request({ method: "PUT", path: "/experience/draft", body: input, options }),
     publishExperienceDraft: (configurationId, options) => request({
       method: "POST",

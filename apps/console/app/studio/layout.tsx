@@ -9,17 +9,28 @@ import {
 
 export default async function StudioLayout({ children }: { children: ReactNode }) {
   const savedSections: StudioSectionId[] = [];
+  let validation = { valid: false, issues: [{ path: "publish.draft", message: "Workspace unavailable." }] };
   try {
-    const workspace = await createConsolePlatformClient().getExperienceWorkspace();
+    const client = createConsolePlatformClient();
+    const [workspace, result] = await Promise.all([
+      client.getExperienceWorkspace(),
+      client.validateExperienceWorkspace(),
+    ]);
+    validation = result;
     savedSections.push("preset", "profile");
     if (workspace.draft) savedSections.push("branding");
-    if (workspace.published) savedSections.push("publish");
+    for (const section of ["services", "resources", "availability", "knowledge"] as const) {
+      if (!validation.issues.some((issue) => (
+        issue.path.startsWith(section) || (section === "knowledge" && issue.path.startsWith("channels"))
+      ))) savedSections.push(section);
+    }
+    if (validation.valid || workspace.published) savedSections.push("publish");
   } catch {
     // The page-level SetupError retains the actionable configuration message.
   }
   const progress = calculateStudioProgress({
     savedSections,
-    validation: { valid: true, issues: [] },
+    validation,
   });
 
   return (

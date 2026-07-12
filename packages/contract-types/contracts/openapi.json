@@ -3510,6 +3510,53 @@
         ]
       }
     },
+    "/v1/experience/validation": {
+      "get": {
+        "operationId": "validateExperienceWorkspace",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/TenantIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/VenueIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/CorrelationIdHeader"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExperienceValidationResponse"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformErrorResponse"
+                }
+              }
+            },
+            "description": "Platform error response."
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Validate every required Studio section",
+        "tags": [
+          "experience"
+        ]
+      }
+    },
     "/v1/experience/workspace": {
       "get": {
         "operationId": "getExperienceWorkspace",

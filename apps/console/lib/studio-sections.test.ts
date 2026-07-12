@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   calculateStudioProgress,
   getStudioSectionHref,
+  sectionForValidationPath,
   studioSections,
 } from "./studio-sections.js";
 
@@ -46,4 +47,10 @@ test("a valid fully saved Studio reports complete progress", () => {
   assert.equal(progress.completed, 8);
   assert.equal(progress.percent, 100);
   assert.equal(Object.values(progress.sections).every((status) => status === "complete"), true);
+});
+
+test("validation paths deep-link to the owning Studio section", () => {
+  assert.equal(sectionForValidationPath("availability.intervals"), "availability");
+  assert.equal(sectionForValidationPath("channels.whatsapp"), "knowledge");
+  assert.equal(sectionForValidationPath("resources.service_1"), "resources");
 });

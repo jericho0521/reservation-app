@@ -9,6 +9,39 @@
   font-family: Arial, Helvetica, sans-serif;
 }
 
+.rp-experience-preview {
+  overflow: hidden;
+  border-radius: 1.25rem;
+  background: #f8fafc;
+  color: #0f172a;
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+.rp-preview-hero {
+  padding: clamp(1.5rem, 5vw, 3.5rem);
+  color: #ffffff;
+  background: linear-gradient(135deg, var(--rp-preview-secondary), var(--rp-preview-primary));
+}
+
+.rp-preview-kicker { font-size: .7rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; opacity: .8; }
+.rp-preview-hero h2 { margin: .55rem 0; font-size: clamp(2rem, 7vw, 4.5rem); line-height: .95; letter-spacing: -.04em; }
+.rp-preview-hero p { max-width: 38rem; margin: 0; line-height: 1.6; opacity: .82; }
+.rp-preview-channels { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: 1.2rem; }
+.rp-preview-channels span { padding: .35rem .6rem; border: 1px solid rgba(255,255,255,.35); border-radius: 999px; font-size: .7rem; }
+.rp-preview-content { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(15rem, .7fr); gap: 1rem; padding: 1rem; }
+.rp-preview-service-list { display: grid; gap: .75rem; }
+.rp-preview-service-list h3 { margin: .5rem 0; }
+.rp-preview-service-list article, .rp-preview-booking-card, .rp-preview-empty { border: 1px solid #dbe2ea; border-radius: .85rem; background: #fff; padding: 1rem; }
+.rp-preview-service-list article > div { display: flex; justify-content: space-between; gap: 1rem; }
+.rp-preview-service-list article p { color: #64748b; font-size: .82rem; line-height: 1.5; }
+.rp-preview-service-list button, .rp-preview-booking-card button { border: 0; border-radius: .55rem; color: #fff; background: var(--rp-preview-primary); padding: .65rem .85rem; font-weight: 700; }
+.rp-preview-booking-card { display: grid; align-content: start; gap: .85rem; }
+.rp-preview-booking-card > span { color: #64748b; font-size: .7rem; text-transform: uppercase; letter-spacing: .08em; }
+.rp-preview-date-row, .rp-preview-time-row { display: grid; grid-template-columns: repeat(2, 1fr); gap: .4rem; }
+.rp-preview-time-row { grid-template-columns: repeat(3, 1fr); }
+.rp-preview-date-row span, .rp-preview-time-row span { border: 1px solid #dbe2ea; border-radius: .45rem; padding: .5rem; font-size: .72rem; text-align: center; }
+@media (max-width: 42rem) { .rp-preview-content { grid-template-columns: 1fr; } }
+
 .rp-shell button,
 .rp-shell input {
   font: inherit;

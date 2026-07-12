@@ -559,6 +559,14 @@ export const publicContractOperations: ContractOperation[] = [
     responseSchema: "ExperienceWorkspaceResponse",
   },
   {
+    method: "get",
+    path: "/v1/experience/validation",
+    operationId: "validateExperienceWorkspace",
+    summary: "Validate every required Studio section",
+    tags: ["experience"],
+    responseSchema: "ExperienceValidationResponse",
+  },
+  {
     method: "put",
     path: "/v1/experience/draft",
     operationId: "saveExperienceDraft",

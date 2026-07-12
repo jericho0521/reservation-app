@@ -12,6 +12,7 @@ import type {
   JsonValue,
   PlatformErrorCode,
   PlatformErrorResponse,
+  ReservationItemInput,
   ReservationResponse,
   ServiceResponse,
 } from "@reservation-platform/contract-types";
@@ -56,10 +57,15 @@ export interface ConversationBookingTools {
 export interface ConversationBookingProposal {
   proposalId: string;
   conversationId: string;
-  booking: BoundPreparedBooking;
+  booking: ConversationBoundBooking;
   status: "pending" | "confirming" | "confirmed";
   reservation?: ReservationResponse;
 }
+
+type ConversationBoundBooking = BoundPreparedBooking & {
+  resource_ids?: string[];
+  reservation_items?: ReservationItemInput[];
+};
 
 export interface ConversationBookingStateStore {
   save(scope: ExperienceScope, proposal: ConversationBookingProposal): Promise<void>;
@@ -246,7 +252,7 @@ async function revalidateProposal(scope: ExperienceScope, booking: PrepareBookin
   const service = await tools.getService(scope, booking.service_id);
   if (!service || service.service_id !== booking.service_id || service.name.trim().toLocaleLowerCase() !== booking.service_name.trim().toLocaleLowerCase()) return undefined;
   const availability = await tools.checkAvailability(scope, { serviceId: service.service_id, date: booking.date });
-  return bindPreparedBookingToAvailability(booking, {
+  const bound = bindPreparedBookingToAvailability(booking, {
     service_id: service.service_id,
     service_name: service.name,
     available_slots: availability.slots.map((slot) => ({
@@ -255,16 +261,60 @@ async function revalidateProposal(scope: ExperienceScope, booking: PrepareBookin
       available_quantity: slot.available_quantity,
       is_available: slot.is_available,
     })),
-  }) ?? undefined;
+  });
+  if (!bound) return undefined;
+  return bindRequiredResources(service, availability, bound);
 }
 
-function reservationInput(booking: BoundPreparedBooking, channel: ConversationChannel): CreateReservationInput {
+function bindRequiredResources(
+  service: ServiceResponse,
+  availability: AvailabilityResponse,
+  booking: BoundPreparedBooking,
+): ConversationBoundBooking | undefined {
+  const requiresResources = service.resource_strategy === "assigned_resource" || service.resource_kind === "room";
+  if (!requiresResources) return booking;
+
+  const slot = availability.slots.find((candidate) => (
+    candidate.is_available
+    && (candidate.start_time ?? candidate.start_at) === booking.start_time
+    && (candidate.end_time ?? candidate.end_at) === booking.end_time
+  ));
+  if (!slot) return undefined;
+  const unavailable = new Set([
+    ...(slot.taken_resource_labels ?? []),
+    ...(slot.maintenance_resource_labels ?? []),
+  ]);
+  const resources = (availability.resources ?? service.resources ?? []).filter((resource) => (
+    resource.is_active !== false && !unavailable.has(resource.label)
+  ));
+  const selected: ReservationItemInput[] = [];
+  let remaining = booking.seats;
+  for (const resource of resources) {
+    if (remaining <= 0) break;
+    const capacity = Math.max(1, resource.capacity ?? 1);
+    if (service.resource_kind === "room" && capacity < booking.seats) continue;
+    const quantity = service.resource_kind === "room" ? booking.seats : Math.min(capacity, remaining);
+    selected.push({ resource_id: resource.resource_id, resource_label: resource.label, quantity });
+    remaining -= quantity;
+    if (service.resource_kind === "room") break;
+  }
+  if (remaining > 0) return undefined;
+  return {
+    ...booking,
+    resource_ids: selected.flatMap((item) => item.resource_id ? [item.resource_id] : []),
+    reservation_items: selected,
+  };
+}
+
+function reservationInput(booking: ConversationBoundBooking, channel: ConversationChannel): CreateReservationInput {
   return {
     service_id: booking.service_id,
     date: booking.date,
     start_time: booking.start_time,
     end_time: booking.end_time,
     quantity: booking.seats,
+    ...(booking.resource_ids ? { resource_ids: booking.resource_ids } : {}),
+    ...(booking.reservation_items ? { reservation_items: booking.reservation_items } : {}),
     customer: { name: booking.user_name, email: booking.user_email, phone: booking.user_phone },
     source: channel,
     metadata: { conversational_booking: true },

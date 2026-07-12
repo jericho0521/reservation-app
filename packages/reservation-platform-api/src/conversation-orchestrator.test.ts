@@ -60,6 +60,31 @@ test("a proposal waits for explicit confirmation and confirmation replays idempo
   assert.equal("reservation" in replay.body && replay.body.reservation?.reservation_id, "reservation_1");
 });
 
+test("assigned-resource proposals bind real available resources before confirmation", async () => {
+  const fixture = createFixture({ responder: { content: "Please confirm the 2pm slot.", supported: true, booking: preparedBooking } });
+  fixture.dependencies.tools.getService = async () => ({
+    service_id: "service_1",
+    name: "Simulator Session",
+    resource_kind: "station",
+    resource_strategy: "assigned_resource",
+  });
+  fixture.dependencies.tools.checkAvailability = async () => ({
+    slots: [{ start_time: "14:00", end_time: "15:00", available_quantity: 1, is_available: true, maintenance_resource_labels: ["Simulator B"] }],
+    resources: [
+      { resource_id: "resource_1", service_id: "service_1", label: "Simulator A", is_active: true, capacity: 1 },
+      { resource_id: "resource_2", service_id: "service_1", label: "Simulator B", is_active: true, capacity: 1 },
+    ],
+  });
+  const proposed = await inbound(fixture.dependencies);
+  const proposalId = "proposal" in proposed.body ? proposed.body.proposal?.proposalId : undefined;
+  const confirmed = await confirmConversationBooking({ scope, conversationId: "conversation_1", proposalId: proposalId!, dependencies: fixture.dependencies });
+  assert.equal(confirmed.status, 200);
+  assert.deepEqual((fixture.createCalls[0]?.input as { resource_ids?: string[] }).resource_ids, ["resource_1"]);
+  assert.deepEqual((fixture.createCalls[0]?.input as { reservation_items?: unknown[] }).reservation_items, [
+    { resource_id: "resource_1", resource_label: "Simulator A", quantity: 1 },
+  ]);
+});
+
 test("stale availability blocks confirmation before reservation creation", async () => {
   const fixture = createFixture({ responder: { content: "Please confirm.", supported: true, booking: preparedBooking } });
   const proposed = await inbound(fixture.dependencies);

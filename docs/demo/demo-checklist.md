@@ -2,10 +2,12 @@
 
 ## Release revision
 
-- [ ] Record accepted commit: `________________________`
+- [x] Record accepted feature revision: `6302bb581c511666b7adba30f4d1167dfdf7b3ca`.
 - [x] Confirm working tree is clean.
 - [x] Confirm the release-candidate gate in the six-week roadmap passes.
 - [ ] Freeze feature changes 48 hours before submission.
+
+Feature freeze started at 2026-07-13 02:57:51 +08:00. The earliest eligible release-tag time is 2026-07-15 02:57:51 +08:00. The approved tag name is `v1.0.0-final`. Any feature or runtime-code change restarts the freeze; documentation-only sign-off records do not alter the accepted feature revision.
 
 ## Environment
 

@@ -705,6 +705,8 @@ Expected demonstration: create bookings through web and simulated WhatsApp, show
 - [x] Fix only release-blocking defects; rerun the failing focused suite and the full gate.
 - [ ] Tag the accepted revision only after the working tree is clean and evidence is recorded.
 
+Feature freeze candidate: `6302bb581c511666b7adba30f4d1167dfdf7b3ca`. The project owner confirmed the candidate and planned `v1.0.0-final` tag on 2026-07-13. The 48-hour feature freeze began at 2026-07-13 02:57:51 +08:00 and completes no earlier than 2026-07-15 02:57:51 +08:00. Any feature or runtime-code change restarts this window.
+
 ```bash
 pnpm install --frozen-lockfile
 pnpm build

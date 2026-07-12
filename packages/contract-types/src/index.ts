@@ -13,6 +13,105 @@ export interface RequestContext {
   correlation_id?: string;
 }
 
+export type ExperiencePresetId =
+  | "racing_gaming"
+  | "rooms_facilities"
+  | "appointments_salon"
+  | "sports_courts"
+  | "restaurant_tables"
+  | "cinema_events"
+  | "equipment_rental"
+  | "classes_workshops";
+
+export type ExperienceConfigurationState = "draft" | "published" | "archived";
+
+export interface ExperienceBranding {
+  brand_name: string;
+  primary_color?: string;
+  secondary_color?: string;
+  logo_url?: string;
+  description?: string;
+}
+
+export interface ExperienceTerminology {
+  customer: string;
+  resource: string;
+  booking: string;
+}
+
+export interface ExperienceChannels {
+  web_booking: boolean;
+  web_chat: boolean;
+  whatsapp: boolean;
+}
+
+export interface ExperiencePresetSummary {
+  preset_id: ExperiencePresetId;
+  name: string;
+  description: string;
+  resource_strategy: "quantity" | "assigned_resource" | "hybrid";
+  terminology: ExperienceTerminology;
+}
+
+export interface ListExperiencePresetsResponse {
+  presets: ExperiencePresetSummary[];
+}
+
+export interface BusinessProfileResponse {
+  business_id: string;
+  tenant_id: string;
+  venue_id: string;
+  name: string;
+  public_slug: string;
+  preset_id: ExperiencePresetId;
+  status: "draft" | "published" | "archived";
+}
+
+export interface ExperienceConfigurationResponse {
+  configuration_id: string;
+  business_id: string;
+  version: number;
+  state: ExperienceConfigurationState;
+  preset_id: ExperiencePresetId;
+  branding: ExperienceBranding;
+  terminology: ExperienceTerminology;
+  channels: ExperienceChannels;
+  updated_at: string;
+  published_at?: string;
+}
+
+export interface ExperienceDraftInput {
+  preset_id: ExperiencePresetId;
+  branding: ExperienceBranding;
+  terminology: ExperienceTerminology;
+  channels: ExperienceChannels;
+}
+
+export interface PublishExperienceInput {
+  configuration_id: string;
+}
+
+export interface ExperienceWorkspaceResponse {
+  profile: BusinessProfileResponse;
+  draft?: ExperienceConfigurationResponse;
+  published?: ExperienceConfigurationResponse;
+}
+
+export interface ExperienceValidationIssue {
+  path: string;
+  message: string;
+}
+
+export interface ExperienceValidationResponse {
+  valid: boolean;
+  issues: ExperienceValidationIssue[];
+}
+
+export interface PublicExperienceResponse {
+  profile: Omit<BusinessProfileResponse, "tenant_id" | "venue_id" | "status">;
+  configuration: ExperienceConfigurationResponse & { state: "published" };
+}
+
 export interface MetadataResponse {
   api_version: string;
   modules: string[];

@@ -153,6 +153,47 @@
         ],
         "type": "object"
       },
+      "BusinessProfileResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "business_id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "preset_id": {
+            "$ref": "#/components/schemas/ExperiencePresetId"
+          },
+          "public_slug": {
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "draft",
+              "published",
+              "archived"
+            ],
+            "type": "string"
+          },
+          "tenant_id": {
+            "type": "string"
+          },
+          "venue_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "business_id",
+          "tenant_id",
+          "venue_id",
+          "name",
+          "public_slug",
+          "preset_id",
+          "status"
+        ],
+        "type": "object"
+      },
       "CancelReservationInput": {
         "additionalProperties": false,
         "properties": {
@@ -388,6 +429,247 @@
         },
         "type": "object"
       },
+      "ExperienceBranding": {
+        "additionalProperties": false,
+        "properties": {
+          "brand_name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "logo_url": {
+            "format": "uri",
+            "type": "string"
+          },
+          "primary_color": {
+            "pattern": "^#[0-9a-fA-F]{6}$",
+            "type": "string"
+          },
+          "secondary_color": {
+            "pattern": "^#[0-9a-fA-F]{6}$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "brand_name"
+        ],
+        "type": "object"
+      },
+      "ExperienceChannels": {
+        "additionalProperties": false,
+        "properties": {
+          "web_booking": {
+            "type": "boolean"
+          },
+          "web_chat": {
+            "type": "boolean"
+          },
+          "whatsapp": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "web_booking",
+          "web_chat",
+          "whatsapp"
+        ],
+        "type": "object"
+      },
+      "ExperienceConfigurationResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "branding": {
+            "$ref": "#/components/schemas/ExperienceBranding"
+          },
+          "business_id": {
+            "type": "string"
+          },
+          "channels": {
+            "$ref": "#/components/schemas/ExperienceChannels"
+          },
+          "configuration_id": {
+            "type": "string"
+          },
+          "preset_id": {
+            "$ref": "#/components/schemas/ExperiencePresetId"
+          },
+          "published_at": {
+            "type": "string"
+          },
+          "state": {
+            "$ref": "#/components/schemas/ExperienceConfigurationState"
+          },
+          "terminology": {
+            "$ref": "#/components/schemas/ExperienceTerminology"
+          },
+          "updated_at": {
+            "type": "string"
+          },
+          "version": {
+            "minimum": 1,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "configuration_id",
+          "business_id",
+          "version",
+          "state",
+          "preset_id",
+          "branding",
+          "terminology",
+          "channels",
+          "updated_at"
+        ],
+        "type": "object"
+      },
+      "ExperienceConfigurationState": {
+        "enum": [
+          "draft",
+          "published",
+          "archived"
+        ],
+        "type": "string"
+      },
+      "ExperienceDraftInput": {
+        "additionalProperties": false,
+        "properties": {
+          "branding": {
+            "$ref": "#/components/schemas/ExperienceBranding"
+          },
+          "channels": {
+            "$ref": "#/components/schemas/ExperienceChannels"
+          },
+          "preset_id": {
+            "$ref": "#/components/schemas/ExperiencePresetId"
+          },
+          "terminology": {
+            "$ref": "#/components/schemas/ExperienceTerminology"
+          }
+        },
+        "required": [
+          "preset_id",
+          "branding",
+          "terminology",
+          "channels"
+        ],
+        "type": "object"
+      },
+      "ExperiencePresetId": {
+        "enum": [
+          "racing_gaming",
+          "rooms_facilities",
+          "appointments_salon",
+          "sports_courts",
+          "restaurant_tables",
+          "cinema_events",
+          "equipment_rental",
+          "classes_workshops"
+        ],
+        "type": "string"
+      },
+      "ExperiencePresetSummary": {
+        "additionalProperties": false,
+        "properties": {
+          "description": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "preset_id": {
+            "$ref": "#/components/schemas/ExperiencePresetId"
+          },
+          "resource_strategy": {
+            "$ref": "#/components/schemas/ResourceStrategy"
+          },
+          "terminology": {
+            "$ref": "#/components/schemas/ExperienceTerminology"
+          }
+        },
+        "required": [
+          "preset_id",
+          "name",
+          "description",
+          "resource_strategy",
+          "terminology"
+        ],
+        "type": "object"
+      },
+      "ExperienceTerminology": {
+        "additionalProperties": false,
+        "properties": {
+          "booking": {
+            "type": "string"
+          },
+          "customer": {
+            "type": "string"
+          },
+          "resource": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "customer",
+          "resource",
+          "booking"
+        ],
+        "type": "object"
+      },
+      "ExperienceValidationIssue": {
+        "additionalProperties": false,
+        "properties": {
+          "message": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "path",
+          "message"
+        ],
+        "type": "object"
+      },
+      "ExperienceValidationResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "issues": {
+            "items": {
+              "$ref": "#/components/schemas/ExperienceValidationIssue"
+            },
+            "type": "array"
+          },
+          "valid": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "valid",
+          "issues"
+        ],
+        "type": "object"
+      },
+      "ExperienceWorkspaceResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "draft": {
+            "$ref": "#/components/schemas/ExperienceConfigurationResponse"
+          },
+          "profile": {
+            "$ref": "#/components/schemas/BusinessProfileResponse"
+          },
+          "published": {
+            "$ref": "#/components/schemas/ExperienceConfigurationResponse"
+          }
+        },
+        "required": [
+          "profile"
+        ],
+        "type": "object"
+      },
       "IdempotencyMetadata": {
         "additionalProperties": false,
         "properties": {
@@ -442,6 +724,21 @@
             "type": "object"
           }
         ]
+      },
+      "ListExperiencePresetsResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "presets": {
+            "items": {
+              "$ref": "#/components/schemas/ExperiencePresetSummary"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "presets"
+        ],
+        "type": "object"
       },
       "ListReservationsQuery": {
         "additionalProperties": false,
@@ -732,6 +1029,75 @@
         },
         "required": [
           "error"
+        ],
+        "type": "object"
+      },
+      "PublicBusinessProfileResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "business_id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "preset_id": {
+            "$ref": "#/components/schemas/ExperiencePresetId"
+          },
+          "public_slug": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "business_id",
+          "name",
+          "public_slug",
+          "preset_id"
+        ],
+        "type": "object"
+      },
+      "PublicExperienceResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "configuration": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ExperienceConfigurationResponse"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "state": {
+                    "const": "published",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "state"
+                ],
+                "type": "object"
+              }
+            ]
+          },
+          "profile": {
+            "$ref": "#/components/schemas/PublicBusinessProfileResponse"
+          }
+        },
+        "required": [
+          "profile",
+          "configuration"
+        ],
+        "type": "object"
+      },
+      "PublishExperienceInput": {
+        "additionalProperties": false,
+        "properties": {
+          "configuration_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "configuration_id"
         ],
         "type": "object"
       },
@@ -1604,6 +1970,214 @@
         "x-module-gated": "chat"
       }
     },
+    "/v1/experience/draft": {
+      "put": {
+        "operationId": "saveExperienceDraft",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/TenantIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/VenueIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/CorrelationIdHeader"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExperienceDraftInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExperienceWorkspaceResponse"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformErrorResponse"
+                }
+              }
+            },
+            "description": "Platform error response."
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Save the current venue experience draft.",
+        "tags": [
+          "Experience Studio"
+        ]
+      }
+    },
+    "/v1/experience/presets": {
+      "get": {
+        "operationId": "listExperiencePresets",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/TenantIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/VenueIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/CorrelationIdHeader"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListExperiencePresetsResponse"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformErrorResponse"
+                }
+              }
+            },
+            "description": "Platform error response."
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "List the available experience presets.",
+        "tags": [
+          "Experience Studio"
+        ]
+      }
+    },
+    "/v1/experience/publish": {
+      "post": {
+        "operationId": "publishExperienceDraft",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/TenantIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/VenueIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/CorrelationIdHeader"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PublishExperienceInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExperienceWorkspaceResponse"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformErrorResponse"
+                }
+              }
+            },
+            "description": "Platform error response."
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Publish a validated venue experience draft.",
+        "tags": [
+          "Experience Studio"
+        ]
+      }
+    },
+    "/v1/experience/workspace": {
+      "get": {
+        "operationId": "getExperienceWorkspace",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/TenantIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/VenueIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/CorrelationIdHeader"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExperienceWorkspaceResponse"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformErrorResponse"
+                }
+              }
+            },
+            "description": "Platform error response."
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Read the current venue experience workspace.",
+        "tags": [
+          "Experience Studio"
+        ]
+      }
+    },
     "/v1/metadata": {
       "get": {
         "operationId": "getMetadata",
@@ -1648,6 +2222,56 @@
         "summary": "Read platform metadata and enabled module notices.",
         "tags": [
           "Metadata"
+        ]
+      }
+    },
+    "/v1/public/experiences/{slug}": {
+      "get": {
+        "operationId": "getPublicExperience",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/TenantIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/VenueIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/CorrelationIdHeader"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicExperienceResponse"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformErrorResponse"
+                }
+              }
+            },
+            "description": "Platform error response."
+          }
+        },
+        "summary": "Read a published browser-safe experience by slug.",
+        "tags": [
+          "Experience Studio"
         ]
       }
     },

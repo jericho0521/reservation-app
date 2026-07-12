@@ -1,7 +1,7 @@
 export type JsonSchema = Record<string, unknown>;
 
 export interface ContractOperation {
-  method: "get" | "post" | "patch";
+  method: "get" | "post" | "put" | "patch";
   path: string;
   operationId: string;
   summary: string;
@@ -14,6 +14,7 @@ export interface ContractOperation {
   idempotencyRequired?: boolean;
   moduleGated?: "chat";
   disabledErrorCode?: string;
+  authentication?: "public";
 }
 
 const ref = (name: string) => ({ $ref: `#/$defs/${name}` });
@@ -359,9 +360,146 @@ export const publicJsonSchemaDefinitions: Record<string, JsonSchema> = {
     reservation_intent_id: stringSchema,
     metadata: ref("MetadataRecord"),
   }),
+  ExperiencePresetId: {
+    type: "string",
+    enum: ["racing_gaming", "rooms_facilities", "appointments_salon", "sports_courts", "restaurant_tables", "cinema_events", "equipment_rental", "classes_workshops"],
+  },
+  ExperienceConfigurationState: {
+    type: "string",
+    enum: ["draft", "published", "archived"],
+  },
+  ExperienceBranding: objectSchema({
+    brand_name: stringSchema,
+    primary_color: { type: "string", pattern: "^#[0-9a-fA-F]{6}$" },
+    secondary_color: { type: "string", pattern: "^#[0-9a-fA-F]{6}$" },
+    logo_url: { type: "string", format: "uri" },
+    description: stringSchema,
+  }, ["brand_name"]),
+  ExperienceTerminology: objectSchema({
+    customer: stringSchema,
+    resource: stringSchema,
+    booking: stringSchema,
+  }, ["customer", "resource", "booking"]),
+  ExperienceChannels: objectSchema({
+    web_booking: booleanSchema,
+    web_chat: booleanSchema,
+    whatsapp: booleanSchema,
+  }, ["web_booking", "web_chat", "whatsapp"]),
+  ExperiencePresetSummary: objectSchema({
+    preset_id: ref("ExperiencePresetId"),
+    name: stringSchema,
+    description: stringSchema,
+    resource_strategy: ref("ResourceStrategy"),
+    terminology: ref("ExperienceTerminology"),
+  }, ["preset_id", "name", "description", "resource_strategy", "terminology"]),
+  ListExperiencePresetsResponse: objectSchema({
+    presets: { type: "array", items: ref("ExperiencePresetSummary") },
+  }, ["presets"]),
+  BusinessProfileResponse: objectSchema({
+    business_id: stringSchema,
+    tenant_id: stringSchema,
+    venue_id: stringSchema,
+    name: stringSchema,
+    public_slug: stringSchema,
+    preset_id: ref("ExperiencePresetId"),
+    status: { type: "string", enum: ["draft", "published", "archived"] },
+  }, ["business_id", "tenant_id", "venue_id", "name", "public_slug", "preset_id", "status"]),
+  ExperienceConfigurationResponse: objectSchema({
+    configuration_id: stringSchema,
+    business_id: stringSchema,
+    version: positiveIntegerSchema,
+    state: ref("ExperienceConfigurationState"),
+    preset_id: ref("ExperiencePresetId"),
+    branding: ref("ExperienceBranding"),
+    terminology: ref("ExperienceTerminology"),
+    channels: ref("ExperienceChannels"),
+    updated_at: stringSchema,
+    published_at: stringSchema,
+  }, ["configuration_id", "business_id", "version", "state", "preset_id", "branding", "terminology", "channels", "updated_at"]),
+  ExperienceDraftInput: objectSchema({
+    preset_id: ref("ExperiencePresetId"),
+    branding: ref("ExperienceBranding"),
+    terminology: ref("ExperienceTerminology"),
+    channels: ref("ExperienceChannels"),
+  }, ["preset_id", "branding", "terminology", "channels"]),
+  PublishExperienceInput: objectSchema({
+    configuration_id: stringSchema,
+  }, ["configuration_id"]),
+  ExperienceWorkspaceResponse: objectSchema({
+    profile: ref("BusinessProfileResponse"),
+    draft: ref("ExperienceConfigurationResponse"),
+    published: ref("ExperienceConfigurationResponse"),
+  }, ["profile"]),
+  ExperienceValidationIssue: objectSchema({
+    path: stringSchema,
+    message: stringSchema,
+  }, ["path", "message"]),
+  ExperienceValidationResponse: objectSchema({
+    valid: booleanSchema,
+    issues: { type: "array", items: ref("ExperienceValidationIssue") },
+  }, ["valid", "issues"]),
+  PublicBusinessProfileResponse: objectSchema({
+    business_id: stringSchema,
+    name: stringSchema,
+    public_slug: stringSchema,
+    preset_id: ref("ExperiencePresetId"),
+  }, ["business_id", "name", "public_slug", "preset_id"]),
+  PublicExperienceResponse: objectSchema({
+    profile: ref("PublicBusinessProfileResponse"),
+    configuration: {
+      allOf: [
+        ref("ExperienceConfigurationResponse"),
+        objectSchema({ state: { type: "string", const: "published" } }, ["state"]),
+      ],
+    },
+  }, ["profile", "configuration"]),
 };
 
 export const publicContractOperations: ContractOperation[] = [
+  {
+    method: "get",
+    path: "/v1/experience/presets",
+    operationId: "listExperiencePresets",
+    summary: "List the available experience presets.",
+    tags: ["Experience Studio"],
+    responseSchema: "ListExperiencePresetsResponse",
+  },
+  {
+    method: "get",
+    path: "/v1/experience/workspace",
+    operationId: "getExperienceWorkspace",
+    summary: "Read the current venue experience workspace.",
+    tags: ["Experience Studio"],
+    responseSchema: "ExperienceWorkspaceResponse",
+  },
+  {
+    method: "put",
+    path: "/v1/experience/draft",
+    operationId: "saveExperienceDraft",
+    summary: "Save the current venue experience draft.",
+    tags: ["Experience Studio"],
+    requestBodySchema: "ExperienceDraftInput",
+    responseSchema: "ExperienceWorkspaceResponse",
+  },
+  {
+    method: "post",
+    path: "/v1/experience/publish",
+    operationId: "publishExperienceDraft",
+    summary: "Publish a validated venue experience draft.",
+    tags: ["Experience Studio"],
+    requestBodySchema: "PublishExperienceInput",
+    responseSchema: "ExperienceWorkspaceResponse",
+  },
+  {
+    method: "get",
+    path: "/v1/public/experiences/{slug}",
+    operationId: "getPublicExperience",
+    summary: "Read a published browser-safe experience by slug.",
+    tags: ["Experience Studio"],
+    pathParameters: ["slug"],
+    responseSchema: "PublicExperienceResponse",
+    authentication: "public",
+  },
   {
     method: "get",
     path: "/v1/metadata",

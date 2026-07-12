@@ -6,16 +6,78 @@ import {
   chatCreateReservationSessionInputSchema,
   chatMessageResponseSchema,
   createReservationInputSchema,
+  experienceDraftInputSchema,
+  experienceWorkspaceResponseSchema,
   listReservationsResponseSchema,
   platformErrorBodySchema,
   metadataRecordSchema,
   platformErrorResponseSchema,
   publicContractOperations,
+  publicExperienceResponseSchema,
   reservationResponseSchema,
   resourceLayoutResponseSchema,
   rescheduleReservationInputSchema,
   serviceResponseSchema,
 } from "./index.js";
+
+test("experience workspace accepts venue-scoped profile and draft", () => {
+  const result = experienceWorkspaceResponseSchema.parse({
+    profile: {
+      business_id: "business_1",
+      tenant_id: "tenant_1",
+      venue_id: "venue_1",
+      name: "Apex Racing",
+      public_slug: "apex-racing",
+      preset_id: "racing_gaming",
+      status: "draft",
+    },
+    draft: {
+      configuration_id: "config_1",
+      business_id: "business_1",
+      version: 1,
+      state: "draft",
+      preset_id: "racing_gaming",
+      branding: { brand_name: "Apex Racing", primary_color: "#f59e0b" },
+      terminology: { customer: "Driver", resource: "Simulator", booking: "Session" },
+      channels: { web_booking: true, web_chat: false, whatsapp: false },
+      updated_at: "2026-07-13T00:00:00.000Z",
+    },
+  });
+
+  assert.equal(result.profile.tenant_id, "tenant_1");
+});
+
+test("public experience rejects draft state and private metadata", () => {
+  assert.throws(() => publicExperienceResponseSchema.parse({
+    profile: {
+      business_id: "business_1",
+      name: "Apex Racing",
+      public_slug: "apex-racing",
+      preset_id: "racing_gaming",
+    },
+    configuration: {
+      configuration_id: "config_1",
+      business_id: "business_1",
+      version: 1,
+      state: "draft",
+      preset_id: "racing_gaming",
+      branding: { brand_name: "Apex Racing" },
+      terminology: { customer: "Driver", resource: "Simulator", booking: "Session" },
+      channels: { web_booking: true, web_chat: false, whatsapp: false },
+      updated_at: "2026-07-13T00:00:00.000Z",
+    },
+    private_metadata: { secret: "no" },
+  }));
+});
+
+test("experience draft rejects unknown preset ids", () => {
+  assert.throws(() => experienceDraftInputSchema.parse({
+    preset_id: "unknown",
+    branding: { brand_name: "Demo" },
+    terminology: { customer: "Customer", resource: "Resource", booking: "Booking" },
+    channels: { web_booking: true, web_chat: false, whatsapp: false },
+  }));
+});
 
 test("createReservationInputSchema accepts a minimal reservation intent", () => {
   const result = createReservationInputSchema.parse({
@@ -308,6 +370,14 @@ test("contract artifact subpaths are exported for package consumers", async () =
   );
 
   assert.equal(openapi.default.info.title, "Reservation Platform API");
+  assert.equal(
+    "security" in openapi.default.paths["/v1/public/experiences/{slug}"].get,
+    false,
+  );
+  assert.deepEqual(
+    openapi.default.paths["/v1/experience/workspace"].get.security,
+    [{ bearerAuth: [] }],
+  );
   assert.equal(metadataSchema.default.title, "MetadataResponse");
 });
 

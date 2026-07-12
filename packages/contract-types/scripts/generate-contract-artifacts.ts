@@ -177,7 +177,7 @@ function buildOpenApiOperation(operation: ContractOperation) {
     operationId: operation.operationId,
     summary: operation.summary,
     tags: operation.tags,
-    security: [{ bearerAuth: [] }],
+    ...(operation.authentication === "public" ? {} : { security: [{ bearerAuth: [] }] }),
     ...(parameters.length > 0 ? { parameters } : {}),
     ...(operation.requestBodySchema ? {
       requestBody: {

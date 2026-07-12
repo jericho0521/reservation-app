@@ -14,6 +14,116 @@ export const jsonValueSchema: z.ZodType<unknown> = z.lazy(() => z.union([
   z.record(jsonValueSchema),
 ]));
 
+export const experiencePresetIdSchema = z.enum([
+  "racing_gaming",
+  "rooms_facilities",
+  "appointments_salon",
+  "sports_courts",
+  "restaurant_tables",
+  "cinema_events",
+  "equipment_rental",
+  "classes_workshops",
+]);
+
+export const experienceConfigurationStateSchema = z.enum(["draft", "published", "archived"]);
+const experienceColorSchema = z.string().regex(/^#[0-9a-fA-F]{6}$/);
+
+export const experienceBrandingSchema = strictObject({
+  brand_name: z.string().min(1),
+  primary_color: experienceColorSchema.optional(),
+  secondary_color: experienceColorSchema.optional(),
+  logo_url: z.string().url().optional(),
+  description: z.string().optional(),
+});
+
+export const experienceTerminologySchema = strictObject({
+  customer: z.string().min(1),
+  resource: z.string().min(1),
+  booking: z.string().min(1),
+});
+
+export const experienceChannelsSchema = strictObject({
+  web_booking: z.boolean(),
+  web_chat: z.boolean(),
+  whatsapp: z.boolean(),
+});
+
+export const experiencePresetSummarySchema = strictObject({
+  preset_id: experiencePresetIdSchema,
+  name: z.string().min(1),
+  description: z.string().min(1),
+  resource_strategy: z.enum(["quantity", "assigned_resource", "hybrid"]),
+  terminology: experienceTerminologySchema,
+});
+
+export const listExperiencePresetsResponseSchema = strictObject({
+  presets: z.array(experiencePresetSummarySchema),
+});
+
+export const businessProfileResponseSchema = strictObject({
+  business_id: z.string().min(1),
+  tenant_id: z.string().min(1),
+  venue_id: z.string().min(1),
+  name: z.string().min(1),
+  public_slug: z.string().min(1),
+  preset_id: experiencePresetIdSchema,
+  status: z.enum(["draft", "published", "archived"]),
+});
+
+export const experienceConfigurationResponseSchema = strictObject({
+  configuration_id: z.string().min(1),
+  business_id: z.string().min(1),
+  version: z.number().int().positive(),
+  state: experienceConfigurationStateSchema,
+  preset_id: experiencePresetIdSchema,
+  branding: experienceBrandingSchema,
+  terminology: experienceTerminologySchema,
+  channels: experienceChannelsSchema,
+  updated_at: z.string().min(1),
+  published_at: z.string().min(1).optional(),
+});
+
+export const experienceDraftInputSchema = strictObject({
+  preset_id: experiencePresetIdSchema,
+  branding: experienceBrandingSchema,
+  terminology: experienceTerminologySchema,
+  channels: experienceChannelsSchema,
+});
+
+export const publishExperienceInputSchema = strictObject({
+  configuration_id: z.string().min(1),
+});
+
+export const experienceWorkspaceResponseSchema = strictObject({
+  profile: businessProfileResponseSchema,
+  draft: experienceConfigurationResponseSchema.optional(),
+  published: experienceConfigurationResponseSchema.optional(),
+});
+
+export const experienceValidationIssueSchema = strictObject({
+  path: z.string().min(1),
+  message: z.string().min(1),
+});
+
+export const experienceValidationResponseSchema = strictObject({
+  valid: z.boolean(),
+  issues: z.array(experienceValidationIssueSchema),
+});
+
+export const publicBusinessProfileResponseSchema = strictObject({
+  business_id: z.string().min(1),
+  name: z.string().min(1),
+  public_slug: z.string().min(1),
+  preset_id: experiencePresetIdSchema,
+});
+
+export const publicExperienceResponseSchema = strictObject({
+  profile: publicBusinessProfileResponseSchema,
+  configuration: experienceConfigurationResponseSchema.extend({
+    state: z.literal("published"),
+  }),
+});
+
 export const metadataResponseSchema = strictObject({
   api_version: z.string(),
   modules: z.array(z.string()),

@@ -1498,8 +1498,8 @@
       "type": "object"
     }
   },
-  "$id": "https://reservation-platform.local/contracts/json-schema/list-reservations-query.schema.json",
-  "$ref": "#/$defs/ListReservationsQuery",
+  "$id": "https://reservation-platform.local/contracts/json-schema/experience-configuration-state.schema.json",
+  "$ref": "#/$defs/ExperienceConfigurationState",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "ListReservationsQuery"
+  "title": "ExperienceConfigurationState"
 }

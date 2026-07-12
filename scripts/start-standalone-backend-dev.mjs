@@ -48,6 +48,8 @@ export function backendDevEnv(inputEnv = process.env, options = {}) {
     "http://127.0.0.1:4201",
     "http://localhost:4202",
     "http://127.0.0.1:4202",
+    "http://localhost:4203",
+    "http://127.0.0.1:4203",
     "http://localhost:4300",
     "http://127.0.0.1:4300",
     "http://localhost:4400",

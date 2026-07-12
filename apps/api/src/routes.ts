@@ -22,13 +22,19 @@ import {
   requireIdempotencyKey,
   requirePlatformBearerToken,
   getPlatformMetadata,
+  listExperiencePresets,
   listReservations,
+  publishExperienceDraft,
+  readExperienceWorkspace,
+  readPublicExperience,
   readReservationById,
   rescheduleReservationWithLegacyPatch,
+  saveExperienceDraft,
   updateReservationWithLegacyPatch,
   type AvailabilityRepositoryPort,
   type AuthenticatedPlatformPrincipal,
   type IdempotencyRepository,
+  type ExperienceStudioRepository,
   type PlatformCatalogRepository,
   type PlatformRequestContext,
   type PlatformTenantVenueRepository,
@@ -44,6 +50,8 @@ import {
   chatMessageInputSchema,
   createResourceMaintenanceInputSchema,
   endResourceMaintenanceInputSchema,
+  experienceDraftInputSchema,
+  publishExperienceInputSchema,
   type ChatConfirmReservationInput,
   type ChatCreateReservationSessionInput,
   type ChatMessageInput,
@@ -72,6 +80,7 @@ export interface StandaloneApiDependencies {
   catalogRepository?: PlatformCatalogRepository;
   chatModule?: StandaloneApiChatModule;
   idempotencyRepository?: IdempotencyRepository;
+  experienceStudioRepository?: ExperienceStudioRepository;
   reservationCreateRepository?: ReservationCreateRepositoryPort;
   reservationMutationRepository?: ReservationMutationRepositoryPort;
   reservationReadRepository?: ReservationReadRepositoryPort;
@@ -211,6 +220,8 @@ const reservationPattern = /^\/v1\/reservations\/([^/]+)$/;
 const reservationCancelPattern = /^\/v1\/reservations\/([^/]+)\/cancel$/;
 const reservationReschedulePattern = /^\/v1\/reservations\/([^/]+)\/reschedule$/;
 const resourceMaintenanceEndPattern = /^\/v1\/resource-maintenance\/([^/]+)\/end$/;
+const publicExperiencePattern = /^\/v1\/public\/experiences\/([^/]+)$/;
+const publicExperienceSlugPattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const reservationIdPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const standaloneHealthBody = {
   status: "ok",
@@ -247,6 +258,30 @@ export async function handleStandaloneApiRequest(
 
     if (request.internalPreflight === "auth-only") {
       return { status: 204, headers: {}, body: undefined };
+    }
+  }
+
+  if (method === "GET" && path === "/v1/experience/presets") {
+    const scopeResponse = requireExperienceScope(request);
+    return scopeResponse ?? jsonResponse(200, listExperiencePresets());
+  }
+
+  if (method === "GET" && path === "/v1/experience/workspace") {
+    return handleExperienceWorkspaceReadRequest(request, dependencies.experienceStudioRepository);
+  }
+
+  if (method === "PUT" && path === "/v1/experience/draft") {
+    return handleExperienceDraftSaveRequest(request, dependencies.experienceStudioRepository);
+  }
+
+  if (method === "POST" && path === "/v1/experience/publish") {
+    return handleExperienceDraftPublishRequest(request, dependencies.experienceStudioRepository);
+  }
+
+  if (method === "GET") {
+    const encodedSlug = publicExperiencePattern.exec(path)?.[1];
+    if (encodedSlug) {
+      return handlePublicExperienceReadRequest(encodedSlug, dependencies.experienceStudioRepository);
     }
   }
 
@@ -540,19 +575,132 @@ type RouteMatcher = string | RegExp | ((path: string) => boolean);
 
 const protectedRouteMetadata: Readonly<Record<string, readonly RouteMatcher[]>> = {
   GET: [
+    "/v1/experience/presets", "/v1/experience/workspace",
     "/v1/availability", "/v1/reservations", reservationPattern,
     "/v1/resource-maintenance", "/v1/venues", venuePattern,
     "/v1/services", servicePattern, "/v1/resources", resourcePattern,
     resourceLayoutPattern, isWhatsAppOwnerRoute,
   ],
   POST: [
+    "/v1/experience/publish",
     "/v1/reservations", reservationCancelPattern, reservationReschedulePattern,
     "/v1/resource-maintenance", resourceMaintenanceEndPattern,
     isChatReservationSessionRoute, isWhatsAppOwnerRoute,
   ],
   PATCH: [reservationPattern, isWhatsAppOwnerRoute],
+  PUT: ["/v1/experience/draft"],
   DELETE: [isWhatsAppOwnerRoute],
 };
+
+async function handleExperienceWorkspaceReadRequest(
+  request: StandaloneApiRequest,
+  repository: ExperienceStudioRepository | undefined,
+): Promise<StandaloneApiResponse> {
+  const scopeResult = readExperienceScope(request);
+  if (!scopeResult.ok) {
+    return scopeResult.response;
+  }
+  if (!repository) {
+    return experienceRepositoryUnavailable();
+  }
+  const result = await readExperienceWorkspace({ scope: scopeResult.scope, repository });
+  return jsonResponse(result.status, result.body);
+}
+
+async function handleExperienceDraftSaveRequest(
+  request: StandaloneApiRequest,
+  repository: ExperienceStudioRepository | undefined,
+): Promise<StandaloneApiResponse> {
+  const scopeResult = readExperienceScope(request);
+  if (!scopeResult.ok) {
+    return scopeResult.response;
+  }
+  const parsed = experienceDraftInputSchema.safeParse(request.body);
+  if (!parsed.success) {
+    return platformError(400, "validation_failed", "Invalid experience draft body.");
+  }
+  if (!repository) {
+    return experienceRepositoryUnavailable();
+  }
+  const result = await saveExperienceDraft({
+    scope: scopeResult.scope,
+    input: parsed.data,
+    repository,
+  });
+  return jsonResponse(result.status, result.body);
+}
+
+async function handleExperienceDraftPublishRequest(
+  request: StandaloneApiRequest,
+  repository: ExperienceStudioRepository | undefined,
+): Promise<StandaloneApiResponse> {
+  const scopeResult = readExperienceScope(request);
+  if (!scopeResult.ok) {
+    return scopeResult.response;
+  }
+  const parsed = publishExperienceInputSchema.safeParse(request.body);
+  if (!parsed.success) {
+    return platformError(400, "validation_failed", "Invalid experience publish body.");
+  }
+  if (!repository) {
+    return experienceRepositoryUnavailable();
+  }
+  const result = await publishExperienceDraft({
+    scope: scopeResult.scope,
+    configurationId: parsed.data.configuration_id,
+    repository,
+  });
+  return jsonResponse(result.status, result.body);
+}
+
+async function handlePublicExperienceReadRequest(
+  encodedSlug: string,
+  repository: ExperienceStudioRepository | undefined,
+): Promise<StandaloneApiResponse> {
+  let slug: string;
+  try {
+    slug = decodeURIComponent(encodedSlug);
+  } catch {
+    return platformError(400, "validation_failed", "Invalid experience slug.");
+  }
+  if (!publicExperienceSlugPattern.test(slug)) {
+    return platformError(400, "validation_failed", "Invalid experience slug.");
+  }
+  if (!repository) {
+    return experienceRepositoryUnavailable();
+  }
+  const result = await readPublicExperience({ slug, repository });
+  return jsonResponse(result.status, result.body);
+}
+
+function requireExperienceScope(request: StandaloneApiRequest): StandaloneApiResponse | undefined {
+  const result = readExperienceScope(request);
+  return result.ok ? undefined : result.response;
+}
+
+function readExperienceScope(request: StandaloneApiRequest):
+  | { ok: true; scope: { tenantId: string; venueId: string } }
+  | { ok: false; response: StandaloneApiResponse } {
+  const context = readPlatformRequestContext(request.headers ?? {});
+  if (!context.tenantId?.trim() || !context.venueId?.trim()) {
+    return {
+      ok: false,
+      response: platformError(
+        400,
+        "validation_failed",
+        "X-Reservation-Tenant-Id and X-Reservation-Venue-Id are required.",
+      ),
+    };
+  }
+  return {
+    ok: true,
+    scope: { tenantId: context.tenantId.trim(), venueId: context.venueId.trim() },
+  };
+}
+
+function experienceRepositoryUnavailable() {
+  return platformError(503, "bad_request", "Experience Studio repository is not configured.");
+}
 
 function isProtectedPlatformDataRoute(method: string, path: string) {
   return (protectedRouteMetadata[method] ?? []).some((matcher) => {

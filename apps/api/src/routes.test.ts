@@ -16,7 +16,11 @@ import {
   reservationResponseSchema,
   resourceMaintenanceResponseSchema,
   type AvailabilityResponse,
+  type BusinessProfileResponse,
+  type ExperienceConfigurationResponse,
+  type ExperienceWorkspaceResponse,
   type PlatformErrorResponse,
+  type PublicExperienceResponse,
 } from "@reservation-platform/contract-types";
 import { createAssignedResourcePolicy, type ReservationService } from "@project-play/reservations-core";
 import type {
@@ -25,6 +29,7 @@ import type {
   IdempotencyCommitRecord,
   IdempotencyRecord,
   IdempotencyRepository,
+  ExperienceStudioRepository,
   PlatformCatalogRepository,
   PlatformTenantVenueRepository,
   ReservationCreateRepositoryPort,
@@ -62,6 +67,122 @@ const standaloneHealthBody = {
   api_version: "v1",
   readiness: "alive",
 };
+
+function experienceWorkspaceFixture(): ExperienceWorkspaceResponse {
+  const profile: BusinessProfileResponse = {
+    business_id: "business_1",
+    tenant_id: "tenant_1",
+    venue_id: "venue_1",
+    name: "Apex Racing",
+    public_slug: "apex-racing",
+    preset_id: "racing_gaming",
+    status: "published",
+  };
+  const published: ExperienceConfigurationResponse = {
+    configuration_id: "configuration_1",
+    business_id: "business_1",
+    version: 1,
+    state: "published",
+    preset_id: "racing_gaming",
+    branding: { brand_name: "Apex Racing" },
+    terminology: { customer: "Driver", resource: "Simulator", booking: "Session" },
+    channels: { web_booking: true, web_chat: false, whatsapp: false },
+    updated_at: "2026-07-13T00:00:00.000Z",
+    published_at: "2026-07-13T00:00:00.000Z",
+  };
+  return {
+    profile,
+    draft: { ...published, configuration_id: "draft_1", version: 2, state: "draft", published_at: undefined },
+    published,
+  };
+}
+
+function fakeExperienceRepository(
+  overrides: Partial<ExperienceStudioRepository> = {},
+): ExperienceStudioRepository {
+  return {
+    readWorkspace: async () => experienceWorkspaceFixture(),
+    saveDraft: async () => experienceWorkspaceFixture(),
+    publishDraft: async () => experienceWorkspaceFixture(),
+    readPublishedBySlug: async () => ({
+      profile: experienceWorkspaceFixture().profile,
+      configuration: experienceWorkspaceFixture().published!,
+    }),
+    ...overrides,
+  };
+}
+
+test("owner experience routes require auth and tenant venue context", async () => {
+  const unauthorized = await handleStandaloneApiRequest({
+    method: "GET",
+    path: "/v1/experience/workspace",
+    headers: {},
+  }, {
+    serviceApiKey: "secret",
+    experienceStudioRepository: fakeExperienceRepository(),
+  });
+  assert.equal(unauthorized.status, 401);
+
+  const missingVenue = await handleStandaloneApiRequest({
+    method: "GET",
+    path: "/v1/experience/workspace",
+    headers: {
+      authorization: "Bearer secret",
+      "x-reservation-tenant-id": "tenant_1",
+    },
+  }, {
+    serviceApiKey: "secret",
+    experienceStudioRepository: fakeExperienceRepository(),
+  });
+  assert.equal(missingVenue.status, 400);
+});
+
+test("public experience route does not require owner auth", async () => {
+  const response = await handleStandaloneApiRequest({
+    method: "GET",
+    path: "/v1/public/experiences/apex-racing",
+    headers: {},
+  }, {
+    serviceApiKey: "secret",
+    experienceStudioRepository: fakeExperienceRepository(),
+  });
+
+  assert.equal(response.status, 200);
+  assert.equal((response.body as PublicExperienceResponse).profile.public_slug, "apex-racing");
+});
+
+test("experience draft route validates strict request bodies", async () => {
+  const response = await handleStandaloneApiRequest({
+    method: "PUT",
+    path: "/v1/experience/draft",
+    headers: {
+      authorization: "Bearer secret",
+      "x-reservation-tenant-id": "tenant_1",
+      "x-reservation-venue-id": "venue_1",
+    },
+    body: { preset_id: "unknown" },
+  }, {
+    serviceApiKey: "secret",
+    experienceStudioRepository: fakeExperienceRepository(),
+  });
+
+  assert.equal(response.status, 400);
+  assert.equal((response.body as PlatformErrorResponse).error.code, "validation_failed");
+});
+
+test("experience routes report invalid slugs and missing repositories", async () => {
+  const invalidSlug = await handleStandaloneApiRequest({
+    method: "GET",
+    path: "/v1/public/experiences/Invalid%20Slug",
+  }, { experienceStudioRepository: fakeExperienceRepository() });
+  assert.equal(invalidSlug.status, 400);
+
+  const missingRepository = await handleStandaloneApiRequest({
+    method: "GET",
+    path: "/v1/public/experiences/apex-racing",
+  });
+  assert.equal(missingRepository.status, 503);
+});
 
 function fakeWhatsAppModule(
   overrides: Partial<StandaloneApiWhatsAppModule> = {},

@@ -18,6 +18,7 @@ import {
 } from "@reservation-platform/api";
 import {
   createSupabaseAvailabilityRepository,
+  createSupabaseExperienceStudioRepository,
   createSupabaseIdempotencyRepository,
   createSupabasePlatformCatalogRepository,
   createSupabaseReservationMutationRepository,
@@ -25,6 +26,7 @@ import {
   createSupabaseReservationRepository,
   createSupabaseResourceMaintenanceRepository,
   createSupabaseTenantVenueRepository,
+  type ExperienceSupabaseLikeClient,
 } from "@project-play/reservations-supabase";
 import {
   BaileysWhatsAppSessionAdapter,
@@ -143,6 +145,7 @@ export interface StandaloneSupabaseRepositoryFactories {
   createReservationMutationRepository(client: StandaloneSupabaseClient): NonNullable<StandaloneApiDependencies["reservationMutationRepository"]>;
   createResourceMaintenanceRepository(client: StandaloneSupabaseClient): NonNullable<StandaloneApiDependencies["resourceMaintenanceRepository"]>;
   createIdempotencyRepository(client: StandaloneSupabaseClient): NonNullable<StandaloneApiDependencies["idempotencyRepository"]>;
+  createExperienceStudioRepository(client: StandaloneSupabaseClient): NonNullable<StandaloneApiDependencies["experienceStudioRepository"]>;
   createTenantVenueRepository(client: StandaloneSupabaseClient): NonNullable<StandaloneApiDependencies["tenantVenueRepository"]>;
 }
 
@@ -183,6 +186,9 @@ const defaultRepositoryFactories: StandaloneSupabaseRepositoryFactories = {
   createReservationMutationRepository: createSupabaseReservationMutationRepository,
   createResourceMaintenanceRepository: createSupabaseResourceMaintenanceRepository,
   createIdempotencyRepository: createSupabaseIdempotencyRepository,
+  createExperienceStudioRepository: (client) => createSupabaseExperienceStudioRepository(
+    client as unknown as ExperienceSupabaseLikeClient,
+  ),
   createTenantVenueRepository: createSupabaseTenantVenueRepository,
 };
 
@@ -221,6 +227,7 @@ export function createStandaloneSupabaseDependencies(
         reservationMutationRepository: repositoryFactories.createReservationMutationRepository(adminClient),
         resourceMaintenanceRepository: repositoryFactories.createResourceMaintenanceRepository(adminClient),
         idempotencyRepository: repositoryFactories.createIdempotencyRepository(adminClient),
+        experienceStudioRepository: repositoryFactories.createExperienceStudioRepository(adminClient),
         tenantVenueRepository: repositoryFactories.createTenantVenueRepository(adminClient),
       }
     : {};

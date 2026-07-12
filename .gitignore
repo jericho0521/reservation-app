@@ -19,6 +19,7 @@
 /.next/
 examples/**/.next/
 /out/
+/output/
 
 # production
 /build

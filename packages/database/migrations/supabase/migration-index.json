@@ -117,6 +117,14 @@
       "scope": "reservation-platform",
       "sha256": "dff0ae01e938597cf46b5900cdc097fe664e362edae0299cf002ebfa509752a9",
       "bytes": 3134
+    },
+    {
+      "order": 15,
+      "path": "packages/database/migrations/supabase/000015_experience_studio_foundation.sql",
+      "module": "core",
+      "scope": "reservation-platform",
+      "sha256": "3f691343726ab69b64255c9242f898b67fbf68ca14862cd6dfbfd7359c7af2c8",
+      "bytes": 6618
     }
   ],
   "optionalMigrations": [

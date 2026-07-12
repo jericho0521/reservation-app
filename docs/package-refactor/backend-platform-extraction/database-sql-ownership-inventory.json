@@ -157,6 +157,16 @@
       "notes": [
         "Backend-owned WhatsApp conversation automation state for staff takeover and explicit automation resume."
       ]
+    },
+    {
+      "path": "packages/database/migrations/supabase/000015_experience_studio_foundation.sql",
+      "classification": "core-platform",
+      "intendedBackendDestination": [
+        "packages/database/migrations/supabase/000015_experience_studio_foundation.sql"
+      ],
+      "notes": [
+        "Backend-owned Experience Studio tenancy compatibility, business profile, versioned configuration, and atomic publication foundation."
+      ]
     }
   ]
 }

@@ -31,6 +31,7 @@ const expectedCoreTargets = [
   "packages/database/migrations/supabase/000012_whatsapp_business_agent.sql",
   "packages/database/migrations/supabase/000013_whatsapp_staff_takeover.sql",
   "packages/database/migrations/supabase/000014_availability_snapshot_rpc.sql",
+  "packages/database/migrations/supabase/000015_experience_studio_foundation.sql",
 ];
 
 const optionalAiPrefix = "packages/database/migrations/supabase/optional/ai-retrieval/";

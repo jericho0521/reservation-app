@@ -6,6 +6,7 @@ import { analyticsDateRange, demandChartPoints, percent } from "./analytics-view
 test("analytics date range preserves valid filters and falls back to the latest 30 days", () => {
   assert.deepEqual(analyticsDateRange({ from: "2026-08-01", to: "2026-08-05" }), { from: "2026-08-01", to: "2026-08-05" });
   assert.deepEqual(analyticsDateRange({ from: "bad", to: "2026-08-05" }, new Date("2026-08-31T12:00:00Z")), { from: "2026-08-02", to: "2026-08-31" });
+  assert.deepEqual(analyticsDateRange({}, new Date(2026, 6, 13, 0, 30)), { from: "2026-06-14", to: "2026-07-13" });
 });
 
 test("demand chart handles no data and one data point without invalid coordinates", () => {

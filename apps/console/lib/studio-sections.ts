@@ -64,6 +64,29 @@ export function calculateStudioProgress(input: {
   };
 }
 
+export function calculateWorkspaceStudioProgress(input: {
+  hasDraft: boolean;
+  hasPublished: boolean;
+  validation: ExperienceValidationResponse;
+}) {
+  if (input.hasPublished && !input.hasDraft) {
+    return calculateStudioProgress({
+      savedSections: studioSections.map((section) => section.id),
+      validation: { valid: true, issues: [] },
+    });
+  }
+
+  const savedSections: StudioSectionId[] = ["preset", "profile"];
+  if (input.hasDraft) savedSections.push("branding");
+  for (const section of ["services", "resources", "availability", "knowledge"] as const) {
+    if (!input.validation.issues.some((issue) => (
+      issue.path.startsWith(section) || (section === "knowledge" && issue.path.startsWith("channels"))
+    ))) savedSections.push(section);
+  }
+  if (input.validation.valid || input.hasPublished) savedSections.push("publish");
+  return calculateStudioProgress({ savedSections, validation: input.validation });
+}
+
 export function sectionForValidationPath(path: string): StudioSectionId {
   if (path.startsWith("preset")) return "preset";
   if (path.startsWith("profile")) return "profile";

@@ -3,12 +3,12 @@ import { StudioNavigation } from "../../components/studio/studio-navigation";
 import { StudioProgress } from "../../components/studio/studio-progress";
 import { createConsolePlatformClient } from "../../lib/platform-client";
 import {
-  calculateStudioProgress,
-  type StudioSectionId,
+  calculateWorkspaceStudioProgress,
 } from "../../lib/studio-sections";
 
 export default async function StudioLayout({ children }: { children: ReactNode }) {
-  const savedSections: StudioSectionId[] = [];
+  let hasDraft = false;
+  let hasPublished = false;
   let validation = { valid: false, issues: [{ path: "publish.draft", message: "Workspace unavailable." }] };
   try {
     const client = createConsolePlatformClient();
@@ -17,19 +17,14 @@ export default async function StudioLayout({ children }: { children: ReactNode }
       client.validateExperienceWorkspace(),
     ]);
     validation = result;
-    savedSections.push("preset", "profile");
-    if (workspace.draft) savedSections.push("branding");
-    for (const section of ["services", "resources", "availability", "knowledge"] as const) {
-      if (!validation.issues.some((issue) => (
-        issue.path.startsWith(section) || (section === "knowledge" && issue.path.startsWith("channels"))
-      ))) savedSections.push(section);
-    }
-    if (validation.valid || workspace.published) savedSections.push("publish");
+    hasDraft = Boolean(workspace.draft);
+    hasPublished = Boolean(workspace.published);
   } catch {
     // The page-level SetupError retains the actionable configuration message.
   }
-  const progress = calculateStudioProgress({
-    savedSections,
+  const progress = calculateWorkspaceStudioProgress({
+    hasDraft,
+    hasPublished,
     validation,
   });
 

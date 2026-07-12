@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   calculateStudioProgress,
+  calculateWorkspaceStudioProgress,
   getStudioSectionHref,
   sectionForValidationPath,
   studioSections,
@@ -45,6 +46,16 @@ test("a valid fully saved Studio reports complete progress", () => {
   });
 
   assert.equal(progress.completed, 8);
+  assert.equal(progress.percent, 100);
+  assert.equal(Object.values(progress.sections).every((status) => status === "complete"), true);
+});
+
+test("a published workspace without a pending draft remains complete", () => {
+  const progress = calculateWorkspaceStudioProgress({
+    hasDraft: false,
+    hasPublished: true,
+    validation: { valid: false, issues: [{ path: "publish.draft", message: "Save a draft before publishing." }] },
+  });
   assert.equal(progress.percent, 100);
   assert.equal(Object.values(progress.sections).every((status) => status === "complete"), true);
 });

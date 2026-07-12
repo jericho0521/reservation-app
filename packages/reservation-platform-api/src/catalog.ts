@@ -1,4 +1,7 @@
 import type {
+  ArchiveCatalogItemInput,
+  ExperienceResourceInput,
+  ExperienceServiceInput,
   ListResourcesResponse,
   ListServicesResponse,
   ListVenuesResponse,
@@ -8,6 +11,12 @@ import type {
   ServiceResponse,
   VenueResponse,
 } from "@reservation-platform/contract-types";
+import {
+  archiveCatalogItemInputSchema,
+  experienceResourceInputSchema,
+  experienceServiceInputSchema,
+} from "@reservation-platform/contract-types";
+import type { ExperienceScope } from "./experience-studio.js";
 import { platformErrorBody } from "./errors.js";
 import {
   toPlatformResource,
@@ -32,11 +41,17 @@ export type CatalogListResult<T> = {
 export type PlatformCatalogRepository = {
   listVenues(): Promise<CatalogListResult<unknown>>;
   getVenue(id: string): Promise<CatalogReadResult<unknown>>;
-  listServices(): Promise<CatalogListResult<unknown>>;
+  listServices(input?: { venueId?: string | null; includeInactive?: boolean }): Promise<CatalogListResult<unknown>>;
   getService(id: string): Promise<CatalogReadResult<unknown>>;
-  listResources(input?: { serviceId?: string | null }): Promise<CatalogListResult<unknown>>;
+  listResources(input?: { serviceId?: string | null; venueId?: string | null; includeInactive?: boolean }): Promise<CatalogListResult<unknown>>;
   getResource(id: string): Promise<CatalogReadResult<unknown>>;
   getResourceLayout(id: string): Promise<CatalogReadResult<unknown>>;
+  createService?(scope: ExperienceScope, input: ExperienceServiceInput): Promise<CatalogReadResult<unknown>>;
+  updateService?(scope: ExperienceScope, id: string, input: ExperienceServiceInput): Promise<CatalogReadResult<unknown>>;
+  archiveService?(scope: ExperienceScope, id: string, input: ArchiveCatalogItemInput): Promise<CatalogReadResult<unknown>>;
+  createResource?(scope: ExperienceScope, input: ExperienceResourceInput): Promise<CatalogReadResult<unknown>>;
+  updateResource?(scope: ExperienceScope, id: string, input: ExperienceResourceInput): Promise<CatalogReadResult<unknown>>;
+  archiveResource?(scope: ExperienceScope, id: string, input: ArchiveCatalogItemInput): Promise<CatalogReadResult<unknown>>;
 };
 
 export type PlatformCatalogResult<T> = {
@@ -127,9 +142,10 @@ export async function getPlatformVenue(
 
 export async function listPlatformServices(
   repository: Pick<PlatformCatalogRepository, "listServices">,
+  input?: { venueId?: string | null; includeInactive?: boolean },
 ): Promise<PlatformCatalogResult<ListServicesResponse>> {
   const repositoryResult = await readCatalogRepository(
-    () => repository.listServices(),
+    () => repository.listServices(input),
     { failureMessage: "Failed to fetch services." },
   );
   if (!repositoryResult.ok) {
@@ -137,6 +153,165 @@ export async function listPlatformServices(
   }
   const { data } = repositoryResult.result;
   return { body: toPlatformServicesResponse(data), status: 200 };
+}
+
+export async function createPlatformService(input: {
+  scope: ExperienceScope;
+  value: ExperienceServiceInput;
+  repository: PlatformCatalogRepository;
+}): Promise<PlatformCatalogResult<ServiceResponse>> {
+  const parsed = experienceServiceInputSchema.safeParse(input.value);
+  return runCatalogMutation({
+    scope: input.scope,
+    parsed,
+    operation: input.repository.createService,
+    invoke: (operation, scope, value) => operation(scope, value),
+    map: toPlatformService,
+    unavailable: "Service mutation repository is not configured.",
+    failure: "Failed to create service.",
+    successStatus: 201,
+  });
+}
+
+export async function updatePlatformService(input: {
+  scope: ExperienceScope;
+  serviceId: string;
+  value: ExperienceServiceInput;
+  repository: PlatformCatalogRepository;
+}): Promise<PlatformCatalogResult<ServiceResponse>> {
+  const parsed = experienceServiceInputSchema.safeParse(input.value);
+  return runCatalogMutation({
+    scope: input.scope,
+    id: input.serviceId,
+    parsed,
+    operation: input.repository.updateService,
+    invoke: (operation, scope, value, id) => operation(scope, id!, value),
+    map: toPlatformService,
+    unavailable: "Service mutation repository is not configured.",
+    failure: "Failed to update service.",
+  });
+}
+
+export async function archivePlatformService(input: {
+  scope: ExperienceScope;
+  serviceId: string;
+  value: ArchiveCatalogItemInput;
+  repository: PlatformCatalogRepository;
+}): Promise<PlatformCatalogResult<ServiceResponse>> {
+  const parsed = archiveCatalogItemInputSchema.safeParse(input.value);
+  return runCatalogMutation({
+    scope: input.scope,
+    id: input.serviceId,
+    parsed,
+    operation: input.repository.archiveService,
+    invoke: (operation, scope, value, id) => operation(scope, id!, value),
+    map: toPlatformService,
+    unavailable: "Service mutation repository is not configured.",
+    failure: "Failed to archive service.",
+  });
+}
+
+export async function createPlatformResource(input: {
+  scope: ExperienceScope;
+  value: ExperienceResourceInput;
+  repository: PlatformCatalogRepository;
+}): Promise<PlatformCatalogResult<ResourceResponse>> {
+  const parsed = experienceResourceInputSchema.safeParse(input.value);
+  return runCatalogMutation({
+    scope: input.scope,
+    parsed,
+    operation: input.repository.createResource,
+    invoke: (operation, scope, value) => operation(scope, value),
+    map: toPlatformResource,
+    unavailable: "Resource mutation repository is not configured.",
+    failure: "Failed to create resource.",
+    successStatus: 201,
+  });
+}
+
+export async function updatePlatformResource(input: {
+  scope: ExperienceScope;
+  resourceId: string;
+  value: ExperienceResourceInput;
+  repository: PlatformCatalogRepository;
+}): Promise<PlatformCatalogResult<ResourceResponse>> {
+  const parsed = experienceResourceInputSchema.safeParse(input.value);
+  return runCatalogMutation({
+    scope: input.scope,
+    id: input.resourceId,
+    parsed,
+    operation: input.repository.updateResource,
+    invoke: (operation, scope, value, id) => operation(scope, id!, value),
+    map: toPlatformResource,
+    unavailable: "Resource mutation repository is not configured.",
+    failure: "Failed to update resource.",
+  });
+}
+
+export async function archivePlatformResource(input: {
+  scope: ExperienceScope;
+  resourceId: string;
+  value: ArchiveCatalogItemInput;
+  repository: PlatformCatalogRepository;
+}): Promise<PlatformCatalogResult<ResourceResponse>> {
+  const parsed = archiveCatalogItemInputSchema.safeParse(input.value);
+  return runCatalogMutation({
+    scope: input.scope,
+    id: input.resourceId,
+    parsed,
+    operation: input.repository.archiveResource,
+    invoke: (operation, scope, value, id) => operation(scope, id!, value),
+    map: toPlatformResource,
+    unavailable: "Resource mutation repository is not configured.",
+    failure: "Failed to archive resource.",
+  });
+}
+
+async function runCatalogMutation<TValue, TResponse, TOperation>(
+  input: {
+    scope: ExperienceScope;
+    id?: string;
+    parsed: { success: true; data: TValue } | { success: false };
+    operation: TOperation | undefined;
+    invoke: (operation: TOperation, scope: ExperienceScope, value: TValue, id?: string) => Promise<CatalogReadResult<unknown>>;
+    map: (row: unknown) => TResponse;
+    unavailable: string;
+    failure: string;
+    successStatus?: number;
+  },
+): Promise<PlatformCatalogResult<TResponse>> {
+  const scope = {
+    tenantId: input.scope.tenantId.trim(),
+    venueId: input.scope.venueId.trim(),
+  };
+  if (!scope.tenantId || !scope.venueId || (input.id !== undefined && !input.id.trim())) {
+    return catalogFailure("validation_failed", "Tenant, venue, and item identifiers are required.", 400);
+  }
+  if (!input.parsed.success) {
+    return catalogFailure("validation_failed", "Catalog input is invalid.", 400);
+  }
+  if (!input.operation) {
+    return catalogFailure("bad_request", input.unavailable, 503);
+  }
+
+  try {
+    const result = await input.invoke(input.operation, scope, input.parsed.data, input.id?.trim());
+    if (result.error) {
+      return catalogStorageFailure(result.error, {
+        failureMessage: input.failure,
+        notFoundMessage: "Catalog item not found.",
+      });
+    }
+    if (!result.data) {
+      return catalogFailure("not_found", "Catalog item not found.", 404);
+    }
+    return { status: input.successStatus ?? 200, body: input.map(result.data) };
+  } catch (error) {
+    return catalogStorageFailure(error, {
+      failureMessage: input.failure,
+      notFoundMessage: "Catalog item not found.",
+    });
+  }
 }
 
 export async function getPlatformService(
@@ -162,7 +337,7 @@ export async function getPlatformService(
 
 export async function listPlatformResources(
   repository: Pick<PlatformCatalogRepository, "listResources">,
-  input?: { serviceId?: string | null },
+  input?: { serviceId?: string | null; venueId?: string | null; includeInactive?: boolean },
 ): Promise<PlatformCatalogResult<ListResourcesResponse>> {
   const repositoryResult = await readCatalogRepository(
     () => repository.listResources(input),
@@ -297,7 +472,11 @@ function readPlatformCatalogAction(
   }
 
   if (path === "/v1/services") {
-    return (repository) => listPlatformServices(repository);
+    const searchParams = readCatalogSearchParams(url);
+    return (repository) => listPlatformServices(repository, {
+      venueId: searchParams.get("venue_id"),
+      includeInactive: searchParams.get("include_inactive") === "true",
+    });
   }
 
   const serviceId = servicePathPattern.exec(path)?.[1];
@@ -306,8 +485,11 @@ function readPlatformCatalogAction(
   }
 
   if (path === "/v1/resources") {
-    const serviceFilter = readCatalogSearchParams(url).get("service_id");
-    return (repository) => listPlatformResources(repository, { serviceId: serviceFilter });
+    const searchParams = readCatalogSearchParams(url);
+    return (repository) => listPlatformResources(repository, {
+      serviceId: searchParams.get("service_id"),
+      includeInactive: searchParams.get("include_inactive") === "true",
+    });
   }
 
   const resourceId = resourcePathPattern.exec(path)?.[1];

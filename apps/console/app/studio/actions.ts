@@ -22,6 +22,58 @@ export async function saveBrandingAction(
   return updateIdentityFromForm(formData, "branding");
 }
 
+export async function saveServiceAction(_previous: StudioActionState, formData: FormData): Promise<StudioActionState> {
+  try {
+    const client = createConsolePlatformClient();
+    const serviceId = String(formData.get("service_id") ?? "").trim();
+    const value = {
+      name: requiredField(formData, "name"),
+      description: String(formData.get("description") ?? "").trim() || undefined,
+      duration_minutes: positiveInteger(formData, "duration_minutes"),
+      total_quantity: positiveInteger(formData, "total_quantity"),
+      resource_kind: requiredField(formData, "resource_kind") as "seat" | "station" | "room" | "court" | "screening" | "capacity_bucket" | "custom",
+      resource_strategy: requiredField(formData, "resource_strategy") as "quantity" | "assigned_resource" | "hybrid",
+    };
+    if (serviceId) await client.updateExperienceService(serviceId, value);
+    else await client.createExperienceService(value);
+    revalidatePath("/studio/services");
+    return { status: "success", message: serviceId ? "Service updated." : "Service created." };
+  } catch (error) { return actionError(error, "The service could not be saved."); }
+}
+
+export async function archiveServiceAction(formData: FormData) {
+  const serviceId = requiredField(formData, "service_id");
+  await createConsolePlatformClient().archiveExperienceService(serviceId, {
+    reason: String(formData.get("reason") ?? "Archived by owner").trim(),
+  });
+  revalidatePath("/studio/services");
+}
+
+export async function saveResourceAction(_previous: StudioActionState, formData: FormData): Promise<StudioActionState> {
+  try {
+    const client = createConsolePlatformClient();
+    const resourceId = String(formData.get("resource_id") ?? "").trim();
+    const value = {
+      service_id: requiredField(formData, "service_id"),
+      label: requiredField(formData, "label"),
+      kind: requiredField(formData, "kind") as "seat" | "station" | "room" | "court" | "screening" | "capacity_bucket" | "custom",
+      capacity: positiveInteger(formData, "capacity"),
+    };
+    if (resourceId) await client.updateExperienceResource(resourceId, value);
+    else await client.createExperienceResource(value);
+    revalidatePath("/studio/resources");
+    return { status: "success", message: resourceId ? "Resource updated." : "Resource created." };
+  } catch (error) { return actionError(error, "The resource could not be saved."); }
+}
+
+export async function archiveResourceAction(formData: FormData) {
+  const resourceId = requiredField(formData, "resource_id");
+  await createConsolePlatformClient().archiveExperienceResource(resourceId, {
+    reason: String(formData.get("reason") ?? "Archived by owner").trim(),
+  });
+  revalidatePath("/studio/resources");
+}
+
 async function updateIdentityFromForm(formData: FormData, source: "profile" | "branding") {
   try {
     const client = createConsolePlatformClient();
@@ -80,4 +132,19 @@ function requiredField(formData: FormData, name: string) {
 function optionalField(formData: FormData, name: string, key: string) {
   const value = String(formData.get(name) ?? "").trim();
   return value ? { [key]: value } : {};
+}
+
+function positiveInteger(formData: FormData, name: string) {
+  const value = Number(requiredField(formData, name));
+  if (!Number.isInteger(value) || value <= 0) throw new Error(`${name.replaceAll("_", " ")} must be a positive integer.`);
+  return value;
+}
+
+function actionError(error: unknown, fallback: string): StudioActionState {
+  return {
+    status: "error",
+    message: error instanceof Error && /required|invalid|positive|conflict/iu.test(error.message)
+      ? error.message
+      : fallback,
+  };
 }

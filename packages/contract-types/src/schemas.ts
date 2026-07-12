@@ -212,6 +212,7 @@ export const serviceResponseSchema = strictObject({
   service_id: z.string(),
   venue_id: z.string().optional(),
   name: z.string(),
+  is_active: z.boolean().optional(),
   description: z.string().optional(),
   duration_minutes: z.number().int().positive().optional(),
   total_quantity: z.number().int().nonnegative().optional(),
@@ -221,6 +222,26 @@ export const serviceResponseSchema = strictObject({
   resources: z.array(resourceResponseSchema).optional(),
   layout: z.lazy(() => resourceLayoutResponseSchema).optional(),
   metadata: metadataRecordSchema.optional(),
+});
+
+export const experienceServiceInputSchema = strictObject({
+  name: z.string().trim().min(1).max(120),
+  description: z.string().trim().max(1000).optional(),
+  duration_minutes: z.number().int().positive().max(1440),
+  total_quantity: z.number().int().positive().max(10000),
+  resource_kind: resourceKindSchema,
+  resource_strategy: z.enum(["quantity", "assigned_resource", "hybrid"]),
+});
+
+export const experienceResourceInputSchema = strictObject({
+  service_id: z.string().min(1),
+  label: z.string().trim().min(1).max(120),
+  kind: resourceKindSchema,
+  capacity: z.number().int().positive().max(10000),
+});
+
+export const archiveCatalogItemInputSchema = strictObject({
+  reason: z.string().trim().max(500).optional(),
 });
 
 export const listServicesResponseSchema = strictObject({

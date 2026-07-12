@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   handlePlatformCatalogRequest,
+  archivePlatformService,
+  createPlatformResource,
   getPlatformResourceLayout,
   getPlatformResource,
   getPlatformService,
@@ -41,6 +43,35 @@ test("catalog service maps venue list rows into platform responses", async () =>
       metadata: undefined,
     }],
   });
+});
+
+test("catalog mutations validate before repository work and map archived services", async () => {
+  let created = false;
+  const invalid = await createPlatformResource({
+    scope: { tenantId: "tenant_1", venueId: "venue_1" },
+    value: { service_id: "service_1", label: "", kind: "station", capacity: 1 },
+    repository: repository({
+      createResource: async () => { created = true; return { data: null }; },
+    }),
+  });
+  assert.equal(invalid.status, 400);
+  assert.equal(created, false);
+
+  const archived = await archivePlatformService({
+    scope: { tenantId: "tenant_1", venueId: "venue_1" },
+    serviceId: "service_1",
+    value: { reason: "Season ended" },
+    repository: repository({
+      archiveService: async () => ({ data: {
+        id: "service_1",
+        name: "Racing session",
+        total_seats: 8,
+        metadata: { is_active: false },
+      } }),
+    }),
+  });
+  assert.equal(archived.status, 200);
+  assert.equal("service_id" in archived.body && archived.body.is_active, false);
 });
 
 test("catalog request dispatcher routes list requests through repository ports", async () => {

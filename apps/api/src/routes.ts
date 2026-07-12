@@ -1,9 +1,13 @@
 import {
   authorizePlatformContext,
+  archivePlatformResource,
+  archivePlatformService,
   beginIdempotentMutation,
   cancelReservation,
   commitIdempotentMutation,
   createJsonRequestFingerprint,
+  createPlatformResource,
+  createPlatformService,
   createReservation,
   createResourceMaintenance,
   endResourceMaintenance,
@@ -23,6 +27,8 @@ import {
   requirePlatformBearerToken,
   getPlatformMetadata,
   listExperiencePresets,
+  listPlatformResources,
+  listPlatformServices,
   listReservations,
   publishExperienceDraft,
   readExperienceWorkspace,
@@ -31,6 +37,8 @@ import {
   rescheduleReservationWithLegacyPatch,
   saveExperienceDraft,
   updateExperienceIdentity,
+  updatePlatformResource,
+  updatePlatformService,
   updateReservationWithLegacyPatch,
   type AvailabilityRepositoryPort,
   type AuthenticatedPlatformPrincipal,
@@ -53,6 +61,9 @@ import {
   endResourceMaintenanceInputSchema,
   experienceDraftInputSchema,
   experienceIdentityInputSchema,
+  experienceResourceInputSchema,
+  experienceServiceInputSchema,
+  archiveCatalogItemInputSchema,
   publishExperienceInputSchema,
   type ChatConfirmReservationInput,
   type ChatCreateReservationSessionInput,
@@ -224,6 +235,10 @@ const reservationReschedulePattern = /^\/v1\/reservations\/([^/]+)\/reschedule$/
 const resourceMaintenanceEndPattern = /^\/v1\/resource-maintenance\/([^/]+)\/end$/;
 const publicExperiencePattern = /^\/v1\/public\/experiences\/([^/]+)$/;
 const publicExperienceSlugPattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+const experienceServicePattern = /^\/v1\/experience\/services\/([^/]+)$/;
+const experienceServiceArchivePattern = /^\/v1\/experience\/services\/([^/]+)\/archive$/;
+const experienceResourcePattern = /^\/v1\/experience\/resources\/([^/]+)$/;
+const experienceResourceArchivePattern = /^\/v1\/experience\/resources\/([^/]+)\/archive$/;
 const reservationIdPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const standaloneHealthBody = {
   status: "ok",
@@ -282,6 +297,46 @@ export async function handleStandaloneApiRequest(
 
   if (method === "PATCH" && path === "/v1/experience/identity") {
     return handleExperienceIdentityUpdateRequest(request, dependencies.experienceStudioRepository);
+  }
+
+  if (method === "POST" && path === "/v1/experience/services") {
+    return handleExperienceServiceCreateRequest(request, dependencies.catalogRepository);
+  }
+  if (method === "GET" && path === "/v1/experience/services") {
+    const scoped = readExperienceScope(request);
+    if (!scoped.ok) return scoped.response;
+    if (!dependencies.catalogRepository) return platformError(503, "bad_request", "Catalog repository is not configured.");
+    const result = await listPlatformServices(dependencies.catalogRepository, {
+      venueId: scoped.scope.venueId,
+      includeInactive: true,
+    });
+    return jsonResponse(result.status, result.body);
+  }
+  if (method === "GET" && path === "/v1/experience/resources") {
+    const scoped = readExperienceScope(request);
+    if (!scoped.ok) return scoped.response;
+    if (!dependencies.catalogRepository) return platformError(503, "bad_request", "Catalog repository is not configured.");
+    const result = await listPlatformResources(dependencies.catalogRepository, {
+      venueId: scoped.scope.venueId,
+      serviceId: url.searchParams.get("service_id"),
+      includeInactive: true,
+    });
+    return jsonResponse(result.status, result.body);
+  }
+  if (method === "POST" && path === "/v1/experience/resources") {
+    return handleExperienceResourceCreateRequest(request, dependencies.catalogRepository);
+  }
+  if (method === "PUT") {
+    const serviceId = experienceServicePattern.exec(path)?.[1];
+    if (serviceId) return handleExperienceServiceUpdateRequest(request, decodeURIComponent(serviceId), dependencies.catalogRepository);
+    const resourceId = experienceResourcePattern.exec(path)?.[1];
+    if (resourceId) return handleExperienceResourceUpdateRequest(request, decodeURIComponent(resourceId), dependencies.catalogRepository);
+  }
+  if (method === "POST") {
+    const serviceId = experienceServiceArchivePattern.exec(path)?.[1];
+    if (serviceId) return handleExperienceServiceArchiveRequest(request, decodeURIComponent(serviceId), dependencies.catalogRepository);
+    const resourceId = experienceResourceArchivePattern.exec(path)?.[1];
+    if (resourceId) return handleExperienceResourceArchiveRequest(request, decodeURIComponent(resourceId), dependencies.catalogRepository);
   }
 
   if (method === "GET") {
@@ -582,6 +637,7 @@ type RouteMatcher = string | RegExp | ((path: string) => boolean);
 const protectedRouteMetadata: Readonly<Record<string, readonly RouteMatcher[]>> = {
   GET: [
     "/v1/experience/presets", "/v1/experience/workspace",
+    "/v1/experience/services", "/v1/experience/resources",
     "/v1/availability", "/v1/reservations", reservationPattern,
     "/v1/resource-maintenance", "/v1/venues", venuePattern,
     "/v1/services", servicePattern, "/v1/resources", resourcePattern,
@@ -589,12 +645,14 @@ const protectedRouteMetadata: Readonly<Record<string, readonly RouteMatcher[]>> 
   ],
   POST: [
     "/v1/experience/publish",
+    "/v1/experience/services", "/v1/experience/resources",
+    experienceServiceArchivePattern, experienceResourceArchivePattern,
     "/v1/reservations", reservationCancelPattern, reservationReschedulePattern,
     "/v1/resource-maintenance", resourceMaintenanceEndPattern,
     isChatReservationSessionRoute, isWhatsAppOwnerRoute,
   ],
   PATCH: ["/v1/experience/identity", reservationPattern, isWhatsAppOwnerRoute],
-  PUT: ["/v1/experience/draft"],
+  PUT: ["/v1/experience/draft", experienceServicePattern, experienceResourcePattern],
   DELETE: [isWhatsAppOwnerRoute],
 };
 
@@ -675,6 +733,66 @@ async function handleExperienceIdentityUpdateRequest(
     input: parsed.data,
     repository,
   });
+  return jsonResponse(result.status, result.body);
+}
+
+async function handleExperienceServiceCreateRequest(request: StandaloneApiRequest, repository: PlatformCatalogRepository | undefined) {
+  const scoped = readExperienceScope(request);
+  if (!scoped.ok) return scoped.response;
+  const parsed = experienceServiceInputSchema.safeParse(request.body);
+  if (!parsed.success) return platformError(400, "validation_failed", "Invalid service body.");
+  if (!repository) return platformError(503, "bad_request", "Catalog repository is not configured.");
+  const result = await createPlatformService({ scope: scoped.scope, value: parsed.data, repository });
+  return jsonResponse(result.status, result.body);
+}
+
+async function handleExperienceServiceUpdateRequest(request: StandaloneApiRequest, serviceId: string, repository: PlatformCatalogRepository | undefined) {
+  const scoped = readExperienceScope(request);
+  if (!scoped.ok) return scoped.response;
+  const parsed = experienceServiceInputSchema.safeParse(request.body);
+  if (!parsed.success) return platformError(400, "validation_failed", "Invalid service body.");
+  if (!repository) return platformError(503, "bad_request", "Catalog repository is not configured.");
+  const result = await updatePlatformService({ scope: scoped.scope, serviceId, value: parsed.data, repository });
+  return jsonResponse(result.status, result.body);
+}
+
+async function handleExperienceServiceArchiveRequest(request: StandaloneApiRequest, serviceId: string, repository: PlatformCatalogRepository | undefined) {
+  const scoped = readExperienceScope(request);
+  if (!scoped.ok) return scoped.response;
+  const parsed = archiveCatalogItemInputSchema.safeParse(request.body ?? {});
+  if (!parsed.success) return platformError(400, "validation_failed", "Invalid service archive body.");
+  if (!repository) return platformError(503, "bad_request", "Catalog repository is not configured.");
+  const result = await archivePlatformService({ scope: scoped.scope, serviceId, value: parsed.data, repository });
+  return jsonResponse(result.status, result.body);
+}
+
+async function handleExperienceResourceCreateRequest(request: StandaloneApiRequest, repository: PlatformCatalogRepository | undefined) {
+  const scoped = readExperienceScope(request);
+  if (!scoped.ok) return scoped.response;
+  const parsed = experienceResourceInputSchema.safeParse(request.body);
+  if (!parsed.success) return platformError(400, "validation_failed", "Invalid resource body.");
+  if (!repository) return platformError(503, "bad_request", "Catalog repository is not configured.");
+  const result = await createPlatformResource({ scope: scoped.scope, value: parsed.data, repository });
+  return jsonResponse(result.status, result.body);
+}
+
+async function handleExperienceResourceUpdateRequest(request: StandaloneApiRequest, resourceId: string, repository: PlatformCatalogRepository | undefined) {
+  const scoped = readExperienceScope(request);
+  if (!scoped.ok) return scoped.response;
+  const parsed = experienceResourceInputSchema.safeParse(request.body);
+  if (!parsed.success) return platformError(400, "validation_failed", "Invalid resource body.");
+  if (!repository) return platformError(503, "bad_request", "Catalog repository is not configured.");
+  const result = await updatePlatformResource({ scope: scoped.scope, resourceId, value: parsed.data, repository });
+  return jsonResponse(result.status, result.body);
+}
+
+async function handleExperienceResourceArchiveRequest(request: StandaloneApiRequest, resourceId: string, repository: PlatformCatalogRepository | undefined) {
+  const scoped = readExperienceScope(request);
+  if (!scoped.ok) return scoped.response;
+  const parsed = archiveCatalogItemInputSchema.safeParse(request.body ?? {});
+  if (!parsed.success) return platformError(400, "validation_failed", "Invalid resource archive body.");
+  if (!repository) return platformError(503, "bad_request", "Catalog repository is not configured.");
+  const result = await archivePlatformResource({ scope: scoped.scope, resourceId, value: parsed.data, repository });
   return jsonResponse(result.status, result.body);
 }
 

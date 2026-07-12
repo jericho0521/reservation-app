@@ -2,9 +2,16 @@ import type {
   ExperienceDraftInput,
   ExperiencePresetId,
   ExperiencePresetSummary,
+  ExperienceResourceInput,
+  ExperienceServiceInput,
   ExperienceValidationResponse,
   ListExperiencePresetsResponse,
 } from "@reservation-platform/contract-types";
+
+export interface ExperiencePresetCatalogDefaults {
+  service: ExperienceServiceInput;
+  resources: Array<Omit<ExperienceResourceInput, "service_id">>;
+}
 
 function preset(
   value: ExperiencePresetSummary,
@@ -102,6 +109,61 @@ export function createExperienceDraftFromPreset(id: ExperiencePresetId): Experie
     terminology: { ...value.terminology },
     channels: { web_booking: true, web_chat: false, whatsapp: false },
   };
+}
+
+export function getExperiencePresetCatalogDefaults(
+  id: ExperiencePresetId,
+): ExperiencePresetCatalogDefaults | undefined {
+  const defaults: Partial<Record<ExperiencePresetId, ExperiencePresetCatalogDefaults>> = {
+    racing_gaming: {
+      service: {
+        name: "Simulator Session",
+        description: "A timed racing simulator session.",
+        duration_minutes: 60,
+        total_quantity: 8,
+        resource_kind: "station",
+        resource_strategy: "assigned_resource",
+      },
+      resources: Array.from({ length: 8 }, (_, index) => ({
+        label: `Simulator ${index + 1}`,
+        kind: "station" as const,
+        capacity: 1,
+      })),
+    },
+    rooms_facilities: {
+      service: {
+        name: "Meeting Room",
+        description: "Book a capacity-matched meeting room.",
+        duration_minutes: 60,
+        total_quantity: 3,
+        resource_kind: "room",
+        resource_strategy: "hybrid",
+      },
+      resources: [4, 8, 12].map((capacity, index) => ({
+        label: `Room ${index + 1}`,
+        kind: "room" as const,
+        capacity,
+      })),
+    },
+    appointments_salon: {
+      service: {
+        name: "Consultation",
+        description: "A one-to-one appointment with an available specialist.",
+        duration_minutes: 45,
+        total_quantity: 3,
+        resource_kind: "custom",
+        resource_strategy: "assigned_resource",
+      },
+      resources: Array.from({ length: 3 }, (_, index) => ({
+        label: `Specialist ${index + 1}`,
+        kind: "custom" as const,
+        capacity: 1,
+      })),
+    },
+  };
+
+  const value = defaults[id];
+  return value ? structuredClone(value) : undefined;
 }
 
 export function validateExperienceDraft(

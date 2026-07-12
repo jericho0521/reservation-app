@@ -223,6 +223,74 @@ test("experience identity route delegates a strict scoped update", async () => {
   });
 });
 
+test("experience catalog routes create and archive through scoped repository ports", async () => {
+  const observed: unknown[] = [];
+  const repository = catalogRepository({
+    async createService(scope, input) {
+      observed.push({ operation: "create", scope, input });
+      return { data: { id: "service_1", venue_id: scope.venueId, ...input } };
+    },
+    async archiveService(scope, id, input) {
+      observed.push({ operation: "archive", scope, id, input });
+      return {
+        data: {
+          id,
+          venue_id: scope.venueId,
+          name: "Simulator Session",
+          metadata: { is_active: false },
+        },
+      };
+    },
+  });
+  const headers = {
+    authorization: "Bearer secret",
+    "x-reservation-tenant-id": "tenant_1",
+    "x-reservation-venue-id": "venue_1",
+  };
+  const serviceInput = {
+    name: "Simulator Session",
+    duration_minutes: 60,
+    total_quantity: 8,
+    resource_kind: "station",
+    resource_strategy: "assigned_resource",
+  };
+
+  const created = await handleStandaloneApiRequest({
+    method: "POST",
+    path: "/v1/experience/services",
+    headers,
+    body: serviceInput,
+  }, { serviceApiKey: "secret", catalogRepository: repository });
+  const archived = await handleStandaloneApiRequest({
+    method: "POST",
+    path: "/v1/experience/services/service%2F1/archive",
+    headers,
+    body: { reason: "Seasonal" },
+  }, { serviceApiKey: "secret", catalogRepository: repository });
+  const deleted = await handleStandaloneApiRequest({
+    method: "DELETE",
+    path: "/v1/experience/services/service_1",
+    headers,
+  }, { serviceApiKey: "secret", catalogRepository: repository });
+
+  assert.equal(created.status, 201);
+  assert.equal(archived.status, 200);
+  assert.equal(deleted.status, 404);
+  assert.deepEqual(observed, [
+    {
+      operation: "create",
+      scope: { tenantId: "tenant_1", venueId: "venue_1" },
+      input: serviceInput,
+    },
+    {
+      operation: "archive",
+      scope: { tenantId: "tenant_1", venueId: "venue_1" },
+      id: "service/1",
+      input: { reason: "Seasonal" },
+    },
+  ]);
+});
+
 function fakeWhatsAppModule(
   overrides: Partial<StandaloneApiWhatsAppModule> = {},
 ): StandaloneApiWhatsAppModule {
@@ -1491,6 +1559,7 @@ test("catalog GET routes use an injected repository and platform response mappin
       service_id: "service_1",
       venue_id: "venue_1",
       name: "Simulator",
+      is_active: true,
       description: undefined,
       duration_minutes: undefined,
       total_quantity: undefined,
@@ -1506,6 +1575,7 @@ test("catalog GET routes use an injected repository and platform response mappin
     service_id: "service_1",
     venue_id: "venue_1",
     name: "Simulator",
+    is_active: true,
     description: undefined,
     duration_minutes: undefined,
     total_quantity: undefined,
@@ -1549,7 +1619,7 @@ test("catalog GET routes use an injected repository and platform response mappin
 });
 
 test("catalog resource list passes service_id query to the injected repository", async () => {
-  const calls: Array<{ serviceId?: string | null }> = [];
+  const calls: Array<{ serviceId?: string | null; includeInactive?: boolean }> = [];
   const handler = createStandaloneApiHandler({
     catalogRepository: catalogRepository({
       async listResources(input) {
@@ -1563,7 +1633,7 @@ test("catalog resource list passes service_id query to the injected repository",
 
   assert.equal(response.status, 200);
   assert.deepEqual(response.body, { resources: [] });
-  assert.deepEqual(calls, [{ serviceId: "service_123" }]);
+  assert.deepEqual(calls, [{ serviceId: "service_123", includeInactive: false }]);
 });
 
 test("catalog get route maps repository missing row to not_found", async () => {

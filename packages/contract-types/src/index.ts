@@ -162,6 +162,7 @@ export interface ServiceResponse {
   service_id: string;
   venue_id?: string;
   name: string;
+  is_active?: boolean;
   description?: string;
   duration_minutes?: number;
   total_quantity?: number;
@@ -171,6 +172,26 @@ export interface ServiceResponse {
   resources?: ResourceResponse[];
   layout?: ResourceLayoutResponse;
   metadata?: MetadataRecord;
+}
+
+export interface ExperienceServiceInput {
+  name: string;
+  description?: string;
+  duration_minutes: number;
+  total_quantity: number;
+  resource_kind: ResourceKind;
+  resource_strategy: "quantity" | "assigned_resource" | "hybrid";
+}
+
+export interface ExperienceResourceInput {
+  service_id: string;
+  label: string;
+  kind: ResourceKind;
+  capacity: number;
+}
+
+export interface ArchiveCatalogItemInput {
+  reason?: string;
 }
 
 export interface ListServicesResponse {

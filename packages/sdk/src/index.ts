@@ -1,6 +1,7 @@
 import type {
   AvailabilityQuery,
   AvailabilityResponse,
+  ArchiveCatalogItemInput,
   CancelReservationInput,
   ChatCreateReservationSessionInput,
   ChatConfirmReservationInput,
@@ -12,6 +13,8 @@ import type {
   EndResourceMaintenanceInput,
   ExperienceDraftInput,
   ExperienceIdentityInput,
+  ExperienceResourceInput,
+  ExperienceServiceInput,
   ExperiencePresetSummary,
   ExperienceWorkspaceResponse,
   ListReservationsQuery,
@@ -126,6 +129,14 @@ export interface ReservationPlatformClient {
   saveExperienceDraft(input: ExperienceDraftInput, options?: RequestOptions): Promise<ExperienceWorkspaceResponse>;
   publishExperienceDraft(configurationId: string, options?: RequestOptions): Promise<ExperienceWorkspaceResponse>;
   updateExperienceIdentity(input: ExperienceIdentityInput, options?: RequestOptions): Promise<ExperienceWorkspaceResponse>;
+  createExperienceService(input: ExperienceServiceInput, options?: RequestOptions): Promise<ServiceResponse>;
+  listExperienceServices(options?: RequestOptions): Promise<ListServicesResponse>;
+  updateExperienceService(serviceId: string, input: ExperienceServiceInput, options?: RequestOptions): Promise<ServiceResponse>;
+  archiveExperienceService(serviceId: string, input?: ArchiveCatalogItemInput, options?: RequestOptions): Promise<ServiceResponse>;
+  createExperienceResource(input: ExperienceResourceInput, options?: RequestOptions): Promise<ResourceResponse>;
+  listExperienceResources(serviceId?: string, options?: RequestOptions): Promise<ListResourcesResponse>;
+  updateExperienceResource(resourceId: string, input: ExperienceResourceInput, options?: RequestOptions): Promise<ResourceResponse>;
+  archiveExperienceResource(resourceId: string, input?: ArchiveCatalogItemInput, options?: RequestOptions): Promise<ResourceResponse>;
   getPublicExperience(slug: string, options?: RequestOptions): Promise<PublicExperienceResponse>;
   getMetadata(options?: RequestOptions): Promise<MetadataResponse>;
   getCurrentTenant(options?: RequestOptions): Promise<TenantResponse>;
@@ -187,6 +198,14 @@ export function createReservationPlatformClient(
       body: input,
       options,
     }),
+    createExperienceService: (input, options) => request({ method: "POST", path: "/experience/services", body: input, options }),
+    listExperienceServices: (options) => request({ method: "GET", path: "/experience/services", options }),
+    updateExperienceService: (serviceId, input, options) => request({ method: "PUT", path: `/experience/services/${encodeURIComponent(serviceId)}`, body: input, options }),
+    archiveExperienceService: (serviceId, input, options) => request({ method: "POST", path: `/experience/services/${encodeURIComponent(serviceId)}/archive`, body: input ?? {}, options }),
+    createExperienceResource: (input, options) => request({ method: "POST", path: "/experience/resources", body: input, options }),
+    listExperienceResources: (serviceId, options) => request({ method: "GET", path: "/experience/resources", query: serviceId ? { service_id: serviceId } : undefined, options }),
+    updateExperienceResource: (resourceId, input, options) => request({ method: "PUT", path: `/experience/resources/${encodeURIComponent(resourceId)}`, body: input, options }),
+    archiveExperienceResource: (resourceId, input, options) => request({ method: "POST", path: `/experience/resources/${encodeURIComponent(resourceId)}/archive`, body: input ?? {}, options }),
     getPublicExperience: (slug, options) => request({
       method: "GET",
       path: `/public/experiences/${encodeURIComponent(slug)}`,

@@ -29,6 +29,11 @@ import type {
   ReservationMutationRepositoryPort,
   ReservationReadRepositoryPort,
 } from "@reservation-platform/api";
+import type {
+  ArchiveCatalogItemInput,
+  ExperienceResourceInput,
+  ExperienceServiceInput,
+} from "@reservation-platform/contract-types";
 
 export * from "./experience-studio.js";
 
@@ -51,10 +56,10 @@ export const RESERVATION_SUPABASE_SELECTS = {
   catalogVenueWithEquipment: "*, equipment(*)",
   catalogServiceWithResources: `
   *,
-  resources:reservable_resources(id, service_id, label, kind, is_active, capacity, metadata),
+  resources:reservable_resources(id, service_id, label, resource_kind, status, capacity, metadata),
   layout:resource_layouts(id, service_id, layout_kind, metadata)
 `,
-  catalogResource: "id, service_id, label, kind, is_active, capacity, metadata",
+  catalogResource: "id, service_id, label, resource_kind, status, capacity, metadata",
   catalogResourceLayout: "id, service_id, layout_kind, metadata",
   service:
     "id, name, description, total_seats, created_at, resource_kind, selection_mode, reservation_policy",
@@ -458,10 +463,15 @@ export function createSupabasePlatformCatalogRepository(
       );
     },
 
-    async listServices() {
-      const result = await fromTable(publicClient, RESERVATION_SUPABASE_TABLES.services)
+    async listServices(options = {}) {
+      let query = fromTable(publicClient, RESERVATION_SUPABASE_TABLES.services)
         .select(RESERVATION_SUPABASE_SELECTS.catalogServiceWithResources)
-        .order("name") as QueryResult<unknown>;
+        .order("name");
+      if (options.venueId) query = query.eq("venue_id", options.venueId);
+      const result = await query as QueryResult<unknown>;
+      if (!result.error && Array.isArray(result.data) && !options.includeInactive) {
+        result.data = result.data.filter((row) => isActiveServiceRow(row));
+      }
 
       return toCatalogListResult(result);
     },
@@ -472,28 +482,49 @@ export function createSupabasePlatformCatalogRepository(
         .eq("id", id)
         .single() as QueryResult<unknown>;
 
-      return toCatalogReadResult(result);
+      return !result.error && result.data && !isActiveServiceRow(result.data)
+        ? { data: null }
+        : toCatalogReadResult(result);
     },
 
-    async listResources({ serviceId } = {}) {
-      let query = fromTable(adminClient(), RESERVATION_SUPABASE_TABLES.reservableResources)
+    async listResources({ serviceId, venueId, includeInactive } = {}) {
+      const client = adminClient();
+      let serviceIds: string[] | undefined;
+      if (venueId) {
+        const services = await fromTable(client, RESERVATION_SUPABASE_TABLES.services)
+          .select("id")
+          .eq("venue_id", venueId) as QueryResult<unknown>;
+        if (services.error) return toCatalogListResult(services);
+        serviceIds = Array.isArray(services.data)
+          ? services.data.flatMap((row) => isRecord(row) && typeof row.id === "string" ? [row.id] : [])
+          : [];
+        if (serviceIds.length === 0) return { data: [] };
+      }
+      let query = fromTable(client, RESERVATION_SUPABASE_TABLES.reservableResources)
         .select(RESERVATION_SUPABASE_SELECTS.catalogResource)
         .order("label");
 
       if (serviceId) {
         query = query.eq("service_id", serviceId);
+      } else if (serviceIds) {
+        query = query.in("service_id", serviceIds);
       }
 
-      return toCatalogListResult(await query as QueryResult<unknown>);
+      const result = await query as QueryResult<unknown>;
+      if (!result.error && Array.isArray(result.data) && !includeInactive) {
+        result.data = result.data.filter((row) => isActiveResourceRow(row));
+      }
+      return toCatalogListResult(result);
     },
 
     async getResource(id) {
-      return toCatalogReadResult(
-        await fromTable(adminClient(), RESERVATION_SUPABASE_TABLES.reservableResources)
+      const result = await fromTable(adminClient(), RESERVATION_SUPABASE_TABLES.reservableResources)
           .select(RESERVATION_SUPABASE_SELECTS.catalogResource)
           .eq("id", id)
-          .single() as QueryResult<unknown>,
-      );
+          .single() as QueryResult<unknown>;
+      return !result.error && result.data && !isActiveResourceRow(result.data)
+        ? { data: null }
+        : toCatalogReadResult(result);
     },
 
     async getResourceLayout(id) {
@@ -504,7 +535,127 @@ export function createSupabasePlatformCatalogRepository(
           .maybeSingle() as QueryResult<unknown>,
       );
     },
+
+    async createService(scope, value) {
+      return toCatalogReadResult(await fromTable(adminClient(), RESERVATION_SUPABASE_TABLES.services)
+        .insert([serviceMutationRow(scope.venueId, value)])
+        .select("*")
+        .single() as QueryResult<unknown>);
+    },
+
+    async updateService(scope, id, value) {
+      return toCatalogReadResult(await fromTable(adminClient(), RESERVATION_SUPABASE_TABLES.services)
+        .update(serviceMutationRow(scope.venueId, value))
+        .eq("id", id)
+        .eq("venue_id", scope.venueId)
+        .select("*")
+        .single() as QueryResult<unknown>);
+    },
+
+    async archiveService(scope, id, value) {
+      const client = adminClient();
+      const current = await fromTable(client, RESERVATION_SUPABASE_TABLES.services)
+        .select("id, metadata")
+        .eq("id", id)
+        .eq("venue_id", scope.venueId)
+        .single() as QueryResult<unknown>;
+      if (current.error || !current.data) return toCatalogReadResult(current);
+      const metadata = isRecord(current.data) && isRecord(current.data.metadata)
+        ? current.data.metadata
+        : {};
+      return toCatalogReadResult(await fromTable(client, RESERVATION_SUPABASE_TABLES.services)
+        .update({ metadata: { ...metadata, is_active: false, archive_reason: value.reason ?? null } })
+        .eq("id", id)
+        .eq("venue_id", scope.venueId)
+        .select("*")
+        .single() as QueryResult<unknown>);
+    },
+
+    async createResource(scope, value) {
+      const client = adminClient();
+      const service = await readScopedService(client, scope.venueId, value.service_id);
+      if (service.error || !service.data) return toCatalogReadResult(service);
+      return toCatalogReadResult(await fromTable(client, RESERVATION_SUPABASE_TABLES.reservableResources)
+        .insert([resourceMutationRow(value)])
+        .select("*")
+        .single() as QueryResult<unknown>);
+    },
+
+    async updateResource(scope, id, value) {
+      const client = adminClient();
+      const service = await readScopedService(client, scope.venueId, value.service_id);
+      if (service.error || !service.data) return toCatalogReadResult(service);
+      return toCatalogReadResult(await fromTable(client, RESERVATION_SUPABASE_TABLES.reservableResources)
+        .update(resourceMutationRow(value))
+        .eq("id", id)
+        .eq("service_id", value.service_id)
+        .select("*")
+        .single() as QueryResult<unknown>);
+    },
+
+    async archiveResource(scope, id, value) {
+      const client = adminClient();
+      const resource = await fromTable(client, RESERVATION_SUPABASE_TABLES.reservableResources)
+        .select("id, service_id, metadata")
+        .eq("id", id)
+        .single() as QueryResult<unknown>;
+      if (resource.error || !isRecord(resource.data) || typeof resource.data.service_id !== "string") {
+        return toCatalogReadResult(resource);
+      }
+      const service = await readScopedService(client, scope.venueId, resource.data.service_id);
+      if (service.error || !service.data) return toCatalogReadResult(service);
+      const metadata = isRecord(resource.data.metadata) ? resource.data.metadata : {};
+      return toCatalogReadResult(await fromTable(client, RESERVATION_SUPABASE_TABLES.reservableResources)
+        .update({ status: "inactive", metadata: { ...metadata, archive_reason: value.reason ?? null } })
+        .eq("id", id)
+        .select("*")
+        .single() as QueryResult<unknown>);
+    },
   };
+}
+
+function serviceMutationRow(venueId: string, value: ExperienceServiceInput) {
+  return {
+    venue_id: venueId,
+    name: value.name,
+    description: value.description ?? null,
+    total_seats: value.total_quantity,
+    resource_kind: value.resource_kind,
+    selection_mode: value.resource_strategy,
+    reservation_policy: {
+      kind: value.resource_strategy === "quantity" ? "capacity" : "assigned_resource",
+      selection_mode: value.resource_strategy,
+      require_resource_labels: value.resource_strategy !== "quantity",
+      allow_partial_capacity: true,
+    },
+    metadata: { duration_minutes: value.duration_minutes, is_active: true },
+  };
+}
+
+function resourceMutationRow(value: ExperienceResourceInput) {
+  return {
+    service_id: value.service_id,
+    label: value.label,
+    resource_kind: value.kind,
+    capacity: value.capacity,
+    status: "available",
+  };
+}
+
+function readScopedService(client: SupabaseLikeClient, venueId: string, serviceId: string) {
+  return fromTable(client, RESERVATION_SUPABASE_TABLES.services)
+    .select("id")
+    .eq("id", serviceId)
+    .eq("venue_id", venueId)
+    .single() as Promise<QueryResult<unknown>>;
+}
+
+function isActiveServiceRow(value: unknown) {
+  return !isRecord(value) || !isRecord(value.metadata) || value.metadata.is_active !== false;
+}
+
+function isActiveResourceRow(value: unknown) {
+  return !isRecord(value) || value.status !== "inactive";
 }
 
 export function createSupabaseAvailabilityRepository(

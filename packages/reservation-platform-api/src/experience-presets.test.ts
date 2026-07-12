@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   createExperienceDraftFromPreset,
   experiencePresets,
+  getExperiencePresetCatalogDefaults,
   validateExperienceDraft,
 } from "./experience-presets.js";
 
@@ -44,4 +45,23 @@ test("preset drafts are fresh copies and cannot mutate the registry", () => {
     createExperienceDraftFromPreset("appointments_salon").terminology.resource,
     "Specialist",
   );
+});
+
+test("flagship presets provide usable domain-specific catalog defaults", () => {
+  const racing = getExperiencePresetCatalogDefaults("racing_gaming");
+  const rooms = getExperiencePresetCatalogDefaults("rooms_facilities");
+  const appointments = getExperiencePresetCatalogDefaults("appointments_salon");
+
+  assert.deepEqual(
+    [racing?.service.resource_strategy, rooms?.service.resource_strategy, appointments?.service.resource_strategy],
+    ["assigned_resource", "hybrid", "assigned_resource"],
+  );
+  assert.deepEqual(
+    [racing?.resources.length, rooms?.resources.map((resource) => resource.capacity), appointments?.service.duration_minutes],
+    [8, [4, 8, 12], 45],
+  );
+  assert.equal(getExperiencePresetCatalogDefaults("sports_courts"), undefined);
+
+  racing!.resources[0]!.label = "Changed";
+  assert.equal(getExperiencePresetCatalogDefaults("racing_gaming")!.resources[0]!.label, "Simulator 1");
 });

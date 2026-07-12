@@ -8,6 +8,8 @@ import {
   createReservationInputSchema,
   experienceDraftInputSchema,
   experienceIdentityInputSchema,
+  experienceResourceInputSchema,
+  experienceServiceInputSchema,
   experienceWorkspaceResponseSchema,
   listReservationsResponseSchema,
   platformErrorBodySchema,
@@ -96,6 +98,29 @@ test("experience identity accepts explicit fields and rejects unsafe slugs", () 
     ...valid,
     unknown: true,
   }).success, false);
+});
+
+test("experience catalog inputs enforce usable service and resource values", () => {
+  assert.equal(experienceServiceInputSchema.safeParse({
+    name: "Racing session",
+    duration_minutes: 60,
+    total_quantity: 8,
+    resource_kind: "station",
+    resource_strategy: "assigned_resource",
+  }).success, true);
+  assert.equal(experienceServiceInputSchema.safeParse({
+    name: "",
+    duration_minutes: 0,
+    total_quantity: -1,
+    resource_kind: "unknown",
+    resource_strategy: "assigned_resource",
+  }).success, false);
+  assert.equal(experienceResourceInputSchema.safeParse({
+    service_id: "service_1",
+    label: "Simulator 1",
+    kind: "station",
+    capacity: 1,
+  }).success, true);
 });
 
 test("createReservationInputSchema accepts a minimal reservation intent", () => {

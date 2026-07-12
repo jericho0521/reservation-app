@@ -76,6 +76,15 @@ type RecordedCatalogRead = {
   cardinality?: "single" | "maybeSingle";
 };
 
+type RecordedCatalogMutation = {
+  table: string;
+  select?: string;
+  insert?: unknown;
+  update?: unknown;
+  filters: Array<{ column: string; value: unknown }>;
+  cardinality?: "single";
+};
+
 type RecordedReservationCompatibilityCall = {
   table: string;
   selectCalls: Array<string | undefined | { columns?: string; options?: Record<string, unknown> }>;
@@ -191,6 +200,54 @@ function createCatalogReadClient(
         },
         maybeSingle() {
           call.cardinality = "maybeSingle";
+          return result;
+        },
+        then(resolve: (value: SupabaseTestResult) => unknown) {
+          return result.then(resolve);
+        },
+      };
+    },
+  };
+}
+
+function createCatalogMutationClient(
+  results: SupabaseTestResult[],
+  calls: RecordedCatalogMutation[],
+) {
+  return {
+    from(table: string) {
+      const call: RecordedCatalogMutation = { table, filters: [] };
+      calls.push(call);
+      const result = Promise.resolve(results.shift() ?? { data: null, error: null });
+
+      return {
+        select(columns?: string) {
+          call.select = columns;
+          return this;
+        },
+        eq(column: string, value: unknown) {
+          call.filters.push({ column, value });
+          return this;
+        },
+        order() {
+          return this;
+        },
+        insert(row: unknown) {
+          call.insert = row;
+          return this;
+        },
+        update(row: unknown) {
+          call.update = row;
+          return this;
+        },
+        upsert() {
+          throw new Error("upsert() should not be called for catalog mutations");
+        },
+        single() {
+          call.cardinality = "single";
+          return result;
+        },
+        maybeSingle() {
           return result;
         },
         then(resolve: (value: SupabaseTestResult) => unknown) {
@@ -338,6 +395,83 @@ test("catalog repository does not create admin client for public catalog reads",
 
   assert.equal(adminClientCreated, false);
   assert.deepEqual(calls.map((call) => call.client), ["public", "public"]);
+});
+
+test("catalog repository hides archived services from public reads but exposes them to owners", async () => {
+  const calls: RecordedCatalogRead[] = [];
+  const rows = [
+    { id: "service-active", metadata: { is_active: true } },
+    { id: "service-archived", metadata: { is_active: false } },
+  ];
+  const client = createCatalogReadClient("public", {
+    [RESERVATION_SUPABASE_TABLES.services]: [
+      { data: structuredClone(rows), error: null },
+      { data: structuredClone(rows), error: null },
+    ],
+  }, calls);
+  const repository = createSupabasePlatformCatalogRepository(client);
+
+  assert.deepEqual((await repository.listServices()).data, [rows[0]]);
+  assert.deepEqual((await repository.listServices({ includeInactive: true })).data, rows);
+});
+
+test("catalog mutations preserve scoped service rows and archive instead of deleting", async () => {
+  const calls: RecordedCatalogMutation[] = [];
+  const client = createCatalogMutationClient([
+    { data: { id: "service_1" }, error: null },
+    { data: { id: "service_1", metadata: { duration_minutes: 60 } }, error: null },
+    { data: { id: "service_1", metadata: { duration_minutes: 60, is_active: false } }, error: null },
+    { data: { id: "resource_1", service_id: "service_1", metadata: { zone: "A" } }, error: null },
+    { data: { id: "service_1" }, error: null },
+    { data: { id: "resource_1", status: "inactive" }, error: null },
+  ], calls);
+  const repository = createSupabasePlatformCatalogRepository(client);
+  const scope = { tenantId: "tenant_1", venueId: "venue_1" };
+
+  await repository.createService!(scope, {
+    name: "Simulator Session",
+    description: "Timed session",
+    duration_minutes: 60,
+    total_quantity: 8,
+    resource_kind: "station",
+    resource_strategy: "assigned_resource",
+  });
+  await repository.archiveService!(scope, "service_1", { reason: "Seasonal" });
+  await repository.archiveResource!(scope, "resource_1", { reason: "Repair" });
+
+  assert.deepEqual(calls[0], {
+    table: RESERVATION_SUPABASE_TABLES.services,
+    select: "*",
+    insert: [{
+      venue_id: "venue_1",
+      name: "Simulator Session",
+      description: "Timed session",
+      total_seats: 8,
+      resource_kind: "station",
+      selection_mode: "assigned_resource",
+      reservation_policy: {
+        kind: "assigned_resource",
+        selection_mode: "assigned_resource",
+        require_resource_labels: true,
+        allow_partial_capacity: true,
+      },
+      metadata: { duration_minutes: 60, is_active: true },
+    }],
+    filters: [],
+    cardinality: "single",
+  });
+  assert.deepEqual(calls[2].update, {
+    metadata: {
+      duration_minutes: 60,
+      is_active: false,
+      archive_reason: "Seasonal",
+    },
+  });
+  assert.deepEqual(calls[5].update, {
+    status: "inactive",
+    metadata: { zone: "A", archive_reason: "Repair" },
+  });
+  assert.equal(calls.some((call) => "delete" in call), false);
 });
 
 test("catalog repository preserves strict service query errors without fallback reads", async () => {

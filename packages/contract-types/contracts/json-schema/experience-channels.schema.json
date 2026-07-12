@@ -1,5 +1,15 @@
 {
   "$defs": {
+    "ArchiveCatalogItemInput": {
+      "additionalProperties": false,
+      "properties": {
+        "reason": {
+          "maxLength": 500,
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
     "AvailabilityQuery": {
       "additionalProperties": false,
       "properties": {
@@ -586,6 +596,72 @@
         "description",
         "resource_strategy",
         "terminology"
+      ],
+      "type": "object"
+    },
+    "ExperienceResourceInput": {
+      "additionalProperties": false,
+      "properties": {
+        "capacity": {
+          "maximum": 10000,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "kind": {
+          "$ref": "#/$defs/ResourceKind"
+        },
+        "label": {
+          "maxLength": 120,
+          "minLength": 1,
+          "type": "string"
+        },
+        "service_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "service_id",
+        "label",
+        "kind",
+        "capacity"
+      ],
+      "type": "object"
+    },
+    "ExperienceServiceInput": {
+      "additionalProperties": false,
+      "properties": {
+        "description": {
+          "maxLength": 1000,
+          "type": "string"
+        },
+        "duration_minutes": {
+          "maximum": 1440,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "name": {
+          "maxLength": 120,
+          "minLength": 1,
+          "type": "string"
+        },
+        "resource_kind": {
+          "$ref": "#/$defs/ResourceKind"
+        },
+        "resource_strategy": {
+          "$ref": "#/$defs/ResourceStrategy"
+        },
+        "total_quantity": {
+          "maximum": 10000,
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "name",
+        "duration_minutes",
+        "total_quantity",
+        "resource_kind",
+        "resource_strategy"
       ],
       "type": "object"
     },
@@ -1412,6 +1488,9 @@
         "duration_minutes": {
           "minimum": 1,
           "type": "integer"
+        },
+        "is_active": {
+          "type": "boolean"
         },
         "layout": {
           "$ref": "#/$defs/ResourceLayoutResponse"

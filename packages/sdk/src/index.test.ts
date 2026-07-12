@@ -89,6 +89,54 @@ test("experience SDK methods use scoped owner and public routes", async () => {
   assert.equal(new Headers(requests[4].init?.headers).get("X-Reservation-Tenant-Id"), null);
 });
 
+test("experience catalog SDK methods preserve mutation paths and bodies", async () => {
+  const requests: Array<{ url: string; init?: RequestInit }> = [];
+  const client = createReservationPlatformClient({
+    baseUrl: "https://platform.example",
+    fetch: async (url, init) => {
+      requests.push({ url: String(url), init });
+      return jsonResponse({});
+    },
+  });
+  const service = {
+    name: "Simulator Session",
+    duration_minutes: 60,
+    total_quantity: 8,
+    resource_kind: "station" as const,
+    resource_strategy: "assigned_resource" as const,
+  };
+  const resource = {
+    service_id: "service/1",
+    label: "Simulator 1",
+    kind: "station" as const,
+    capacity: 1,
+  };
+
+  await client.listExperienceServices();
+  await client.createExperienceService(service);
+  await client.updateExperienceService("service/1", service);
+  await client.archiveExperienceService("service/1", { reason: "Seasonal" });
+  await client.listExperienceResources();
+  await client.createExperienceResource(resource);
+  await client.updateExperienceResource("resource/1", resource);
+  await client.archiveExperienceResource("resource/1");
+
+  assert.deepEqual(requests.map(({ url, init }) => [new URL(url).pathname, init?.method]), [
+    ["/v1/experience/services", "GET"],
+    ["/v1/experience/services", "POST"],
+    ["/v1/experience/services/service%2F1", "PUT"],
+    ["/v1/experience/services/service%2F1/archive", "POST"],
+    ["/v1/experience/resources", "GET"],
+    ["/v1/experience/resources", "POST"],
+    ["/v1/experience/resources/resource%2F1", "PUT"],
+    ["/v1/experience/resources/resource%2F1/archive", "POST"],
+  ]);
+  assert.deepEqual(JSON.parse(String(requests[1]!.init?.body)), service);
+  assert.deepEqual(JSON.parse(String(requests[3]!.init?.body)), { reason: "Seasonal" });
+  assert.deepEqual(JSON.parse(String(requests[5]!.init?.body)), resource);
+  assert.deepEqual(JSON.parse(String(requests[7]!.init?.body)), {});
+});
+
 test("SDK maps createReservation to POST /v1/reservations with context headers", async () => {
   const calls: { url: string; init: RequestInit }[] = [];
   const client = createReservationPlatformClient({

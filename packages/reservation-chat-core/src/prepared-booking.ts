@@ -3,6 +3,7 @@ import { PREPARE_BOOKING_TOOL_NAME } from "./tool-schemas.js";
 
 export interface PreparedBookingPayload {
   ready_for_confirmation: true;
+  service_id?: string;
   service_name: string;
   date: string;
   start_time: string;
@@ -13,6 +14,7 @@ export interface PreparedBookingPayload {
 }
 
 export interface PrepareBookingInput {
+  service_id?: string;
   service_name: string;
   date: string;
   start_time: string;
@@ -20,6 +22,22 @@ export interface PrepareBookingInput {
   user_name: string;
   user_email: string;
   user_phone: string;
+}
+
+export interface PreparedBookingAvailabilityBinding {
+  service_id: string;
+  service_name: string;
+  available_slots: Array<{
+    start_time: string;
+    end_time: string;
+    available_quantity: number;
+    is_available: boolean;
+  }>;
+}
+
+export interface BoundPreparedBooking extends PrepareBookingInput {
+  service_id: string;
+  end_time: string;
 }
 
 export interface PreparedBookingToolCall {
@@ -126,6 +144,7 @@ export function parsePrepareBookingInput(value: unknown): PrepareBookingInput | 
   }
 
   const serviceName = value.service_name;
+  const serviceId = value.service_id;
   const date = value.date;
   const startTime = value.start_time;
   const seats = value.seats;
@@ -135,6 +154,7 @@ export function parsePrepareBookingInput(value: unknown): PrepareBookingInput | 
 
   if (
     !isNonEmptyString(serviceName) ||
+    (serviceId !== undefined && !isNonEmptyString(serviceId)) ||
     !isValidDateString(date) ||
     !isValidTimeString(startTime) ||
     !isValidSeatCount(seats) ||
@@ -146,6 +166,7 @@ export function parsePrepareBookingInput(value: unknown): PrepareBookingInput | 
   }
 
   return {
+    ...(isNonEmptyString(serviceId) ? { service_id: serviceId.trim() } : {}),
     service_name: serviceName.trim(),
     date: date.trim(),
     start_time: startTime.trim(),
@@ -153,6 +174,30 @@ export function parsePrepareBookingInput(value: unknown): PrepareBookingInput | 
     user_name: userName.trim(),
     user_email: userEmail.trim(),
     user_phone: userPhone.trim(),
+  };
+}
+
+export function bindPreparedBookingToAvailability(
+  value: PrepareBookingInput,
+  availability: PreparedBookingAvailabilityBinding,
+): BoundPreparedBooking | null {
+  if (
+    value.service_id !== undefined && value.service_id !== availability.service_id
+    || value.service_name.trim().toLocaleLowerCase() !== availability.service_name.trim().toLocaleLowerCase()
+  ) {
+    return null;
+  }
+  const slot = availability.available_slots.find((candidate) =>
+    candidate.is_available
+    && candidate.start_time === value.start_time
+    && candidate.available_quantity >= value.seats
+  );
+  if (!slot) return null;
+  return {
+    ...value,
+    service_id: availability.service_id,
+    service_name: availability.service_name,
+    end_time: slot.end_time,
   };
 }
 

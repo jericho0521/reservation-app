@@ -6,6 +6,7 @@ export type ChatAuditEventType =
   | "chat.workflow.completed"
   | "chat.workflow.failed"
   | "chat.retrieval.completed"
+  | "chat.tools.proposed"
   | "chat.checkpoint.loaded"
   | "chat.checkpoint.saved";
 
@@ -23,4 +24,3 @@ export interface ChatAuditEvent {
 export interface ChatAuditSink {
   record(event: ChatAuditEvent): Promise<void> | void;
 }
-

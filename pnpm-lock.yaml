@@ -329,6 +329,9 @@ importers:
 
   packages/reservation-platform-api:
     dependencies:
+      '@project-play/reservation-chat-core':
+        specifier: workspace:*
+        version: link:../reservation-chat-core
       '@project-play/reservations-core':
         specifier: workspace:*
         version: link:../reservations-core

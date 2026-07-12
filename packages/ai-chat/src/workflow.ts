@@ -68,6 +68,14 @@ export async function runChatWorkflow(
       retrieval_context: retrievalContext,
       checkpoint_id: loaded?.checkpoint_id,
     });
+    if (output.tool_calls?.length) {
+      await recordAudit(input, dependencies, "chat.tools.proposed", {
+        tools: output.tool_calls.map((tool) => ({
+          tool_call_id: tool.tool_call_id,
+          name: tool.name,
+        })),
+      });
+    }
 
     const saved = await dependencies.checkpoint_store?.save({
       scope: input.tenant_config.scope,

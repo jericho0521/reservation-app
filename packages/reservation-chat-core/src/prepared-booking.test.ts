@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   bookingConfirmationActionFromPreparedBookingPayload,
+  bindPreparedBookingToAvailability,
   extractPreparedBookingActionFromToolCalls,
   parsePrepareBookingInput,
   parsePreparedBookingPayloadJson,
@@ -52,6 +53,22 @@ test("parsePrepareBookingInput reads prepare_booking tool arguments without the 
   const toolInput = preparedBookingToolInput();
 
   assert.deepEqual(parsePrepareBookingInput(toolInput), toolInput);
+});
+
+test("prepared bookings bind only to a real service id and currently available slot", () => {
+  const input = { ...preparedBookingToolInput(), service_id: "service_1" };
+  const availability = {
+    service_id: "service_1",
+    service_name: "Racing Simulator",
+    available_slots: [{ start_time: "14:00", end_time: "15:00", available_quantity: 2, is_available: true }],
+  };
+  assert.deepEqual(bindPreparedBookingToAvailability(input, availability), {
+    ...input,
+    end_time: "15:00",
+  });
+  assert.equal(bindPreparedBookingToAvailability({ ...input, service_id: "hallucinated" }, availability), null);
+  assert.equal(bindPreparedBookingToAvailability({ ...input, start_time: "15:00" }, availability), null);
+  assert.equal(bindPreparedBookingToAvailability({ ...input, seats: 3 }, availability), null);
 });
 
 test("parsePrepareBookingInput trims customer-entered string fields", () => {

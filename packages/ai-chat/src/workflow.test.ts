@@ -321,6 +321,32 @@ test("retrieval and checkpoint ports are optional and injected", async () => {
   );
 });
 
+test("workflow audits tool identities without model inputs or hidden reasoning", async () => {
+  const events: ChatAuditEvent[] = [];
+  await runChatWorkflow({
+    tenant_config: tenantConfig,
+    session_id: "session_tools",
+    messages: [{ role: "user", content: "Book the 2pm slot" }],
+  }, {
+    model_provider: {
+      async generate() {
+        return {
+          message: { role: "assistant", content: "Please confirm the proposal." },
+          tool_calls: [{
+            tool_call_id: "tool_1",
+            name: "prepare_booking",
+            input: { service_id: "service_1", private_reasoning: "must not be audited" },
+          }],
+        };
+      },
+    },
+    audit_sink: { record(event) { events.push(event); } },
+  });
+  const toolEvent = events.find((event) => event.type === "chat.tools.proposed");
+  assert.deepEqual(toolEvent?.data, { tools: [{ tool_call_id: "tool_1", name: "prepare_booking" }] });
+  assert.doesNotMatch(JSON.stringify(toolEvent), /private_reasoning/u);
+});
+
 test("provider internals do not leak from errors", async () => {
   const publicError = publicChatError({
     code: "model_rate_limited",

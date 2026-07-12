@@ -8,6 +8,7 @@ export interface CheckAvailabilityToolInput {
 }
 
 export interface PrepareBookingToolInput {
+  service_id?: string;
   service_name: string;
   date: string;
   start_time: string;
@@ -44,6 +45,10 @@ export const checkAvailabilityToolJsonSchema = {
 export const prepareBookingToolJsonSchema = {
   type: "object",
   properties: {
+    service_id: {
+      type: "string",
+      description: "Stable service id returned by check_availability. Include it when available.",
+    },
     service_name: { type: "string" },
     date: { type: "string" },
     start_time: { type: "string" },

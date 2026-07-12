@@ -273,11 +273,11 @@ Expected demonstration: start from an empty venue, choose a room-booking preset,
 
 **Produces:** A slug-routed, browser-safe public app that renders only published configuration through the SDK.
 
-- [ ] Test unknown, draft-only, archived, and published slugs.
-- [ ] Generate CSS custom properties from validated branding values.
-- [ ] Add metadata, responsive navigation, error boundary, and loading skeleton.
-- [ ] Add frontend boundary proof preventing server credentials and backend imports.
-- [ ] Commit as `feat(booking): add configurable public experience`.
+- [x] Test unknown, draft-only, archived, and published slugs.
+- [x] Generate CSS custom properties from validated branding values.
+- [x] Add metadata, responsive navigation, error boundary, and loading skeleton.
+- [x] Add frontend boundary proof preventing server credentials and backend imports.
+- [x] Commit as `feat(booking): add configurable public experience`.
 
 ### Task 3.2: Extend the shared booking flow
 
@@ -290,11 +290,11 @@ Expected demonstration: start from an empty venue, choose a room-booking preset,
 
 **Produces:** Service → date → slot → capacity/resource → customer details → review → explicit confirmation → success state.
 
-- [ ] Test forward/back transitions, stale slot recovery, duplicate submit protection, and API validation mapping.
-- [ ] Keep reservation mutation behind the confirmation step.
-- [ ] Preserve typed headless state so visual components remain replaceable.
-- [ ] Meet keyboard navigation, visible focus, label, and contrast requirements.
-- [ ] Commit as `feat(ui): add complete configurable booking journey`.
+- [x] Test forward/back transitions, stale slot recovery, duplicate submit protection, and API validation mapping.
+- [x] Keep reservation mutation behind the confirmation step.
+- [x] Preserve typed headless state so visual components remain replaceable.
+- [x] Meet keyboard navigation, visible focus, label, and contrast requirements.
+- [x] Commit as `feat(ui): add complete configurable booking journey`.
 
 ### Task 3.3: Polish racing simulator experience
 
@@ -305,10 +305,10 @@ Expected demonstration: start from an empty venue, choose a room-booking preset,
 
 **Produces:** Assigned-simulator sessions, driver terminology, track/session seed data, maintenance conflict visibility, and premium visual styling.
 
-- [ ] Seed deterministic services, simulators, availability, maintenance, and sample reservations.
-- [ ] Prove an unavailable simulator is never offered.
-- [ ] Prove two concurrent requests cannot reserve the same simulator/time.
-- [ ] Commit as `feat(demo): polish racing simulator experience`.
+- [x] Seed deterministic services, simulators, availability, maintenance, and sample reservations.
+- [x] Prove an unavailable simulator is never offered.
+- [x] Prove two concurrent requests cannot reserve the same simulator/time.
+- [x] Commit as `feat(demo): polish racing simulator experience`.
 
 ### Task 3.4: Polish room-booking experience
 
@@ -319,10 +319,10 @@ Expected demonstration: start from an empty venue, choose a room-booking preset,
 
 **Produces:** Organizer, room capacity, meeting duration, equipment metadata, and assigned-room booking.
 
-- [ ] Prove capacity filters exclude undersized rooms.
-- [ ] Prove maintenance and existing meetings affect availability.
-- [ ] Add realistic empty/search/confirmation states.
-- [ ] Commit as `feat(demo): polish room booking experience`.
+- [x] Prove capacity filters exclude undersized rooms.
+- [x] Prove maintenance and existing meetings affect availability.
+- [x] Add realistic empty/search/confirmation states.
+- [x] Commit as `feat(demo): polish room booking experience`.
 
 ### Task 3.5: Add appointment experience and validate remaining presets
 
@@ -334,10 +334,10 @@ Expected demonstration: start from an empty venue, choose a room-booking preset,
 
 **Produces:** Specialist assignment, appointment durations, and polished appointment booking; the other five presets must create, validate, preview, and publish without custom subsystems.
 
-- [ ] Prove staff schedule and overlapping appointments affect slots.
-- [ ] Parameterize preset validation across all eight IDs.
-- [ ] Keep industry differences configuration-driven.
-- [ ] Commit as `feat(demo): add appointments and validate all presets`.
+- [x] Prove staff schedule and overlapping appointments affect slots.
+- [x] Parameterize preset validation across all eight IDs.
+- [x] Keep industry differences configuration-driven.
+- [x] Commit as `feat(demo): add appointments and validate all presets`.
 
 ### Task 3.6: Add customer reservation management
 
@@ -348,9 +348,9 @@ Expected demonstration: start from an empty venue, choose a room-booking preset,
 
 **Produces:** Secure view and cancellation for a single reservation using an opaque, expiring or revocable token. Rescheduling is stretch scope.
 
-- [ ] Test token hashing, wrong-tenant access, cancellation policy, replay, and expired/invalid tokens.
-- [ ] Never expose owner service credentials or customer lookup by sequential ID.
-- [ ] Commit as `feat(booking): add secure reservation management`.
+- [x] Test token hashing, wrong-tenant access, cancellation policy, replay, and expired/invalid tokens.
+- [x] Never expose owner service credentials or customer lookup by sequential ID.
+- [x] Commit as `feat(booking): add secure reservation management`.
 
 ### Phase 3 gate
 
@@ -810,7 +810,7 @@ Update this table at each weekly gate.
 | --- | --- | --- | --- | --- |
 | 1. Foundation | 2026-07-19 | Complete | Full Phase 1 gate passed; 2 optional live-URL E2E checks skipped with documented env requirements. | None |
 | 2. Experience Studio | 2026-07-26 | Complete | Contract types 21, API package 158, database 13, Supabase adapter 50, SDK 19, UI 13, console 9, standalone API 125; console production build, package boundary, packed-package, and migration-bundle gates passed. | None |
-| 3. Customer Experiences | 2026-08-02 | Not started | — | — |
+| 3. Customer Experiences | 2026-08-02 | Complete | React 14, UI 18, root E2E 15 passed with 2 documented optional live-URL skips; booking production build and package/frontend boundaries passed. Flagship builds and focused API, database, SDK, Supabase, security-token, concurrency, and all-eight-preset proofs also passed. | None |
 | 4. Omnichannel AI | 2026-08-09 | Not started | — | — |
 | 5. Operations and Analytics | 2026-08-16 | Not started | — | — |
 | 6. Hardening and Presentation | 2026-08-23 | Not started | — | — |

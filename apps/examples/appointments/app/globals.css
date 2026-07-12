@@ -1,0 +1,45 @@
+@import "tailwindcss";
+
+:root { color-scheme: light; font-family: Inter, ui-sans-serif, system-ui, sans-serif; background: #fbf7f3; color: #2f2528; }
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body { margin: 0; background: #fbf7f3; }
+a { color: inherit; }
+.luma-nav { width: min(76rem, calc(100% - 2rem)); min-height: 5rem; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #ded3ce; }
+.luma-nav > a { font: 700 1.25rem Georgia, serif; letter-spacing: .14em; text-decoration: none; }
+.luma-nav > a span { margin-left: .25rem; color: #bb6f70; font-size: .65rem; }
+.luma-nav nav { display: flex; gap: 1.5rem; align-items: center; }
+.luma-nav nav a { font-size: .78rem; text-decoration: none; }
+.luma-nav nav a:last-child { padding: .7rem 1rem; border: 1px solid #77565d; border-radius: 999px; }
+.luma-hero { width: min(76rem, calc(100% - 2rem)); min-height: 42rem; margin: 0 auto; padding: clamp(4rem, 9vw, 8rem) 0; display: grid; grid-template-columns: 1.25fr .75fr; gap: 4rem; align-items: center; }
+.luma-eyebrow { color: #a45d62; font-size: .68rem; font-weight: 800; letter-spacing: .15em; text-transform: uppercase; }
+.luma-hero h1 { margin: 1rem 0; font: 400 clamp(5rem, 12vw, 10rem)/.78 Georgia, serif; letter-spacing: -.065em; }
+.luma-hero p { max-width: 36rem; color: #786a6d; font-size: 1.08rem; line-height: 1.75; }
+.luma-hero > div > a { display: inline-block; margin-top: 1.5rem; padding: .9rem 1.2rem; border-radius: 999px; background: #77565d; color: #fff; font-weight: 750; text-decoration: none; }
+.luma-hero aside { min-height: 24rem; padding: 2rem; display: flex; flex-direction: column; justify-content: space-between; border-radius: 12rem 12rem 1rem 1rem; background: linear-gradient(160deg, #e9c9bd, #d8a8a2); }
+.luma-hero aside div { padding-top: 4rem; text-align: center; }
+.luma-hero aside span { display: block; color: #79585c; font-size: .68rem; text-transform: uppercase; }
+.luma-hero aside strong { display: block; margin-top: .5rem; font: 400 1.5rem Georgia, serif; }
+.luma-hero blockquote { margin: 0; padding-top: 1.5rem; border-top: 1px solid rgba(84,52,58,.25); font: italic 1.1rem Georgia, serif; }
+.luma-specialists { padding: clamp(4rem, 9vw, 8rem) max(1rem, calc((100% - 76rem) / 2)); background: #49383d; color: #f9efeb; }
+.luma-specialists h2, .luma-booking h2 { margin: .7rem 0 2.5rem; font: 400 clamp(3rem, 7vw, 5.5rem)/.9 Georgia, serif; letter-spacing: -.045em; }
+.luma-specialists > div { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
+.luma-specialists article { min-height: 14rem; padding: 1.5rem; border: 1px solid #725d63; border-radius: 7rem 7rem .8rem .8rem; text-align: center; }
+.luma-specialists article > span { width: 3rem; height: 3rem; margin: 1rem auto 2rem; display: grid; place-items: center; border-radius: 50%; background: #d8a8a2; color: #49383d; font: 700 .7rem ui-monospace, monospace; }
+.luma-specialists h3 { margin: 0; font: 400 1.8rem Georgia, serif; }
+.luma-specialists p { color: #c9b7bc; font-size: .78rem; }
+.luma-booking { padding: clamp(4rem, 9vw, 8rem) 1rem; background: #f0e4df; }
+.luma-booking > header { width: min(64rem, 100%); margin: 0 auto 2.5rem; }
+.luma-booking > header p { max-width: 40rem; color: #786a6d; line-height: 1.65; }
+.luma-booking-shell, .rp-public-journey { border: 1px solid #d7c6c2; border-radius: 1.5rem; background: #fffaf7; color: #392c30; box-shadow: 0 2rem 5rem rgba(73,56,61,.09); }
+.luma-button, .luma-selected { border-color: #77565d; border-radius: 999px; background: #77565d; color: white; }
+.luma-button-disabled { border-radius: 999px; background: #ded4d2; color: #95888b; }
+.luma-input { border: 1px solid #d2c3bf; border-radius: .7rem; background: #fff; color: #392c30; }
+.luma-summary { border: 1px solid #ddcfcb; border-radius: 1rem; background: #f7eeea; }
+.luma-muted { color: #85777b; }
+.luma-error { padding: 1rem; border: 1px solid #a6444d; border-radius: .8rem; color: #8e3038; }
+.luma-success { padding: 1rem; border-radius: .8rem; background: #e9c9bd; color: #49383d; }
+.luma-setup { width: min(64rem, 100%); margin: 0 auto; padding: 2rem; border: 1px solid #d7c6c2; border-radius: 1rem; background: #fffaf7; }
+.luma-setup p { color: #786a6d; }
+@media (max-width: 760px) { .luma-hero { min-height: auto; grid-template-columns: 1fr; } .luma-hero aside { min-height: 15rem; border-radius: 1rem; } .luma-specialists > div { grid-template-columns: 1fr; } .luma-specialists article { min-height: 11rem; border-radius: 1rem; } .luma-nav nav a:first-child { display: none; } }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }

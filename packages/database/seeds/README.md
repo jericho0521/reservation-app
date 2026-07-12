@@ -13,3 +13,7 @@ conflict, and one sample reservation. It is development/demo data only.
 `rooms-demo.sql` creates the Northstar Rooms flagship fixture with attendee
 capacities, equipment metadata, operating hours, maintenance, and an existing
 meeting. It is development/demo data only.
+
+`appointments-demo.sql` creates the Luma Studio flagship fixture with three
+specialists, 45-minute appointment metadata, staff hours, and an overlapping
+sample appointment. It is development/demo data only.

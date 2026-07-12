@@ -81,7 +81,7 @@ export function generateAvailabilityTimeSlots(
   const maintenanceResourceLabels = normalizeResourceLabels(options.maintenanceResourceLabels ?? []);
 
   return slotTimes.map(({ startTime, endTime }) => {
-    const slotReservations = getReservationsForSlot(reservations, startTime);
+    const slotReservations = getReservationsForSlot(reservations, startTime, endTime);
     const unavailableResourceLabels = getUnavailableResourceLabels(
       slotReservations,
       maintenanceResourceLabels,

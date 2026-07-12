@@ -132,6 +132,40 @@ importers:
         specifier: ^5
         version: 5.9.3
 
+  apps/examples/appointments:
+    dependencies:
+      '@reservation-platform/react':
+        specifier: workspace:*
+        version: link:../../../packages/reservation-react
+      '@reservation-platform/ui':
+        specifier: workspace:*
+        version: link:../../../packages/reservation-ui
+      next:
+        specifier: ^16.1.1
+        version: 16.2.9(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
+      react:
+        specifier: ^19.2.3
+        version: 19.2.7
+      react-dom:
+        specifier: ^19.2.3
+        version: 19.2.7(react@19.2.7)
+    devDependencies:
+      '@types/node':
+        specifier: ^20
+        version: 20.19.28
+      '@types/react':
+        specifier: ^19
+        version: 19.2.17
+      '@types/react-dom':
+        specifier: ^19
+        version: 19.2.3(@types/react@19.2.17)
+      tailwindcss:
+        specifier: ^4.1.18
+        version: 4.3.1
+      typescript:
+        specifier: ^5
+        version: 5.9.3
+
   apps/examples/racing-simulator:
     dependencies:
       '@reservation-platform/react':

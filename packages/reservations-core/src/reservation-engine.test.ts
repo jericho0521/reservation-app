@@ -178,6 +178,36 @@ test("availability generates interval slots inside configured local windows", ()
   ]);
 });
 
+test("overlapping appointments mark a specialist unavailable across interval starts", () => {
+  const service = makeService({
+    total_seats: 2,
+    resources: ["Amina", "Jules"].map((label) => ({
+      id: label,
+      service_id: "service-1",
+      label,
+      kind: "custom",
+      is_active: true,
+      capacity: 1,
+    })),
+    policy: createAssignedResourcePolicy(2),
+  });
+  const slots = generateAvailabilityTimeSlots(service, [makeReservation({
+    start_time: "11:00",
+    end_time: "11:45",
+    quantity: 1,
+    items: [{ resource_label: "Amina", quantity: 1 }],
+    seat_labels: ["Amina"],
+  })], {
+    operatingWindows: [{ start_time: "10:00", end_time: "12:00", interval_minutes: 15 }],
+    durationMinutes: 45,
+  });
+
+  assert.deepEqual(
+    slots.filter((slot) => slot.taken_resource_labels.includes("Amina")).map((slot) => slot.start_time),
+    ["10:30", "10:45", "11:00", "11:15"],
+  );
+});
+
 test("conflicting resources are detected by exact labels", () => {
   const existingReservations = [
     makeReservation({

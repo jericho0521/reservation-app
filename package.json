@@ -54,7 +54,7 @@
     "local:supabase:start": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/start-local-supabase.ps1",
     "local:supabase:stop": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/stop-local-supabase.ps1",
     "test:smoke": "node --import tsx --test \"tests/smoke/**/*.smoke.ts\"",
-    "test:e2e": "node --import tsx --test \"tests/e2e/**/*.e2e.ts\"",
+    "test:e2e": "pnpm demo:reset && node --import tsx --test \"tests/e2e/**/*.e2e.ts\"",
     "demo:reset": "node scripts/reset-final-demo.mjs",
     "demo:verify": "node scripts/verify-final-demo-readiness.mjs",
     "test": "pnpm run packages:test && pnpm run backend-platform:verify-standalone-api-skeleton && pnpm run database:verify-migration-bundle"

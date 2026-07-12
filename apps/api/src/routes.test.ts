@@ -4283,7 +4283,7 @@ test("reservation cancel route validates input but uses the existing cancel serv
     body: {
       reason: "customer_request",
       metadata: {
-        source: "standalone-api-test",
+        changed_by: "standalone-api-test",
       },
     },
   });
@@ -4296,6 +4296,9 @@ test("reservation cancel route validates input but uses the existing cancel serv
     patch: {
       status: "cancelled",
       updated_at: (repositoryCall as { patch: { updated_at: string } }).patch.updated_at,
+      cancelled_at: (repositoryCall as { patch: { cancelled_at: string } }).patch.cancelled_at,
+      cancellation_reason: "customer_request",
+      cancelled_by: "standalone-api-test",
     },
   });
 });

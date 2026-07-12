@@ -2280,6 +2280,10 @@ async function handleReservationCancelRequest(
     mutate: (repository) => cancelReservation({
       repository,
       reservationId,
+      audit: {
+        ...(preparedInput.input.reason ? { reason: preparedInput.input.reason } : {}),
+        ...(typeof preparedInput.input.metadata?.changed_by === "string" ? { changedBy: preparedInput.input.metadata.changed_by } : {}),
+      },
     }),
   });
 }

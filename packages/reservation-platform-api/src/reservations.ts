@@ -143,6 +143,9 @@ export type LegacyReservationUpdatePatch = ReturnType<typeof toLegacyBookingUpda
   seats_booked?: number;
   seat_labels?: string[];
   interface_type?: "form" | "chat";
+  cancellation_reason?: string;
+  cancelled_by?: string;
+  cancelled_at?: string;
 };
 
 export interface ReservationMutationRepositoryPort {
@@ -802,6 +805,7 @@ export async function cancelReservation(input: {
   repository: Pick<ReservationMutationRepositoryPort, "updateReservation">;
   reservationId: string;
   now?: () => Date;
+  audit?: { reason?: string; changedBy?: string };
 }): Promise<ReservationApplicationResult<ReservationResponse>> {
   const invalidId = validateReservationId(input.reservationId, "Invalid reservation id");
   if (invalidId) {
@@ -812,11 +816,15 @@ export async function cancelReservation(input: {
   }
 
   try {
+    const cancelledAt = (input.now ?? (() => new Date()))().toISOString();
     const { data, error } = await input.repository.updateReservation({
       reservationId: input.reservationId,
       patch: {
         status: "cancelled",
-        updated_at: (input.now ?? (() => new Date()))().toISOString(),
+        updated_at: cancelledAt,
+        cancelled_at: cancelledAt,
+        ...(input.audit?.reason ? { cancellation_reason: input.audit.reason } : {}),
+        ...(input.audit?.changedBy ? { cancelled_by: input.audit.changedBy } : {}),
       },
     });
 

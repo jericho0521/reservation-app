@@ -392,6 +392,8 @@ export function toPlatformReservation(row: unknown): ReservationResponse {
     metadata: mergeMetadata(
       metadataFrom(record),
       legacyServiceNameFrom(record) ? { service_name: legacyServiceNameFrom(record) ?? null } : undefined,
+      stringValue(record.interface_type) ? { channel_origin: record.interface_type === "chat" ? "web_chat" : "web_booking" } : undefined,
+      primitiveObjectFrom(record, ["cancellation_reason", "cancelled_by", "cancelled_at"]),
     ),
     created_at: stringValue(record.created_at),
     updated_at: stringValue(record.updated_at),

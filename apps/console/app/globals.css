@@ -240,6 +240,43 @@ a { color: inherit; text-decoration: none; }
 .loading-card { height: 8rem; }
 .loading-panel { height: 20rem; }
 @keyframes loading-shimmer { to { background-position: -200% 0; } }
+.reservation-filters { display: grid; grid-template-columns: minmax(12rem, 1.3fr) repeat(3, minmax(9rem, 1fr)) auto; gap: .75rem; align-items: end; padding: 1rem; border: 1px solid var(--border); border-radius: 1rem; background: var(--panel); }
+.reservation-filters label { display: grid; gap: .35rem; color: var(--muted); font-size: .72rem; }
+.reservation-filters input, .reservation-filters select { width: 100%; padding: .65rem .75rem; border: 1px solid var(--border); border-radius: .6rem; color: var(--text); background: #0b111a; }
+.reservation-filters button { padding: .7rem .9rem; border: 0; border-radius: .6rem; color: var(--accent-ink); background: var(--accent); font-weight: 700; cursor: pointer; }
+.reservation-table-panel { overflow: hidden; border: 1px solid var(--border); border-radius: 1rem; background: var(--panel); }
+.responsive-table { overflow-x: auto; }
+.responsive-table table { width: 100%; border-collapse: collapse; }
+.responsive-table th, .responsive-table td { padding: .85rem 1rem; border-bottom: 1px solid var(--border); text-align: left; }
+.responsive-table th { color: var(--muted); font-size: .7rem; text-transform: uppercase; }
+.responsive-table td { font-size: .82rem; }
+.responsive-table td > strong, .responsive-table td > span { display: block; }
+.responsive-table td > span { margin-top: .2rem; color: var(--muted); font-size: .7rem; }
+.responsive-table td:last-child { text-align: right; white-space: nowrap; }
+.responsive-table td:last-child a { color: var(--accent); }
+.reservation-detail-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(18rem, .55fr); gap: 1rem; align-items: start; }
+.detail-panel, .destructive-panel { padding: 1.25rem; border: 1px solid var(--border); border-radius: 1rem; background: var(--panel); }
+.detail-panel h2:not(:first-child) { margin-top: 1.5rem; }
+.detail-panel dl { display: grid; grid-template-columns: repeat(2, 1fr); gap: .75rem; }
+.detail-panel dl div { padding: .75rem; border: 1px solid var(--border); border-radius: .7rem; }
+.detail-panel dt { color: var(--muted); font-size: .7rem; }
+.detail-panel dd { margin: .25rem 0 0; }
+.detail-panel ul { display: grid; gap: .5rem; padding-left: 1.2rem; }
+.destructive-panel { border-color: #7f1d1d; }
+.destructive-panel.is-complete { border-color: #166534; }
+.destructive-panel p { color: var(--muted); }
+.danger-action { padding: .75rem .95rem; border: 1px solid #ef4444; border-radius: .65rem; color: #fee2e2; background: #991b1b; font-weight: 700; cursor: pointer; }
+.resource-operations-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
+.maintenance-card { padding: 1.15rem; border: 1px solid var(--border); border-radius: 1rem; background: var(--panel); }
+.maintenance-card.is-maintenance { border-color: #854d0e; }
+.maintenance-card > header { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; }
+.maintenance-card > header span:first-child { color: var(--muted); font-size: .72rem; }
+.maintenance-card h2 { margin: .25rem 0; }
+.conflict-warning { margin: 1rem 0; padding: .8rem; border: 1px solid #854d0e; border-radius: .7rem; background: rgba(133,77,14,.12); }
+.conflict-warning p { color: var(--muted); font-size: .75rem; }
+.conflict-warning ul { display: grid; gap: .4rem; padding-left: 1rem; font-size: .75rem; }
+.conflict-warning a { color: var(--accent); }
+.maintenance-action { margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border); }
 
 @media (max-width: 900px) {
   .console-frame { display: block; }
@@ -256,6 +293,9 @@ a { color: inherit; text-decoration: none; }
   .takeover-panel { position: static; }
   .readiness-grid, .simulator-panel { grid-template-columns: 1fr; }
   .overview-columns { grid-template-columns: 1fr; }
+  .reservation-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .reservation-filters button { grid-column: 1 / -1; }
+  .reservation-detail-grid, .resource-operations-grid { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 620px) {
@@ -274,4 +314,5 @@ a { color: inherit; text-decoration: none; }
   .today-timeline li { grid-template-columns: 3.5rem minmax(0, 1fr); }
   .today-timeline li > div { grid-column: 2; justify-items: start; }
   .attention-panel li, .session-controls { align-items: stretch; flex-direction: column; }
+  .reservation-filters, .detail-panel dl { grid-template-columns: 1fr; }
 }

@@ -233,6 +233,7 @@ test("reservation cancel service validates ids, stamps cancelled patch, and maps
     },
     reservationId: "123e4567-e89b-42d3-a456-426614174000",
     now: () => new Date("2026-06-12T04:05:06.000Z"),
+    audit: { reason: "customer request", changedBy: "owner_console" },
   });
 
   assert.deepEqual(call, {
@@ -240,6 +241,9 @@ test("reservation cancel service validates ids, stamps cancelled patch, and maps
     patch: {
       status: "cancelled",
       updated_at: "2026-06-12T04:05:06.000Z",
+      cancelled_at: "2026-06-12T04:05:06.000Z",
+      cancellation_reason: "customer request",
+      cancelled_by: "owner_console",
     },
   });
   assert.equal(cancelled.status, 200);

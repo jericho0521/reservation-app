@@ -1,5 +1,9 @@
 -- Venue-scoped operational summaries and descriptive analytics RPCs.
 
+alter table public.bookings add column if not exists cancellation_reason text;
+alter table public.bookings add column if not exists cancelled_by text;
+alter table public.bookings add column if not exists cancelled_at timestamptz;
+
 create or replace function public.read_platform_operations_overview(
   p_tenant_id text,
   p_venue_id uuid,

@@ -177,6 +177,17 @@
       ]
     },
     {
+      "kind": "core-migration",
+      "order": 16,
+      "targetPath": "packages/database/migrations/supabase/000016_experience_availability_rules.sql",
+      "sourceAssets": [
+        {
+          "path": "packages/database/migrations/supabase/000016_experience_availability_rules.sql",
+          "section": "Venue-scoped operating settings, normalized intervals, closures, atomic replacement, and availability snapshot integration"
+        }
+      ]
+    },
+    {
       "kind": "optional-ai-retrieval",
       "targetPath": "packages/database/migrations/supabase/optional/ai-retrieval/000001_knowledge_chunks.sql",
       "sourceAssets": [

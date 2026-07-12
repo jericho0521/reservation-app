@@ -137,6 +137,34 @@ test("experience catalog SDK methods preserve mutation paths and bodies", async 
   assert.deepEqual(JSON.parse(String(requests[7]!.init?.body)), {});
 });
 
+test("experience operating-hours SDK methods use the owner route", async () => {
+  const requests: Array<{ url: string; init?: RequestInit }> = [];
+  const value = {
+    timezone: "Asia/Kuala_Lumpur",
+    booking_horizon_days: 60,
+    slot_interval_minutes: 30,
+    minimum_notice_minutes: 120,
+    intervals: [{ day_of_week: 1, start_time: "09:00", end_time: "17:00" }],
+    closures: [{ date: "2026-08-31" }],
+  };
+  const client = createReservationPlatformClient({
+    baseUrl: "https://platform.example",
+    fetch: async (url, init) => {
+      requests.push({ url: String(url), init });
+      return jsonResponse(value);
+    },
+  });
+
+  await client.getExperienceOperatingHours();
+  await client.updateExperienceOperatingHours(value);
+
+  assert.deepEqual(requests.map(({ url, init }) => [new URL(url).pathname, init?.method]), [
+    ["/v1/experience/operating-hours", "GET"],
+    ["/v1/experience/operating-hours", "PUT"],
+  ]);
+  assert.deepEqual(JSON.parse(String(requests[1]!.init?.body)), value);
+});
+
 test("SDK maps createReservation to POST /v1/reservations with context headers", async () => {
   const calls: { url: string; init: RequestInit }[] = [];
   const client = createReservationPlatformClient({

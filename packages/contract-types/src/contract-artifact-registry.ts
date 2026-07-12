@@ -160,6 +160,34 @@ export const publicJsonSchemaDefinitions: Record<string, JsonSchema> = {
   ArchiveCatalogItemInput: objectSchema({
     reason: { type: "string", maxLength: 500 },
   }),
+  ExperienceOperatingInterval: objectSchema({
+    day_of_week: { type: "integer", minimum: 0, maximum: 6 },
+    start_time: { type: "string", pattern: "^(?:[01]\\d|2[0-3]):[0-5]\\d$" },
+    end_time: { type: "string", pattern: "^(?:[01]\\d|2[0-3]):[0-5]\\d$" },
+  }, ["day_of_week", "start_time", "end_time"]),
+  ExperienceDateClosure: objectSchema({
+    date: { type: "string", pattern: "^\\d{4}-\\d{2}-\\d{2}$" },
+    reason: { type: "string", maxLength: 200 },
+  }, ["date"]),
+  ExperienceOperatingHoursInput: objectSchema({
+    timezone: { type: "string", minLength: 1, maxLength: 100 },
+    booking_horizon_days: { type: "integer", minimum: 1, maximum: 365 },
+    slot_interval_minutes: { type: "integer", minimum: 5, maximum: 720 },
+    minimum_notice_minutes: { type: "integer", minimum: 0, maximum: 10080 },
+    intervals: { type: "array", maxItems: 56, items: ref("ExperienceOperatingInterval") },
+    closures: { type: "array", maxItems: 366, items: ref("ExperienceDateClosure") },
+  }, ["timezone", "booking_horizon_days", "slot_interval_minutes", "minimum_notice_minutes", "intervals", "closures"]),
+  ExperienceOperatingHoursResponse: objectSchema({
+    tenant_id: stringSchema,
+    venue_id: stringSchema,
+    timezone: { type: "string", minLength: 1, maxLength: 100 },
+    booking_horizon_days: { type: "integer", minimum: 1, maximum: 365 },
+    slot_interval_minutes: { type: "integer", minimum: 5, maximum: 720 },
+    minimum_notice_minutes: { type: "integer", minimum: 0, maximum: 10080 },
+    intervals: { type: "array", maxItems: 56, items: ref("ExperienceOperatingInterval") },
+    closures: { type: "array", maxItems: 366, items: ref("ExperienceDateClosure") },
+    updated_at: stringSchema,
+  }, ["tenant_id", "venue_id", "timezone", "booking_horizon_days", "slot_interval_minutes", "minimum_notice_minutes", "intervals", "closures"]),
   ListServicesResponse: objectSchema({
     services: { type: "array", items: ref("ServiceResponse") },
   }, ["services"]),
@@ -539,6 +567,23 @@ export const publicContractOperations: ContractOperation[] = [
     tags: ["Experience Studio"],
     querySchema: "ListResourcesQuery",
     responseSchema: "ListResourcesResponse",
+  },
+  {
+    method: "get",
+    path: "/v1/experience/operating-hours",
+    operationId: "getExperienceOperatingHours",
+    summary: "Read venue operating hours and booking rules",
+    tags: ["experience"],
+    responseSchema: "ExperienceOperatingHoursResponse",
+  },
+  {
+    method: "put",
+    path: "/v1/experience/operating-hours",
+    operationId: "updateExperienceOperatingHours",
+    summary: "Replace venue operating hours and booking rules",
+    tags: ["experience"],
+    requestBodySchema: "ExperienceOperatingHoursInput",
+    responseSchema: "ExperienceOperatingHoursResponse",
   },
   {
     method: "post",

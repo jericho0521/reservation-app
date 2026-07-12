@@ -17,6 +17,12 @@ export function getEndTime(startTime: string) {
 
 export interface GenerateAvailabilityOptions {
   operatingHours?: readonly number[];
+  operatingWindows?: ReadonlyArray<{
+    start_time: string;
+    end_time: string;
+    interval_minutes: number;
+  }>;
+  durationMinutes?: number;
   maintenanceResourceLabels?: string[];
   legacyFallbackLabels?: string[];
 }
@@ -66,11 +72,15 @@ export function generateAvailabilityTimeSlots(
   reservations: Reservation[],
   options: GenerateAvailabilityOptions = {},
 ): ReservationTimeSlot[] {
-  const operatingHours = options.operatingHours ?? DEFAULT_OPERATING_HOURS;
+  const slotTimes = options.operatingWindows
+    ? generateWindowSlotTimes(options.operatingWindows, options.durationMinutes ?? 60)
+    : (options.operatingHours ?? DEFAULT_OPERATING_HOURS).map((hour) => {
+        const startTime = `${hour.toString().padStart(2, "0")}:00`;
+        return { startTime, endTime: getEndTime(startTime) };
+      });
   const maintenanceResourceLabels = normalizeResourceLabels(options.maintenanceResourceLabels ?? []);
 
-  return operatingHours.map((hour) => {
-    const startTime = `${hour.toString().padStart(2, "0")}:00`;
+  return slotTimes.map(({ startTime, endTime }) => {
     const slotReservations = getReservationsForSlot(reservations, startTime);
     const unavailableResourceLabels = getUnavailableResourceLabels(
       slotReservations,
@@ -85,7 +95,7 @@ export function generateAvailabilityTimeSlots(
 
     return {
       start_time: startTime,
-      end_time: getEndTime(startTime),
+      end_time: endTime,
       available_quantity: availableQuantity,
       is_available: availableQuantity > 0,
       taken_resource_labels: unavailableResourceLabels,
@@ -97,4 +107,37 @@ export function generateAvailabilityTimeSlots(
         : {}),
     };
   });
+}
+
+function generateWindowSlotTimes(
+  windows: ReadonlyArray<{ start_time: string; end_time: string; interval_minutes: number }>,
+  durationMinutes: number,
+) {
+  const slots = new Map<string, { startTime: string; endTime: string }>();
+  for (const window of windows) {
+    const start = timeToMinutes(window.start_time);
+    const end = timeToMinutes(window.end_time);
+    if (start === null || end === null || start >= end || window.interval_minutes <= 0 || durationMinutes <= 0) {
+      continue;
+    }
+    for (let minute = start; minute + durationMinutes <= end; minute += window.interval_minutes) {
+      const startTime = minutesToTime(minute);
+      slots.set(startTime, { startTime, endTime: minutesToTime(minute + durationMinutes) });
+    }
+  }
+  return [...slots.values()].sort((left, right) => left.startTime.localeCompare(right.startTime));
+}
+
+function timeToMinutes(value: string) {
+  const match = /^(\d{2}):(\d{2})$/.exec(value);
+  if (!match) return null;
+  const hours = Number(match[1]);
+  const minutes = Number(match[2]);
+  return hours < 24 && minutes < 60 ? hours * 60 + minutes : null;
+}
+
+function minutesToTime(value: number) {
+  const hours = Math.floor(value / 60);
+  const minutes = value % 60;
+  return `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}`;
 }

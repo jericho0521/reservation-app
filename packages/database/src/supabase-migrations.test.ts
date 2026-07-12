@@ -9,16 +9,32 @@ import {
 
 const indexPath = new URL("../migrations/supabase/migration-index.json", import.meta.url);
 
-test("core plan includes exactly 000001 through 000015 in order", async () => {
+test("core plan includes exactly 000001 through 000016 in order", async () => {
   const index = await readActualIndex();
   const plan = buildSupabaseMigrationPlan(index);
 
   assert.deepEqual(
     plan.migrations.map((entry) => entry.path.match(/\/(\d{6})_[^/]+\.sql$/)?.[1]),
-    Array.from({ length: 15 }, (_, index) => String(index + 1).padStart(6, "0")),
+    Array.from({ length: 16 }, (_, index) => String(index + 1).padStart(6, "0")),
   );
-  assert.equal(plan.migrations.length, 15);
+  assert.equal(plan.migrations.length, 16);
   assert.equal(plan.seeds.length, 0);
+});
+
+test("experience availability migration owns normalized rules and shared snapshot integration", async () => {
+  const sql = await readFile(new URL("../migrations/supabase/000016_experience_availability_rules.sql", import.meta.url), "utf8");
+
+  for (const expected of [
+    "create table if not exists public.platform_availability_settings",
+    "create table if not exists public.platform_operating_intervals",
+    "create table if not exists public.platform_date_closures",
+    "create or replace function public.replace_experience_operating_hours",
+    "prevent_platform_operating_interval_overlap",
+    "create or replace function public.read_reservation_availability_snapshot",
+    "'operating_hours'",
+  ]) {
+    assert.match(sql.toLowerCase(), new RegExp(expected.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  }
 });
 
 test("default plan excludes optional AI retrieval and development seed entries", async () => {
@@ -34,7 +50,7 @@ test("AI retrieval option appends optional AI retrieval migrations after core mi
   const plan = buildSupabaseMigrationPlan(index, { includeAiRetrieval: true });
 
   assert.deepEqual(
-    plan.migrations.slice(15).map((entry) => entry.path),
+    plan.migrations.slice(16).map((entry) => entry.path),
     [
       "packages/database/migrations/supabase/optional/ai-retrieval/000001_knowledge_chunks.sql",
       "packages/database/migrations/supabase/optional/ai-retrieval/000002_langchain_checkpoints.sql",

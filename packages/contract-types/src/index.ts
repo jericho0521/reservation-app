@@ -194,6 +194,32 @@ export interface ArchiveCatalogItemInput {
   reason?: string;
 }
 
+export interface ExperienceOperatingInterval {
+  day_of_week: number;
+  start_time: string;
+  end_time: string;
+}
+
+export interface ExperienceDateClosure {
+  date: string;
+  reason?: string;
+}
+
+export interface ExperienceOperatingHoursInput {
+  timezone: string;
+  booking_horizon_days: number;
+  slot_interval_minutes: number;
+  minimum_notice_minutes: number;
+  intervals: ExperienceOperatingInterval[];
+  closures: ExperienceDateClosure[];
+}
+
+export interface ExperienceOperatingHoursResponse extends ExperienceOperatingHoursInput {
+  tenant_id: string;
+  venue_id: string;
+  updated_at?: string;
+}
+
 export interface ListServicesResponse {
   services: ServiceResponse[];
 }

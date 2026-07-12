@@ -74,6 +74,42 @@ export async function archiveResourceAction(formData: FormData) {
   revalidatePath("/studio/resources");
 }
 
+export async function saveOperatingHoursAction(
+  _previous: StudioActionState,
+  formData: FormData,
+): Promise<StudioActionState> {
+  try {
+    const intervals = Array.from({ length: 7 }, (_, dayOfWeek) => (
+      Array.from({ length: 2 }, (_, intervalIndex) => {
+        const start = String(formData.get(`day_${dayOfWeek}_start_${intervalIndex}`) ?? "").trim();
+        const end = String(formData.get(`day_${dayOfWeek}_end_${intervalIndex}`) ?? "").trim();
+        return start && end ? { day_of_week: dayOfWeek, start_time: start, end_time: end } : null;
+      }).filter((value): value is { day_of_week: number; start_time: string; end_time: string } => value !== null)
+    )).flat();
+    const closures = String(formData.get("closures") ?? "")
+      .split("\n")
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .map((line) => {
+        const [date, ...reasonParts] = line.split("|");
+        const reason = reasonParts.join("|").trim();
+        return { date: date!.trim(), ...(reason ? { reason } : {}) };
+      });
+    await createConsolePlatformClient().updateExperienceOperatingHours({
+      timezone: requiredField(formData, "timezone"),
+      booking_horizon_days: positiveInteger(formData, "booking_horizon_days"),
+      slot_interval_minutes: positiveInteger(formData, "slot_interval_minutes"),
+      minimum_notice_minutes: nonNegativeInteger(formData, "minimum_notice_minutes"),
+      intervals,
+      closures,
+    });
+    revalidatePath("/studio/availability");
+    return { status: "success", message: "Operating hours saved." };
+  } catch (error) {
+    return actionError(error, "Operating hours could not be saved.");
+  }
+}
+
 async function updateIdentityFromForm(formData: FormData, source: "profile" | "branding") {
   try {
     const client = createConsolePlatformClient();
@@ -137,6 +173,12 @@ function optionalField(formData: FormData, name: string, key: string) {
 function positiveInteger(formData: FormData, name: string) {
   const value = Number(requiredField(formData, name));
   if (!Number.isInteger(value) || value <= 0) throw new Error(`${name.replaceAll("_", " ")} must be a positive integer.`);
+  return value;
+}
+
+function nonNegativeInteger(formData: FormData, name: string) {
+  const value = Number(requiredField(formData, name));
+  if (!Number.isInteger(value) || value < 0) throw new Error(`${name.replaceAll("_", " ")} must be zero or a positive integer.`);
   return value;
 }
 

@@ -31,12 +31,14 @@ import {
   listPlatformServices,
   listReservations,
   publishExperienceDraft,
+  readExperienceOperatingHours,
   readExperienceWorkspace,
   readPublicExperience,
   readReservationById,
   rescheduleReservationWithLegacyPatch,
   saveExperienceDraft,
   updateExperienceIdentity,
+  replaceExperienceOperatingHours,
   updatePlatformResource,
   updatePlatformService,
   updateReservationWithLegacyPatch,
@@ -44,6 +46,7 @@ import {
   type AuthenticatedPlatformPrincipal,
   type IdempotencyRepository,
   type ExperienceStudioRepository,
+  type OperatingHoursRepository,
   type PlatformCatalogRepository,
   type PlatformRequestContext,
   type PlatformTenantVenueRepository,
@@ -94,6 +97,7 @@ export interface StandaloneApiDependencies {
   chatModule?: StandaloneApiChatModule;
   idempotencyRepository?: IdempotencyRepository;
   experienceStudioRepository?: ExperienceStudioRepository;
+  operatingHoursRepository?: OperatingHoursRepository;
   reservationCreateRepository?: ReservationCreateRepositoryPort;
   reservationMutationRepository?: ReservationMutationRepositoryPort;
   reservationReadRepository?: ReservationReadRepositoryPort;
@@ -297,6 +301,25 @@ export async function handleStandaloneApiRequest(
 
   if (method === "PATCH" && path === "/v1/experience/identity") {
     return handleExperienceIdentityUpdateRequest(request, dependencies.experienceStudioRepository);
+  }
+
+  if (method === "GET" && path === "/v1/experience/operating-hours") {
+    const scoped = readExperienceScope(request);
+    if (!scoped.ok) return scoped.response;
+    if (!dependencies.operatingHoursRepository) return platformError(503, "bad_request", "Operating hours repository is not configured.");
+    const result = await readExperienceOperatingHours({ scope: scoped.scope, repository: dependencies.operatingHoursRepository });
+    return jsonResponse(result.status, result.body);
+  }
+  if (method === "PUT" && path === "/v1/experience/operating-hours") {
+    const scoped = readExperienceScope(request);
+    if (!scoped.ok) return scoped.response;
+    if (!dependencies.operatingHoursRepository) return platformError(503, "bad_request", "Operating hours repository is not configured.");
+    const result = await replaceExperienceOperatingHours({
+      scope: scoped.scope,
+      value: request.body,
+      repository: dependencies.operatingHoursRepository,
+    });
+    return jsonResponse(result.status, result.body);
   }
 
   if (method === "POST" && path === "/v1/experience/services") {
@@ -637,7 +660,7 @@ type RouteMatcher = string | RegExp | ((path: string) => boolean);
 const protectedRouteMetadata: Readonly<Record<string, readonly RouteMatcher[]>> = {
   GET: [
     "/v1/experience/presets", "/v1/experience/workspace",
-    "/v1/experience/services", "/v1/experience/resources",
+    "/v1/experience/services", "/v1/experience/resources", "/v1/experience/operating-hours",
     "/v1/availability", "/v1/reservations", reservationPattern,
     "/v1/resource-maintenance", "/v1/venues", venuePattern,
     "/v1/services", servicePattern, "/v1/resources", resourcePattern,
@@ -652,7 +675,7 @@ const protectedRouteMetadata: Readonly<Record<string, readonly RouteMatcher[]>> 
     isChatReservationSessionRoute, isWhatsAppOwnerRoute,
   ],
   PATCH: ["/v1/experience/identity", reservationPattern, isWhatsAppOwnerRoute],
-  PUT: ["/v1/experience/draft", experienceServicePattern, experienceResourcePattern],
+  PUT: ["/v1/experience/draft", "/v1/experience/operating-hours", experienceServicePattern, experienceResourcePattern],
   DELETE: [isWhatsAppOwnerRoute],
 };
 

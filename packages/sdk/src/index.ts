@@ -13,6 +13,8 @@ import type {
   EndResourceMaintenanceInput,
   ExperienceDraftInput,
   ExperienceIdentityInput,
+  ExperienceOperatingHoursInput,
+  ExperienceOperatingHoursResponse,
   ExperienceResourceInput,
   ExperienceServiceInput,
   ExperiencePresetSummary,
@@ -137,6 +139,8 @@ export interface ReservationPlatformClient {
   listExperienceResources(serviceId?: string, options?: RequestOptions): Promise<ListResourcesResponse>;
   updateExperienceResource(resourceId: string, input: ExperienceResourceInput, options?: RequestOptions): Promise<ResourceResponse>;
   archiveExperienceResource(resourceId: string, input?: ArchiveCatalogItemInput, options?: RequestOptions): Promise<ResourceResponse>;
+  getExperienceOperatingHours(options?: RequestOptions): Promise<ExperienceOperatingHoursResponse>;
+  updateExperienceOperatingHours(input: ExperienceOperatingHoursInput, options?: RequestOptions): Promise<ExperienceOperatingHoursResponse>;
   getPublicExperience(slug: string, options?: RequestOptions): Promise<PublicExperienceResponse>;
   getMetadata(options?: RequestOptions): Promise<MetadataResponse>;
   getCurrentTenant(options?: RequestOptions): Promise<TenantResponse>;
@@ -206,6 +210,8 @@ export function createReservationPlatformClient(
     listExperienceResources: (serviceId, options) => request({ method: "GET", path: "/experience/resources", query: serviceId ? { service_id: serviceId } : undefined, options }),
     updateExperienceResource: (resourceId, input, options) => request({ method: "PUT", path: `/experience/resources/${encodeURIComponent(resourceId)}`, body: input, options }),
     archiveExperienceResource: (resourceId, input, options) => request({ method: "POST", path: `/experience/resources/${encodeURIComponent(resourceId)}/archive`, body: input ?? {}, options }),
+    getExperienceOperatingHours: (options) => request({ method: "GET", path: "/experience/operating-hours", options }),
+    updateExperienceOperatingHours: (input, options) => request({ method: "PUT", path: "/experience/operating-hours", body: input, options }),
     getPublicExperience: (slug, options) => request({
       method: "GET",
       path: `/public/experiences/${encodeURIComponent(slug)}`,

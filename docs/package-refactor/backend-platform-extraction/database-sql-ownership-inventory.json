@@ -167,6 +167,16 @@
       "notes": [
         "Backend-owned Experience Studio tenancy compatibility, business profile, versioned configuration, and atomic publication foundation."
       ]
+    },
+    {
+      "path": "packages/database/migrations/supabase/000016_experience_availability_rules.sql",
+      "classification": "core-platform",
+      "intendedBackendDestination": [
+        "packages/database/migrations/supabase/000016_experience_availability_rules.sql"
+      ],
+      "notes": [
+        "Backend-owned venue operating settings, normalized weekly intervals, date closures, atomic replacement RPC, and shared availability snapshot integration."
+      ]
     }
   ]
 }

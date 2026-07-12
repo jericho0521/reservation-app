@@ -244,6 +244,49 @@ export const archiveCatalogItemInputSchema = strictObject({
   reason: z.string().trim().max(500).optional(),
 });
 
+const localTimeSchema = z.string().regex(/^(?:[01]\d|2[0-3]):[0-5]\d$/);
+const localDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine((value) => {
+  const date = new Date(`${value}T00:00:00.000Z`);
+  return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === value;
+}, "Date must be a real calendar date.");
+const ianaTimezoneSchema = z.string().min(1).max(100).refine((value) => {
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone: value }).format();
+    return value.includes("/") || value === "UTC";
+  } catch {
+    return false;
+  }
+}, "Timezone must be a valid IANA timezone.");
+
+export const experienceOperatingIntervalSchema = strictObject({
+  day_of_week: z.number().int().min(0).max(6),
+  start_time: localTimeSchema,
+  end_time: localTimeSchema,
+}).refine((value) => value.start_time < value.end_time, {
+  message: "Operating intervals must end after they start; overnight intervals are not supported.",
+  path: ["end_time"],
+});
+
+export const experienceDateClosureSchema = strictObject({
+  date: localDateSchema,
+  reason: z.string().trim().max(200).optional(),
+});
+
+export const experienceOperatingHoursInputSchema = strictObject({
+  timezone: ianaTimezoneSchema,
+  booking_horizon_days: z.number().int().min(1).max(365),
+  slot_interval_minutes: z.number().int().min(5).max(720),
+  minimum_notice_minutes: z.number().int().min(0).max(10080),
+  intervals: z.array(experienceOperatingIntervalSchema).max(56),
+  closures: z.array(experienceDateClosureSchema).max(366),
+});
+
+export const experienceOperatingHoursResponseSchema = experienceOperatingHoursInputSchema.extend({
+  tenant_id: z.string().min(1),
+  venue_id: z.string().min(1),
+  updated_at: z.string().optional(),
+});
+
 export const listServicesResponseSchema = strictObject({
   services: z.array(serviceResponseSchema),
 });

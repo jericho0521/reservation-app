@@ -572,6 +572,7 @@ test("availability repository reads and adapts one database snapshot", async () 
             resource_kind: "seat",
             selection_mode: "assigned_resource",
             reservation_policy: { max_quantity: 2 },
+            metadata: { duration_minutes: 45 },
           },
           bookings: [{
             id: "booking-1",
@@ -601,6 +602,16 @@ test("availability repository reads and adapts one database snapshot", async () 
             layout_kind: "grid",
             metadata: { columns: 2 },
           },
+          operating_hours: {
+            tenant_id: "tenant_1",
+            venue_id: "venue_1",
+            timezone: "Asia/Kuala_Lumpur",
+            booking_horizon_days: 60,
+            slot_interval_minutes: 30,
+            minimum_notice_minutes: 120,
+            intervals: [{ day_of_week: 1, start_time: "09:00", end_time: "17:00" }],
+            closures: [{ date: "2026-08-31" }],
+          },
         },
         error: null,
       };
@@ -618,6 +629,15 @@ test("availability repository reads and adapts one database snapshot", async () 
   assert.deepEqual(availability.service.resources?.map((resource) => resource.label), ["RS1"]);
   assert.deepEqual(availability.bookings.map((booking) => booking.interface_type), ["chat"]);
   assert.deepEqual(availability.maintenanceResourceLabels, ["RS2"]);
+  assert.equal(availability.durationMinutes, 45);
+  assert.deepEqual(availability.operatingHours, {
+    timezone: "Asia/Kuala_Lumpur",
+    booking_horizon_days: 60,
+    slot_interval_minutes: 30,
+    minimum_notice_minutes: 120,
+    intervals: [{ day_of_week: 1, start_time: "09:00", end_time: "17:00" }],
+    closures: [{ date: "2026-08-31" }],
+  });
   assert.deepEqual(rpcCalls, [
     {
       fn: RESERVATION_SUPABASE_AVAILABILITY_RPCS.readSnapshot,

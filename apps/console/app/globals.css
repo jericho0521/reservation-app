@@ -97,6 +97,16 @@ a { color: inherit; text-decoration: none; }
 .catalog-editor-heading h2 { margin: .3rem 0 0; }
 .archive-form { display: flex; justify-content: flex-end; margin-top: .8rem; }
 .archive-form button { padding: .55rem .75rem; border: 1px solid #7f1d1d; border-radius: .6rem; color: #fecaca; background: transparent; cursor: pointer; }
+.availability-editor { gap: 1.5rem; margin-top: 1.5rem; }
+.weekly-schedule { display: grid; gap: .75rem; }
+.schedule-day { border: 1px solid var(--border); border-radius: 14px; padding: .85rem 1rem 1rem; }
+.schedule-day legend { color: var(--text); font-weight: 700; padding: 0 .35rem; }
+.schedule-interval { display: grid; grid-template-columns: minmax(8rem, .7fr) repeat(2, 1fr); gap: .75rem; align-items: end; margin-top: .6rem; }
+.schedule-interval > span { color: var(--muted); font-size: .85rem; padding-bottom: .7rem; }
+.slot-preview { border: 1px solid var(--border); background: var(--panel-soft); border-radius: 16px; padding: 1rem; display: grid; gap: .8rem; }
+.slot-preview h3, .slot-preview p { margin: 0; }
+.slot-chip-list { display: flex; flex-wrap: wrap; gap: .5rem; }
+.slot-chip { border: 1px solid var(--border); background: var(--panel); border-radius: 999px; padding: .4rem .7rem; font-size: .85rem; }
 
 @media (max-width: 900px) {
   .console-frame { display: block; }
@@ -119,4 +129,6 @@ a { color: inherit; text-decoration: none; }
   .form-columns, .form-columns.three { grid-template-columns: 1fr; }
   .form-footer { align-items: stretch; flex-direction: column; }
   .primary-action { text-align: center; }
+  .schedule-interval { grid-template-columns: 1fr 1fr; }
+  .schedule-interval > span { grid-column: 1 / -1; padding: 0; }
 }

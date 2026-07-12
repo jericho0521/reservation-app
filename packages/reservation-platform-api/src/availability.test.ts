@@ -220,6 +220,52 @@ test("availability list service derives date, reads repository, and maps slots w
   });
 });
 
+test("availability intersects operating windows, minimum notice, horizon, and closures", async () => {
+  const operatingHours = {
+    timezone: "Asia/Kuala_Lumpur",
+    booking_horizon_days: 30,
+    slot_interval_minutes: 30,
+    minimum_notice_minutes: 120,
+    intervals: [{ day_of_week: 1, start_time: "09:00", end_time: "12:00" }],
+    closures: [{ date: "2026-07-20" }],
+  };
+  const repository: AvailabilityRepositoryPort = {
+    async readAvailability() {
+      return {
+        service,
+        bookings: [],
+        maintenanceResourceLabels: [],
+        operatingHours,
+        durationMinutes: 60,
+      };
+    },
+  };
+  const now = new Date("2026-07-13T00:00:00.000Z");
+
+  const open = await listAvailability({
+    repository,
+    query: { service_id: "svc_123", date: "2026-07-13" },
+    now,
+  });
+  const closed = await listAvailability({
+    repository,
+    query: { service_id: "svc_123", date: "2026-07-20" },
+    now,
+  });
+  const beyondHorizon = await listAvailability({
+    repository,
+    query: { service_id: "svc_123", date: "2026-08-20" },
+    now,
+  });
+
+  assert.ok(!("error" in open.body));
+  assert.deepEqual(open.body.slots.map((slot) => slot.start_time), ["10:00", "10:30", "11:00"]);
+  assert.ok(!("error" in closed.body));
+  assert.equal(closed.body.slots.length, 0);
+  assert.ok(!("error" in beyondHorizon.body));
+  assert.equal(beyondHorizon.body.slots.length, 0);
+});
+
 test("availability list service maps storage not found errors", async () => {
   const missing = await listAvailability({
     repository: {

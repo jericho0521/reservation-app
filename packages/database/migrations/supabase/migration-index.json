@@ -125,6 +125,14 @@
       "scope": "reservation-platform",
       "sha256": "3f691343726ab69b64255c9242f898b67fbf68ca14862cd6dfbfd7359c7af2c8",
       "bytes": 6618
+    },
+    {
+      "order": 16,
+      "path": "packages/database/migrations/supabase/000016_experience_availability_rules.sql",
+      "module": "core",
+      "scope": "reservation-platform",
+      "sha256": "35b3a39a339b0bed89d80b4a4b5c96d02afb6fcf7bfc120109af1eb4860abc67",
+      "bytes": 11569
     }
   ],
   "optionalMigrations": [

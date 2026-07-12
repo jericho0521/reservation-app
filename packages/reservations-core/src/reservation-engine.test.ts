@@ -142,6 +142,19 @@ test("maintenance resources reduce availability without requiring RS labels", ()
   assert.deepEqual(getMaintenanceResourceConflicts(["A1", "A2"], ["A2"]), ["A2"]);
 });
 
+test("availability generates interval slots inside configured local windows", () => {
+  const slots = generateAvailabilityTimeSlots(makeService({}), [], {
+    operatingWindows: [{ start_time: "09:00", end_time: "11:00", interval_minutes: 30 }],
+    durationMinutes: 60,
+  });
+
+  assert.deepEqual(slots.map((slot) => [slot.start_time, slot.end_time]), [
+    ["09:00", "10:00"],
+    ["09:30", "10:30"],
+    ["10:00", "11:00"],
+  ]);
+});
+
 test("conflicting resources are detected by exact labels", () => {
   const existingReservations = [
     makeReservation({

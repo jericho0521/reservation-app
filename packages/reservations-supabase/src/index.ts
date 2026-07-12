@@ -31,11 +31,14 @@ import type {
 } from "@reservation-platform/api";
 import type {
   ArchiveCatalogItemInput,
+  ExperienceOperatingHoursInput,
   ExperienceResourceInput,
   ExperienceServiceInput,
 } from "@reservation-platform/contract-types";
+import { experienceOperatingHoursResponseSchema } from "@reservation-platform/contract-types";
 
 export * from "./experience-studio.js";
+export * from "./operating-hours.js";
 
 export const RESERVATION_SUPABASE_TABLES = {
   platformTenants: "tenants",
@@ -103,6 +106,7 @@ export interface ServiceMetadataRow {
   resource_kind?: ResourceKind | null;
   selection_mode?: ResourceSelectionMode | null;
   reservation_policy?: unknown;
+  metadata?: Record<string, unknown> | null;
 }
 
 export interface ResourceRow {
@@ -208,6 +212,8 @@ export interface SupabaseAvailabilityRead {
   service: ReservationService;
   bookings: Reservation[];
   maintenanceResourceLabels: string[];
+  operatingHours?: ExperienceOperatingHoursInput;
+  durationMinutes?: number;
 }
 
 interface SupabaseAvailabilitySnapshot {
@@ -216,6 +222,7 @@ interface SupabaseAvailabilitySnapshot {
   maintenance: MaintenanceRow[];
   resources: ResourceRow[];
   layout: LayoutRow | null;
+  operatingHours?: ExperienceOperatingHoursInput;
 }
 
 export interface SupabaseAvailabilityRepository {
@@ -334,6 +341,7 @@ function parseAvailabilitySnapshot(raw: unknown): SupabaseAvailabilitySnapshot |
     || !Array.isArray(raw.maintenance)
     || !Array.isArray(raw.resources)
     || (raw.layout !== null && !isRecord(raw.layout))
+    || (raw.operating_hours !== null && raw.operating_hours !== undefined && !isRecord(raw.operating_hours))
     || !raw.bookings.every(isRecord)
     || !raw.maintenance.every(isRecord)
     || !raw.resources.every(isRecord)
@@ -341,12 +349,28 @@ function parseAvailabilitySnapshot(raw: unknown): SupabaseAvailabilitySnapshot |
     throw new Error("Availability snapshot RPC returned an invalid response");
   }
 
+  const operatingHoursResponse = raw.operating_hours === null || raw.operating_hours === undefined
+    ? null
+    : experienceOperatingHoursResponseSchema.safeParse(raw.operating_hours);
+  if (operatingHoursResponse && !operatingHoursResponse.success) {
+    throw new Error("Availability snapshot RPC returned invalid operating hours");
+  }
+  const operatingHours = operatingHoursResponse?.success ? {
+    timezone: operatingHoursResponse.data.timezone,
+    booking_horizon_days: operatingHoursResponse.data.booking_horizon_days,
+    slot_interval_minutes: operatingHoursResponse.data.slot_interval_minutes,
+    minimum_notice_minutes: operatingHoursResponse.data.minimum_notice_minutes,
+    intervals: operatingHoursResponse.data.intervals,
+    closures: operatingHoursResponse.data.closures,
+  } : undefined;
+
   return {
     service: raw.service as unknown as ServiceMetadataRow,
     bookings: raw.bookings as unknown as LegacyBookingShape[],
     maintenance: raw.maintenance as MaintenanceRow[],
     resources: raw.resources as unknown as ResourceRow[],
     layout: raw.layout as LayoutRow | null,
+    ...(operatingHours ? { operatingHours } : {}),
   };
 }
 
@@ -690,6 +714,10 @@ export function createSupabaseAvailabilityRepository(
           interface_type: booking.interface_type === "chat" ? "chat" : "form",
         }))),
         maintenanceResourceLabels: adaptMaintenanceRows(snapshot.maintenance),
+        ...(snapshot.operatingHours ? { operatingHours: snapshot.operatingHours } : {}),
+        ...(getNumber(snapshot.service.metadata?.duration_minutes) ? {
+          durationMinutes: getNumber(snapshot.service.metadata?.duration_minutes)!,
+        } : {}),
       };
     },
   };

@@ -20,6 +20,7 @@ import {
   createSupabaseAvailabilityRepository,
   createSupabaseExperienceStudioRepository,
   createSupabaseIdempotencyRepository,
+  createSupabaseOperatingHoursRepository,
   createSupabasePlatformCatalogRepository,
   createSupabaseReservationMutationRepository,
   createSupabaseReservationReadRepository,
@@ -146,6 +147,7 @@ export interface StandaloneSupabaseRepositoryFactories {
   createResourceMaintenanceRepository(client: StandaloneSupabaseClient): NonNullable<StandaloneApiDependencies["resourceMaintenanceRepository"]>;
   createIdempotencyRepository(client: StandaloneSupabaseClient): NonNullable<StandaloneApiDependencies["idempotencyRepository"]>;
   createExperienceStudioRepository(client: StandaloneSupabaseClient): NonNullable<StandaloneApiDependencies["experienceStudioRepository"]>;
+  createOperatingHoursRepository(client: StandaloneSupabaseClient): NonNullable<StandaloneApiDependencies["operatingHoursRepository"]>;
   createTenantVenueRepository(client: StandaloneSupabaseClient): NonNullable<StandaloneApiDependencies["tenantVenueRepository"]>;
 }
 
@@ -189,6 +191,10 @@ const defaultRepositoryFactories: StandaloneSupabaseRepositoryFactories = {
   createExperienceStudioRepository: (client) => createSupabaseExperienceStudioRepository(
     client as unknown as ExperienceSupabaseLikeClient,
   ),
+  createOperatingHoursRepository: (client) => {
+    if (!client.rpc) throw new Error("Supabase client does not support RPC calls");
+    return createSupabaseOperatingHoursRepository({ rpc: client.rpc.bind(client) });
+  },
   createTenantVenueRepository: createSupabaseTenantVenueRepository,
 };
 
@@ -228,6 +234,7 @@ export function createStandaloneSupabaseDependencies(
         resourceMaintenanceRepository: repositoryFactories.createResourceMaintenanceRepository(adminClient),
         idempotencyRepository: repositoryFactories.createIdempotencyRepository(adminClient),
         experienceStudioRepository: repositoryFactories.createExperienceStudioRepository(adminClient),
+        operatingHoursRepository: repositoryFactories.createOperatingHoursRepository(adminClient),
         tenantVenueRepository: repositoryFactories.createTenantVenueRepository(adminClient),
       }
     : {};

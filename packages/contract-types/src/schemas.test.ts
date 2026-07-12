@@ -8,6 +8,7 @@ import {
   createReservationInputSchema,
   experienceDraftInputSchema,
   experienceIdentityInputSchema,
+  experienceOperatingHoursInputSchema,
   experienceResourceInputSchema,
   experienceServiceInputSchema,
   experienceWorkspaceResponseSchema,
@@ -121,6 +122,28 @@ test("experience catalog inputs enforce usable service and resource values", () 
     kind: "station",
     capacity: 1,
   }).success, true);
+});
+
+test("experience operating hours reject invalid timezones, dates, and overnight intervals", () => {
+  const valid = {
+    timezone: "Asia/Kuala_Lumpur",
+    booking_horizon_days: 60,
+    slot_interval_minutes: 30,
+    minimum_notice_minutes: 120,
+    intervals: [{ day_of_week: 1, start_time: "09:00", end_time: "17:00" }],
+    closures: [{ date: "2026-08-31", reason: "Public holiday" }],
+  };
+
+  assert.equal(experienceOperatingHoursInputSchema.safeParse(valid).success, true);
+  assert.equal(experienceOperatingHoursInputSchema.safeParse({ ...valid, timezone: "Mars/Base" }).success, false);
+  assert.equal(experienceOperatingHoursInputSchema.safeParse({
+    ...valid,
+    intervals: [{ day_of_week: 1, start_time: "22:00", end_time: "02:00" }],
+  }).success, false);
+  assert.equal(experienceOperatingHoursInputSchema.safeParse({
+    ...valid,
+    closures: [{ date: "2026-02-30" }],
+  }).success, false);
 });
 
 test("createReservationInputSchema accepts a minimal reservation intent", () => {

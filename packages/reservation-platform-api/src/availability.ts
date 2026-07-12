@@ -4,6 +4,7 @@ import {
   type ReservationService,
 } from "@project-play/reservations-core";
 import type { AvailabilityResponse } from "@reservation-platform/contract-types";
+import type { ExperienceOperatingHoursInput } from "@reservation-platform/contract-types";
 import { platformErrorBody } from "./errors.js";
 import { toPlatformAvailabilityResponse } from "./platform-adapters.js";
 
@@ -23,6 +24,8 @@ export interface AvailabilityRead {
   service: ReservationService;
   bookings: Reservation[];
   maintenanceResourceLabels: string[];
+  operatingHours?: ExperienceOperatingHoursInput;
+  durationMinutes?: number;
 }
 
 export interface AvailabilityRepositoryPort {
@@ -47,6 +50,7 @@ export type AvailabilityServiceResult = {
 export interface ListAvailabilityInput {
   repository: AvailabilityRepositoryPort | (() => AvailabilityRepositoryPort);
   query: AvailabilityQuerySearchParamsInput;
+  now?: Date;
 }
 
 export function prepareAvailabilityQuery(
@@ -83,6 +87,7 @@ export function prepareAvailabilityQuery(
 export async function listAvailability({
   repository,
   query,
+  now = new Date(),
 }: ListAvailabilityInput): Promise<AvailabilityServiceResult> {
   const preparedQuery = prepareAvailabilityQuery(query);
   if (preparedQuery.status !== 200) {
@@ -98,14 +103,25 @@ export async function listAvailability({
   try {
     const resolvedRepository = typeof repository === "function" ? repository() : repository;
     const availability = await resolvedRepository.readAvailability({ serviceId, date });
-    const timeSlots = generateAvailabilityTimeSlots(
+    const windows = availability.operatingHours
+      ? getOperatingWindowsForDate(availability.operatingHours, date, now)
+      : undefined;
+    const timeSlots = windows === null ? [] : generateAvailabilityTimeSlots(
       availability.service,
       availability.bookings,
       {
+        ...(windows ? {
+          operatingWindows: windows,
+          durationMinutes: availability.durationMinutes ?? 60,
+        } : {}),
         maintenanceResourceLabels: availability.maintenanceResourceLabels,
         legacyFallbackLabels: getLegacyFallbackLabels(availability.service),
       },
-    );
+    ).filter((slot) => (
+      !availability.operatingHours
+      || minutesUntilLocalSlot(availability.operatingHours.timezone, date, slot.start_time, now)
+        >= availability.operatingHours.minimum_notice_minutes
+    ));
 
     return {
       status: 200,
@@ -127,6 +143,59 @@ export async function listAvailability({
       cause: error,
     };
   }
+}
+
+export function getOperatingWindowsForDate(
+  schedule: ExperienceOperatingHoursInput,
+  date: string,
+  now: Date,
+): Array<{ start_time: string; end_time: string; interval_minutes: number }> | null {
+  if (schedule.closures.some((closure) => closure.date === date)) return null;
+  const localNow = localDateAndMinutes(schedule.timezone, now);
+  const requestedDay = dateOrdinal(date);
+  const currentDay = dateOrdinal(localNow.date);
+  if (requestedDay < currentDay || requestedDay - currentDay > schedule.booking_horizon_days) return null;
+  const dayOfWeek = new Date(`${date}T00:00:00.000Z`).getUTCDay();
+  return schedule.intervals
+    .filter((interval) => interval.day_of_week === dayOfWeek)
+    .map((interval) => ({
+      start_time: interval.start_time,
+      end_time: interval.end_time,
+      interval_minutes: schedule.slot_interval_minutes,
+    }));
+}
+
+function minutesUntilLocalSlot(timezone: string, date: string, time: string, now: Date) {
+  const localNow = localDateAndMinutes(timezone, now);
+  return (dateOrdinal(date) - dateOrdinal(localNow.date)) * 1440
+    + timeMinutes(time)
+    - localNow.minutes;
+}
+
+function localDateAndMinutes(timezone: string, value: Date) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: timezone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(value);
+  const part = (type: Intl.DateTimeFormatPartTypes) => parts.find((entry) => entry.type === type)!.value;
+  return {
+    date: `${part("year")}-${part("month")}-${part("day")}`,
+    minutes: Number(part("hour")) * 60 + Number(part("minute")),
+  };
+}
+
+function dateOrdinal(value: string) {
+  return Math.floor(Date.parse(`${value}T00:00:00.000Z`) / 86_400_000);
+}
+
+function timeMinutes(value: string) {
+  const [hours, minutes] = value.split(":").map(Number);
+  return hours! * 60 + minutes!;
 }
 
 export function getLegacyFallbackLabels(service: ReservationService) {

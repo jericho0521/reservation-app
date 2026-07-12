@@ -507,6 +507,23 @@
       ],
       "type": "string"
     },
+    "ExperienceDateClosure": {
+      "additionalProperties": false,
+      "properties": {
+        "date": {
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+          "type": "string"
+        },
+        "reason": {
+          "maxLength": 200,
+          "type": "string"
+        }
+      },
+      "required": [
+        "date"
+      ],
+      "type": "object"
+    },
     "ExperienceDraftInput": {
       "additionalProperties": false,
       "properties": {
@@ -555,6 +572,137 @@
         "public_slug",
         "branding",
         "terminology"
+      ],
+      "type": "object"
+    },
+    "ExperienceOperatingHoursInput": {
+      "additionalProperties": false,
+      "properties": {
+        "booking_horizon_days": {
+          "maximum": 365,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "closures": {
+          "items": {
+            "$ref": "#/$defs/ExperienceDateClosure"
+          },
+          "maxItems": 366,
+          "type": "array"
+        },
+        "intervals": {
+          "items": {
+            "$ref": "#/$defs/ExperienceOperatingInterval"
+          },
+          "maxItems": 56,
+          "type": "array"
+        },
+        "minimum_notice_minutes": {
+          "maximum": 10080,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "slot_interval_minutes": {
+          "maximum": 720,
+          "minimum": 5,
+          "type": "integer"
+        },
+        "timezone": {
+          "maxLength": 100,
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "timezone",
+        "booking_horizon_days",
+        "slot_interval_minutes",
+        "minimum_notice_minutes",
+        "intervals",
+        "closures"
+      ],
+      "type": "object"
+    },
+    "ExperienceOperatingHoursResponse": {
+      "additionalProperties": false,
+      "properties": {
+        "booking_horizon_days": {
+          "maximum": 365,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "closures": {
+          "items": {
+            "$ref": "#/$defs/ExperienceDateClosure"
+          },
+          "maxItems": 366,
+          "type": "array"
+        },
+        "intervals": {
+          "items": {
+            "$ref": "#/$defs/ExperienceOperatingInterval"
+          },
+          "maxItems": 56,
+          "type": "array"
+        },
+        "minimum_notice_minutes": {
+          "maximum": 10080,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "slot_interval_minutes": {
+          "maximum": 720,
+          "minimum": 5,
+          "type": "integer"
+        },
+        "tenant_id": {
+          "type": "string"
+        },
+        "timezone": {
+          "maxLength": 100,
+          "minLength": 1,
+          "type": "string"
+        },
+        "updated_at": {
+          "type": "string"
+        },
+        "venue_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "tenant_id",
+        "venue_id",
+        "timezone",
+        "booking_horizon_days",
+        "slot_interval_minutes",
+        "minimum_notice_minutes",
+        "intervals",
+        "closures"
+      ],
+      "type": "object"
+    },
+    "ExperienceOperatingInterval": {
+      "additionalProperties": false,
+      "properties": {
+        "day_of_week": {
+          "maximum": 6,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "end_time": {
+          "pattern": "^(?:[01]\\d|2[0-3]):[0-5]\\d$",
+          "type": "string"
+        },
+        "start_time": {
+          "pattern": "^(?:[01]\\d|2[0-3]):[0-5]\\d$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "day_of_week",
+        "start_time",
+        "end_time"
       ],
       "type": "object"
     },

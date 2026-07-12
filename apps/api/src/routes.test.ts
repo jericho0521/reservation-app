@@ -30,6 +30,7 @@ import type {
   IdempotencyRecord,
   IdempotencyRepository,
   ExperienceStudioRepository,
+  OperatingHoursRepository,
   PlatformCatalogRepository,
   PlatformTenantVenueRepository,
   ReservationCreateRepositoryPort,
@@ -290,6 +291,59 @@ test("experience catalog routes create and archive through scoped repository por
     },
   ]);
 });
+
+test("experience operating-hours routes read and atomically replace scoped rules", async () => {
+  const observed: unknown[] = [];
+  const repository: OperatingHoursRepository = {
+    async read(scope) {
+      observed.push({ operation: "read", scope });
+      return { data: { tenant_id: scope.tenantId, venue_id: scope.venueId, ...operatingHoursFixture() } };
+    },
+    async replace(scope, input) {
+      observed.push({ operation: "replace", scope, input });
+      return { data: { tenant_id: scope.tenantId, venue_id: scope.venueId, ...input } };
+    },
+  };
+  const headers = {
+    authorization: "Bearer secret",
+    "x-reservation-tenant-id": "tenant_1",
+    "x-reservation-venue-id": "venue_1",
+  };
+
+  const read = await handleStandaloneApiRequest({
+    method: "GET",
+    path: "/v1/experience/operating-hours",
+    headers,
+  }, { serviceApiKey: "secret", operatingHoursRepository: repository });
+  const replaced = await handleStandaloneApiRequest({
+    method: "PUT",
+    path: "/v1/experience/operating-hours",
+    headers,
+    body: operatingHoursFixture(),
+  }, { serviceApiKey: "secret", operatingHoursRepository: repository });
+
+  assert.equal(read.status, 200);
+  assert.equal(replaced.status, 200);
+  assert.deepEqual(observed, [
+    { operation: "read", scope: { tenantId: "tenant_1", venueId: "venue_1" } },
+    {
+      operation: "replace",
+      scope: { tenantId: "tenant_1", venueId: "venue_1" },
+      input: operatingHoursFixture(),
+    },
+  ]);
+});
+
+function operatingHoursFixture() {
+  return {
+    timezone: "Asia/Kuala_Lumpur",
+    booking_horizon_days: 60,
+    slot_interval_minutes: 30,
+    minimum_notice_minutes: 120,
+    intervals: [{ day_of_week: 1, start_time: "09:00", end_time: "17:00" }],
+    closures: [{ date: "2026-08-31", reason: "Public holiday" }],
+  };
+}
 
 function fakeWhatsAppModule(
   overrides: Partial<StandaloneApiWhatsAppModule> = {},

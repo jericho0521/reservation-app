@@ -4,4 +4,4 @@ Long-form product and implementation manuals live here.
 
 | Manual | Use It For |
 | --- | --- |
-| [Backend Modules Developer and User Manual](backend-modules-dev-user-manual.html) | Implementing backend module manifests, Docker deployment, WhatsApp automation, and staff operating workflows. |
+| [Reservation Experience Platform Handbook](backend-modules-dev-user-manual.html) | Setting up, using, extending, testing, deploying, and integrating with the complete platform, including the full `/v1` API reference. |

@@ -304,6 +304,7 @@ function BookingFlowInner({
               resources={resources}
               selectedResourceIds={selectedResourceIds}
               unavailableResourceLabels={[...(flow.state.selectedSlot?.taken_resource_labels ?? []), ...(flow.state.selectedSlot?.maintenance_resource_labels ?? [])]}
+              minimumCapacity={flow.state.quantity}
               onToggle={(resource) => {
                 const selected = resources.filter((candidate) => selectedResourceIds.has(candidate.resource_id));
                 const next = selectedResourceIds.has(resource.resource_id) ? selected.filter((candidate) => candidate.resource_id !== resource.resource_id) : [...selected, resource];
@@ -345,9 +346,15 @@ export function ServicePicker({
   className?: string;
 }) {
   const services = useServices();
+  const [query, setQuery] = useState("");
+  const visibleServices = filterBookingServices(services.data ?? [], query);
   return (
     <div className={cn("rp-service-picker grid gap-3", className)}>
-      {(services.data ?? []).map((service) => (
+      <label className="rp-service-search"><span>Find a service</span><input type="search" value={query} onChange={(event) => setQuery(event.currentTarget.value)} placeholder="Search by name or description" /></label>
+      {services.loading ? <div className="rp-loading-state" aria-live="polite">Loading live services…</div> : null}
+      {services.error ? <div className="rp-error">Services are temporarily unavailable. <button type="button" onClick={() => void services.refetch()}>Try again</button></div> : null}
+      {!services.loading && !services.error && visibleServices.length === 0 ? <div className="rp-empty-state">{query.trim() ? "No services match that search." : "No bookable services are available right now."}</div> : null}
+      {visibleServices.map((service) => (
         <button
           key={service.service_id}
           type="button"
@@ -372,6 +379,12 @@ export function ServicePicker({
       ))}
     </div>
   );
+}
+
+export function filterBookingServices(services: ServiceResponse[], query: string) {
+  const normalized = query.trim().toLocaleLowerCase();
+  if (!normalized) return services;
+  return services.filter((service) => `${service.name} ${service.description ?? ""}`.toLocaleLowerCase().includes(normalized));
 }
 
 export function DatePicker({
@@ -494,6 +507,7 @@ export function ResourceSelector({
   resources,
   selectedResourceIds,
   unavailableResourceLabels = [],
+  minimumCapacity = 1,
   onToggle,
   theme,
 }: {
@@ -501,6 +515,7 @@ export function ResourceSelector({
   resources: ResourceResponse[];
   selectedResourceIds: Set<string>;
   unavailableResourceLabels?: string[];
+  minimumCapacity?: number;
   onToggle: (resource: ResourceResponse) => void;
   theme: Required<ThemeClasses>;
 }) {
@@ -512,7 +527,8 @@ export function ResourceSelector({
       </span>
       <div className="rp-resource-grid grid grid-cols-2 gap-2 sm:grid-cols-4">
         {resources.map((resource) => {
-          const disabled = unavailable.has(resource.label) || !resource.is_active;
+          const undersized = resource.kind === "room" && (resource.capacity ?? 1) < minimumCapacity;
+          const disabled = unavailable.has(resource.label) || !resource.is_active || undersized;
           const isSelected = selectedResourceIds.has(resource.resource_id);
           return (
             <button
@@ -530,7 +546,7 @@ export function ResourceSelector({
             >
               <span className="rp-resource-label text-xs font-bold tracking-tight">{resource.label}</span>
               <span className="rp-resource-meta text-[9px] uppercase tracking-wider opacity-60 mt-1">
-                {disabled ? "Unavailable" : isSelected ? "Selected" : "Select"}
+                {undersized ? `Up to ${resource.capacity ?? 1}` : disabled ? "Unavailable" : isSelected ? "Selected" : resource.capacity && resource.capacity > 1 ? `Up to ${resource.capacity}` : "Select"}
               </span>
             </button>
           );

@@ -88,7 +88,9 @@ export function generateAvailabilityTimeSlots(
       options.legacyFallbackLabels ?? [],
     );
     const capacityResult = getCapacityResult(service, slotReservations, maintenanceResourceLabels);
-    const unavailableQuantity = service.policy.kind === "capacity"
+    const hasVariableResourceCapacity = (service.resources ?? [])
+      .some((resource) => (resource.capacity ?? 1) > 1);
+    const unavailableQuantity = service.policy.kind === "capacity" || hasVariableResourceCapacity
       ? capacityResult.unavailable_quantity
       : unavailableResourceLabels.length;
     const availableQuantity = Math.max(0, capacityResult.capacity - unavailableQuantity);

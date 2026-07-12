@@ -29,6 +29,7 @@ const baseState: BookingFlowState = {
   quantity: 2,
   selectedResourceIds: [],
   selectedResourceLabels: [],
+  selectedResourceCapacities: [],
   customer: { name: "Alex" },
   purpose: "Planning",
   submitting: false,
@@ -83,6 +84,33 @@ test("validateBookingFlow rejects assigned resource count mismatches", () => {
   });
   assert.equal(validation.isValid, false);
   assert.deepEqual(validation.missing, ["resources"]);
+});
+
+test("room resources satisfy attendee quantity through configured capacity", () => {
+  const roomState: BookingFlowState = {
+    ...baseState,
+    service: { service_id: "svc_123", name: "Meeting room", resource_strategy: "hybrid" },
+    availability: { slots: [{ start_time: "09:00", end_time: "10:00", available_quantity: 10, is_available: true }] },
+    selectedSlot: { start_time: "09:00", end_time: "10:00", available_quantity: 10, is_available: true },
+    quantity: 6,
+    selectedResourceIds: ["room_1"],
+    selectedResourceLabels: ["Boardroom"],
+    selectedResourceCapacities: [8],
+  };
+  assert.equal(validateBookingFlow(roomState).isValid, true);
+  assert.deepEqual(createReservationPayload(roomState).reservation_items, [{ resource_label: "Boardroom", quantity: 6 }]);
+});
+
+test("room resources reject attendee quantities above selected capacity", () => {
+  const validation = validateBookingFlow({
+    ...baseState,
+    service: { service_id: "svc_123", name: "Meeting room", resource_strategy: "hybrid" },
+    quantity: 9,
+    selectedResourceIds: ["room_1"],
+    selectedResourceLabels: ["Boardroom"],
+    selectedResourceCapacities: [8],
+  });
+  assert.deepEqual(validation.missing, ["slot", "resources"]);
 });
 
 test("validateBookingFlow rejects unavailable selected resources", () => {

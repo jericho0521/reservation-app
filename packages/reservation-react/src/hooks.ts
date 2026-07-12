@@ -296,6 +296,7 @@ export function useBookingFlow({
     quantity,
     selectedResourceIds: selectedResources.map((resource: ResourceResponse) => resource.resource_id),
     selectedResourceLabels: selectedResources.map((resource: ResourceResponse) => resource.label),
+    selectedResourceCapacities: selectedResources.map((resource: ResourceResponse) => resource.capacity ?? 1),
     customer,
     purpose,
     submitting,

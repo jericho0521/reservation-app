@@ -142,6 +142,29 @@ test("maintenance resources reduce availability without requiring RS labels", ()
   assert.deepEqual(getMaintenanceResourceConflicts(["A1", "A2"], ["A2"]), ["A2"]);
 });
 
+test("room availability subtracts attendee capacity for meetings and maintenance", () => {
+  const service = makeService({
+    name: "Meeting rooms",
+    resource_kind: "room",
+    selection_mode: "hybrid",
+    resources: [
+      { id: "focus", service_id: "service-1", label: "Focus", kind: "room", is_active: true, capacity: 4 },
+      { id: "boardroom", service_id: "service-1", label: "Boardroom", kind: "room", is_active: true, capacity: 10 },
+    ],
+    total_seats: 14,
+  });
+  const slots = generateAvailabilityTimeSlots(service, [makeReservation({
+    quantity: 6,
+    items: [{ resource_label: "Boardroom", quantity: 6 }],
+    seat_labels: ["Boardroom"],
+  })], { maintenanceResourceLabels: ["Focus"] });
+
+  const slot = slots.find((candidate) => candidate.start_time === "14:00");
+  assert.equal(slot?.available_quantity, 4);
+  assert.deepEqual(slot?.taken_resource_labels, ["Boardroom", "Focus"]);
+  assert.deepEqual(slot?.maintenance_resource_labels, ["Focus"]);
+});
+
 test("availability generates interval slots inside configured local windows", () => {
   const slots = generateAvailabilityTimeSlots(makeService({}), [], {
     operatingWindows: [{ start_time: "09:00", end_time: "11:00", interval_minutes: 30 }],

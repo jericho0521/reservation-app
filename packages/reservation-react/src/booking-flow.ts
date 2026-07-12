@@ -24,6 +24,7 @@ export interface BookingFlowState {
   quantity: number;
   selectedResourceIds: string[];
   selectedResourceLabels: string[];
+  selectedResourceCapacities?: number[];
   customer: CustomerSnapshot;
   purpose: string;
   submitting: boolean;
@@ -101,8 +102,17 @@ export function validateBookingFlow(state: BookingFlowState): BookingFlowValidat
   const currentSelectedSlot = resolveSelectedAvailabilitySlot(state);
   if (!isSlotBookable(currentSelectedSlot, state.quantity)) missing.push("slot");
   if (!Number.isInteger(state.quantity) || state.quantity < 1) missing.push("quantity");
-  const usesAssignedResources = strategy === "assigned_resource" || state.selectedResourceIds.length > 0;
-  if (usesAssignedResources && state.selectedResourceIds.length !== state.quantity) {
+  const usesAssignedResources = strategy === "assigned_resource"
+    || state.service?.resource_kind === "room"
+    || state.selectedResourceIds.length > 0;
+  const selectedCapacity = getSelectedResourceCapacity(state);
+  const allowsCapacitySurplus = state.service?.resource_kind === "room"
+    || (state.selectedResourceCapacities ?? []).some((capacity) => capacity > 1);
+  if (usesAssignedResources && (
+    state.selectedResourceIds.length === 0
+    || selectedCapacity < state.quantity
+    || (!allowsCapacitySurplus && selectedCapacity !== state.quantity)
+  )) {
     missing.push("resources");
   }
   if (
@@ -139,12 +149,29 @@ export function canAdvanceBookingJourney(step: BookingJourneyStep, state: Bookin
     case "slot": return isSlotBookable(currentSlot, state.quantity);
     case "options": {
       if (!Number.isInteger(state.quantity) || state.quantity < 1) return false;
-      return strategy !== "assigned_resource" || state.selectedResourceIds.length === state.quantity;
+      const selectedCapacity = getSelectedResourceCapacity(state);
+      const requiresResource = strategy === "assigned_resource" || state.service?.resource_kind === "room";
+      const allowsCapacitySurplus = state.service?.resource_kind === "room"
+        || (state.selectedResourceCapacities ?? []).some((capacity) => capacity > 1);
+      return !requiresResource || (
+        state.selectedResourceIds.length > 0
+        && selectedCapacity >= state.quantity
+        && (allowsCapacitySurplus || selectedCapacity === state.quantity)
+      );
     }
     case "details": return Boolean(state.customer.name?.trim() && state.customer.email?.trim());
     case "review": return validateBookingFlow(state).isValid;
     case "success": return false;
   }
+}
+
+function getSelectedResourceCapacity(
+  state: Pick<BookingFlowState, "selectedResourceIds" | "selectedResourceCapacities">,
+) {
+  const capacities = state.selectedResourceCapacities?.length === state.selectedResourceIds.length
+    ? state.selectedResourceCapacities
+    : state.selectedResourceIds.map(() => 1);
+  return capacities.reduce((sum, capacity) => sum + capacity, 0);
 }
 
 export function nextBookingJourneyStep(step: BookingJourneyStep, state: BookingFlowState): BookingJourneyStep {
@@ -191,16 +218,28 @@ export function createReservationPayload(state: BookingFlowState): CreateReserva
     ...(state.selectedResourceIds.length > 0 ? { resource_ids: state.selectedResourceIds } : {}),
     ...(state.selectedResourceLabels.length > 0
       ? {
-          reservation_items: state.selectedResourceLabels.map((resource_label) => ({
-            resource_label,
-            quantity: 1,
-          })),
+          reservation_items: allocateReservationItems(
+            state.selectedResourceLabels,
+            state.selectedResourceCapacities,
+            state.quantity,
+          ),
         }
       : {}),
     customer: state.customer,
     source: "reservation-platform-react",
     metadata: state.purpose.trim() ? { purpose: state.purpose.trim() } : undefined,
   };
+}
+
+function allocateReservationItems(labels: string[], capacities: number[] | undefined, quantity: number) {
+  let remaining = quantity;
+  return labels.flatMap((resource_label, index) => {
+    if (remaining <= 0) return [];
+    const capacity = Math.max(1, capacities?.[index] ?? 1);
+    const itemQuantity = Math.min(capacity, remaining);
+    remaining -= itemQuantity;
+    return [{ resource_label, quantity: itemQuantity }];
+  });
 }
 
 export async function submitBookingFlow(input: {

@@ -10,6 +10,7 @@ import {
   ReservationError,
   ResourceSelector,
   getBookingControlVisibility,
+  filterBookingServices,
   shouldSyncQuantityToSelectedResources,
   ExperiencePreview,
 } from "./components.js";
@@ -105,6 +106,22 @@ test("ResourceSelector marks unavailable resources and preserves selected theme 
   assert.ok(classNames.some((className) => className.includes("custom-selected")));
 });
 
+test("ResourceSelector disables rooms below the requested attendee capacity", () => {
+  const element = ResourceSelector({
+    label: "Room",
+    resources: [
+      { resource_id: "room_1", label: "Focus room", kind: "room", is_active: true, capacity: 4 },
+      { resource_id: "room_2", label: "Boardroom", kind: "room", is_active: true, capacity: 10 },
+    ],
+    selectedResourceIds: new Set(),
+    minimumCapacity: 6,
+    onToggle: () => undefined,
+    theme: defaultThemeClasses,
+  });
+  assert.match(flattenText(element), /Up to 4/u);
+  assert.equal(collectProps(element, (props) => props.disabled === true ? true : undefined).length, 1);
+});
+
 test("ReservationError renders a safe fallback message", () => {
   const element = ReservationError({});
 
@@ -187,4 +204,14 @@ test("booking step actions keep confirmation disabled until review is valid", ()
   });
   assert.match(flattenText(element), /Confirm reservation/u);
   assert.equal(collectProps(element, (props) => props.disabled === true ? true : undefined).length, 1);
+});
+
+test("service search matches names and descriptions with a useful empty result", () => {
+  const services = [
+    { service_id: "one", name: "Boardroom", description: "Video conferencing" },
+    { service_id: "two", name: "Focus room", description: "Quiet work" },
+  ];
+  assert.deepEqual(filterBookingServices(services, "video"), [services[0]]);
+  assert.deepEqual(filterBookingServices(services, "missing"), []);
+  assert.deepEqual(filterBookingServices(services, "  "), services);
 });

@@ -1,8 +1,47 @@
 @import "tailwindcss";
 
-body {
-  margin: 0;
-  background: #f4f7f5;
-  color: #111827;
-  font-family: Arial, Helvetica, sans-serif;
-}
+:root { color-scheme: light; font-family: Inter, ui-sans-serif, system-ui, sans-serif; background: #f4f1e9; color: #16302a; }
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body { margin: 0; background: #f4f1e9; }
+a { color: inherit; }
+.northstar-nav { width: min(78rem, calc(100% - 2rem)); min-height: 5rem; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #c9c8bd; }
+.northstar-nav a { display: flex; align-items: center; gap: .65rem; font-size: .8rem; font-weight: 800; text-decoration: none; }
+.northstar-nav a:first-child span { width: 2.3rem; height: 2.3rem; display: grid; place-items: center; border-radius: 50%; background: #16302a; color: #f4f1e9; font-family: Georgia, serif; font-size: 1.15rem; }
+.northstar-nav a:last-child { padding: .75rem 1rem; border: 1px solid #16302a; border-radius: 999px; }
+.northstar-hero { width: min(78rem, calc(100% - 2rem)); min-height: 42rem; margin: 0 auto; padding: clamp(4rem, 10vw, 8rem) 0; display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(15rem, .5fr); gap: 3rem; align-items: end; }
+.northstar-eyebrow, .northstar-rooms header > span { color: #7a5d46; font-size: .7rem; font-weight: 800; letter-spacing: .13em; text-transform: uppercase; }
+.northstar-hero h1 { margin: 1rem 0; font: 500 clamp(4rem, 10vw, 8.5rem)/.86 Georgia, "Times New Roman", serif; letter-spacing: -.055em; }
+.northstar-hero h1 em { color: #3c7f68; font-weight: 400; }
+.northstar-hero > div > p { max-width: 40rem; color: #5f6c67; font-size: 1.1rem; line-height: 1.75; }
+.northstar-hero > div > a { display: inline-block; margin-top: 1.5rem; padding: .9rem 1.2rem; border-radius: 999px; background: #156b55; color: white; font-weight: 750; text-decoration: none; }
+.northstar-hero aside { padding: 1.7rem; border-radius: 9rem 9rem 1.2rem 1.2rem; background: #dce8d9; text-align: center; }
+.northstar-hero aside span { display: block; padding-top: 3rem; color: #607066; font-size: .7rem; text-transform: uppercase; }
+.northstar-hero aside strong { display: block; margin-top: 1rem; font: 500 2rem Georgia, serif; }
+.northstar-hero aside p { color: #607066; font-size: .78rem; }
+.northstar-rooms { padding: clamp(4rem, 8vw, 7rem) max(1rem, calc((100% - 78rem) / 2)); background: #16302a; color: #f5f1e8; }
+.northstar-rooms header { max-width: 45rem; }
+.northstar-rooms h2, .northstar-booking h2 { margin: .6rem 0 2.5rem; font: 500 clamp(2.8rem, 6vw, 5rem)/.95 Georgia, serif; letter-spacing: -.04em; }
+.northstar-rooms > div { display: grid; grid-template-columns: repeat(4, 1fr); border-top: 1px solid #4c625b; }
+.northstar-rooms article { min-height: 16rem; padding: 1.4rem; border-right: 1px solid #4c625b; }
+.northstar-rooms article > span { color: #82968e; font: .7rem ui-monospace, monospace; }
+.northstar-rooms article h3 { margin: 3rem 0 .5rem; font: 500 2rem Georgia, serif; }
+.northstar-rooms article strong { color: #c7d9c0; font-size: .85rem; }
+.northstar-rooms article p { color: #93a49d; font-size: .78rem; line-height: 1.5; }
+.northstar-booking { padding: clamp(4rem, 9vw, 8rem) 1rem; background: #ebe7dc; }
+.northstar-booking > header { width: min(64rem, 100%); margin: 0 auto 2.5rem; }
+.northstar-booking > header p { max-width: 40rem; color: #66736e; line-height: 1.65; }
+.northstar-booking-shell, .rp-public-journey { border: 1px solid #c9c8bd; border-radius: 1.4rem; background: #f9f7f1; color: #16302a; box-shadow: 0 2rem 5rem rgba(32,47,42,.08); }
+.northstar-button, .northstar-selected { border-color: #156b55; border-radius: 999px; background: #156b55; color: white; }
+.northstar-button-disabled { border-radius: 999px; background: #d8ddd8; color: #7b8681; }
+.northstar-input { border: 1px solid #bec8c2; border-radius: .7rem; background: #fff; color: #16302a; }
+.northstar-summary { border: 1px solid #c9d2cc; border-radius: 1rem; background: #eef2ec; }
+.northstar-muted { color: #718078; }
+.northstar-error { padding: 1rem; border: 1px solid #9f3f34; border-radius: .8rem; color: #8d2f27; }
+.northstar-success { padding: 1rem; border-radius: .8rem; background: #dce8d9; color: #16302a; }
+.northstar-setup { width: min(64rem, 100%); margin: 0 auto; padding: 2rem; border: 1px solid #c9c8bd; border-radius: 1rem; background: #f9f7f1; }
+.northstar-setup p { color: #66736e; }
+
+@media (max-width: 800px) { .northstar-hero { min-height: auto; grid-template-columns: 1fr; } .northstar-hero aside { border-radius: 1rem; text-align: left; } .northstar-hero aside span { padding: 0; } .northstar-rooms > div { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 520px) { .northstar-rooms > div { grid-template-columns: 1fr; } .northstar-rooms article { min-height: 12rem; border-right: 0; border-bottom: 1px solid #4c625b; } }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }

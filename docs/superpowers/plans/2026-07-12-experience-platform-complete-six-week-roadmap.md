@@ -406,9 +406,9 @@ sequenceDiagram
 
 **Produces:** `Conversation`, `ConversationParticipant`, `ConversationMessage`, channel, direction, delivery state, automation state, timestamps, and optional reservation link.
 
-- [ ] Test tenant/venue scoping, channel message deduplication, chronological pagination, and takeover state.
-- [ ] Store channel identifiers separately from display-safe customer data.
-- [ ] Commit as `feat(conversations): add unified conversation model`.
+- [x] Test tenant/venue scoping, channel message deduplication, chronological pagination, and takeover state.
+- [x] Store channel identifiers separately from display-safe customer data.
+- [x] Commit as `feat(conversations): add unified conversation model`.
 
 ### Task 4.2: Build the provider-neutral booking orchestrator
 
@@ -421,10 +421,10 @@ sequenceDiagram
 
 **Produces:** One normalized inbound-message workflow that retrieves experience context, proposes a booking, waits for explicit confirmation, and calls idempotent reservation tools.
 
-- [ ] Test unsupported requests, hallucinated IDs, stale availability, duplicate confirmation, and tool failure.
-- [ ] Record structured audit events without exposing hidden reasoning or secrets.
-- [ ] Ensure AI-generated prose cannot directly mutate reservations.
-- [ ] Commit as `feat(ai): orchestrate safe conversational bookings`.
+- [x] Test unsupported requests, hallucinated IDs, stale availability, duplicate confirmation, and tool failure.
+- [x] Record structured audit events without exposing hidden reasoning or secrets.
+- [x] Ensure AI-generated prose cannot directly mutate reservations.
+- [x] Commit as `feat(ai): orchestrate safe conversational bookings`.
 
 ### Task 4.3: Add the reusable web-chat widget
 
@@ -436,9 +436,9 @@ sequenceDiagram
 
 **Produces:** Responsive chat UI with history, typing/loading, retry, booking proposal card, confirmation action, and handoff notice.
 
-- [ ] Test the deterministic responder first; add configured external AI as an adapter choice.
-- [ ] Test refresh restores the conversation without leaking another venue's messages.
-- [ ] Commit as `feat(chat): add customer web booking assistant`.
+- [x] Test the deterministic responder first; add configured external AI as an adapter choice.
+- [x] Test refresh restores the conversation without leaking another venue's messages.
+- [x] Commit as `feat(chat): add customer web booking assistant`.
 
 ### Task 4.4: Connect Baileys to unified conversations
 
@@ -451,9 +451,9 @@ sequenceDiagram
 
 **Produces:** Inbound/outbound WhatsApp messages normalized into the shared conversation store, encrypted session persistence when configured, QR returned through protected APIs, and no raw QR logging.
 
-- [ ] Test reconnect, deduplication, encrypted restore, plaintext compatibility, unsupported content, and takeover suppression.
-- [ ] Keep Baileys-specific objects behind the WhatsApp package boundary.
-- [ ] Commit as `feat(whatsapp): connect unified booking conversations`.
+- [x] Test reconnect, deduplication, encrypted restore, plaintext compatibility, unsupported content, and takeover suppression.
+- [x] Keep Baileys-specific objects behind the WhatsApp package boundary.
+- [x] Commit as `feat(whatsapp): connect unified booking conversations`.
 
 ### Task 4.5: Build owner inbox and staff takeover
 
@@ -467,10 +467,10 @@ sequenceDiagram
 
 **Produces:** Channel-filterable inbox, readable timeline, linked reservation, manual reply, takeover, and resume automation.
 
-- [ ] Test that takeover is authoritative across web and WhatsApp.
-- [ ] Test staff messages never pass through AI generation.
-- [ ] Use polling for the six-week version unless realtime support is already stable.
-- [ ] Commit as `feat(console): add unified inbox and staff takeover`.
+- [x] Test that takeover is authoritative across web and WhatsApp.
+- [x] Test staff messages never pass through AI generation.
+- [x] Use polling for the six-week version unless realtime support is already stable.
+- [x] Commit as `feat(console): add unified inbox and staff takeover`.
 
 ### Task 4.6: Add deterministic simulation and readiness controls
 
@@ -483,14 +483,14 @@ sequenceDiagram
 
 **Produces:** Demo-safe simulated WhatsApp messages that traverse the same orchestrator, plus distinct configured/connected/healthy states for AI and WhatsApp.
 
-- [ ] Prove simulation does not require network access or real credentials.
-- [ ] Display QR only to an authenticated owner and never in logs.
-- [ ] Commit as `feat(demo): add channel simulation and readiness`.
+- [x] Prove simulation does not require network access or real credentials.
+- [x] Display QR only to an authenticated owner and never in logs.
+- [x] Commit as `feat(demo): add channel simulation and readiness`.
 
 ### Phase 4 gate
 
 ```bash
-pnpm --filter @reservation-platform/reservation-chat-core run test
+pnpm --filter @project-play/reservation-chat-core run test
 pnpm --filter @reservation-platform/ai-chat run test
 pnpm --filter @reservation-platform/whatsapp run test
 pnpm --dir apps/api run test
@@ -811,6 +811,6 @@ Update this table at each weekly gate.
 | 1. Foundation | 2026-07-19 | Complete | Full Phase 1 gate passed; 2 optional live-URL E2E checks skipped with documented env requirements. | None |
 | 2. Experience Studio | 2026-07-26 | Complete | Contract types 21, API package 158, database 13, Supabase adapter 50, SDK 19, UI 13, console 9, standalone API 125; console production build, package boundary, packed-package, and migration-bundle gates passed. | None |
 | 3. Customer Experiences | 2026-08-02 | Complete | React 14, UI 18, root E2E 15 passed with 2 documented optional live-URL skips; booking production build and package/frontend boundaries passed. Flagship builds and focused API, database, SDK, Supabase, security-token, concurrency, and all-eight-preset proofs also passed. | None |
-| 4. Omnichannel AI | 2026-08-09 | In progress | Task 4.1 unified conversation contracts, persistence, API routes, and adapters are being implemented; focused and phase gates remain outstanding. | None |
+| 4. Omnichannel AI | 2026-08-09 | Complete | Chat core 38, AI chat 21, WhatsApp 29, standalone API 135, SDK 25, contract types 23, and console 12 passed; console production build passed. Root smoke command passed with 3 documented live-backend skips to be exercised in Phase 6. | None |
 | 5. Operations and Analytics | 2026-08-16 | Not started | — | — |
 | 6. Hardening and Presentation | 2026-08-23 | Not started | — | — |

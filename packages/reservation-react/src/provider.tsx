@@ -1,4 +1,5 @@
 import {
+  createPublicExperienceBookingClient,
   createReservationPlatformClient,
   type ReservationPlatformClient,
   type ReservationPlatformClientOptions,
@@ -10,6 +11,22 @@ export interface ReservationProviderProps
   baseUrl?: string;
   client?: ReservationPlatformClient;
   children: ReactNode;
+}
+
+export function PublicExperienceReservationProvider({
+  baseUrl,
+  slug,
+  children,
+}: {
+  baseUrl: string;
+  slug: string;
+  children: ReactNode;
+}) {
+  const client = useMemo(
+    () => createPublicExperienceBookingClient({ baseUrl, slug }),
+    [baseUrl, slug],
+  );
+  return <ReservationProvider client={client}>{children}</ReservationProvider>;
 }
 
 const ReservationClientContext = createContext<ReservationPlatformClient | null>(null);

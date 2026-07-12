@@ -13,6 +13,7 @@ import {
   shouldSyncQuantityToSelectedResources,
   ExperiencePreview,
 } from "./components.js";
+import { BookingStepActions, BookingStepProgress } from "./booking/journey.js";
 import { createBookingFlowConfig, createExperiencePreviewConfig } from "./config.js";
 import { defaultThemeClasses } from "./types.js";
 
@@ -168,4 +169,22 @@ test("ExperiencePreview renders draft branding, terminology, channels, and servi
   assert.match(flattenText(element), /Sprint Session/);
   assert.match(flattenText(element), /Continue to Session/);
   assert.doesNotMatch(flattenText(element), /WhatsApp/);
+});
+
+test("booking progress exposes the guided service-to-review sequence", () => {
+  const element = BookingStepProgress({ step: "details" });
+  assert.match(flattenText(element), /Service.*Date.*Time.*Options.*Details.*Review/u);
+  assert.equal(collectProps(element, (props) => props["aria-current"] === "step" ? true : undefined).length, 1);
+});
+
+test("booking step actions keep confirmation disabled until review is valid", () => {
+  const element = BookingStepActions({
+    canContinue: false,
+    canGoBack: true,
+    continueLabel: "Confirm reservation",
+    onBack: () => undefined,
+    onContinue: () => undefined,
+  });
+  assert.match(flattenText(element), /Confirm reservation/u);
+  assert.equal(collectProps(element, (props) => props.disabled === true ? true : undefined).length, 1);
 });

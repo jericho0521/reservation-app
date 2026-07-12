@@ -155,6 +155,100 @@ test("public experience route does not require owner auth", async () => {
   assert.equal((response.body as PublicExperienceResponse).profile.public_slug, "apex-racing");
 });
 
+test("public booking catalog resolves the published venue without owner headers", async () => {
+  let venueId: string | null | undefined;
+  const response = await handleStandaloneApiRequest({
+    method: "GET",
+    path: "/v1/public/experiences/apex-racing/services",
+    headers: {},
+  }, {
+    serviceApiKey: "secret",
+    experienceStudioRepository: fakeExperienceRepository(),
+    catalogRepository: catalogRepository({
+      async listServices(input) {
+        venueId = input?.venueId;
+        return { data: [{ id: "service_1", venue_id: "venue_1", name: "Sprint Session", is_active: true }] };
+      },
+    }),
+  });
+
+  assert.equal(response.status, 200);
+  assert.equal(venueId, "venue_1");
+  assert.equal((response.body as { services: Array<{ name: string }> }).services[0]?.name, "Sprint Session");
+});
+
+test("public booking availability rejects services outside the published venue", async () => {
+  let availabilityRead = false;
+  const response = await handleStandaloneApiRequest({
+    method: "GET",
+    path: "/v1/public/experiences/apex-racing/availability?service_id=other_service&date=2026-07-20",
+    headers: {},
+  }, {
+    experienceStudioRepository: fakeExperienceRepository(),
+    catalogRepository: catalogRepository(),
+    availabilityRepository: availabilityRepository({
+      async readAvailability() {
+        availabilityRead = true;
+        throw new Error("must not run");
+      },
+    }),
+  });
+
+  assert.equal(response.status, 404);
+  assert.equal(availabilityRead, false);
+});
+
+test("public booking creates only against a published venue service and scopes idempotency internally", async () => {
+  const serviceId = "11111111-1111-4111-8111-111111111111";
+  const idempotencyRepository = new InMemoryIdempotencyRepository();
+  const response = await handleStandaloneApiRequest({
+    method: "POST",
+    path: "/v1/public/experiences/apex-racing/reservations",
+    headers: { "Idempotency-Key": "public_booking_12345678" },
+    body: {
+      service_id: serviceId,
+      date: "2026-07-20",
+      start_time: "09:00",
+      end_time: "10:00",
+      quantity: 1,
+      customer: { name: "Alex", email: "alex@example.com" },
+    },
+  }, {
+    serviceApiKey: "secret",
+    experienceStudioRepository: fakeExperienceRepository(),
+    catalogRepository: catalogRepository({
+      async listServices() {
+        return { data: [{ id: serviceId, venue_id: "venue_1", name: "Sprint Session", is_active: true }] };
+      },
+    }),
+    idempotencyRepository,
+    reservationCreateRepository: reservationCreateRepository(),
+  });
+
+  assert.equal(response.status, 201);
+  assert.equal(idempotencyRepository.records.get("public_booking_12345678")?.tenantId, "tenant_1");
+  assert.equal(idempotencyRepository.records.get("public_booking_12345678")?.path, "/v1/public/experiences/apex-racing/reservations");
+});
+
+test("public booking routes disappear when web booking is disabled", async () => {
+  const workspace = experienceWorkspaceFixture();
+  const response = await handleStandaloneApiRequest({
+    method: "GET",
+    path: "/v1/public/experiences/apex-racing/services",
+    headers: {},
+  }, {
+    experienceStudioRepository: fakeExperienceRepository({
+      readPublishedBySlug: async () => ({
+        profile: workspace.profile,
+        configuration: { ...workspace.published!, channels: { web_booking: false, web_chat: true, whatsapp: false } },
+      }),
+    }),
+    catalogRepository: catalogRepository(),
+  });
+
+  assert.equal(response.status, 404);
+});
+
 test("experience draft route validates strict request bodies", async () => {
   const response = await handleStandaloneApiRequest({
     method: "PUT",

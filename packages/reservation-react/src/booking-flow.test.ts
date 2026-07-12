@@ -2,11 +2,17 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  bookingErrorMessage,
+  canAdvanceBookingJourney,
   createReservationPayload,
+  nextBookingJourneyStep,
+  previousBookingJourneyStep,
+  submitBookingFlowOnce,
   submitLabelForMissing,
   validateBookingFlow,
   type BookingFlowState,
 } from "./booking-flow.js";
+import { PlatformError } from "@reservation-platform/sdk";
 
 const baseState: BookingFlowState = {
   serviceId: "svc_123",
@@ -180,4 +186,47 @@ test("createReservationPayload rejects stale selected slots when availability is
     }),
     /Selected slot is no longer available/,
   );
+});
+
+test("booking journey advances and returns only when the current step is complete", () => {
+  assert.equal(canAdvanceBookingJourney("date", baseState), true);
+  assert.equal(nextBookingJourneyStep("date", baseState), "slot");
+  assert.equal(nextBookingJourneyStep("details", baseState), "details");
+  assert.equal(nextBookingJourneyStep("details", {
+    ...baseState,
+    customer: { name: "Alex", email: "alex@example.com" },
+  }), "review");
+  assert.equal(previousBookingJourneyStep("review"), "details");
+  assert.equal(previousBookingJourneyStep("date"), "date");
+});
+
+test("booking journey maps stale API validation to a recovery instruction", () => {
+  assert.equal(bookingErrorMessage(new PlatformError({
+    code: "conflict",
+    message: "resource_conflict",
+    status: 409,
+  })), "That option is no longer available. Refresh availability and choose another time.");
+});
+
+test("duplicate confirmation shares one in-flight reservation mutation", async () => {
+  let creates = 0;
+  let release!: () => void;
+  const pending = new Promise<void>((resolve) => { release = resolve; });
+  const client = {
+    async createReservation() {
+      creates += 1;
+      await pending;
+      return { reservation_id: "reservation_1", status: "confirmed", service_id: baseState.serviceId, quantity: 2 };
+    },
+    async listAvailability() {
+      return baseState.availability!;
+    },
+  };
+  const guard = {};
+  const first = submitBookingFlowOnce({ client, state: baseState }, guard);
+  const second = submitBookingFlowOnce({ client, state: baseState }, guard);
+  assert.equal(first, second);
+  assert.equal(creates, 1);
+  release();
+  await first;
 });

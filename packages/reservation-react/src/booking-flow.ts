@@ -1,4 +1,4 @@
-import { createIdempotencyKey, type ReservationPlatformClient } from "@reservation-platform/sdk";
+import { createIdempotencyKey, isPlatformError, type ReservationPlatformClient } from "@reservation-platform/sdk";
 import type {
   AvailabilityResponse,
   AvailabilitySlot,
@@ -11,6 +11,9 @@ import type {
 } from "@reservation-platform/contract-types";
 
 export type BookingStrategy = "quantity" | "assigned_resource" | "hybrid";
+export type BookingJourneyStep = "date" | "slot" | "options" | "details" | "review" | "success";
+
+export const bookingJourneySteps = ["date", "slot", "options", "details", "review"] as const;
 
 export interface BookingFlowState {
   serviceId: string;
@@ -128,6 +131,44 @@ export function submitLabelForMissing(missing: BookingFlowMissingReason[], submi
   return "Confirm Reservation";
 }
 
+export function canAdvanceBookingJourney(step: BookingJourneyStep, state: BookingFlowState) {
+  const currentSlot = resolveSelectedAvailabilitySlot(state);
+  const strategy = getServiceStrategy(state.service);
+  switch (step) {
+    case "date": return Boolean(state.serviceId && state.date && state.availability);
+    case "slot": return isSlotBookable(currentSlot, state.quantity);
+    case "options": {
+      if (!Number.isInteger(state.quantity) || state.quantity < 1) return false;
+      return strategy !== "assigned_resource" || state.selectedResourceIds.length === state.quantity;
+    }
+    case "details": return Boolean(state.customer.name?.trim() && state.customer.email?.trim());
+    case "review": return validateBookingFlow(state).isValid;
+    case "success": return false;
+  }
+}
+
+export function nextBookingJourneyStep(step: BookingJourneyStep, state: BookingFlowState): BookingJourneyStep {
+  if (!canAdvanceBookingJourney(step, state)) return step;
+  const index = bookingJourneySteps.indexOf(step as typeof bookingJourneySteps[number]);
+  return bookingJourneySteps[index + 1] ?? "review";
+}
+
+export function previousBookingJourneyStep(step: BookingJourneyStep): BookingJourneyStep {
+  if (step === "success") return "review";
+  const index = bookingJourneySteps.indexOf(step as typeof bookingJourneySteps[number]);
+  return bookingJourneySteps[Math.max(0, index - 1)] ?? "date";
+}
+
+export function bookingErrorMessage(error: unknown) {
+  if (isPlatformError(error)) {
+    if (error.body.code === "conflict" || error.body.code === "validation_failed") {
+      return "That option is no longer available. Refresh availability and choose another time.";
+    }
+    return error.body.message;
+  }
+  return error instanceof Error ? error.message : "Reservation request failed.";
+}
+
 export function createReservationPayload(state: BookingFlowState): CreateReservationInput {
   const currentSelectedSlot = resolveSelectedAvailabilitySlot(state);
   if (state.availability && state.selectedSlot && !currentSelectedSlot) {
@@ -185,4 +226,20 @@ export async function submitBookingFlow(input: {
   });
 
   return { reservation, availability };
+}
+
+export interface BookingSubmissionGuard {
+  current?: Promise<Awaited<ReturnType<typeof submitBookingFlow>>>;
+}
+
+export function submitBookingFlowOnce(
+  input: Parameters<typeof submitBookingFlow>[0],
+  guard: BookingSubmissionGuard,
+) {
+  if (guard.current) return guard.current;
+  const submission = submitBookingFlow(input).finally(() => {
+    if (guard.current === submission) guard.current = undefined;
+  });
+  guard.current = submission;
+  return submission;
 }

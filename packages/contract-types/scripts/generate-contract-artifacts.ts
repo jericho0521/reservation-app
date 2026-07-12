@@ -104,6 +104,7 @@ function buildOpenApiArtifact() {
       { name: "Availability" },
       { name: "Reservations" },
       { name: "Resource maintenance" },
+      { name: "Public booking" },
       { name: "Chat", description: "Module-gated. Disabled backends return chat_module_disabled in the shared error shape." },
     ],
     paths: buildOpenApiPaths(publicContractOperations),

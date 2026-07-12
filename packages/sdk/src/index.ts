@@ -155,6 +155,9 @@ export interface ReservationPlatformClient {
   getExperienceChannelSettings(options?: RequestOptions): Promise<ExperienceChannelSettingsResponse>;
   updateExperienceChannelSettings(input: ExperienceChannels, options?: RequestOptions): Promise<ExperienceChannelSettingsResponse>;
   getPublicExperience(slug: string, options?: RequestOptions): Promise<PublicExperienceResponse>;
+  listPublicExperienceServices(slug: string, options?: RequestOptions): Promise<ListServicesResponse>;
+  listPublicExperienceAvailability(slug: string, input: AvailabilityQuery, options?: RequestOptions): Promise<AvailabilityResponse>;
+  createPublicExperienceReservation(slug: string, input: CreateReservationInput, options?: RequestOptions): Promise<ReservationResponse>;
   getMetadata(options?: RequestOptions): Promise<MetadataResponse>;
   getCurrentTenant(options?: RequestOptions): Promise<TenantResponse>;
   listVenues(input?: ListVenuesQuery, options?: RequestOptions): Promise<ListVenuesResponse>;
@@ -238,6 +241,26 @@ export function createReservationPlatformClient(
       options,
       public: true,
     }),
+    listPublicExperienceServices: (slug, options) => request({
+      method: "GET",
+      path: `/public/experiences/${encodeURIComponent(slug)}/services`,
+      options,
+      public: true,
+    }),
+    listPublicExperienceAvailability: (slug, input, options) => request({
+      method: "GET",
+      path: `/public/experiences/${encodeURIComponent(slug)}/availability`,
+      query: input,
+      options,
+      public: true,
+    }),
+    createPublicExperienceReservation: (slug, input, options) => request({
+      method: "POST",
+      path: `/public/experiences/${encodeURIComponent(slug)}/reservations`,
+      body: input,
+      options,
+      public: true,
+    }),
     getMetadata: (options) => request({ method: "GET", path: "/metadata", options }),
     getCurrentTenant: (options) => request({ method: "GET", path: "/tenants/current", options }),
     listVenues: (input, options) => request({ method: "GET", path: "/venues", query: input, options }),
@@ -263,6 +286,25 @@ export function createReservationPlatformClient(
       streamMessage: (chatSessionId, input, options) => request({ method: "POST", path: `/chat/reservation-sessions/${encodeURIComponent(chatSessionId)}/messages:stream`, body: input, options, stream: true }),
       confirmReservation: (chatSessionId, input, options) => request({ method: "POST", path: `/chat/reservation-sessions/${encodeURIComponent(chatSessionId)}/confirm`, body: input, options }),
     },
+  };
+}
+
+export function createPublicExperienceBookingClient(
+  clientOptions: ReservationPlatformClientOptions & { slug: string },
+): ReservationPlatformClient {
+  const { slug, ...options } = clientOptions;
+  const client = createReservationPlatformClient(options);
+  return {
+    ...client,
+    listServices: (_input, requestOptions) => client.listPublicExperienceServices(slug, requestOptions),
+    getService: async (serviceId, requestOptions) => {
+      const { services } = await client.listPublicExperienceServices(slug, requestOptions);
+      const service = services.find((candidate) => candidate.service_id === serviceId);
+      if (!service) throw new PlatformError({ code: "not_found", message: "Service not found.", status: 404 });
+      return service;
+    },
+    listAvailability: (input, requestOptions) => client.listPublicExperienceAvailability(slug, input, requestOptions),
+    createReservation: (input, requestOptions) => client.createPublicExperienceReservation(slug, input, requestOptions),
   };
 }
 

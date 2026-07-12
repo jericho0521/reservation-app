@@ -8,6 +8,7 @@ const appDir = path.join(repoRoot, "apps/booking");
 const packageJson = JSON.parse(await readFile(path.join(appDir, "package.json"), "utf8"));
 const allowedDependencies = new Set([
   "@reservation-platform/sdk",
+  "@reservation-platform/ui",
   "next",
   "react",
   "react-dom",

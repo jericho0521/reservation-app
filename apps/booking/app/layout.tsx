@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import "./globals.css";
+import "@reservation-platform/ui/styles.css";
 
 export const metadata: Metadata = {
   title: { default: "Book an experience", template: "%s · Reservations" },

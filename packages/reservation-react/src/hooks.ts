@@ -18,7 +18,7 @@ import {
   getSlotEnd,
   getSlotStart,
   isSlotBookable,
-  submitBookingFlow,
+  submitBookingFlowOnce,
   validateBookingFlow,
   type BookingFlowState,
 } from "./booking-flow.js";
@@ -235,6 +235,7 @@ export function useBookingFlow({
   const [submitting, setSubmitting] = useState(false);
   const [reservation, setReservation] = useState<ReservationResponse>();
   const [error, setError] = useState<Error>();
+  const submissionGuard = useRef({});
 
   const availability = useAvailability({ service_id: serviceId, date, quantity });
   const unavailableResourceLabelsKey = [
@@ -321,7 +322,7 @@ export function useBookingFlow({
     setSubmitting(true);
     setError(undefined);
     try {
-      const result = await submitBookingFlow({ client, state });
+      const result = await submitBookingFlowOnce({ client, state }, submissionGuard.current);
       setReservation(result.reservation);
       return result.reservation;
     } catch (caught) {

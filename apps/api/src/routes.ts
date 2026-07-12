@@ -82,6 +82,7 @@ import {
   type ChatCreateReservationSessionInput,
   type ChatMessageInput,
   type JsonValue,
+  type ListServicesResponse,
   type MetadataRecord,
   type PlatformErrorResponse,
 } from "@reservation-platform/contract-types";
@@ -249,6 +250,9 @@ const reservationCancelPattern = /^\/v1\/reservations\/([^/]+)\/cancel$/;
 const reservationReschedulePattern = /^\/v1\/reservations\/([^/]+)\/reschedule$/;
 const resourceMaintenanceEndPattern = /^\/v1\/resource-maintenance\/([^/]+)\/end$/;
 const publicExperiencePattern = /^\/v1\/public\/experiences\/([^/]+)$/;
+const publicExperienceServicesPattern = /^\/v1\/public\/experiences\/([^/]+)\/services$/;
+const publicExperienceAvailabilityPattern = /^\/v1\/public\/experiences\/([^/]+)\/availability$/;
+const publicExperienceReservationsPattern = /^\/v1\/public\/experiences\/([^/]+)\/reservations$/;
 const publicExperienceSlugPattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const experienceServicePattern = /^\/v1\/experience\/services\/([^/]+)$/;
 const experienceServiceArchivePattern = /^\/v1\/experience\/services\/([^/]+)\/archive$/;
@@ -439,6 +443,27 @@ export async function handleStandaloneApiRequest(
     if (serviceId) return handleExperienceServiceArchiveRequest(request, decodeURIComponent(serviceId), dependencies.catalogRepository);
     const resourceId = experienceResourceArchivePattern.exec(path)?.[1];
     if (resourceId) return handleExperienceResourceArchiveRequest(request, decodeURIComponent(resourceId), dependencies.catalogRepository);
+  }
+
+  if (method === "GET") {
+    const encodedSlug = publicExperienceServicesPattern.exec(path)?.[1];
+    if (encodedSlug) {
+      return handlePublicExperienceServicesRequest(encodedSlug, dependencies);
+    }
+  }
+
+  if (method === "GET") {
+    const encodedSlug = publicExperienceAvailabilityPattern.exec(path)?.[1];
+    if (encodedSlug) {
+      return handlePublicExperienceAvailabilityRequest(encodedSlug, url, dependencies);
+    }
+  }
+
+  if (method === "POST") {
+    const encodedSlug = publicExperienceReservationsPattern.exec(path)?.[1];
+    if (encodedSlug) {
+      return handlePublicExperienceReservationCreateRequest(encodedSlug, request, dependencies);
+    }
   }
 
   if (method === "GET") {
@@ -1014,6 +1039,118 @@ async function handlePublicExperienceReadRequest(
   return jsonResponse(result.status, result.body);
 }
 
+async function resolvePublicBookingExperience(
+  encodedSlug: string,
+  dependencies: StandaloneApiDependencies,
+): Promise<
+  | { ok: true; slug: string; tenantId: string; venueId: string }
+  | { ok: false; response: StandaloneApiResponse }
+> {
+  let slug: string;
+  try {
+    slug = decodeURIComponent(encodedSlug);
+  } catch {
+    return { ok: false, response: platformError(400, "validation_failed", "Invalid experience slug.") };
+  }
+  if (!publicExperienceSlugPattern.test(slug)) {
+    return { ok: false, response: platformError(400, "validation_failed", "Invalid experience slug.") };
+  }
+  if (!dependencies.experienceStudioRepository) {
+    return { ok: false, response: experienceRepositoryUnavailable() };
+  }
+  try {
+    const published = await dependencies.experienceStudioRepository.readPublishedBySlug(slug);
+    if (
+      !published
+      || published.configuration.state !== "published"
+      || !published.configuration.channels.web_booking
+    ) {
+      return { ok: false, response: platformError(404, "not_found", "Published booking experience not found.") };
+    }
+    return {
+      ok: true,
+      slug,
+      tenantId: published.profile.tenant_id,
+      venueId: published.profile.venue_id,
+    };
+  } catch {
+    return { ok: false, response: platformError(500, "internal_error", "Failed to read published booking experience.") };
+  }
+}
+
+async function readPublicExperienceServices(
+  encodedSlug: string,
+  dependencies: StandaloneApiDependencies,
+): Promise<
+  | {
+      ok: true;
+      scope: { slug: string; tenantId: string; venueId: string };
+      response: { status: number; body: ListServicesResponse };
+      services: Array<{ service_id: string }>;
+    }
+  | { ok: false; response: StandaloneApiResponse }
+> {
+  const scope = await resolvePublicBookingExperience(encodedSlug, dependencies);
+  if (!scope.ok) return scope;
+  if (!dependencies.catalogRepository) {
+    return { ok: false, response: platformError(503, "bad_request", "Catalog repository is not configured.") };
+  }
+  const response = await listPlatformServices(dependencies.catalogRepository, { venueId: scope.venueId });
+  const body = response.body;
+  if (response.status !== 200 || !("services" in body)) {
+    return { ok: false, response: jsonResponse(response.status, response.body) };
+  }
+  return {
+    ok: true,
+    scope,
+    response: { status: response.status, body },
+    services: body.services,
+  };
+}
+
+async function handlePublicExperienceServicesRequest(
+  encodedSlug: string,
+  dependencies: StandaloneApiDependencies,
+) {
+  const result = await readPublicExperienceServices(encodedSlug, dependencies);
+  return result.ok
+    ? jsonResponse(result.response.status, result.response.body)
+    : result.response;
+}
+
+async function handlePublicExperienceAvailabilityRequest(
+  encodedSlug: string,
+  url: URL,
+  dependencies: StandaloneApiDependencies,
+) {
+  const services = await readPublicExperienceServices(encodedSlug, dependencies);
+  if (!services.ok) return services.response;
+  const serviceId = url.searchParams.get("service_id");
+  if (!serviceId || !services.services.some((service) => service.service_id === serviceId)) {
+    return platformError(404, "not_found", "Service is not available for this experience.");
+  }
+  return handleAvailabilityRequest(url, dependencies.availabilityRepository);
+}
+
+async function handlePublicExperienceReservationCreateRequest(
+  encodedSlug: string,
+  request: StandaloneApiRequest,
+  dependencies: StandaloneApiDependencies,
+) {
+  const services = await readPublicExperienceServices(encodedSlug, dependencies);
+  if (!services.ok) return services.response;
+  const serviceId = request.body && typeof request.body === "object" && !Array.isArray(request.body)
+    ? (request.body as Record<string, unknown>).service_id
+    : undefined;
+  if (typeof serviceId !== "string" || !services.services.some((service) => service.service_id === serviceId)) {
+    return platformError(404, "not_found", "Service is not available for this experience.");
+  }
+  return handleReservationCreateRequest(request, dependencies, {
+    tenantId: services.scope.tenantId,
+    path: `/v1/public/experiences/${services.scope.slug}/reservations`,
+  });
+}
+
 function requireExperienceScope(request: StandaloneApiRequest): StandaloneApiResponse | undefined {
   const result = readExperienceScope(request);
   return result.ok ? undefined : result.response;
@@ -1098,6 +1235,7 @@ async function handleAvailabilityRequest(
 async function handleReservationCreateRequest(
   request: StandaloneApiRequest,
   dependencies: StandaloneApiDependencies,
+  publicContext?: { tenantId: string; path: string },
 ): Promise<StandaloneApiResponse> {
   const requiredKey = requireIdempotencyKey(getHeader(request.headers, "Idempotency-Key"));
   if (!requiredKey.ok) {
@@ -1121,9 +1259,9 @@ async function handleReservationCreateRequest(
 
   const begin = await beginIdempotentMutation(dependencies.idempotencyRepository, {
     key: requiredKey.key,
-    tenantId: getHeader(request.headers, "X-Reservation-Tenant-Id"),
+    tenantId: publicContext?.tenantId ?? getHeader(request.headers, "X-Reservation-Tenant-Id"),
     method: request.method,
-    path: "/v1/reservations",
+    path: publicContext?.path ?? "/v1/reservations",
     fingerprint: createJsonRequestFingerprint(preparedInput.input as unknown as JsonValue),
   });
 

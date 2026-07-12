@@ -6,12 +6,18 @@ import type {
 } from "@reservation-platform/contract-types";
 import {
   ReservationProvider,
+  PublicExperienceReservationProvider,
+  bookingErrorMessage,
+  canAdvanceBookingJourney,
   getServiceStrategy,
   getSlotEnd,
   getSlotStart,
+  nextBookingJourneyStep,
+  previousBookingJourneyStep,
   useBookingFlow,
   useServices,
   type BookingStrategy,
+  type BookingJourneyStep,
   type BookingFlowState,
 } from "@reservation-platform/react";
 import { useState, type CSSProperties, type ReactNode } from "react";
@@ -23,6 +29,7 @@ import {
   type BookingLabels,
   type ThemeClasses,
 } from "./types.js";
+import { BookingStepActions, BookingStepPanel, BookingStepProgress } from "./booking/journey.js";
 
 export interface BookingFlowProps {
   serviceId?: string;
@@ -160,6 +167,50 @@ export function BookingFlow({
   return baseUrl ? <ReservationProvider baseUrl={baseUrl}>{content}</ReservationProvider> : content;
 }
 
+export function PublicBookingJourney({
+  baseUrl,
+  slug,
+  labels,
+  theme,
+  className,
+}: {
+  baseUrl: string;
+  slug: string;
+  labels?: Partial<BookingLabels>;
+  theme?: ThemeClasses;
+  className?: string;
+}) {
+  return <PublicExperienceReservationProvider baseUrl={baseUrl} slug={slug}>
+    <PublicBookingJourneyInner labels={labels} theme={theme} className={className} />
+  </PublicExperienceReservationProvider>;
+}
+
+function PublicBookingJourneyInner({
+  labels,
+  theme,
+  className,
+}: {
+  labels?: Partial<BookingLabels>;
+  theme?: ThemeClasses;
+  className?: string;
+}) {
+  const [serviceId, setServiceId] = useState<string>();
+  if (!serviceId) {
+    return <section className={cn("rp-public-journey", className)}>
+      <BookingStepProgress step="service" />
+      <header className="rp-service-step-header"><span>Start here</span><h2>Choose an experience</h2><p>Select the service you want to reserve.</p></header>
+      <ServicePicker onSelect={(service) => setServiceId(service.service_id)} />
+    </section>;
+  }
+  return <BookingFlow
+    serviceId={serviceId}
+    labels={labels}
+    theme={theme}
+    className={className}
+    useExistingProvider
+  />;
+}
+
 export function BookingSetupError({
   title,
   message,
@@ -188,6 +239,7 @@ function BookingFlowInner({
   const mergedLabels = mergeLabels(labels);
   const mergedTheme = mergeTheme(theme);
   const flow = useBookingFlow({ serviceId, initialDate, initialQuantity });
+  const [step, setStep] = useState<BookingJourneyStep>("date");
   const [submitError, setSubmitError] = useState<string>();
 
   const resources = flow.state.availability?.resources ?? [];
@@ -203,14 +255,19 @@ function BookingFlowInner({
     setSubmitError(undefined);
     try {
       await flow.actions.submit();
+      setStep("success");
     } catch (error) {
-      setSubmitError(error instanceof Error ? error.message : String(error));
+      setSubmitError(bookingErrorMessage(error));
+      await flow.actions.refetchAvailability();
+      setStep("slot");
     }
   }
 
+  const canContinue = canAdvanceBookingJourney(step, flow.state);
+  const stepIndex = step === "success" ? 5 : (["date", "slot", "options", "details", "review"] as const).indexOf(step);
+
   return (
     <section className={cn(mergedTheme.shell, className)}>
-      {/* Header Block */}
       <div className="rp-header flex flex-col md:flex-row md:items-baseline justify-between border-b border-black dark:border-neutral-800 pb-6 mb-8 gap-4">
         <div>
           <div className="rp-kicker-row flex items-center gap-2">
@@ -232,91 +289,48 @@ function BookingFlowInner({
           </div>
         )}
       </div>
-
-      <div className="rp-layout grid gap-8 md:grid-cols-[1.5fr_1fr]">
-        <div className="rp-main grid gap-6 md:pr-8 md:border-r border-neutral-200 dark:border-neutral-800">
-          <DatePicker
-            label={mergedLabels.date}
-            value={flow.state.date}
-            onChange={flow.actions.setDate}
-            className={mergedTheme.input}
-          />
-
-          <AvailabilityTimeline
-            label={mergedLabels.time}
-            slots={slots}
-            selectedSlot={flow.state.selectedSlot}
-            quantity={flow.state.quantity}
-            loading={flow.availability.loading}
-            onSelect={flow.actions.setSelectedSlot}
-          />
-
-          {controlVisibility.showResourceSelector ? (
-            <ResourceSelector
+      <BookingStepProgress step={step} />
+      <div className="rp-layout rp-journey-layout">
+        <div className="rp-main">
+          {step === "date" ? <BookingStepPanel step={step} title="Choose a date" description="We will check the latest opening hours and booking notice rules.">
+            <DatePicker label={mergedLabels.date} value={flow.state.date} onChange={flow.actions.setDate} className={mergedTheme.input} />
+          </BookingStepPanel> : null}
+          {step === "slot" ? <BookingStepPanel step={step} title="Choose an available time" description="Availability reflects existing reservations and maintenance.">
+            <AvailabilityTimeline label={mergedLabels.time} slots={slots} selectedSlot={flow.state.selectedSlot} quantity={flow.state.quantity} loading={flow.availability.loading} onSelect={flow.actions.setSelectedSlot} />
+          </BookingStepPanel> : null}
+          {step === "options" ? <BookingStepPanel step={step} title={`Choose ${mergedLabels.resource.toLowerCase()} and quantity`} description="Unavailable options cannot be selected.">
+            {controlVisibility.showResourceSelector ? <ResourceSelector
               label={mergedLabels.resource}
               resources={resources}
               selectedResourceIds={selectedResourceIds}
-              unavailableResourceLabels={[
-                ...(flow.state.selectedSlot?.taken_resource_labels ?? []),
-                ...(flow.state.selectedSlot?.maintenance_resource_labels ?? []),
-              ]}
+              unavailableResourceLabels={[...(flow.state.selectedSlot?.taken_resource_labels ?? []), ...(flow.state.selectedSlot?.maintenance_resource_labels ?? [])]}
               onToggle={(resource) => {
                 const selected = resources.filter((candidate) => selectedResourceIds.has(candidate.resource_id));
-                const next = selectedResourceIds.has(resource.resource_id)
-                  ? selected.filter((candidate) => candidate.resource_id !== resource.resource_id)
-                  : [...selected, resource];
+                const next = selectedResourceIds.has(resource.resource_id) ? selected.filter((candidate) => candidate.resource_id !== resource.resource_id) : [...selected, resource];
                 flow.actions.setSelectedResources(next);
-                if (shouldSyncQuantityToSelectedResources(bookingStrategy)) {
-                  flow.actions.setQuantity(Math.max(1, next.length));
-                }
+                if (shouldSyncQuantityToSelectedResources(bookingStrategy)) flow.actions.setQuantity(Math.max(1, next.length));
               }}
               theme={mergedTheme}
-            />
-          ) : null}
-
-          {controlVisibility.showQuantitySelector ? (
-            <QuantitySelector
-              label={mergedLabels.quantity}
-              value={flow.state.quantity}
-              onChange={flow.actions.setQuantity}
-              className={mergedTheme.input}
-            />
-          ) : null}
-
-          <CustomerForm
-            labels={mergedLabels}
-            customer={flow.state.customer}
-            purpose={flow.state.purpose}
-            inputClassName={mergedTheme.input}
-            onCustomerChange={flow.actions.setCustomer}
-            onPurposeChange={flow.actions.setPurpose}
-          />
-        </div>
-
-        <div className="rp-sidebar flex flex-col gap-6">
-          <BookingSummary
-            labels={mergedLabels}
-            service={flow.state.service}
-            state={flow.state}
-            panelClassName={mergedTheme.panel}
-          />
-          {flow.state.reservation ? (
+            /> : null}
+            {controlVisibility.showQuantitySelector ? <QuantitySelector label={mergedLabels.quantity} value={flow.state.quantity} onChange={flow.actions.setQuantity} className={mergedTheme.input} /> : null}
+          </BookingStepPanel> : null}
+          {step === "details" ? <BookingStepPanel step={step} title="Your details" description="We use these details only for this reservation and its updates.">
+            <CustomerForm labels={mergedLabels} customer={flow.state.customer} purpose={flow.state.purpose} inputClassName={mergedTheme.input} onCustomerChange={flow.actions.setCustomer} onPurposeChange={flow.actions.setPurpose} />
+          </BookingStepPanel> : null}
+          {step === "review" ? <BookingStepPanel step={step} title="Review and confirm" description="Nothing is reserved until you press the confirmation button.">
+            <BookingSummary labels={mergedLabels} service={flow.state.service} state={flow.state} panelClassName={mergedTheme.panel} />
+          </BookingStepPanel> : null}
+          {step === "success" && flow.state.reservation ? <BookingStepPanel step={step} title="You are booked" description="Keep this confirmation for your records.">
             <ReservationSuccess reservationId={flow.state.reservation.reservation_id} className={mergedTheme.success} />
-          ) : null}
-          {flow.service.error || flow.availability.error || submitError ? (
-            <ReservationError
-              message={flow.service.error?.message ?? flow.availability.error?.message ?? submitError}
-              className={mergedTheme.error}
-            />
-          ) : null}
-          <button
-            type="button"
-            className={flow.validation.isValid ? mergedTheme.button : mergedTheme.buttonDisabled}
-            disabled={!flow.validation.isValid}
-            onClick={() => void submit()}
-          >
-            {flow.validation.submitLabel}
-          </button>
+          </BookingStepPanel> : null}
+          {flow.service.error || flow.availability.error || submitError ? <ReservationError message={flow.service.error?.message ?? flow.availability.error?.message ?? submitError} className={mergedTheme.error} /> : null}
+          {step !== "success" ? <BookingStepActions
+            canContinue={canContinue}
+            canGoBack={stepIndex > 0}
+            continueLabel={step === "review" ? (flow.state.submitting ? "Confirming…" : "Confirm reservation") : "Continue"}
+            onBack={() => setStep(previousBookingJourneyStep(step))}
+            onContinue={() => step === "review" ? void submit() : setStep(nextBookingJourneyStep(step, flow.state))}
+          /> : null}
         </div>
       </div>
     </section>

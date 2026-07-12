@@ -3,6 +3,7 @@ import { readdir, readFile } from "node:fs/promises";
 import test from "node:test";
 import {
   createIdempotencyKey,
+  createPublicExperienceBookingClient,
   createReservationPlatformClient,
   isPlatformError,
 } from "./index.js";
@@ -165,6 +166,71 @@ test("experience operating-hours SDK methods use the owner route", async () => {
     ["/v1/experience/operating-hours", "PUT"],
   ]);
   assert.deepEqual(JSON.parse(String(requests[1]!.init?.body)), value);
+});
+
+test("public booking SDK methods stay slug-scoped and omit owner authorization", async () => {
+  const requests: Array<{ url: string; init?: RequestInit }> = [];
+  const client = createReservationPlatformClient({
+    baseUrl: "https://platform.example",
+    tenantId: "tenant_private",
+    venueId: "venue_private",
+    getAccessToken: () => "owner-secret",
+    fetch: async (url, init) => {
+      requests.push({ url: String(url), init });
+      return jsonResponse({ services: [] });
+    },
+  });
+  const reservation = {
+    service_id: "11111111-1111-4111-8111-111111111111",
+    date: "2026-07-20",
+    start_time: "09:00",
+    end_time: "10:00",
+    quantity: 1,
+    customer: { name: "Alex" },
+  };
+
+  await client.listPublicExperienceServices("apex racing");
+  await client.listPublicExperienceAvailability("apex racing", { service_id: reservation.service_id, date: reservation.date });
+  await client.createPublicExperienceReservation("apex racing", reservation, { idempotencyKey: "public_12345678" });
+
+  assert.deepEqual(requests.map(({ url, init }) => [new URL(url).pathname, init?.method]), [
+    ["/v1/public/experiences/apex%20racing/services", "GET"],
+    ["/v1/public/experiences/apex%20racing/availability", "GET"],
+    ["/v1/public/experiences/apex%20racing/reservations", "POST"],
+  ]);
+  for (const request of requests) {
+    const headers = new Headers(request.init?.headers);
+    assert.equal(headers.has("Authorization"), false);
+    assert.equal(headers.has("X-Reservation-Tenant-Id"), false);
+    assert.equal(headers.has("X-Reservation-Venue-Id"), false);
+  }
+  assert.equal(new Headers(requests[2]?.init?.headers).get("Idempotency-Key"), "public_12345678");
+});
+
+test("public booking client adapts headless service, availability, and mutation calls", async () => {
+  const requests: string[] = [];
+  const client = createPublicExperienceBookingClient({
+    baseUrl: "https://platform.example",
+    slug: "apex-racing",
+    fetch: async (url) => {
+      requests.push(new URL(String(url)).pathname);
+      if (String(url).endsWith("/services")) return jsonResponse({ services: [{ service_id: "service_1", name: "Sprint" }] });
+      if (String(url).includes("/availability")) return jsonResponse({ slots: [] });
+      return jsonResponse({ reservation_id: "reservation_1", service_id: "service_1", status: "confirmed", quantity: 1 });
+    },
+  });
+
+  await client.listServices();
+  await client.getService("service_1");
+  await client.listAvailability({ service_id: "service_1", date: "2026-07-20" });
+  await client.createReservation({ service_id: "service_1", date: "2026-07-20", start_time: "09:00", end_time: "10:00", quantity: 1, customer: { name: "Alex" } });
+
+  assert.deepEqual(requests, [
+    "/v1/public/experiences/apex-racing/services",
+    "/v1/public/experiences/apex-racing/services",
+    "/v1/public/experiences/apex-racing/availability",
+    "/v1/public/experiences/apex-racing/reservations",
+  ]);
 });
 
 test("experience knowledge and channel SDK methods preserve owner paths", async () => {

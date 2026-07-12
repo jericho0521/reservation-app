@@ -2,6 +2,7 @@ import type {
   BusinessProfileResponse,
   ExperienceConfigurationResponse,
   ExperienceDraftInput,
+  ExperienceIdentityInput,
   ExperiencePresetId,
   ExperienceWorkspaceResponse,
 } from "@reservation-platform/contract-types";
@@ -141,6 +142,42 @@ export function createSupabaseExperienceStudioRepository(
     return readWorkspace(scope);
   }
 
+  async function updateIdentity(scope: ExperienceScope, input: ExperienceIdentityInput) {
+    let workspace = await readWorkspace(scope);
+    if (!workspace) return undefined;
+
+    if (!workspace.draft && workspace.published) {
+      workspace = await saveDraft(scope, {
+        preset_id: workspace.published.preset_id,
+        branding: workspace.published.branding,
+        terminology: workspace.published.terminology,
+        channels: workspace.published.channels,
+      });
+    }
+    if (!workspace.draft) return undefined;
+
+    const profileResult = await client
+      .from(BUSINESS_PROFILES_TABLE)
+      .update({ name: input.name, public_slug: input.public_slug })
+      .eq("tenant_id", scope.tenantId)
+      .eq("venue_id", scope.venueId)
+      .select("*")
+      .single();
+    assertQuerySucceeded(profileResult, "Failed to update experience business profile.");
+    adaptBusinessProfileRow(profileResult.data);
+
+    const configurationResult = await client
+      .from(EXPERIENCE_CONFIGURATIONS_TABLE)
+      .update({ branding: input.branding, terminology: input.terminology })
+      .eq("id", workspace.draft.configuration_id)
+      .select("*")
+      .single();
+    assertQuerySucceeded(configurationResult, "Failed to update experience configuration.");
+    adaptExperienceConfigurationRow(configurationResult.data);
+
+    return readWorkspace(scope);
+  }
+
   async function readPublishedBySlug(slug: string) {
     const profileResult = await client
       .from(BUSINESS_PROFILES_TABLE)
@@ -173,7 +210,7 @@ export function createSupabaseExperienceStudioRepository(
     };
   }
 
-  return { readWorkspace, saveDraft, publishDraft, readPublishedBySlug };
+  return { readWorkspace, saveDraft, publishDraft, updateIdentity, readPublishedBySlug };
 }
 
 export function adaptBusinessProfileRow(value: unknown): BusinessProfileResponse {

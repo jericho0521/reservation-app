@@ -104,6 +104,7 @@ function fakeExperienceRepository(
     readWorkspace: async () => experienceWorkspaceFixture(),
     saveDraft: async () => experienceWorkspaceFixture(),
     publishDraft: async () => experienceWorkspaceFixture(),
+    updateIdentity: async () => experienceWorkspaceFixture(),
     readPublishedBySlug: async () => ({
       profile: experienceWorkspaceFixture().profile,
       configuration: experienceWorkspaceFixture().published!,
@@ -182,6 +183,44 @@ test("experience routes report invalid slugs and missing repositories", async ()
     path: "/v1/public/experiences/apex-racing",
   });
   assert.equal(missingRepository.status, 503);
+});
+
+test("experience identity route delegates a strict scoped update", async () => {
+  let observed: unknown;
+  const response = await handleStandaloneApiRequest({
+    method: "PATCH",
+    path: "/v1/experience/identity",
+    headers: {
+      authorization: "Bearer secret",
+      "x-reservation-tenant-id": "tenant_1",
+      "x-reservation-venue-id": "venue_1",
+    },
+    body: {
+      name: "Apex Racing",
+      public_slug: "apex-racing",
+      branding: { brand_name: "Apex Racing" },
+      terminology: { customer: "Driver", resource: "Simulator", booking: "Session" },
+    },
+  }, {
+    serviceApiKey: "secret",
+    experienceStudioRepository: fakeExperienceRepository({
+      updateIdentity: async (scope, input) => {
+        observed = { scope, input };
+        return experienceWorkspaceFixture();
+      },
+    }),
+  });
+
+  assert.equal(response.status, 200);
+  assert.deepEqual(observed, {
+    scope: { tenantId: "tenant_1", venueId: "venue_1" },
+    input: {
+      name: "Apex Racing",
+      public_slug: "apex-racing",
+      branding: { brand_name: "Apex Racing" },
+      terminology: { customer: "Driver", resource: "Simulator", booking: "Session" },
+    },
+  });
 });
 
 function fakeWhatsAppModule(

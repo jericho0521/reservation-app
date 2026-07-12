@@ -422,6 +422,12 @@ export const publicJsonSchemaDefinitions: Record<string, JsonSchema> = {
     terminology: ref("ExperienceTerminology"),
     channels: ref("ExperienceChannels"),
   }, ["preset_id", "branding", "terminology", "channels"]),
+  ExperienceIdentityInput: objectSchema({
+    name: { type: "string", minLength: 1, maxLength: 120 },
+    public_slug: { type: "string", pattern: "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+    branding: ref("ExperienceBranding"),
+    terminology: ref("ExperienceTerminology"),
+  }, ["name", "public_slug", "branding", "terminology"]),
   PublishExperienceInput: objectSchema({
     configuration_id: stringSchema,
   }, ["configuration_id"]),
@@ -488,6 +494,15 @@ export const publicContractOperations: ContractOperation[] = [
     summary: "Publish a validated venue experience draft.",
     tags: ["Experience Studio"],
     requestBodySchema: "PublishExperienceInput",
+    responseSchema: "ExperienceWorkspaceResponse",
+  },
+  {
+    method: "patch",
+    path: "/v1/experience/identity",
+    operationId: "updateExperienceIdentity",
+    summary: "Update the current venue business identity and draft presentation.",
+    tags: ["Experience Studio"],
+    requestBodySchema: "ExperienceIdentityInput",
     responseSchema: "ExperienceWorkspaceResponse",
   },
   {

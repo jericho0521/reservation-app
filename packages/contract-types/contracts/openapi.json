@@ -556,6 +556,33 @@
         ],
         "type": "object"
       },
+      "ExperienceIdentityInput": {
+        "additionalProperties": false,
+        "properties": {
+          "branding": {
+            "$ref": "#/components/schemas/ExperienceBranding"
+          },
+          "name": {
+            "maxLength": 120,
+            "minLength": 1,
+            "type": "string"
+          },
+          "public_slug": {
+            "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+            "type": "string"
+          },
+          "terminology": {
+            "$ref": "#/components/schemas/ExperienceTerminology"
+          }
+        },
+        "required": [
+          "name",
+          "public_slug",
+          "branding",
+          "terminology"
+        ],
+        "type": "object"
+      },
       "ExperiencePresetId": {
         "enum": [
           "racing_gaming",
@@ -2022,6 +2049,63 @@
           }
         ],
         "summary": "Save the current venue experience draft.",
+        "tags": [
+          "Experience Studio"
+        ]
+      }
+    },
+    "/v1/experience/identity": {
+      "patch": {
+        "operationId": "updateExperienceIdentity",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/TenantIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/VenueIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/CorrelationIdHeader"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExperienceIdentityInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExperienceWorkspaceResponse"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformErrorResponse"
+                }
+              }
+            },
+            "description": "Platform error response."
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Update the current venue business identity and draft presentation.",
         "tags": [
           "Experience Studio"
         ]

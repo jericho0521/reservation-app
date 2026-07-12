@@ -30,6 +30,7 @@ import {
   readReservationById,
   rescheduleReservationWithLegacyPatch,
   saveExperienceDraft,
+  updateExperienceIdentity,
   updateReservationWithLegacyPatch,
   type AvailabilityRepositoryPort,
   type AuthenticatedPlatformPrincipal,
@@ -51,6 +52,7 @@ import {
   createResourceMaintenanceInputSchema,
   endResourceMaintenanceInputSchema,
   experienceDraftInputSchema,
+  experienceIdentityInputSchema,
   publishExperienceInputSchema,
   type ChatConfirmReservationInput,
   type ChatCreateReservationSessionInput,
@@ -276,6 +278,10 @@ export async function handleStandaloneApiRequest(
 
   if (method === "POST" && path === "/v1/experience/publish") {
     return handleExperienceDraftPublishRequest(request, dependencies.experienceStudioRepository);
+  }
+
+  if (method === "PATCH" && path === "/v1/experience/identity") {
+    return handleExperienceIdentityUpdateRequest(request, dependencies.experienceStudioRepository);
   }
 
   if (method === "GET") {
@@ -587,7 +593,7 @@ const protectedRouteMetadata: Readonly<Record<string, readonly RouteMatcher[]>> 
     "/v1/resource-maintenance", resourceMaintenanceEndPattern,
     isChatReservationSessionRoute, isWhatsAppOwnerRoute,
   ],
-  PATCH: [reservationPattern, isWhatsAppOwnerRoute],
+  PATCH: ["/v1/experience/identity", reservationPattern, isWhatsAppOwnerRoute],
   PUT: ["/v1/experience/draft"],
   DELETE: [isWhatsAppOwnerRoute],
 };
@@ -648,6 +654,25 @@ async function handleExperienceDraftPublishRequest(
   const result = await publishExperienceDraft({
     scope: scopeResult.scope,
     configurationId: parsed.data.configuration_id,
+    repository,
+  });
+  return jsonResponse(result.status, result.body);
+}
+
+async function handleExperienceIdentityUpdateRequest(
+  request: StandaloneApiRequest,
+  repository: ExperienceStudioRepository | undefined,
+): Promise<StandaloneApiResponse> {
+  const scopeResult = readExperienceScope(request);
+  if (!scopeResult.ok) return scopeResult.response;
+  const parsed = experienceIdentityInputSchema.safeParse(request.body);
+  if (!parsed.success) {
+    return platformError(400, "validation_failed", "Invalid experience identity body.");
+  }
+  if (!repository) return experienceRepositoryUnavailable();
+  const result = await updateExperienceIdentity({
+    scope: scopeResult.scope,
+    input: parsed.data,
     repository,
   });
   return jsonResponse(result.status, result.body);

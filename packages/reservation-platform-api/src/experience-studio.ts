@@ -2,9 +2,11 @@ import type {
   BusinessProfileResponse,
   ExperienceConfigurationResponse,
   ExperienceDraftInput,
+  ExperienceIdentityInput,
   ExperienceWorkspaceResponse,
   PublicExperienceResponse,
 } from "@reservation-platform/contract-types";
+import { experienceIdentityInputSchema } from "@reservation-platform/contract-types";
 import { platformErrorBody } from "./errors.js";
 import { validateExperienceDraft } from "./experience-presets.js";
 
@@ -22,6 +24,10 @@ export interface ExperienceStudioRepository {
   publishDraft(
     scope: ExperienceScope,
     configurationId: string,
+  ): Promise<ExperienceWorkspaceResponse | undefined>;
+  updateIdentity(
+    scope: ExperienceScope,
+    input: ExperienceIdentityInput,
   ): Promise<ExperienceWorkspaceResponse | undefined>;
   readPublishedBySlug(slug: string): Promise<{
     profile: BusinessProfileResponse;
@@ -122,6 +128,32 @@ export async function publishExperienceDraft(input: {
       : errorResult("not_found", "Experience draft not found.", 404);
   } catch (cause) {
     return errorResult("internal_error", "Failed to publish experience draft.", 500, cause);
+  }
+}
+
+export async function updateExperienceIdentity(input: {
+  scope: ExperienceScope;
+  input: ExperienceIdentityInput;
+  repository: ExperienceStudioRepository;
+}): Promise<ExperienceStudioResult<ExperienceWorkspaceResponse>> {
+  const scopeError = validateScope(input.scope);
+  if (scopeError) return scopeError;
+
+  const parsed = experienceIdentityInputSchema.safeParse(input.input);
+  if (!parsed.success) {
+    return errorResult("validation_failed", "Experience identity is invalid.", 400);
+  }
+
+  try {
+    const workspace = await input.repository.updateIdentity(
+      normalizeScope(input.scope),
+      parsed.data,
+    );
+    return workspace
+      ? { status: 200, body: workspace }
+      : errorResult("not_found", "Experience workspace not found.", 404);
+  } catch (cause) {
+    return errorResult("internal_error", "Failed to update experience identity.", 500, cause);
   }
 }
 

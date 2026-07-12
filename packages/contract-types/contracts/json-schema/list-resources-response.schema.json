@@ -521,6 +521,33 @@
       ],
       "type": "object"
     },
+    "ExperienceIdentityInput": {
+      "additionalProperties": false,
+      "properties": {
+        "branding": {
+          "$ref": "#/$defs/ExperienceBranding"
+        },
+        "name": {
+          "maxLength": 120,
+          "minLength": 1,
+          "type": "string"
+        },
+        "public_slug": {
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "type": "string"
+        },
+        "terminology": {
+          "$ref": "#/$defs/ExperienceTerminology"
+        }
+      },
+      "required": [
+        "name",
+        "public_slug",
+        "branding",
+        "terminology"
+      ],
+      "type": "object"
+    },
     "ExperiencePresetId": {
       "enum": [
         "racing_gaming",

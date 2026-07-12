@@ -59,6 +59,12 @@ test("experience SDK methods use scoped owner and public routes", async () => {
     channels: { web_booking: true, web_chat: false, whatsapp: false },
   });
   await client.publishExperienceDraft("configuration_1");
+  await client.updateExperienceIdentity({
+    name: "Apex Racing",
+    public_slug: "apex-racing",
+    branding: { brand_name: "Apex Racing" },
+    terminology: { customer: "Driver", resource: "Simulator", booking: "Session" },
+  });
   await client.getPublicExperience("apex racing");
 
   assert.equal(requests[0].url, "https://platform.example/v1/experience/workspace");
@@ -75,11 +81,12 @@ test("experience SDK methods use scoped owner and public routes", async () => {
     configuration_id: "configuration_1",
   });
   assert.equal(
-    requests[3].url,
+    requests[4].url,
     "https://platform.example/v1/public/experiences/apex%20racing",
   );
-  assert.equal(new Headers(requests[3].init?.headers).get("Authorization"), null);
-  assert.equal(new Headers(requests[3].init?.headers).get("X-Reservation-Tenant-Id"), null);
+  assert.equal(requests[3].init?.method, "PATCH");
+  assert.equal(new Headers(requests[4].init?.headers).get("Authorization"), null);
+  assert.equal(new Headers(requests[4].init?.headers).get("X-Reservation-Tenant-Id"), null);
 });
 
 test("SDK maps createReservation to POST /v1/reservations with context headers", async () => {

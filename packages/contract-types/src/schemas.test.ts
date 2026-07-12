@@ -7,6 +7,7 @@ import {
   chatMessageResponseSchema,
   createReservationInputSchema,
   experienceDraftInputSchema,
+  experienceIdentityInputSchema,
   experienceWorkspaceResponseSchema,
   listReservationsResponseSchema,
   platformErrorBodySchema,
@@ -77,6 +78,24 @@ test("experience draft rejects unknown preset ids", () => {
     terminology: { customer: "Customer", resource: "Resource", booking: "Booking" },
     channels: { web_booking: true, web_chat: false, whatsapp: false },
   }));
+});
+
+test("experience identity accepts explicit fields and rejects unsafe slugs", () => {
+  const valid = {
+    name: "Apex Racing",
+    public_slug: "apex-racing",
+    branding: { brand_name: "Apex Racing", primary_color: "#f59e0b" },
+    terminology: { customer: "Driver", resource: "Simulator", booking: "Session" },
+  };
+  assert.equal(experienceIdentityInputSchema.safeParse(valid).success, true);
+  assert.equal(experienceIdentityInputSchema.safeParse({
+    ...valid,
+    public_slug: "Apex Racing/../../secret",
+  }).success, false);
+  assert.equal(experienceIdentityInputSchema.safeParse({
+    ...valid,
+    unknown: true,
+  }).success, false);
 });
 
 test("createReservationInputSchema accepts a minimal reservation intent", () => {

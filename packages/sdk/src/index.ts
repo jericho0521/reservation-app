@@ -11,6 +11,7 @@ import type {
   CreateResourceMaintenanceInput,
   EndResourceMaintenanceInput,
   ExperienceDraftInput,
+  ExperienceIdentityInput,
   ExperiencePresetSummary,
   ExperienceWorkspaceResponse,
   ListReservationsQuery,
@@ -124,6 +125,7 @@ export interface ReservationPlatformClient {
   getExperienceWorkspace(options?: RequestOptions): Promise<ExperienceWorkspaceResponse>;
   saveExperienceDraft(input: ExperienceDraftInput, options?: RequestOptions): Promise<ExperienceWorkspaceResponse>;
   publishExperienceDraft(configurationId: string, options?: RequestOptions): Promise<ExperienceWorkspaceResponse>;
+  updateExperienceIdentity(input: ExperienceIdentityInput, options?: RequestOptions): Promise<ExperienceWorkspaceResponse>;
   getPublicExperience(slug: string, options?: RequestOptions): Promise<PublicExperienceResponse>;
   getMetadata(options?: RequestOptions): Promise<MetadataResponse>;
   getCurrentTenant(options?: RequestOptions): Promise<TenantResponse>;
@@ -177,6 +179,12 @@ export function createReservationPlatformClient(
       method: "POST",
       path: "/experience/publish",
       body: { configuration_id: configurationId },
+      options,
+    }),
+    updateExperienceIdentity: (input, options) => request({
+      method: "PATCH",
+      path: "/experience/identity",
+      body: input,
       options,
     }),
     getPublicExperience: (slug, options) => request({

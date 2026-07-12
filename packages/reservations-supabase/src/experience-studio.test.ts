@@ -187,3 +187,39 @@ test("public reads normalize slugs and require published rows", async () => {
     ["eq", ["status", "published"]],
   ]);
 });
+
+test("identity updates scope profile and draft writes", async () => {
+  const calls: Array<[string, unknown]> = [];
+  const updatedProfile = { ...profileRow(), name: "Apex", public_slug: "apex" };
+  const updatedDraft = {
+    ...configurationRow("draft"),
+    branding: { brand_name: "Apex" },
+  };
+  const repository = createSupabaseExperienceStudioRepository(fakeClient(calls, [
+    { data: profileRow(), error: null },
+    { data: [configurationRow("draft")], error: null },
+    { data: updatedProfile, error: null },
+    { data: updatedDraft, error: null },
+    { data: updatedProfile, error: null },
+    { data: [updatedDraft], error: null },
+  ]));
+
+  const workspace = await repository.updateIdentity(
+    { tenantId: "tenant_1", venueId: "venue_1" },
+    {
+      name: "Apex",
+      public_slug: "apex",
+      branding: { brand_name: "Apex" },
+      terminology: { customer: "Driver", resource: "Simulator", booking: "Session" },
+    },
+  );
+
+  assert.equal(workspace?.profile.public_slug, "apex");
+  assert.deepEqual(calls.filter(([name]) => name === "update"), [
+    ["update", { name: "Apex", public_slug: "apex" }],
+    ["update", {
+      branding: { brand_name: "Apex" },
+      terminology: { customer: "Driver", resource: "Simulator", booking: "Session" },
+    }],
+  ]);
+});

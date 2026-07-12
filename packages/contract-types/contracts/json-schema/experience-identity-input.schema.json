@@ -1525,8 +1525,8 @@
       "type": "object"
     }
   },
-  "$id": "https://reservation-platform.local/contracts/json-schema/tenant-response.schema.json",
-  "$ref": "#/$defs/TenantResponse",
+  "$id": "https://reservation-platform.local/contracts/json-schema/experience-identity-input.schema.json",
+  "$ref": "#/$defs/ExperienceIdentityInput",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "TenantResponse"
+  "title": "ExperienceIdentityInput"
 }

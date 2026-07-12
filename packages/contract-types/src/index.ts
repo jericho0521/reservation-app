@@ -87,6 +87,13 @@ export interface ExperienceDraftInput {
   channels: ExperienceChannels;
 }
 
+export interface ExperienceIdentityInput {
+  name: string;
+  public_slug: string;
+  branding: ExperienceBranding;
+  terminology: ExperienceTerminology;
+}
+
 export interface PublishExperienceInput {
   configuration_id: string;
 }

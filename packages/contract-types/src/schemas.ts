@@ -90,6 +90,13 @@ export const experienceDraftInputSchema = strictObject({
   channels: experienceChannelsSchema,
 });
 
+export const experienceIdentityInputSchema = strictObject({
+  name: z.string().trim().min(1).max(120),
+  public_slug: z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
+  branding: experienceBrandingSchema,
+  terminology: experienceTerminologySchema,
+});
+
 export const publishExperienceInputSchema = strictObject({
   configuration_id: z.string().min(1),
 });

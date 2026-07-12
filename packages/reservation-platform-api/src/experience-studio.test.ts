@@ -11,6 +11,7 @@ import {
   readExperienceWorkspace,
   readPublicExperience,
   saveExperienceDraft,
+  updateExperienceIdentity,
   type ExperienceScope,
   type ExperienceStudioRepository,
 } from "./experience-studio.js";
@@ -74,6 +75,7 @@ function fakeExperienceRepository(
       draft: undefined,
       published: { ...configurationFixture("published"), configuration_id: "draft_1", version: 2 },
     }),
+    updateIdentity: async () => workspaceFixture(),
     readPublishedBySlug: async () => ({
       profile: profileFixture(),
       configuration: configurationFixture("published"),
@@ -166,4 +168,26 @@ test("storage failures are sanitized", async () => {
       status: 500,
     },
   });
+});
+
+test("identity updates reject unsafe slugs before repository work", async () => {
+  let updated = false;
+  const result = await updateExperienceIdentity({
+    scope,
+    input: {
+      name: "Apex Racing",
+      public_slug: "Apex Racing",
+      branding: { brand_name: "Apex Racing" },
+      terminology: { customer: "Driver", resource: "Simulator", booking: "Session" },
+    },
+    repository: fakeExperienceRepository({
+      updateIdentity: async () => {
+        updated = true;
+        return workspaceFixture();
+      },
+    }),
+  });
+
+  assert.equal(result.status, 400);
+  assert.equal(updated, false);
 });

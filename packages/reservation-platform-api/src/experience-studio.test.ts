@@ -120,6 +120,23 @@ test("public read omits tenant and venue identifiers", async () => {
   assert.equal(result.body.configuration.state, "published");
 });
 
+for (const state of [undefined, "draft", "archived"] as const) {
+  test(`public read hides ${state ?? "unknown"} experience slugs`, async () => {
+    const result = await readPublicExperience({
+      slug: "private-experience",
+      repository: fakeExperienceRepository({
+        readPublishedBySlug: async () => state ? {
+          profile: profileFixture(),
+          configuration: configurationFixture(state),
+        } : undefined,
+      }),
+    });
+
+    assert.equal(result.status, 404);
+    assert.equal("error" in result.body && result.body.error.code, "not_found");
+  });
+}
+
 test("owner reads reject missing scope before repository work", async () => {
   let read = false;
   const result = await readExperienceWorkspace({

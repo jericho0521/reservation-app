@@ -17,9 +17,9 @@ At each width, complete Studio publish, public booking, staff takeover/reply, re
 
 | Width | Expected behavior | Release-candidate audit |
 | --- | --- | --- |
-| 375px | Single-column forms and cards; horizontally scrollable primary navigation; readable tables; no clipped actions | Responsive rules and production builds verified |
-| 768px | Single-column command-center content with usable filters and Studio navigation | Responsive rules and production builds verified |
-| Desktop | Persistent owner navigation, two-column detail views, visible operational context | Responsive rules and production builds verified |
+| 375px | Single-column forms and cards; horizontally scrollable primary navigation; readable tables; no clipped actions | Database-backed local walkthrough completed; no page-level overflow or clipped primary actions |
+| 768px | Single-column command-center content with usable filters and Studio navigation | Database-backed local walkthrough completed; headings, filters, and Studio navigation remained usable |
+| Desktop | Persistent owner navigation, two-column detail views, visible operational context | Database-backed local walkthrough completed at 1440px across every primary owner and public journey |
 
 ## Keyboard and screen-reader walkthrough
 

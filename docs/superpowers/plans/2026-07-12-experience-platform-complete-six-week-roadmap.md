@@ -650,7 +650,7 @@ Expected demonstration: create bookings through web and simulated WhatsApp, show
 
 **Produces:** Automated proofs for the four presentation-critical journeys, with simulation substituting for external WhatsApp/AI services.
 
-- [ ] Run each test from a freshly reset demo database.
+- [x] Run each test from a freshly reset demo database.
 - [x] Capture failure diagnostics without credentials or QR data.
 - [x] Commit as `test(e2e): cover final demonstration journeys`.
 
@@ -662,8 +662,8 @@ Expected demonstration: create bookings through web and simulated WhatsApp, show
 
 **Produces:** Consistent responsive layouts, typography, terminology, focus behavior, reduced-motion behavior, forms, errors, skeletons, empty states, and mobile navigation.
 
-- [ ] Walk every primary journey at 375px, 768px, and desktop width.
-- [ ] Complete keyboard-only flow and inspect headings, labels, contrast, and focus.
+- [x] Walk every primary journey at 375px, 768px, and desktop width.
+- [x] Complete keyboard-only flow and inspect headings, labels, contrast, and focus.
 - [x] Fix only presentation-blocking inconsistencies; no new feature work.
 - [x] Commit as `fix(ui): polish final customer and owner journeys`.
 
@@ -734,7 +734,21 @@ Verified code revision: `06a6df349bf65641e1a9bde4e03c2c0a103d995c`.
 - The security scanner initially reported its own committed detection fixtures, was narrowed to exclude only those two fixture files, gained an integration regression test, and the complete gate passed again.
 - `git status --short` printed nothing after the verified gate.
 
-Remaining unchecked items require the final deployed environment or human presentation sign-off: live database E2E reset, responsive/keyboard walkthrough on deployed URLs, three timed rehearsals, backup recording, 48-hour feature freeze, screenshot approval, and release tag selection.
+At this first candidate gate, live database E2E reset, responsive/keyboard walkthrough, rehearsals, backup recording, feature freeze, screenshot approval, and release tagging were still pending. The follow-up evidence below supersedes the locally verifiable portions of that list.
+
+### Release-candidate walkthrough evidence — 2026-07-13
+
+Verified code revision: `407ac5556c46738a193be1edfe41110f641ddee4`.
+
+- Applied all 20 core migrations to a disposable PostgreSQL 16 database, reset it with `demo:reset`, and verified exactly three published flagship businesses with `demo:verify`.
+- Ran the 26-test E2E suite from that fresh database: 24 passed and the two optional hosted-page probes skipped because deployed URLs were not configured.
+- Exercised the owner overview, Experience Studio draft/preview/publish flow, public racing booking and management link, simulated WhatsApp proposal/confirmation, unified staff takeover/reply/resume, maintenance-aware availability, and analytics against the database-backed local runtime.
+- Walked every owner route at 375px, 768px, and 1440px with no page-level horizontal overflow; inspected the public booking, chat, and management journeys at mobile and desktop widths.
+- Verified visible keyboard focus, the skip link, primary headings, and control labels. The audit found and fixed the booking date label, local-calendar defaults, public booking page heading, disabled WhatsApp setup state, Studio completion state, analytics date range, local CORS coverage, and conversational resource assignment.
+- The clean release gate passed: frozen install, build, package tests, root tests, authenticated smoke tests (3/3), E2E, package boundaries, migration bundle verification, deployment verification, database reset, and readiness verification.
+- The deployment verifier had no hosted environment values, so its live deployment probe remains skipped; source, bundle, Docker, and secret/QR logging checks passed.
+
+Remaining unchecked items require a deployed environment or human presentation/release sign-off: deployed-URL browser walkthrough, three timed spoken rehearsals, backup recording approval, 48-hour feature freeze, screenshot approval, and release tag selection. The earlier 2026-07-12 note is retained as historical evidence of the first candidate gate.
 
 ---
 
@@ -827,4 +841,4 @@ Update this table at each weekly gate.
 | 3. Customer Experiences | 2026-08-02 | Complete | React 14, UI 18, root E2E 15 passed with 2 documented optional live-URL skips; booking production build and package/frontend boundaries passed. Flagship builds and focused API, database, SDK, Supabase, security-token, concurrency, and all-eight-preset proofs also passed. | None |
 | 4. Omnichannel AI | 2026-08-09 | Complete | Chat core 38, AI chat 21, WhatsApp 29, standalone API 135, SDK 25, contract types 23, and console 12 passed; console production build passed. Root smoke command passed with 3 documented live-backend skips to be exercised in Phase 6. | None |
 | 5. Operations and Analytics | 2026-08-16 | Complete | Supabase adapter 56, SDK 27, standalone API 137, console 23, and console production build passed; migration bundle verified with 20 ordered core migrations and 18 inventoried SQL assets. | None |
-| 6. Hardening and Presentation | 2026-08-23 | Not started | — | — |
+| 6. Hardening and Presentation | 2026-08-23 | Engineering complete; presentation sign-off pending | Clean source and database-backed release gates passed at `407ac55`; 24/24 runnable E2E tests, 3/3 authenticated smoke tests, responsive/keyboard local walkthrough, security/deployment verification, and deterministic three-business reset verified. | None; deployed walkthrough, rehearsals, backup recording, freeze, and release tag remain operational sign-offs. |

@@ -5,6 +5,7 @@ const futureSections: string[] = [];
 export function ConsoleShell({ children }: { children: ReactNode }) {
   return (
     <div className="console-frame">
+      <a className="skip-link" href="#console-main">Skip to main content</a>
       <aside className="console-sidebar">
         <a className="console-brand" href="/">
           <span className="brand-mark">R</span>
@@ -30,7 +31,7 @@ export function ConsoleShell({ children }: { children: ReactNode }) {
         </nav>
         <p className="sidebar-note">One engine. Every booking channel.</p>
       </aside>
-      <main className="console-main">{children}</main>
+      <main className="console-main" id="console-main" tabIndex={-1}>{children}</main>
     </div>
   );
 }

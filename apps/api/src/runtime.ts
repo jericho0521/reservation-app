@@ -508,6 +508,7 @@ export function standaloneWhatsAppDependenciesFromEnv(
         }
         return service.handleInboundMessage(input);
       },
+      sendDirectMessage: (input) => service.sendDirectMessage(input),
       readiness: async () => {
         const session = await service.sessionStatus().catch(() => undefined);
         const businessConfig = await service.getConfig().catch(() => undefined);

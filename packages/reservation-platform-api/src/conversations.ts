@@ -44,6 +44,7 @@ export interface ConversationRepository {
   listMessages(scope: ExperienceScope, conversationId: string, query: Required<Pick<ListConversationMessagesQuery, "limit">> & Omit<ListConversationMessagesQuery, "limit">): Promise<{ data?: ConversationMessageResponse[]; error?: unknown }>;
   append(scope: ExperienceScope, conversationId: string, input: ConversationAppendInput): Promise<{ data?: ConversationMessageResponse; error?: unknown }>;
   updateAutomation(scope: ExperienceScope, conversationId: string, input: ConversationAutomationInput & { changedBy?: string }): Promise<{ data?: ConversationResponse; error?: unknown }>;
+  getDeliveryTarget?(scope: ExperienceScope, conversationId: string): Promise<{ data?: { channelIdentifier: string }; error?: unknown }>;
 }
 
 export type ConversationResult<T> = { status: number; body: T | ReturnType<typeof platformErrorBody> };
@@ -153,6 +154,7 @@ export async function appendStaffReply(input: {
   conversationId: string;
   value: unknown;
   repository: ConversationRepository;
+  deliver?: (input: { conversation: ConversationResponse; content: string }) => Promise<void>;
 }): Promise<ConversationResult<ConversationMessageResponse>> {
   const parsed = conversationStaffReplyInputSchema.safeParse(input.value);
   if (!parsed.success) return validationFailure("Staff reply is invalid.");
@@ -163,6 +165,13 @@ export async function appendStaffReply(input: {
   });
   if (conversation.status !== 200 || !("channel" in conversation.body)) {
     return { status: conversation.status, body: conversation.body as ReturnType<typeof platformErrorBody> };
+  }
+  try {
+    const takeover = await input.repository.updateAutomation(input.scope, input.conversationId, { automation_state: "manual", changedBy: "staff" });
+    if (takeover.error || !takeover.data) throw takeover.error ?? new Error("takeover failed");
+    await input.deliver?.({ conversation: conversation.body, content: parsed.data.content });
+  } catch {
+    return storageFailure();
   }
   return appendConversationMessage({
     ...input,

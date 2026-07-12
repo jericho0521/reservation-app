@@ -210,6 +210,7 @@ export interface StandaloneApiWhatsAppModule {
     changed_by?: string;
   }): WhatsAppConversationMessage | undefined | Promise<WhatsAppConversationMessage | undefined>;
   handleInboundMessage(input: WhatsAppInboundMessage): unknown | Promise<unknown>;
+  sendDirectMessage?(input: { to: string; text: string; metadata?: MetadataRecord }): void | Promise<void>;
   readiness(): unknown | Promise<unknown>;
 }
 
@@ -1470,7 +1471,21 @@ async function handleConversationStaffReply(
   const conversationId = decodeConversationId(encodedId);
   if (!conversationId) return platformError(400, "validation_failed", "Invalid conversation id.");
   if (!dependencies.conversationRepository) return platformError(503, "bad_request", "Conversation repository is not configured.");
-  const result = await appendStaffReply({ scope: scoped.scope, conversationId, value: request.body, repository: dependencies.conversationRepository });
+  const result = await appendStaffReply({
+    scope: scoped.scope,
+    conversationId,
+    value: request.body,
+    repository: dependencies.conversationRepository,
+    deliver: async ({ conversation, content }) => {
+      if (conversation.channel !== "whatsapp") return;
+      if (!dependencies.whatsappModule?.sendDirectMessage || !dependencies.conversationRepository?.getDeliveryTarget) {
+        throw new Error("WhatsApp delivery is not configured.");
+      }
+      const target = await dependencies.conversationRepository.getDeliveryTarget(scoped.scope, conversationId);
+      if (target.error || !target.data) throw target.error ?? new Error("WhatsApp delivery target is unavailable.");
+      await dependencies.whatsappModule.sendDirectMessage({ to: target.data.channelIdentifier, text: content, metadata: { staff_reply: true } });
+    },
+  });
   return jsonResponse(result.status, result.body);
 }
 

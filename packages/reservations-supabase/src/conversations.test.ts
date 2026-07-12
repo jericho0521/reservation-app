@@ -8,6 +8,7 @@ test("unified conversation repository enforces scope, pagination, dedup RPC, and
   assert.match(source, /append_platform_conversation_message/u);
   assert.match(source, /order\("created_at", \{ ascending: false \}\).*limit\(input\.limit\)/su);
   assert.match(source, /channel_identifier: input\.participant\.channelIdentifier/u);
+  assert.match(source, /select\("channel_identifier"\)/u);
   const adapter = source.slice(source.indexOf("function adaptConversation"), source.indexOf("function adaptMessage"));
   assert.doesNotMatch(adapter, /channel_identifier|identifier_hash/u);
 });

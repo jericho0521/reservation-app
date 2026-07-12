@@ -99,6 +99,13 @@ export class WhatsAppBusinessModule {
     return this.sessionService.restoreConnection();
   }
 
+  async sendDirectMessage(input: { to: string; text: string; metadata?: MetadataRecord }) {
+    if (!this.sender) throw new Error("WhatsApp session is not connected.");
+    const text = input.text.trim();
+    if (!text) throw new Error("Message text is required.");
+    await this.sender.sendMessage({ provider: "session_qr", to: input.to, text, metadata: input.metadata });
+  }
+
   getConfig() {
     return this.store.getConfig();
   }

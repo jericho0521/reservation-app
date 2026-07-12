@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   appendConversationMessage,
+  appendStaffReply,
   listConversationMessages,
   listConversations,
   updateConversationAutomation,
@@ -53,6 +54,23 @@ test("manual takeover state is delegated authoritatively within scope", async ()
   });
   assert.equal("automation_state" in result.body && result.body.automation_state, "manual");
   assert.deepEqual(received, { scope, id: "conversation_1", value: { automation_state: "manual", changedBy: "staff_1" } });
+});
+
+test("staff replies pause automation before direct delivery and persistence", async () => {
+  const order: string[] = [];
+  const repo = repository({
+    updateAutomation: async () => { order.push("takeover"); return { data: conversationFixture({ automation_state: "manual" }) }; },
+    append: async () => { order.push("persist"); return { data: messageFixture({ direction: "outbound", sender_type: "staff" }) }; },
+  });
+  const result = await appendStaffReply({
+    scope,
+    conversationId: "conversation_1",
+    value: { content: "A staff reply" },
+    repository: repo,
+    deliver: async () => { order.push("deliver"); },
+  });
+  assert.equal(result.status, 200);
+  assert.deepEqual(order, ["takeover", "deliver", "persist"]);
 });
 
 function repository(overrides: Partial<ConversationRepository>): ConversationRepository {

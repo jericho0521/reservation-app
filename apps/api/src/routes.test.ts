@@ -563,6 +563,7 @@ test("experience channel route separates desired settings from readiness", async
 
 test("conversation owner routes preserve scope, filters, chronology, replies, and takeover", async () => {
   const observed: unknown[] = [];
+  const delivered: unknown[] = [];
   const repository = conversationRepository({
     async list(scope, query) {
       observed.push({ operation: "list", scope, query });
@@ -580,6 +581,10 @@ test("conversation owner routes preserve scope, filters, chronology, replies, an
       observed.push({ operation: "automation", scope, conversationId, input });
       return { data: conversationFixture({ automation_state: input.automation_state }) };
     },
+    async getDeliveryTarget(scope, conversationId) {
+      observed.push({ operation: "target", scope, conversationId });
+      return { data: { channelIdentifier: "60123@s.whatsapp.net" } };
+    },
   });
   const headers = {
     authorization: "Bearer secret",
@@ -589,7 +594,11 @@ test("conversation owner routes preserve scope, filters, chronology, replies, an
 
   const listed = await handleStandaloneApiRequest({ method: "GET", path: "/v1/conversations?channel=whatsapp&status=active&limit=25", headers }, { serviceApiKey: "secret", conversationRepository: repository });
   const messages = await handleStandaloneApiRequest({ method: "GET", path: "/v1/conversations/conversation%2F1/messages?limit=10", headers }, { serviceApiKey: "secret", conversationRepository: repository });
-  const replied = await handleStandaloneApiRequest({ method: "POST", path: "/v1/conversations/conversation%2F1/messages", headers, body: { content: "A staff reply" } }, { serviceApiKey: "secret", conversationRepository: repository });
+  const replied = await handleStandaloneApiRequest({ method: "POST", path: "/v1/conversations/conversation%2F1/messages", headers, body: { content: "A staff reply" } }, {
+    serviceApiKey: "secret",
+    conversationRepository: repository,
+    whatsappModule: { async sendDirectMessage(input) { delivered.push(input); } } as StandaloneApiWhatsAppModule,
+  });
   const takeover = await handleStandaloneApiRequest({ method: "PUT", path: "/v1/conversations/conversation%2F1/automation", headers, body: { automation_state: "manual" } }, { serviceApiKey: "secret", conversationRepository: repository });
 
   assert.equal(listed.status, 200);
@@ -599,9 +608,12 @@ test("conversation owner routes preserve scope, filters, chronology, replies, an
   assert.deepEqual(observed, [
     { operation: "list", scope: { tenantId: "tenant_1", venueId: "venue_1" }, query: { channel: "whatsapp", status: "active", limit: 25 } },
     { operation: "messages", scope: { tenantId: "tenant_1", venueId: "venue_1" }, conversationId: "conversation/1", query: { limit: 10 } },
+    { operation: "automation", scope: { tenantId: "tenant_1", venueId: "venue_1" }, conversationId: "conversation/1", input: { automation_state: "manual", changedBy: "staff" } },
+    { operation: "target", scope: { tenantId: "tenant_1", venueId: "venue_1" }, conversationId: "conversation/1" },
     { operation: "append", scope: { tenantId: "tenant_1", venueId: "venue_1" }, conversationId: "conversation/1", input: { channel: "whatsapp", direction: "outbound", senderType: "staff", content: "A staff reply" } },
     { operation: "automation", scope: { tenantId: "tenant_1", venueId: "venue_1" }, conversationId: "conversation/1", input: { automation_state: "manual", changedBy: "staff" } },
   ]);
+  assert.deepEqual(delivered, [{ to: "60123@s.whatsapp.net", text: "A staff reply", metadata: { staff_reply: true } }]);
 });
 
 test("conversation owner routes reject missing authentication before repository access", async () => {

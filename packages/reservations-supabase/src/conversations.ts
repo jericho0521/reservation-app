@@ -112,6 +112,17 @@ export function createSupabaseConversationRepository(client: ConversationSupabas
         .maybeSingle();
       return adaptOne(result, adaptConversation);
     },
+    async getDeliveryTarget(scope, conversationId) {
+      const conversation = await get(scope, conversationId);
+      if (!conversation.data || conversation.error) return { data: undefined, ...(conversation.error ? { error: conversation.error } : {}) };
+      const result = await client.from(participantsTable)
+        .select("channel_identifier")
+        .eq("conversation_id", conversationId)
+        .eq("role", "customer")
+        .maybeSingle();
+      const identifier = result.data ? stringValue(asRecord(result.data).channel_identifier) : undefined;
+      return { data: identifier ? { channelIdentifier: identifier } : undefined, ...(result.error ? { error: result.error } : {}) };
+    },
   };
 }
 

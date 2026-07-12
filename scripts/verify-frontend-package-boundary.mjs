@@ -31,6 +31,7 @@ const packageChecks = [
     ],
     allowedDevDependencies: [
       "@types/react",
+      "react",
       "tsx",
       "typescript",
     ],

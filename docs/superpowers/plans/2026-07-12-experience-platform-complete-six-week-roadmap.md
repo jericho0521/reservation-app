@@ -96,15 +96,15 @@ flowchart LR
 
 ### Required work packages
 
-- [ ] Add experience contracts, strict schemas, and generated contract registry entries.
-- [ ] Add the immutable eight-preset registry and deterministic preset-to-draft creation.
-- [ ] Add migration `000015_experience_studio_foundation.sql` with business profiles, versioned configurations, tenant/venue scoping, and atomic publishing.
-- [ ] Add framework-neutral workspace, save-draft, validate, publish, and public-read use cases.
-- [ ] Add the Supabase experience repository.
-- [ ] Mount protected owner routes and the public slug route in `apps/api`.
-- [ ] Add typed SDK methods for every Phase 1 endpoint.
-- [ ] Create `apps/console` with authenticated server-only SDK configuration and read-only Studio shell.
-- [ ] Add Phase 1 integration proof, startup documentation, and seed fixture.
+- [x] Add experience contracts, strict schemas, and generated contract registry entries.
+- [x] Add the immutable eight-preset registry and deterministic preset-to-draft creation.
+- [x] Add migration `000015_experience_studio_foundation.sql` with business profiles, versioned configurations, tenant/venue scoping, and atomic publishing.
+- [x] Add framework-neutral workspace, save-draft, validate, publish, and public-read use cases.
+- [x] Add the Supabase experience repository.
+- [x] Mount protected owner routes and the public slug route in `apps/api`.
+- [x] Add typed SDK methods for every Phase 1 endpoint.
+- [x] Create `apps/console` with authenticated server-only SDK configuration and read-only Studio shell.
+- [x] Add Phase 1 integration proof, startup documentation, and seed fixture.
 
 ### Phase gate
 
@@ -141,12 +141,12 @@ Expected demonstration: select the racing preset through an API/seed action, ope
 
 **Produces:** An ordered section registry for `preset`, `profile`, `services`, `resources`, `availability`, `knowledge`, `branding`, and `publish`, plus completion state derived from server validation.
 
-- [ ] Test exact section order, route generation, and incomplete/complete progress calculation.
-- [ ] Render desktop sidebar and mobile step navigation from the registry.
-- [ ] Keep draft data server-owned; use local form state only for unsaved edits.
-- [ ] Add loading, missing workspace, unauthorized, and retry states.
-- [ ] Run `pnpm --dir apps/console run test && pnpm --dir apps/console run build`.
-- [ ] Commit as `feat(console): add experience studio workflow`.
+- [x] Test exact section order, route generation, and incomplete/complete progress calculation.
+- [x] Render desktop sidebar and mobile step navigation from the registry.
+- [x] Keep draft data server-owned; use local form state only for unsaved edits.
+- [x] Add loading, missing workspace, unauthorized, and retry states.
+- [x] Run `pnpm --dir apps/console run test && pnpm --dir apps/console run build`.
+- [x] Commit as `feat(console): add experience studio workflow`.
 
 ### Task 2.2: Add owner-editable profile, branding, and terminology
 
@@ -162,12 +162,12 @@ Expected demonstration: select the racing preset through an API/seed action, ope
 
 **Produces:** Patch inputs for business name, public slug, description, colors, logo URL, and three terminology labels.
 
-- [ ] Add strict schema tests for color, slug, URL, length, unknown fields, and tenant isolation.
-- [ ] Add one owner update use case; do not expose generic JSON patching.
-- [ ] Add typed SDK update methods with exact validation error mapping.
-- [ ] Build accessible labeled forms with save confirmation and unsaved-change warning.
-- [ ] Verify a failed save does not mutate the currently published configuration.
-- [ ] Commit as `feat(studio): edit business identity and branding`.
+- [x] Add strict schema tests for color, slug, URL, length, unknown fields, and tenant isolation.
+- [x] Add one owner update use case; do not expose generic JSON patching.
+- [x] Add typed SDK update methods with exact validation error mapping.
+- [x] Build accessible labeled forms with save confirmation and unsaved-change warning.
+- [x] Verify a failed save does not mutate the currently published configuration.
+- [x] Commit as `feat(studio): edit business identity and branding`.
 
 ### Task 2.3: Add services and resource configuration
 
@@ -182,12 +182,12 @@ Expected demonstration: select the racing preset through an API/seed action, ope
 
 **Produces:** Owner-only list/create/update/archive actions for services and resources, including duration, capacity, resource strategy, and active state.
 
-- [ ] Test that archived catalog entries disappear publicly but remain visible to owners.
-- [ ] Test preset defaults for racing, rooms, and appointments.
-- [ ] Reuse existing catalog repositories and add only missing mutation ports.
-- [ ] Prevent resource deletion when future reservations depend on it; archive instead.
-- [ ] Add empty-state actions that create the first service/resource.
-- [ ] Commit as `feat(studio): configure services and resources`.
+- [x] Test that archived catalog entries disappear publicly but remain visible to owners.
+- [x] Test preset defaults for racing, rooms, and appointments.
+- [x] Reuse existing catalog repositories and add only missing mutation ports.
+- [x] Prevent resource deletion when future reservations depend on it; archive instead.
+- [x] Add empty-state actions that create the first service/resource.
+- [x] Commit as `feat(studio): configure services and resources`.
 
 ### Task 2.4: Add operating hours and availability rules
 
@@ -201,12 +201,12 @@ Expected demonstration: select the racing preset through an API/seed action, ope
 
 **Produces:** Weekly opening intervals, booking horizon, slot interval, minimum notice, timezone, and date-specific closures.
 
-- [ ] Test overlapping intervals, invalid timezone, overnight ambiguity, and closed dates.
-- [ ] Persist normalized local-time rules with an IANA timezone.
-- [ ] Make availability queries intersect operating rules, maintenance, capacity, and existing reservations.
-- [ ] Show a seven-day visual schedule editor and a computed sample-day preview.
-- [ ] Run database, API, SDK, and availability suites.
-- [ ] Commit as `feat(availability): add configurable operating rules`.
+- [x] Test overlapping intervals, invalid timezone, overnight ambiguity, and closed dates.
+- [x] Persist normalized local-time rules with an IANA timezone.
+- [x] Make availability queries intersect operating rules, maintenance, capacity, and existing reservations.
+- [x] Show a seven-day visual schedule editor and a computed sample-day preview.
+- [x] Run database, API, SDK, and availability suites.
+- [x] Commit as `feat(availability): add configurable operating rules`.
 
 ### Task 2.5: Add AI knowledge and channel settings
 
@@ -219,10 +219,10 @@ Expected demonstration: select the racing preset through an API/seed action, ope
 
 **Produces:** Owner-managed FAQ entries and enablement flags for web booking, web chat, and WhatsApp. Enabling a channel does not claim readiness unless its runtime check passes.
 
-- [ ] Test tenant isolation, entry length limits, deterministic ordering, and archive behavior.
-- [ ] Store structured question/answer/source entries; do not build a general document CMS.
-- [ ] Expose readiness separately from desired enablement.
-- [ ] Commit as `feat(studio): configure knowledge and channels`.
+- [x] Test tenant isolation, entry length limits, deterministic ordering, and archive behavior.
+- [x] Store structured question/answer/source entries; do not build a general document CMS.
+- [x] Expose readiness separately from desired enablement.
+- [x] Commit as `feat(studio): configure knowledge and channels`.
 
 ### Task 2.6: Add preview, validation summary, and publication UI
 
@@ -235,11 +235,11 @@ Expected demonstration: select the racing preset through an API/seed action, ope
 
 **Produces:** A responsive preview rendered by shared customer components, deep links from validation issues to their section, and explicit publish confirmation.
 
-- [ ] Test that preview uses the draft while the public route still uses the published version.
-- [ ] Test publication is blocked by each required-section failure.
-- [ ] Display the published version/time and distinguish saved draft from live configuration.
-- [ ] Validate mobile, tablet, and desktop preview sizes.
-- [ ] Commit as `feat(studio): preview and publish experiences`.
+- [x] Test that preview uses the draft while the public route still uses the published version.
+- [x] Test publication is blocked by each required-section failure.
+- [x] Display the published version/time and distinguish saved draft from live configuration.
+- [x] Validate mobile, tablet, and desktop preview sizes.
+- [x] Commit as `feat(studio): preview and publish experiences`.
 
 ### Phase 2 gate
 
@@ -809,7 +809,7 @@ Update this table at each weekly gate.
 | Phase | Planned end | Status | Gate evidence | Scope cuts |
 | --- | --- | --- | --- | --- |
 | 1. Foundation | 2026-07-19 | Complete | Full Phase 1 gate passed; 2 optional live-URL E2E checks skipped with documented env requirements. | None |
-| 2. Experience Studio | 2026-07-26 | Not started | — | — |
+| 2. Experience Studio | 2026-07-26 | Complete | Contract types 21, API package 158, database 13, Supabase adapter 50, SDK 19, UI 13, console 9, standalone API 125; console production build, package boundary, packed-package, and migration-bundle gates passed. | None |
 | 3. Customer Experiences | 2026-08-02 | Not started | — | — |
 | 4. Omnichannel AI | 2026-08-09 | Not started | — | — |
 | 5. Operations and Analytics | 2026-08-16 | Not started | — | — |

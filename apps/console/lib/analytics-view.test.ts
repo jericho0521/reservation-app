@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
-import { analyticsDateRange, demandChartPoints, percent } from "./analytics-view";
+import { analyticsDateRange, demandChartPoints, demandChartTitle, percent } from "./analytics-view";
 
 test("analytics date range preserves valid filters and falls back to the latest 30 days", () => {
   assert.deepEqual(analyticsDateRange({ from: "2026-08-01", to: "2026-08-05" }), { from: "2026-08-01", to: "2026-08-05" });
@@ -12,6 +12,7 @@ test("analytics date range preserves valid filters and falls back to the latest 
 test("demand chart handles no data and one data point without invalid coordinates", () => {
   assert.deepEqual(demandChartPoints([]), []);
   assert.deepEqual(demandChartPoints([{ date: "2026-08-01", total: 0, confirmed: 0, completed: 0, cancelled: 0 }]), [{ date: "2026-08-01", total: 0, x: 300, y: 180 }]);
+  assert.equal(demandChartTitle({ date: "2026-08-01", total: 2 }), "2026-08-01: 2 reservations");
   assert.equal(percent(0), "0%");
 });
 

@@ -19,7 +19,9 @@ export default async function StudioPage() {
             <h1>Choose how your business books</h1>
             <p>Every preset uses the same availability and reservation engine.</p>
           </div>
-          <span className="status-pill">Phase 1 · Read only</span>
+          <span className="status-pill">
+            {workspace.published ? `Version ${workspace.published.version} live` : "Draft workspace"}
+          </span>
         </header>
         <section className="preset-grid" aria-label="Industry presets">
           {presetResult.presets.map((preset) => {

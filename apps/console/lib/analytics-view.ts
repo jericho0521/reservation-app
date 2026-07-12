@@ -16,6 +16,10 @@ export function demandChartPoints(days: AnalyticsResponse["reservations_by_day"]
   }));
 }
 
+export function demandChartTitle(point: { date: string; total: number }) {
+  return `${point.date}: ${point.total} reservations`;
+}
+
 export function percent(value: number) { return `${Math.round(value * 100)}%`; }
 function localDate(value: Date) { return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, "0")}-${String(value.getDate()).padStart(2, "0")}`; }
 function validDate(value?: string) { if (!value || !/^\d{4}-\d{2}-\d{2}$/u.test(value)) return false; const parsed = Date.parse(`${value}T00:00:00Z`); return !Number.isNaN(parsed) && new Date(parsed).toISOString().slice(0, 10) === value; }

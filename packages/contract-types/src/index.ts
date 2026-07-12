@@ -220,6 +220,44 @@ export interface ExperienceOperatingHoursResponse extends ExperienceOperatingHou
   updated_at?: string;
 }
 
+export interface ExperienceKnowledgeInput {
+  question: string;
+  answer: string;
+  source?: string;
+}
+
+export interface ExperienceKnowledgeEntryResponse extends ExperienceKnowledgeInput {
+  knowledge_id: string;
+  tenant_id: string;
+  venue_id: string;
+  status: "active" | "archived";
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface ListExperienceKnowledgeResponse {
+  entries: ExperienceKnowledgeEntryResponse[];
+}
+
+export type ExperienceChannelReadinessState = "ready" | "not_configured" | "degraded";
+
+export interface ExperienceChannelReadiness {
+  desired_enabled: boolean;
+  configured: boolean;
+  ready: boolean;
+  state: ExperienceChannelReadinessState;
+  message?: string;
+}
+
+export interface ExperienceChannelSettingsResponse {
+  channels: ExperienceChannels;
+  readiness: {
+    web_booking: ExperienceChannelReadiness;
+    web_chat: ExperienceChannelReadiness;
+    whatsapp: ExperienceChannelReadiness;
+  };
+}
+
 export interface ListServicesResponse {
   services: ServiceResponse[];
 }

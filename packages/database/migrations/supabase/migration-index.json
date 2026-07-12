@@ -133,6 +133,14 @@
       "scope": "reservation-platform",
       "sha256": "35b3a39a339b0bed89d80b4a4b5c96d02afb6fcf7bfc120109af1eb4860abc67",
       "bytes": 11569
+    },
+    {
+      "order": 17,
+      "path": "packages/database/migrations/supabase/000017_experience_knowledge.sql",
+      "module": "core",
+      "scope": "reservation-platform",
+      "sha256": "a26c5e0c3999ee0bb63fd28b2bc4511fa56d69760b64af69fa2b857698d9e652",
+      "bytes": 1581
     }
   ],
   "optionalMigrations": [

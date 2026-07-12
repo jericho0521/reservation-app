@@ -2,6 +2,7 @@ import type {
   BusinessProfileResponse,
   ExperienceConfigurationResponse,
   ExperienceDraftInput,
+  ExperienceChannels,
   ExperienceIdentityInput,
   ExperienceWorkspaceResponse,
   PublicExperienceResponse,
@@ -28,6 +29,10 @@ export interface ExperienceStudioRepository {
   updateIdentity(
     scope: ExperienceScope,
     input: ExperienceIdentityInput,
+  ): Promise<ExperienceWorkspaceResponse | undefined>;
+  updateChannels?(
+    scope: ExperienceScope,
+    input: ExperienceChannels,
   ): Promise<ExperienceWorkspaceResponse | undefined>;
   readPublishedBySlug(slug: string): Promise<{
     profile: BusinessProfileResponse;

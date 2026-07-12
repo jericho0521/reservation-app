@@ -15,6 +15,11 @@ import type {
   ExperienceIdentityInput,
   ExperienceOperatingHoursInput,
   ExperienceOperatingHoursResponse,
+  ExperienceKnowledgeInput,
+  ExperienceKnowledgeEntryResponse,
+  ListExperienceKnowledgeResponse,
+  ExperienceChannelSettingsResponse,
+  ExperienceChannels,
   ExperienceResourceInput,
   ExperienceServiceInput,
   ExperiencePresetSummary,
@@ -141,6 +146,12 @@ export interface ReservationPlatformClient {
   archiveExperienceResource(resourceId: string, input?: ArchiveCatalogItemInput, options?: RequestOptions): Promise<ResourceResponse>;
   getExperienceOperatingHours(options?: RequestOptions): Promise<ExperienceOperatingHoursResponse>;
   updateExperienceOperatingHours(input: ExperienceOperatingHoursInput, options?: RequestOptions): Promise<ExperienceOperatingHoursResponse>;
+  listExperienceKnowledge(includeArchived?: boolean, options?: RequestOptions): Promise<ListExperienceKnowledgeResponse>;
+  createExperienceKnowledge(input: ExperienceKnowledgeInput, options?: RequestOptions): Promise<ExperienceKnowledgeEntryResponse>;
+  updateExperienceKnowledge(knowledgeId: string, input: ExperienceKnowledgeInput, options?: RequestOptions): Promise<ExperienceKnowledgeEntryResponse>;
+  archiveExperienceKnowledge(knowledgeId: string, options?: RequestOptions): Promise<ExperienceKnowledgeEntryResponse>;
+  getExperienceChannelSettings(options?: RequestOptions): Promise<ExperienceChannelSettingsResponse>;
+  updateExperienceChannelSettings(input: ExperienceChannels, options?: RequestOptions): Promise<ExperienceChannelSettingsResponse>;
   getPublicExperience(slug: string, options?: RequestOptions): Promise<PublicExperienceResponse>;
   getMetadata(options?: RequestOptions): Promise<MetadataResponse>;
   getCurrentTenant(options?: RequestOptions): Promise<TenantResponse>;
@@ -212,6 +223,12 @@ export function createReservationPlatformClient(
     archiveExperienceResource: (resourceId, input, options) => request({ method: "POST", path: `/experience/resources/${encodeURIComponent(resourceId)}/archive`, body: input ?? {}, options }),
     getExperienceOperatingHours: (options) => request({ method: "GET", path: "/experience/operating-hours", options }),
     updateExperienceOperatingHours: (input, options) => request({ method: "PUT", path: "/experience/operating-hours", body: input, options }),
+    listExperienceKnowledge: (includeArchived, options) => request({ method: "GET", path: "/experience/knowledge", query: includeArchived ? { include_archived: true } : undefined, options }),
+    createExperienceKnowledge: (input, options) => request({ method: "POST", path: "/experience/knowledge", body: input, options }),
+    updateExperienceKnowledge: (knowledgeId, input, options) => request({ method: "PUT", path: `/experience/knowledge/${encodeURIComponent(knowledgeId)}`, body: input, options }),
+    archiveExperienceKnowledge: (knowledgeId, options) => request({ method: "POST", path: `/experience/knowledge/${encodeURIComponent(knowledgeId)}/archive`, body: {}, options }),
+    getExperienceChannelSettings: (options) => request({ method: "GET", path: "/experience/channels", options }),
+    updateExperienceChannelSettings: (input, options) => request({ method: "PUT", path: "/experience/channels", body: input, options }),
     getPublicExperience: (slug, options) => request({
       method: "GET",
       path: `/public/experiences/${encodeURIComponent(slug)}`,

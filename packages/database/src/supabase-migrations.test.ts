@@ -9,15 +9,15 @@ import {
 
 const indexPath = new URL("../migrations/supabase/migration-index.json", import.meta.url);
 
-test("core plan includes exactly 000001 through 000016 in order", async () => {
+test("core plan includes exactly 000001 through 000017 in order", async () => {
   const index = await readActualIndex();
   const plan = buildSupabaseMigrationPlan(index);
 
   assert.deepEqual(
     plan.migrations.map((entry) => entry.path.match(/\/(\d{6})_[^/]+\.sql$/)?.[1]),
-    Array.from({ length: 16 }, (_, index) => String(index + 1).padStart(6, "0")),
+    Array.from({ length: 17 }, (_, index) => String(index + 1).padStart(6, "0")),
   );
-  assert.equal(plan.migrations.length, 16);
+  assert.equal(plan.migrations.length, 17);
   assert.equal(plan.seeds.length, 0);
 });
 
@@ -37,6 +37,18 @@ test("experience availability migration owns normalized rules and shared snapsho
   }
 });
 
+test("experience knowledge migration is scoped, bounded, archival, and service-role only", async () => {
+  const sql = (await readFile(new URL("../migrations/supabase/000017_experience_knowledge.sql", import.meta.url), "utf8")).toLowerCase();
+
+  assert.match(sql, /create table if not exists public\.platform_experience_knowledge/);
+  assert.match(sql, /foreign key \(tenant_id, venue_id\) references public\.venues\(tenant_id, id\)/);
+  assert.match(sql, /status text not null default 'active' check \(status in \('active', 'archived'\)\)/);
+  assert.match(sql, /revoke all on table public\.platform_experience_knowledge from public, anon, authenticated/);
+  assert.match(sql, /grant select, insert, update on table public\.platform_experience_knowledge to service_role/);
+  assert.doesNotMatch(sql, /grant .*delete.*platform_experience_knowledge/);
+  assert.doesNotMatch(sql, /grant select .* to anon|grant select .* to authenticated/);
+});
+
 test("default plan excludes optional AI retrieval and development seed entries", async () => {
   const index = await readActualIndex();
   const plan = buildSupabaseMigrationPlan(index);
@@ -50,7 +62,7 @@ test("AI retrieval option appends optional AI retrieval migrations after core mi
   const plan = buildSupabaseMigrationPlan(index, { includeAiRetrieval: true });
 
   assert.deepEqual(
-    plan.migrations.slice(16).map((entry) => entry.path),
+    plan.migrations.slice(17).map((entry) => entry.path),
     [
       "packages/database/migrations/supabase/optional/ai-retrieval/000001_knowledge_chunks.sql",
       "packages/database/migrations/supabase/optional/ai-retrieval/000002_langchain_checkpoints.sql",

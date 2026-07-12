@@ -2,12 +2,14 @@ import {
   authorizePlatformContext,
   archivePlatformResource,
   archivePlatformService,
+  archiveExperienceKnowledge,
   beginIdempotentMutation,
   cancelReservation,
   commitIdempotentMutation,
   createJsonRequestFingerprint,
   createPlatformResource,
   createPlatformService,
+  createExperienceKnowledge,
   createReservation,
   createResourceMaintenance,
   endResourceMaintenance,
@@ -27,11 +29,13 @@ import {
   requirePlatformBearerToken,
   getPlatformMetadata,
   listExperiencePresets,
+  listExperienceKnowledge,
   listPlatformResources,
   listPlatformServices,
   listReservations,
   publishExperienceDraft,
   readExperienceOperatingHours,
+  readExperienceChannelSettings,
   readExperienceWorkspace,
   readPublicExperience,
   readReservationById,
@@ -39,6 +43,8 @@ import {
   saveExperienceDraft,
   updateExperienceIdentity,
   replaceExperienceOperatingHours,
+  updateExperienceChannelSettings,
+  updateExperienceKnowledge,
   updatePlatformResource,
   updatePlatformService,
   updateReservationWithLegacyPatch,
@@ -46,6 +52,8 @@ import {
   type AuthenticatedPlatformPrincipal,
   type IdempotencyRepository,
   type ExperienceStudioRepository,
+  type ExperienceKnowledgeRepository,
+  type ExperienceChannelRuntimeReadiness,
   type OperatingHoursRepository,
   type PlatformCatalogRepository,
   type PlatformRequestContext,
@@ -97,6 +105,7 @@ export interface StandaloneApiDependencies {
   chatModule?: StandaloneApiChatModule;
   idempotencyRepository?: IdempotencyRepository;
   experienceStudioRepository?: ExperienceStudioRepository;
+  experienceKnowledgeRepository?: ExperienceKnowledgeRepository;
   operatingHoursRepository?: OperatingHoursRepository;
   reservationCreateRepository?: ReservationCreateRepositoryPort;
   reservationMutationRepository?: ReservationMutationRepositoryPort;
@@ -243,6 +252,8 @@ const experienceServicePattern = /^\/v1\/experience\/services\/([^/]+)$/;
 const experienceServiceArchivePattern = /^\/v1\/experience\/services\/([^/]+)\/archive$/;
 const experienceResourcePattern = /^\/v1\/experience\/resources\/([^/]+)$/;
 const experienceResourceArchivePattern = /^\/v1\/experience\/resources\/([^/]+)\/archive$/;
+const experienceKnowledgePattern = /^\/v1\/experience\/knowledge\/([^/]+)$/;
+const experienceKnowledgeArchivePattern = /^\/v1\/experience\/knowledge\/([^/]+)\/archive$/;
 const reservationIdPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const standaloneHealthBody = {
   status: "ok",
@@ -319,6 +330,68 @@ export async function handleStandaloneApiRequest(
       value: request.body,
       repository: dependencies.operatingHoursRepository,
     });
+    return jsonResponse(result.status, result.body);
+  }
+
+  if (method === "GET" && path === "/v1/experience/knowledge") {
+    const scoped = readExperienceScope(request);
+    if (!scoped.ok) return scoped.response;
+    if (!dependencies.experienceKnowledgeRepository) return platformError(503, "bad_request", "Experience knowledge repository is not configured.");
+    const result = await listExperienceKnowledge({
+      scope: scoped.scope,
+      repository: dependencies.experienceKnowledgeRepository,
+      includeArchived: url.searchParams.get("include_archived") === "true",
+    });
+    return jsonResponse(result.status, result.body);
+  }
+  if (method === "POST" && path === "/v1/experience/knowledge") {
+    const scoped = readExperienceScope(request);
+    if (!scoped.ok) return scoped.response;
+    if (!dependencies.experienceKnowledgeRepository) return platformError(503, "bad_request", "Experience knowledge repository is not configured.");
+    const result = await createExperienceKnowledge({
+      scope: scoped.scope,
+      value: request.body,
+      repository: dependencies.experienceKnowledgeRepository,
+    });
+    return jsonResponse(result.status, result.body);
+  }
+  if (method === "PUT") {
+    const knowledgeId = experienceKnowledgePattern.exec(path)?.[1];
+    if (knowledgeId) {
+      const scoped = readExperienceScope(request);
+      if (!scoped.ok) return scoped.response;
+      if (!dependencies.experienceKnowledgeRepository) return platformError(503, "bad_request", "Experience knowledge repository is not configured.");
+      const result = await updateExperienceKnowledge({
+        scope: scoped.scope,
+        knowledgeId: decodeURIComponent(knowledgeId),
+        value: request.body,
+        repository: dependencies.experienceKnowledgeRepository,
+      });
+      return jsonResponse(result.status, result.body);
+    }
+  }
+  if (method === "POST") {
+    const knowledgeId = experienceKnowledgeArchivePattern.exec(path)?.[1];
+    if (knowledgeId) {
+      const scoped = readExperienceScope(request);
+      if (!scoped.ok) return scoped.response;
+      if (!dependencies.experienceKnowledgeRepository) return platformError(503, "bad_request", "Experience knowledge repository is not configured.");
+      const result = await archiveExperienceKnowledge({
+        scope: scoped.scope,
+        knowledgeId: decodeURIComponent(knowledgeId),
+        repository: dependencies.experienceKnowledgeRepository,
+      });
+      return jsonResponse(result.status, result.body);
+    }
+  }
+  if ((method === "GET" || method === "PUT") && path === "/v1/experience/channels") {
+    const scoped = readExperienceScope(request);
+    if (!scoped.ok) return scoped.response;
+    if (!dependencies.experienceStudioRepository) return platformError(503, "bad_request", "Experience repository is not configured.");
+    const readiness = await readChannelRuntimeReadiness(dependencies);
+    const result = method === "GET"
+      ? await readExperienceChannelSettings({ scope: scoped.scope, repository: dependencies.experienceStudioRepository, readiness })
+      : await updateExperienceChannelSettings({ scope: scoped.scope, value: request.body, repository: dependencies.experienceStudioRepository, readiness });
     return jsonResponse(result.status, result.body);
   }
 
@@ -661,6 +734,7 @@ const protectedRouteMetadata: Readonly<Record<string, readonly RouteMatcher[]>> 
   GET: [
     "/v1/experience/presets", "/v1/experience/workspace",
     "/v1/experience/services", "/v1/experience/resources", "/v1/experience/operating-hours",
+    "/v1/experience/knowledge", "/v1/experience/channels",
     "/v1/availability", "/v1/reservations", reservationPattern,
     "/v1/resource-maintenance", "/v1/venues", venuePattern,
     "/v1/services", servicePattern, "/v1/resources", resourcePattern,
@@ -668,16 +742,60 @@ const protectedRouteMetadata: Readonly<Record<string, readonly RouteMatcher[]>> 
   ],
   POST: [
     "/v1/experience/publish",
-    "/v1/experience/services", "/v1/experience/resources",
+    "/v1/experience/services", "/v1/experience/resources", "/v1/experience/knowledge",
     experienceServiceArchivePattern, experienceResourceArchivePattern,
+    experienceKnowledgeArchivePattern,
     "/v1/reservations", reservationCancelPattern, reservationReschedulePattern,
     "/v1/resource-maintenance", resourceMaintenanceEndPattern,
     isChatReservationSessionRoute, isWhatsAppOwnerRoute,
   ],
   PATCH: ["/v1/experience/identity", reservationPattern, isWhatsAppOwnerRoute],
-  PUT: ["/v1/experience/draft", "/v1/experience/operating-hours", experienceServicePattern, experienceResourcePattern],
+  PUT: ["/v1/experience/draft", "/v1/experience/operating-hours", "/v1/experience/channels", experienceServicePattern, experienceResourcePattern, experienceKnowledgePattern],
   DELETE: [isWhatsAppOwnerRoute],
 };
+
+async function readChannelRuntimeReadiness(
+  dependencies: StandaloneApiDependencies,
+): Promise<ExperienceChannelRuntimeReadiness> {
+  const webBookingReady = Boolean(dependencies.catalogRepository && dependencies.availabilityRepository);
+  const webChatReady = Boolean(dependencies.chatModule);
+  let whatsappReady = false;
+  let whatsappMessage = dependencies.whatsappModule ? "Connect and finish WhatsApp setup." : "Configure the WhatsApp module.";
+  if (dependencies.whatsappModule) {
+    try {
+      const result = await dependencies.whatsappModule.readiness();
+      if (typeof result === "object" && result !== null && !Array.isArray(result)) {
+        whatsappReady = (result as Record<string, unknown>).production_ready === true;
+        const missing = (result as Record<string, unknown>).missing_requirements;
+        if (Array.isArray(missing) && missing.every((value) => typeof value === "string")) {
+          whatsappMessage = missing.length > 0
+            ? `Complete WhatsApp setup: ${missing.join(", ")}.`
+            : "WhatsApp is ready.";
+        }
+      }
+    } catch {
+      whatsappMessage = "WhatsApp readiness could not be checked.";
+    }
+  }
+
+  return {
+    web_booking: {
+      configured: webBookingReady,
+      ready: webBookingReady,
+      ...(webBookingReady ? {} : { message: "Configure catalog and availability repositories." }),
+    },
+    web_chat: {
+      configured: webChatReady,
+      ready: webChatReady,
+      ...(webChatReady ? {} : { message: "Configure the AI chat module." }),
+    },
+    whatsapp: {
+      configured: Boolean(dependencies.whatsappModule),
+      ready: whatsappReady,
+      message: whatsappMessage,
+    },
+  };
+}
 
 async function handleExperienceWorkspaceReadRequest(
   request: StandaloneApiRequest,

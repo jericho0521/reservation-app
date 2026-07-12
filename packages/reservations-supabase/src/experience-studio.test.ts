@@ -223,3 +223,32 @@ test("identity updates scope profile and draft writes", async () => {
     }],
   ]);
 });
+
+test("channel updates mutate only the scoped draft channel object", async () => {
+  const calls: Array<[string, unknown]> = [];
+  const updatedDraft = {
+    ...configurationRow("draft"),
+    channels: { web_booking: true, web_chat: true, whatsapp: true },
+  };
+  const repository = createSupabaseExperienceStudioRepository(fakeClient(calls, [
+    { data: profileRow(), error: null },
+    { data: [configurationRow("draft")], error: null },
+    { data: updatedDraft, error: null },
+    { data: profileRow(), error: null },
+    { data: [updatedDraft], error: null },
+  ]));
+
+  const workspace = await repository.updateChannels!(
+    { tenantId: "tenant_1", venueId: "venue_1" },
+    { web_booking: true, web_chat: true, whatsapp: true },
+  );
+
+  assert.deepEqual(workspace?.draft?.channels, { web_booking: true, web_chat: true, whatsapp: true });
+  assert.deepEqual(calls.filter(([name]) => name === "update"), [[
+    "update",
+    { channels: { web_booking: true, web_chat: true, whatsapp: true } },
+  ]]);
+  assert.equal(calls.some(([name, value]) => (
+    name === "eq" && JSON.stringify(value) === JSON.stringify(["id", "config_1"])
+  )), true);
+});

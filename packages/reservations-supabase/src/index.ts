@@ -38,6 +38,7 @@ import type {
 import { experienceOperatingHoursResponseSchema } from "@reservation-platform/contract-types";
 
 export * from "./experience-studio.js";
+export * from "./experience-knowledge.js";
 export * from "./operating-hours.js";
 
 export const RESERVATION_SUPABASE_TABLES = {

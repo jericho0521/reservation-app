@@ -177,6 +177,16 @@
       "notes": [
         "Backend-owned venue operating settings, normalized weekly intervals, date closures, atomic replacement RPC, and shared availability snapshot integration."
       ]
+    },
+    {
+      "path": "packages/database/migrations/supabase/000017_experience_knowledge.sql",
+      "classification": "core-platform",
+      "intendedBackendDestination": [
+        "packages/database/migrations/supabase/000017_experience_knowledge.sql"
+      ],
+      "notes": [
+        "Backend-owned structured venue FAQ knowledge with active/archive lifecycle for AI and channel orchestration."
+      ]
     }
   ]
 }

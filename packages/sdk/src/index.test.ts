@@ -165,6 +165,37 @@ test("experience operating-hours SDK methods use the owner route", async () => {
   assert.deepEqual(JSON.parse(String(requests[1]!.init?.body)), value);
 });
 
+test("experience knowledge and channel SDK methods preserve owner paths", async () => {
+  const requests: Array<{ url: string; init?: RequestInit }> = [];
+  const knowledge = { question: "Where should I park?", answer: "Use the north entrance." };
+  const channels = { web_booking: true, web_chat: true, whatsapp: false };
+  const client = createReservationPlatformClient({
+    baseUrl: "https://platform.example",
+    fetch: async (url, init) => {
+      requests.push({ url: String(url), init });
+      return jsonResponse({});
+    },
+  });
+
+  await client.listExperienceKnowledge(true);
+  await client.createExperienceKnowledge(knowledge);
+  await client.updateExperienceKnowledge("knowledge/1", knowledge);
+  await client.archiveExperienceKnowledge("knowledge/1");
+  await client.getExperienceChannelSettings();
+  await client.updateExperienceChannelSettings(channels);
+
+  assert.deepEqual(requests.map(({ url, init }) => [`${new URL(url).pathname}${new URL(url).search}`, init?.method]), [
+    ["/v1/experience/knowledge?include_archived=true", "GET"],
+    ["/v1/experience/knowledge", "POST"],
+    ["/v1/experience/knowledge/knowledge%2F1", "PUT"],
+    ["/v1/experience/knowledge/knowledge%2F1/archive", "POST"],
+    ["/v1/experience/channels", "GET"],
+    ["/v1/experience/channels", "PUT"],
+  ]);
+  assert.deepEqual(JSON.parse(String(requests[1]!.init?.body)), knowledge);
+  assert.deepEqual(JSON.parse(String(requests[5]!.init?.body)), channels);
+});
+
 test("SDK maps createReservation to POST /v1/reservations with context headers", async () => {
   const calls: { url: string; init: RequestInit }[] = [];
   const client = createReservationPlatformClient({

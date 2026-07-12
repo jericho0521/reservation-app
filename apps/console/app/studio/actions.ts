@@ -110,6 +110,49 @@ export async function saveOperatingHoursAction(
   }
 }
 
+export async function saveKnowledgeAction(
+  _previous: StudioActionState,
+  formData: FormData,
+): Promise<StudioActionState> {
+  try {
+    const client = createConsolePlatformClient();
+    const knowledgeId = String(formData.get("knowledge_id") ?? "").trim();
+    const value = {
+      question: requiredField(formData, "question"),
+      answer: requiredField(formData, "answer"),
+      source: String(formData.get("source") ?? "").trim() || undefined,
+    };
+    if (knowledgeId) await client.updateExperienceKnowledge(knowledgeId, value);
+    else await client.createExperienceKnowledge(value);
+    revalidatePath("/studio/knowledge");
+    return { status: "success", message: knowledgeId ? "Knowledge entry updated." : "Knowledge entry created." };
+  } catch (error) {
+    return actionError(error, "The knowledge entry could not be saved.");
+  }
+}
+
+export async function archiveKnowledgeAction(formData: FormData) {
+  await createConsolePlatformClient().archiveExperienceKnowledge(requiredField(formData, "knowledge_id"));
+  revalidatePath("/studio/knowledge");
+}
+
+export async function saveChannelSettingsAction(
+  _previous: StudioActionState,
+  formData: FormData,
+): Promise<StudioActionState> {
+  try {
+    await createConsolePlatformClient().updateExperienceChannelSettings({
+      web_booking: formData.get("web_booking") === "on",
+      web_chat: formData.get("web_chat") === "on",
+      whatsapp: formData.get("whatsapp") === "on",
+    });
+    revalidatePath("/studio/knowledge");
+    return { status: "success", message: "Channel preferences saved." };
+  } catch (error) {
+    return actionError(error, "Channel preferences could not be saved.");
+  }
+}
+
 async function updateIdentityFromForm(formData: FormData, source: "profile" | "branding") {
   try {
     const client = createConsolePlatformClient();

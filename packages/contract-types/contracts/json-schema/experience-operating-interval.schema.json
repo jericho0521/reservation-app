@@ -431,6 +431,38 @@
       ],
       "type": "object"
     },
+    "ExperienceChannelReadiness": {
+      "additionalProperties": false,
+      "properties": {
+        "configured": {
+          "type": "boolean"
+        },
+        "desired_enabled": {
+          "type": "boolean"
+        },
+        "message": {
+          "type": "string"
+        },
+        "ready": {
+          "type": "boolean"
+        },
+        "state": {
+          "enum": [
+            "ready",
+            "not_configured",
+            "degraded"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "desired_enabled",
+        "configured",
+        "ready",
+        "state"
+      ],
+      "type": "object"
+    },
     "ExperienceChannels": {
       "additionalProperties": false,
       "properties": {
@@ -448,6 +480,39 @@
         "web_booking",
         "web_chat",
         "whatsapp"
+      ],
+      "type": "object"
+    },
+    "ExperienceChannelSettingsResponse": {
+      "additionalProperties": false,
+      "properties": {
+        "channels": {
+          "$ref": "#/$defs/ExperienceChannels"
+        },
+        "readiness": {
+          "additionalProperties": false,
+          "properties": {
+            "web_booking": {
+              "$ref": "#/$defs/ExperienceChannelReadiness"
+            },
+            "web_chat": {
+              "$ref": "#/$defs/ExperienceChannelReadiness"
+            },
+            "whatsapp": {
+              "$ref": "#/$defs/ExperienceChannelReadiness"
+            }
+          },
+          "required": [
+            "web_booking",
+            "web_chat",
+            "whatsapp"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "channels",
+        "readiness"
       ],
       "type": "object"
     },
@@ -572,6 +637,80 @@
         "public_slug",
         "branding",
         "terminology"
+      ],
+      "type": "object"
+    },
+    "ExperienceKnowledgeEntryResponse": {
+      "additionalProperties": false,
+      "properties": {
+        "answer": {
+          "maxLength": 4000,
+          "minLength": 1,
+          "type": "string"
+        },
+        "created_at": {
+          "type": "string"
+        },
+        "knowledge_id": {
+          "type": "string"
+        },
+        "question": {
+          "maxLength": 300,
+          "minLength": 1,
+          "type": "string"
+        },
+        "source": {
+          "maxLength": 500,
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "active",
+            "archived"
+          ],
+          "type": "string"
+        },
+        "tenant_id": {
+          "type": "string"
+        },
+        "updated_at": {
+          "type": "string"
+        },
+        "venue_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "knowledge_id",
+        "tenant_id",
+        "venue_id",
+        "question",
+        "answer",
+        "status"
+      ],
+      "type": "object"
+    },
+    "ExperienceKnowledgeInput": {
+      "additionalProperties": false,
+      "properties": {
+        "answer": {
+          "maxLength": 4000,
+          "minLength": 1,
+          "type": "string"
+        },
+        "question": {
+          "maxLength": 300,
+          "minLength": 1,
+          "type": "string"
+        },
+        "source": {
+          "maxLength": 500,
+          "type": "string"
+        }
+      },
+      "required": [
+        "question",
+        "answer"
       ],
       "type": "object"
     },
@@ -940,6 +1079,21 @@
           "type": "object"
         }
       ]
+    },
+    "ListExperienceKnowledgeResponse": {
+      "additionalProperties": false,
+      "properties": {
+        "entries": {
+          "items": {
+            "$ref": "#/$defs/ExperienceKnowledgeEntryResponse"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "entries"
+      ],
+      "type": "object"
     },
     "ListExperiencePresetsResponse": {
       "additionalProperties": false,

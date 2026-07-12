@@ -287,6 +287,42 @@ export const experienceOperatingHoursResponseSchema = experienceOperatingHoursIn
   updated_at: z.string().optional(),
 });
 
+export const experienceKnowledgeInputSchema = strictObject({
+  question: z.string().trim().min(1).max(300),
+  answer: z.string().trim().min(1).max(4000),
+  source: z.string().trim().max(500).optional(),
+});
+
+export const experienceKnowledgeEntryResponseSchema = experienceKnowledgeInputSchema.extend({
+  knowledge_id: z.string().min(1),
+  tenant_id: z.string().min(1),
+  venue_id: z.string().min(1),
+  status: z.enum(["active", "archived"]),
+  created_at: z.string().optional(),
+  updated_at: z.string().optional(),
+});
+
+export const listExperienceKnowledgeResponseSchema = strictObject({
+  entries: z.array(experienceKnowledgeEntryResponseSchema),
+});
+
+export const experienceChannelReadinessSchema = strictObject({
+  desired_enabled: z.boolean(),
+  configured: z.boolean(),
+  ready: z.boolean(),
+  state: z.enum(["ready", "not_configured", "degraded"]),
+  message: z.string().optional(),
+});
+
+export const experienceChannelSettingsResponseSchema = strictObject({
+  channels: experienceChannelsSchema,
+  readiness: strictObject({
+    web_booking: experienceChannelReadinessSchema,
+    web_chat: experienceChannelReadinessSchema,
+    whatsapp: experienceChannelReadinessSchema,
+  }),
+});
+
 export const listServicesResponseSchema = strictObject({
   services: z.array(serviceResponseSchema),
 });

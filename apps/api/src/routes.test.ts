@@ -30,6 +30,7 @@ import type {
   IdempotencyRecord,
   IdempotencyRepository,
   ExperienceStudioRepository,
+  ExperienceKnowledgeRepository,
   OperatingHoursRepository,
   PlatformCatalogRepository,
   PlatformTenantVenueRepository,
@@ -106,6 +107,7 @@ function fakeExperienceRepository(
     saveDraft: async () => experienceWorkspaceFixture(),
     publishDraft: async () => experienceWorkspaceFixture(),
     updateIdentity: async () => experienceWorkspaceFixture(),
+    updateChannels: async () => experienceWorkspaceFixture(),
     readPublishedBySlug: async () => ({
       profile: experienceWorkspaceFixture().profile,
       configuration: experienceWorkspaceFixture().published!,
@@ -332,6 +334,95 @@ test("experience operating-hours routes read and atomically replace scoped rules
       input: operatingHoursFixture(),
     },
   ]);
+});
+
+test("experience knowledge routes preserve owner scope and archive lifecycle", async () => {
+  const observed: unknown[] = [];
+  const entry = (status: "active" | "archived") => ({
+    knowledge_id: "knowledge_1",
+    tenant_id: "tenant_1",
+    venue_id: "venue_1",
+    question: "Where should I park?",
+    answer: "Use the north entrance.",
+    status,
+  });
+  const repository: ExperienceKnowledgeRepository = {
+    list: async () => ({ data: [] }),
+    create: async (scope, input) => {
+      observed.push({ operation: "create", scope, input });
+      return { data: { ...entry("active"), ...input } };
+    },
+    update: async () => ({ data: entry("active") }),
+    archive: async (scope, id) => {
+      observed.push({ operation: "archive", scope, id });
+      return { data: entry("archived") };
+    },
+  };
+  const headers = {
+    authorization: "Bearer secret",
+    "x-reservation-tenant-id": "tenant_1",
+    "x-reservation-venue-id": "venue_1",
+  };
+  const created = await handleStandaloneApiRequest({
+    method: "POST",
+    path: "/v1/experience/knowledge",
+    headers,
+    body: { question: "Where should I park?", answer: "Use the north entrance." },
+  }, { serviceApiKey: "secret", experienceKnowledgeRepository: repository });
+  const archived = await handleStandaloneApiRequest({
+    method: "POST",
+    path: "/v1/experience/knowledge/knowledge_1/archive",
+    headers,
+  }, { serviceApiKey: "secret", experienceKnowledgeRepository: repository });
+
+  assert.equal(created.status, 201);
+  assert.equal(archived.status, 200);
+  assert.deepEqual(observed, [
+    {
+      operation: "create",
+      scope: { tenantId: "tenant_1", venueId: "venue_1" },
+      input: { question: "Where should I park?", answer: "Use the north entrance." },
+    },
+    {
+      operation: "archive",
+      scope: { tenantId: "tenant_1", venueId: "venue_1" },
+      id: "knowledge_1",
+    },
+  ]);
+});
+
+test("experience channel route separates desired settings from readiness", async () => {
+  let channels: unknown;
+  const repository = fakeExperienceRepository({
+    updateChannels: async (_scope, input) => {
+      channels = input;
+      const workspace = experienceWorkspaceFixture();
+      return { ...workspace, draft: { ...workspace.draft!, channels: input } };
+    },
+  });
+  const response = await handleStandaloneApiRequest({
+    method: "PUT",
+    path: "/v1/experience/channels",
+    headers: {
+      authorization: "Bearer secret",
+      "x-reservation-tenant-id": "tenant_1",
+      "x-reservation-venue-id": "venue_1",
+    },
+    body: { web_booking: true, web_chat: true, whatsapp: true },
+  }, {
+    serviceApiKey: "secret",
+    experienceStudioRepository: repository,
+    catalogRepository: catalogRepository(),
+    availabilityRepository: availabilityRepository(),
+  });
+
+  assert.equal(response.status, 200);
+  assert.deepEqual(channels, { web_booking: true, web_chat: true, whatsapp: true });
+  assert.deepEqual((response.body as { readiness: Record<string, { ready: boolean; state: string }> }).readiness, {
+    web_booking: { desired_enabled: true, configured: true, ready: true, state: "ready" },
+    web_chat: { desired_enabled: true, configured: false, ready: false, state: "not_configured", message: "Configure the AI chat module." },
+    whatsapp: { desired_enabled: true, configured: false, ready: false, state: "not_configured", message: "Configure the WhatsApp module." },
+  });
 });
 
 function operatingHoursFixture() {

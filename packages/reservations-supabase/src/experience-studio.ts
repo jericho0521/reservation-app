@@ -2,6 +2,7 @@ import type {
   BusinessProfileResponse,
   ExperienceConfigurationResponse,
   ExperienceDraftInput,
+  ExperienceChannels,
   ExperienceIdentityInput,
   ExperiencePresetId,
   ExperienceWorkspaceResponse,
@@ -178,6 +179,31 @@ export function createSupabaseExperienceStudioRepository(
     return readWorkspace(scope);
   }
 
+  async function updateChannels(scope: ExperienceScope, input: ExperienceChannels) {
+    let workspace = await readWorkspace(scope);
+    if (!workspace) return undefined;
+
+    if (!workspace.draft && workspace.published) {
+      workspace = await saveDraft(scope, {
+        preset_id: workspace.published.preset_id,
+        branding: workspace.published.branding,
+        terminology: workspace.published.terminology,
+        channels: workspace.published.channels,
+      });
+    }
+    if (!workspace.draft) return undefined;
+
+    const configurationResult = await client
+      .from(EXPERIENCE_CONFIGURATIONS_TABLE)
+      .update({ channels: input })
+      .eq("id", workspace.draft.configuration_id)
+      .select("*")
+      .single();
+    assertQuerySucceeded(configurationResult, "Failed to update experience channels.");
+    adaptExperienceConfigurationRow(configurationResult.data);
+    return readWorkspace(scope);
+  }
+
   async function readPublishedBySlug(slug: string) {
     const profileResult = await client
       .from(BUSINESS_PROFILES_TABLE)
@@ -210,7 +236,7 @@ export function createSupabaseExperienceStudioRepository(
     };
   }
 
-  return { readWorkspace, saveDraft, publishDraft, updateIdentity, readPublishedBySlug };
+  return { readWorkspace, saveDraft, publishDraft, updateIdentity, updateChannels, readPublishedBySlug };
 }
 
 export function adaptBusinessProfileRow(value: unknown): BusinessProfileResponse {

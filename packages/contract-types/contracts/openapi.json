@@ -466,6 +466,38 @@
         ],
         "type": "object"
       },
+      "ExperienceChannelReadiness": {
+        "additionalProperties": false,
+        "properties": {
+          "configured": {
+            "type": "boolean"
+          },
+          "desired_enabled": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "ready": {
+            "type": "boolean"
+          },
+          "state": {
+            "enum": [
+              "ready",
+              "not_configured",
+              "degraded"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "desired_enabled",
+          "configured",
+          "ready",
+          "state"
+        ],
+        "type": "object"
+      },
       "ExperienceChannels": {
         "additionalProperties": false,
         "properties": {
@@ -483,6 +515,39 @@
           "web_booking",
           "web_chat",
           "whatsapp"
+        ],
+        "type": "object"
+      },
+      "ExperienceChannelSettingsResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "channels": {
+            "$ref": "#/components/schemas/ExperienceChannels"
+          },
+          "readiness": {
+            "additionalProperties": false,
+            "properties": {
+              "web_booking": {
+                "$ref": "#/components/schemas/ExperienceChannelReadiness"
+              },
+              "web_chat": {
+                "$ref": "#/components/schemas/ExperienceChannelReadiness"
+              },
+              "whatsapp": {
+                "$ref": "#/components/schemas/ExperienceChannelReadiness"
+              }
+            },
+            "required": [
+              "web_booking",
+              "web_chat",
+              "whatsapp"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "channels",
+          "readiness"
         ],
         "type": "object"
       },
@@ -607,6 +672,80 @@
           "public_slug",
           "branding",
           "terminology"
+        ],
+        "type": "object"
+      },
+      "ExperienceKnowledgeEntryResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "answer": {
+            "maxLength": 4000,
+            "minLength": 1,
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "knowledge_id": {
+            "type": "string"
+          },
+          "question": {
+            "maxLength": 300,
+            "minLength": 1,
+            "type": "string"
+          },
+          "source": {
+            "maxLength": 500,
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "active",
+              "archived"
+            ],
+            "type": "string"
+          },
+          "tenant_id": {
+            "type": "string"
+          },
+          "updated_at": {
+            "type": "string"
+          },
+          "venue_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "knowledge_id",
+          "tenant_id",
+          "venue_id",
+          "question",
+          "answer",
+          "status"
+        ],
+        "type": "object"
+      },
+      "ExperienceKnowledgeInput": {
+        "additionalProperties": false,
+        "properties": {
+          "answer": {
+            "maxLength": 4000,
+            "minLength": 1,
+            "type": "string"
+          },
+          "question": {
+            "maxLength": 300,
+            "minLength": 1,
+            "type": "string"
+          },
+          "source": {
+            "maxLength": 500,
+            "type": "string"
+          }
+        },
+        "required": [
+          "question",
+          "answer"
         ],
         "type": "object"
       },
@@ -975,6 +1114,21 @@
             "type": "object"
           }
         ]
+      },
+      "ListExperienceKnowledgeResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "entries": {
+            "items": {
+              "$ref": "#/components/schemas/ExperienceKnowledgeEntryResponse"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "entries"
+        ],
+        "type": "object"
       },
       "ListExperiencePresetsResponse": {
         "additionalProperties": false,
@@ -2224,6 +2378,108 @@
         "x-module-gated": "chat"
       }
     },
+    "/v1/experience/channels": {
+      "get": {
+        "operationId": "getExperienceChannelSettings",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/TenantIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/VenueIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/CorrelationIdHeader"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExperienceChannelSettingsResponse"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformErrorResponse"
+                }
+              }
+            },
+            "description": "Platform error response."
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Read desired channel settings and runtime readiness",
+        "tags": [
+          "experience"
+        ]
+      },
+      "put": {
+        "operationId": "updateExperienceChannelSettings",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/TenantIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/VenueIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/CorrelationIdHeader"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExperienceChannels"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExperienceChannelSettingsResponse"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformErrorResponse"
+                }
+              }
+            },
+            "description": "Platform error response."
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Update desired customer channels",
+        "tags": [
+          "experience"
+        ]
+      }
+    },
     "/v1/experience/draft": {
       "put": {
         "operationId": "saveExperienceDraft",
@@ -2335,6 +2591,228 @@
         "summary": "Update the current venue business identity and draft presentation.",
         "tags": [
           "Experience Studio"
+        ]
+      }
+    },
+    "/v1/experience/knowledge": {
+      "get": {
+        "operationId": "listExperienceKnowledge",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/TenantIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/VenueIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/CorrelationIdHeader"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListExperienceKnowledgeResponse"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformErrorResponse"
+                }
+              }
+            },
+            "description": "Platform error response."
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "List owner-managed experience knowledge",
+        "tags": [
+          "experience"
+        ]
+      },
+      "post": {
+        "operationId": "createExperienceKnowledge",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/TenantIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/VenueIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/CorrelationIdHeader"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExperienceKnowledgeInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExperienceKnowledgeEntryResponse"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformErrorResponse"
+                }
+              }
+            },
+            "description": "Platform error response."
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Create an experience knowledge entry",
+        "tags": [
+          "experience"
+        ]
+      }
+    },
+    "/v1/experience/knowledge/{knowledge_id}": {
+      "put": {
+        "operationId": "updateExperienceKnowledge",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "knowledge_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/TenantIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/VenueIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/CorrelationIdHeader"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExperienceKnowledgeInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExperienceKnowledgeEntryResponse"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformErrorResponse"
+                }
+              }
+            },
+            "description": "Platform error response."
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Update an experience knowledge entry",
+        "tags": [
+          "experience"
+        ]
+      }
+    },
+    "/v1/experience/knowledge/{knowledge_id}/archive": {
+      "post": {
+        "operationId": "archiveExperienceKnowledge",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "knowledge_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/TenantIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/VenueIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/CorrelationIdHeader"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExperienceKnowledgeEntryResponse"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformErrorResponse"
+                }
+              }
+            },
+            "description": "Platform error response."
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Archive an experience knowledge entry",
+        "tags": [
+          "experience"
         ]
       }
     },

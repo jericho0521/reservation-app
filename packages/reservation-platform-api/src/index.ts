@@ -4,6 +4,7 @@ export * from "./catalog.js";
 export * from "./context.js";
 export * from "./errors.js";
 export * from "./experience-presets.js";
+export * from "./experience-knowledge.js";
 export * from "./experience-studio.js";
 export * from "./idempotency.js";
 export * from "./metadata.js";

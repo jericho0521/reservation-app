@@ -9,6 +9,8 @@ import {
   experienceDraftInputSchema,
   experienceIdentityInputSchema,
   experienceOperatingHoursInputSchema,
+  experienceKnowledgeInputSchema,
+  experienceChannelSettingsResponseSchema,
   experienceResourceInputSchema,
   experienceServiceInputSchema,
   experienceWorkspaceResponseSchema,
@@ -144,6 +146,23 @@ test("experience operating hours reject invalid timezones, dates, and overnight 
     ...valid,
     closures: [{ date: "2026-02-30" }],
   }).success, false);
+});
+
+test("experience knowledge and channel readiness stay structured and bounded", () => {
+  assert.equal(experienceKnowledgeInputSchema.safeParse({
+    question: "Where should I park?",
+    answer: "Use the north entrance.",
+    source: "Owner FAQ",
+  }).success, true);
+  assert.equal(experienceKnowledgeInputSchema.safeParse({ question: "", answer: "A" }).success, false);
+  assert.equal(experienceChannelSettingsResponseSchema.safeParse({
+    channels: { web_booking: true, web_chat: false, whatsapp: true },
+    readiness: {
+      web_booking: { desired_enabled: true, configured: true, ready: true, state: "ready" },
+      web_chat: { desired_enabled: false, configured: false, ready: false, state: "not_configured" },
+      whatsapp: { desired_enabled: true, configured: true, ready: false, state: "degraded" },
+    },
+  }).success, true);
 });
 
 test("createReservationInputSchema accepts a minimal reservation intent", () => {

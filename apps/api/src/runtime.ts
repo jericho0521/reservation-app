@@ -19,6 +19,7 @@ import {
 import {
   createSupabaseAvailabilityRepository,
   createSupabaseExperienceStudioRepository,
+  createSupabaseExperienceKnowledgeRepository,
   createSupabaseIdempotencyRepository,
   createSupabaseOperatingHoursRepository,
   createSupabasePlatformCatalogRepository,
@@ -28,6 +29,7 @@ import {
   createSupabaseResourceMaintenanceRepository,
   createSupabaseTenantVenueRepository,
   type ExperienceSupabaseLikeClient,
+  type ExperienceKnowledgeSupabaseClient,
 } from "@project-play/reservations-supabase";
 import {
   BaileysWhatsAppSessionAdapter,
@@ -147,6 +149,7 @@ export interface StandaloneSupabaseRepositoryFactories {
   createResourceMaintenanceRepository(client: StandaloneSupabaseClient): NonNullable<StandaloneApiDependencies["resourceMaintenanceRepository"]>;
   createIdempotencyRepository(client: StandaloneSupabaseClient): NonNullable<StandaloneApiDependencies["idempotencyRepository"]>;
   createExperienceStudioRepository(client: StandaloneSupabaseClient): NonNullable<StandaloneApiDependencies["experienceStudioRepository"]>;
+  createExperienceKnowledgeRepository(client: StandaloneSupabaseClient): NonNullable<StandaloneApiDependencies["experienceKnowledgeRepository"]>;
   createOperatingHoursRepository(client: StandaloneSupabaseClient): NonNullable<StandaloneApiDependencies["operatingHoursRepository"]>;
   createTenantVenueRepository(client: StandaloneSupabaseClient): NonNullable<StandaloneApiDependencies["tenantVenueRepository"]>;
 }
@@ -191,6 +194,9 @@ const defaultRepositoryFactories: StandaloneSupabaseRepositoryFactories = {
   createExperienceStudioRepository: (client) => createSupabaseExperienceStudioRepository(
     client as unknown as ExperienceSupabaseLikeClient,
   ),
+  createExperienceKnowledgeRepository: (client) => createSupabaseExperienceKnowledgeRepository(
+    client as unknown as ExperienceKnowledgeSupabaseClient,
+  ),
   createOperatingHoursRepository: (client) => {
     if (!client.rpc) throw new Error("Supabase client does not support RPC calls");
     return createSupabaseOperatingHoursRepository({ rpc: client.rpc.bind(client) });
@@ -234,6 +240,7 @@ export function createStandaloneSupabaseDependencies(
         resourceMaintenanceRepository: repositoryFactories.createResourceMaintenanceRepository(adminClient),
         idempotencyRepository: repositoryFactories.createIdempotencyRepository(adminClient),
         experienceStudioRepository: repositoryFactories.createExperienceStudioRepository(adminClient),
+        experienceKnowledgeRepository: repositoryFactories.createExperienceKnowledgeRepository(adminClient),
         operatingHoursRepository: repositoryFactories.createOperatingHoursRepository(adminClient),
         tenantVenueRepository: repositoryFactories.createTenantVenueRepository(adminClient),
       }

@@ -41,6 +41,18 @@ button, a { font: inherit; }
 .skeleton-title { width: min(42rem, 90%); height: 8rem; margin-top: 1rem; }
 .skeleton-copy { width: min(34rem, 75%); height: 4rem; margin-top: 1rem; }
 .error-page { width: min(38rem, calc(100% - 2rem)); margin: 12vh auto; padding: 2rem; border: 1px solid #d8d7d2; border-radius: 1rem; background: white; }
+.manage-shell { width: min(46rem, calc(100% - 2rem)); margin: 0 auto; padding: 2rem 0 6rem; }
+.manage-back { display: inline-block; margin-bottom: 2rem; color: #5c6168; text-decoration: none; }
+.manage-card { padding: clamp(1.5rem, 5vw, 3rem); border: 1px solid #d8d7d2; border-radius: 1.5rem; background: white; box-shadow: 0 2rem 5rem rgba(20,20,15,.08); }
+.manage-card h1 { margin: .8rem 0; font-size: clamp(2.4rem, 7vw, 4.5rem); letter-spacing: -.055em; }
+.manage-card > p, .manage-card form p { color: #5c6168; line-height: 1.6; }
+.manage-card dl { margin: 2rem 0; display: grid; grid-template-columns: repeat(2, 1fr); border-top: 1px solid #e2e1dc; }
+.manage-card dl div { padding: 1rem 0; border-bottom: 1px solid #e2e1dc; }
+.manage-card dt { color: #747980; font-size: .7rem; text-transform: uppercase; }
+.manage-card dd { margin: .3rem 0 0; font-weight: 800; text-transform: capitalize; }
+.manage-card form { margin-top: 2rem; padding: 1.2rem; border: 1px solid #f1b9b4; border-radius: 1rem; background: #fff5f4; }
+.manage-card form button { padding: .8rem 1rem; border: 0; border-radius: 999px; background: #9f2922; color: white; cursor: pointer; font-weight: 800; }
+.manage-cancelled { margin-top: 2rem; padding: 1rem; border-radius: 1rem; background: #e9f6ed; color: #245b35; }
 
 @keyframes pulse { to { background-position: -200% 0; } }
 

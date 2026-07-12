@@ -11,6 +11,7 @@ import {
   createPlatformService,
   createExperienceKnowledge,
   createReservation,
+  issueReservationManagement,
   createResourceMaintenance,
   endResourceMaintenance,
   listAvailability,
@@ -39,6 +40,8 @@ import {
   readExperienceWorkspace,
   readPublicExperience,
   readReservationById,
+  readManagedReservation,
+  cancelManagedReservation,
   rescheduleReservationWithLegacyPatch,
   saveExperienceDraft,
   updateExperienceIdentity,
@@ -62,6 +65,7 @@ import {
   type PlatformTenantVenueRepository,
   type ReservationCreateRepositoryPort,
   type ReservationMutationRepositoryPort,
+  type ReservationManagementRepository,
   type ReservationReadRepositoryPort,
   type ResourceMaintenanceRepositoryPort,
   validatePlatformTenantVenueContext,
@@ -85,6 +89,7 @@ import {
   type ListServicesResponse,
   type MetadataRecord,
   type PlatformErrorResponse,
+  type ReservationResponse,
 } from "@reservation-platform/contract-types";
 import type {
   WhatsAppBusinessConfig,
@@ -112,6 +117,7 @@ export interface StandaloneApiDependencies {
   operatingHoursRepository?: OperatingHoursRepository;
   reservationCreateRepository?: ReservationCreateRepositoryPort;
   reservationMutationRepository?: ReservationMutationRepositoryPort;
+  reservationManagementRepository?: ReservationManagementRepository;
   reservationReadRepository?: ReservationReadRepositoryPort;
   resourceMaintenanceRepository?: ResourceMaintenanceRepositoryPort;
   serviceApiKey?: string;
@@ -253,6 +259,8 @@ const publicExperiencePattern = /^\/v1\/public\/experiences\/([^/]+)$/;
 const publicExperienceServicesPattern = /^\/v1\/public\/experiences\/([^/]+)\/services$/;
 const publicExperienceAvailabilityPattern = /^\/v1\/public\/experiences\/([^/]+)\/availability$/;
 const publicExperienceReservationsPattern = /^\/v1\/public\/experiences\/([^/]+)\/reservations$/;
+const publicExperienceManagementPattern = /^\/v1\/public\/experiences\/([^/]+)\/manage\/([^/]+)$/;
+const publicExperienceManagementCancelPattern = /^\/v1\/public\/experiences\/([^/]+)\/manage\/([^/]+)\/cancel$/;
 const publicExperienceSlugPattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const experienceServicePattern = /^\/v1\/experience\/services\/([^/]+)$/;
 const experienceServiceArchivePattern = /^\/v1\/experience\/services\/([^/]+)\/archive$/;
@@ -464,6 +472,16 @@ export async function handleStandaloneApiRequest(
     if (encodedSlug) {
       return handlePublicExperienceReservationCreateRequest(encodedSlug, request, dependencies);
     }
+  }
+
+  if (method === "GET") {
+    const match = publicExperienceManagementPattern.exec(path);
+    if (match) return handlePublicReservationManagementRequest(match[1]!, match[2]!, dependencies, "read");
+  }
+
+  if (method === "POST") {
+    const match = publicExperienceManagementCancelPattern.exec(path);
+    if (match) return handlePublicReservationManagementRequest(match[1]!, match[2]!, dependencies, "cancel");
   }
 
   if (method === "GET") {
@@ -788,7 +806,13 @@ const protectedRouteMetadata: Readonly<Record<string, readonly RouteMatcher[]>> 
 async function readChannelRuntimeReadiness(
   dependencies: StandaloneApiDependencies,
 ): Promise<ExperienceChannelRuntimeReadiness> {
-  const webBookingReady = Boolean(dependencies.catalogRepository && dependencies.availabilityRepository);
+  const webBookingReady = Boolean(
+    dependencies.catalogRepository
+    && dependencies.availabilityRepository
+    && dependencies.reservationCreateRepository
+    && dependencies.idempotencyRepository
+    && dependencies.reservationManagementRepository
+  );
   const webChatReady = Boolean(dependencies.chatModule);
   let whatsappReady = false;
   let whatsappMessage = dependencies.whatsappModule ? "Connect and finish WhatsApp setup." : "Configure the WhatsApp module.";
@@ -1137,6 +1161,9 @@ async function handlePublicExperienceReservationCreateRequest(
   request: StandaloneApiRequest,
   dependencies: StandaloneApiDependencies,
 ) {
+  if (!dependencies.reservationManagementRepository) {
+    return platformError(503, "bad_request", "Reservation management repository is not configured.");
+  }
   const services = await readPublicExperienceServices(encodedSlug, dependencies);
   if (!services.ok) return services.response;
   const serviceId = request.body && typeof request.body === "object" && !Array.isArray(request.body)
@@ -1145,10 +1172,56 @@ async function handlePublicExperienceReservationCreateRequest(
   if (typeof serviceId !== "string" || !services.services.some((service) => service.service_id === serviceId)) {
     return platformError(404, "not_found", "Service is not available for this experience.");
   }
-  return handleReservationCreateRequest(request, dependencies, {
+  const response = await handleReservationCreateRequest(request, dependencies, {
     tenantId: services.scope.tenantId,
     path: `/v1/public/experiences/${services.scope.slug}/reservations`,
   });
+  if (
+    response.status === 201
+    && dependencies.reservationManagementRepository
+    && response.body
+    && typeof response.body === "object"
+    && !Array.isArray(response.body)
+    && typeof (response.body as Record<string, unknown>).reservation_id === "string"
+  ) {
+    try {
+      const management = await issueReservationManagement({
+        repository: dependencies.reservationManagementRepository,
+        reservation: response.body as ReservationResponse,
+      });
+      return jsonResponse(201, {
+        ...(response.body as Record<string, unknown>),
+        management_token: management.token,
+        management_expires_at: management.expiresAt,
+      });
+    } catch {
+      return response;
+    }
+  }
+  return response;
+}
+
+async function handlePublicReservationManagementRequest(
+  encodedSlug: string,
+  encodedToken: string,
+  dependencies: StandaloneApiDependencies,
+  operation: "read" | "cancel",
+) {
+  if (!dependencies.reservationManagementRepository) {
+    return platformError(503, "bad_request", "Reservation management repository is not configured.");
+  }
+  let publicSlug: string;
+  let token: string;
+  try {
+    publicSlug = decodeURIComponent(encodedSlug);
+    token = decodeURIComponent(encodedToken);
+  } catch {
+    return platformError(404, "not_found", "Reservation management link is invalid or expired.");
+  }
+  const result = operation === "read"
+    ? await readManagedReservation({ repository: dependencies.reservationManagementRepository, publicSlug, token })
+    : await cancelManagedReservation({ repository: dependencies.reservationManagementRepository, publicSlug, token });
+  return jsonResponse(result.status, result.body);
 }
 
 function requireExperienceScope(request: StandaloneApiRequest): StandaloneApiResponse | undefined {

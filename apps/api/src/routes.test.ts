@@ -36,6 +36,7 @@ import type {
   PlatformTenantVenueRepository,
   ReservationCreateRepositoryPort,
   ReservationMutationRepositoryPort,
+  ReservationManagementRepository,
   ReservationReadRepositoryPort,
   ResourceMaintenanceRepositoryPort,
 } from "@reservation-platform/api";
@@ -201,6 +202,7 @@ test("public booking availability rejects services outside the published venue",
 test("public booking creates only against a published venue service and scopes idempotency internally", async () => {
   const serviceId = "11111111-1111-4111-8111-111111111111";
   const idempotencyRepository = new InMemoryIdempotencyRepository();
+  let managementIssue: unknown;
   const response = await handleStandaloneApiRequest({
     method: "POST",
     path: "/v1/public/experiences/apex-racing/reservations",
@@ -223,11 +225,43 @@ test("public booking creates only against a published venue service and scopes i
     }),
     idempotencyRepository,
     reservationCreateRepository: reservationCreateRepository(),
+    reservationManagementRepository: reservationManagementRepository({
+      issue: async (input) => { managementIssue = input; return { data: { id: "token-row" } }; },
+    }),
   });
 
   assert.equal(response.status, 201);
   assert.equal(idempotencyRepository.records.get("public_booking_12345678")?.tenantId, "tenant_1");
   assert.equal(idempotencyRepository.records.get("public_booking_12345678")?.path, "/v1/public/experiences/apex-racing/reservations");
+  const body = response.body as { management_token?: string; management_expires_at?: string };
+  assert.match(body.management_token ?? "", /^[A-Za-z0-9_-]{43}$/u);
+  assert.match(body.management_expires_at ?? "", /^\d{4}-\d{2}-\d{2}T/u);
+  assert.notEqual((managementIssue as { tokenHash?: string }).tokenHash, body.management_token);
+});
+
+test("public management routes read and replay cancellation without owner auth", async () => {
+  const token = "abcdefghijklmnopqrstuvwxyzABCDEFGH123456789";
+  const calls: string[] = [];
+  const repository = reservationManagementRepository({
+    read: async () => { calls.push("read"); return { data: { ok: true, booking: reservationRow() } }; },
+    cancel: async () => { calls.push("cancel"); return { data: { ok: true, replayed: true, booking: reservationRow({ status: "cancelled" }) } }; },
+  });
+  const read = await handleStandaloneApiRequest({
+    method: "GET",
+    path: `/v1/public/experiences/apex-racing/manage/${token}`,
+    headers: {},
+  }, { serviceApiKey: "secret", reservationManagementRepository: repository });
+  const cancelled = await handleStandaloneApiRequest({
+    method: "POST",
+    path: `/v1/public/experiences/apex-racing/manage/${token}/cancel`,
+    headers: {},
+    body: {},
+  }, { serviceApiKey: "secret", reservationManagementRepository: repository });
+
+  assert.equal(read.status, 200);
+  assert.equal(cancelled.status, 200);
+  assert.equal((cancelled.body as { status: string }).status, "cancelled");
+  assert.deepEqual(calls, ["read", "cancel"]);
 });
 
 test("public booking routes disappear when web booking is disabled", async () => {
@@ -508,6 +542,9 @@ test("experience channel route separates desired settings from readiness", async
     experienceStudioRepository: repository,
     catalogRepository: catalogRepository(),
     availabilityRepository: availabilityRepository(),
+    reservationCreateRepository: reservationCreateRepository(),
+    idempotencyRepository: new InMemoryIdempotencyRepository(),
+    reservationManagementRepository: reservationManagementRepository(),
   });
 
   assert.equal(response.status, 200);
@@ -544,6 +581,9 @@ test("experience validation blocks publication until required sections pass", as
       archive: async () => ({ data: null }),
     } satisfies ExperienceKnowledgeRepository,
     availabilityRepository: availabilityRepository(),
+    reservationCreateRepository: reservationCreateRepository(),
+    idempotencyRepository: new InMemoryIdempotencyRepository(),
+    reservationManagementRepository: reservationManagementRepository(),
   };
   const headers = {
     authorization: "Bearer secret",
@@ -4658,6 +4698,15 @@ function reservationMutationRepository(overrides: Partial<ReservationMutationRep
         }),
       };
     },
+    ...overrides,
+  };
+}
+
+function reservationManagementRepository(overrides: Partial<ReservationManagementRepository> = {}): ReservationManagementRepository {
+  return {
+    issue: async () => ({ data: {} }),
+    read: async () => ({ data: { ok: false, error_code: "not_found" } }),
+    cancel: async () => ({ data: { ok: false, error_code: "not_found" } }),
     ...overrides,
   };
 }

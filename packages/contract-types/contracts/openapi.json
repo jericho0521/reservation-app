@@ -1612,6 +1612,12 @@
           "end_time": {
             "type": "string"
           },
+          "management_expires_at": {
+            "type": "string"
+          },
+          "management_token": {
+            "type": "string"
+          },
           "metadata": {
             "$ref": "#/components/schemas/MetadataRecord"
           },
@@ -3806,6 +3812,122 @@
           }
         },
         "summary": "Read availability for a service in a published booking experience.",
+        "tags": [
+          "Public booking"
+        ]
+      }
+    },
+    "/v1/public/experiences/{slug}/manage/{token}": {
+      "get": {
+        "operationId": "getManagedReservation",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "token",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/TenantIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/VenueIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/CorrelationIdHeader"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReservationResponse"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformErrorResponse"
+                }
+              }
+            },
+            "description": "Platform error response."
+          }
+        },
+        "summary": "Read one reservation through an opaque customer management token.",
+        "tags": [
+          "Public booking"
+        ]
+      }
+    },
+    "/v1/public/experiences/{slug}/manage/{token}/cancel": {
+      "post": {
+        "operationId": "cancelManagedReservation",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "token",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/TenantIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/VenueIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/CorrelationIdHeader"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReservationResponse"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformErrorResponse"
+                }
+              }
+            },
+            "description": "Platform error response."
+          }
+        },
+        "summary": "Cancel one future reservation through an opaque customer management token.",
         "tags": [
           "Public booking"
         ]

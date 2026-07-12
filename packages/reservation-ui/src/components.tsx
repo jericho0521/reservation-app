@@ -2,6 +2,7 @@ import type {
   AvailabilitySlot,
   CustomerSnapshot,
   ResourceResponse,
+  ReservationResponse,
   ServiceResponse,
 } from "@reservation-platform/contract-types";
 import {
@@ -42,6 +43,7 @@ export interface BookingFlowProps {
   useExistingProvider?: boolean;
   setupErrorTitle?: string;
   setupErrorMessage?: string;
+  managementBasePath?: string;
 }
 
 export interface ExperiencePreviewProps {
@@ -142,6 +144,7 @@ export function BookingFlow({
   useExistingProvider = false,
   setupErrorTitle = "Reservation backend configuration required",
   setupErrorMessage = "Set the backend base URL and service id, or wrap BookingFlow in ReservationProvider and pass a service id.",
+  managementBasePath,
 }: BookingFlowProps) {
   if (!serviceId || (!baseUrl && !useExistingProvider)) {
     return (
@@ -161,6 +164,7 @@ export function BookingFlow({
       className={className}
       initialDate={initialDate}
       initialQuantity={initialQuantity}
+      managementBasePath={managementBasePath}
     />
   );
 
@@ -181,7 +185,7 @@ export function PublicBookingJourney({
   className?: string;
 }) {
   return <PublicExperienceReservationProvider baseUrl={baseUrl} slug={slug}>
-    <PublicBookingJourneyInner labels={labels} theme={theme} className={className} />
+    <PublicBookingJourneyInner labels={labels} theme={theme} className={className} managementBasePath={`/${slug}/manage`} />
   </PublicExperienceReservationProvider>;
 }
 
@@ -189,10 +193,12 @@ function PublicBookingJourneyInner({
   labels,
   theme,
   className,
+  managementBasePath,
 }: {
   labels?: Partial<BookingLabels>;
   theme?: ThemeClasses;
   className?: string;
+  managementBasePath: string;
 }) {
   const [serviceId, setServiceId] = useState<string>();
   if (!serviceId) {
@@ -208,6 +214,7 @@ function PublicBookingJourneyInner({
     theme={theme}
     className={className}
     useExistingProvider
+    managementBasePath={managementBasePath}
   />;
 }
 
@@ -235,6 +242,7 @@ function BookingFlowInner({
   className,
   initialDate,
   initialQuantity,
+  managementBasePath,
 }: Omit<BookingFlowProps, "baseUrl" | "serviceId"> & { serviceId: string }) {
   const mergedLabels = mergeLabels(labels);
   const mergedTheme = mergeTheme(theme);
@@ -322,7 +330,7 @@ function BookingFlowInner({
             <BookingSummary labels={mergedLabels} service={flow.state.service} state={flow.state} panelClassName={mergedTheme.panel} />
           </BookingStepPanel> : null}
           {step === "success" && flow.state.reservation ? <BookingStepPanel step={step} title="You are booked" description="Keep this confirmation for your records.">
-            <ReservationSuccess reservationId={flow.state.reservation.reservation_id} className={mergedTheme.success} />
+            <ReservationSuccess reservation={flow.state.reservation} managementBasePath={managementBasePath} className={mergedTheme.success} />
           </BookingStepPanel> : null}
           {flow.service.error || flow.availability.error || submitError ? <ReservationError message={flow.service.error?.message ?? flow.availability.error?.message ?? submitError} className={mergedTheme.error} /> : null}
           {step !== "success" ? <BookingStepActions
@@ -661,12 +669,21 @@ function SummaryRow({ label, value }: { label: string; value: ReactNode }) {
   );
 }
 
-export function ReservationSuccess({ reservationId, className }: { reservationId: string; className?: string }) {
+export function ReservationSuccess({
+  reservation,
+  managementBasePath,
+  className,
+}: {
+  reservation: Pick<ReservationResponse, "reservation_id" | "management_token">;
+  managementBasePath?: string;
+  className?: string;
+}) {
   return (
     <div className={cn(className, "rp-success flex flex-col gap-1")}>
       <span className="rp-status-kicker font-bold uppercase tracking-wider text-[10px]">Success</span>
       <p className="rp-status-text text-xs font-semibold">Reservation created successfully.</p>
-      <p className="rp-status-id font-mono text-[10px] break-all opacity-80 mt-1">ID: {reservationId}</p>
+      <p className="rp-status-id font-mono text-[10px] break-all opacity-80 mt-1">ID: {reservation.reservation_id}</p>
+      {managementBasePath && reservation.management_token ? <a className="rp-management-link" href={`${managementBasePath}/${encodeURIComponent(reservation.management_token)}`}>View or cancel this reservation</a> : null}
     </div>
   );
 }

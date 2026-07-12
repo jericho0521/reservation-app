@@ -199,6 +199,17 @@
       ]
     },
     {
+      "kind": "core-migration",
+      "order": 18,
+      "targetPath": "packages/database/migrations/supabase/000018_reservation_management_tokens.sql",
+      "sourceAssets": [
+        {
+          "path": "packages/database/migrations/supabase/000018_reservation_management_tokens.sql",
+          "section": "Hashed expiring customer management tokens with slug-scoped read and cancellation RPCs"
+        }
+      ]
+    },
+    {
       "kind": "optional-ai-retrieval",
       "targetPath": "packages/database/migrations/supabase/optional/ai-retrieval/000001_knowledge_chunks.sql",
       "sourceAssets": [

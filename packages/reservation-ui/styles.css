@@ -203,6 +203,14 @@
   font-size: 0.68rem;
 }
 
+.rp-management-link {
+  margin-top: 0.75rem;
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-decoration: underline;
+  text-underline-offset: 0.2rem;
+}
+
 .rp-public-journey,
 .rp-step-panel {
   display: grid;

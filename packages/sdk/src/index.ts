@@ -158,6 +158,8 @@ export interface ReservationPlatformClient {
   listPublicExperienceServices(slug: string, options?: RequestOptions): Promise<ListServicesResponse>;
   listPublicExperienceAvailability(slug: string, input: AvailabilityQuery, options?: RequestOptions): Promise<AvailabilityResponse>;
   createPublicExperienceReservation(slug: string, input: CreateReservationInput, options?: RequestOptions): Promise<ReservationResponse>;
+  getManagedReservation(slug: string, token: string, options?: RequestOptions): Promise<ReservationResponse>;
+  cancelManagedReservation(slug: string, token: string, options?: RequestOptions): Promise<ReservationResponse>;
   getMetadata(options?: RequestOptions): Promise<MetadataResponse>;
   getCurrentTenant(options?: RequestOptions): Promise<TenantResponse>;
   listVenues(input?: ListVenuesQuery, options?: RequestOptions): Promise<ListVenuesResponse>;
@@ -258,6 +260,19 @@ export function createReservationPlatformClient(
       method: "POST",
       path: `/public/experiences/${encodeURIComponent(slug)}/reservations`,
       body: input,
+      options,
+      public: true,
+    }),
+    getManagedReservation: (slug, token, options) => request({
+      method: "GET",
+      path: `/public/experiences/${encodeURIComponent(slug)}/manage/${encodeURIComponent(token)}`,
+      options,
+      public: true,
+    }),
+    cancelManagedReservation: (slug, token, options) => request({
+      method: "POST",
+      path: `/public/experiences/${encodeURIComponent(slug)}/manage/${encodeURIComponent(token)}/cancel`,
+      body: {},
       options,
       public: true,
     }),

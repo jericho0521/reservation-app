@@ -233,6 +233,25 @@ test("public booking client adapts headless service, availability, and mutation 
   ]);
 });
 
+test("customer management SDK methods encode opaque token paths and stay public", async () => {
+  const requests: Array<{ url: string; init?: RequestInit }> = [];
+  const client = createReservationPlatformClient({
+    baseUrl: "https://platform.example",
+    getAccessToken: () => "owner-secret",
+    fetch: async (url, init) => {
+      requests.push({ url: String(url), init });
+      return jsonResponse({ reservation_id: "reservation_1", service_id: "service_1", status: "confirmed", quantity: 1 });
+    },
+  });
+  await client.getManagedReservation("luma studio", "opaque/token");
+  await client.cancelManagedReservation("luma studio", "opaque/token");
+  assert.deepEqual(requests.map(({ url, init }) => [new URL(url).pathname, init?.method]), [
+    ["/v1/public/experiences/luma%20studio/manage/opaque%2Ftoken", "GET"],
+    ["/v1/public/experiences/luma%20studio/manage/opaque%2Ftoken/cancel", "POST"],
+  ]);
+  requests.forEach((request) => assert.equal(new Headers(request.init?.headers).has("Authorization"), false));
+});
+
 test("experience knowledge and channel SDK methods preserve owner paths", async () => {
   const requests: Array<{ url: string; init?: RequestInit }> = [];
   const knowledge = { question: "Where should I park?", answer: "Use the north entrance." };

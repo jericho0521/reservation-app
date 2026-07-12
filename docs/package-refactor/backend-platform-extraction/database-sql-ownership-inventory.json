@@ -187,6 +187,16 @@
       "notes": [
         "Backend-owned structured venue FAQ knowledge with active/archive lifecycle for AI and channel orchestration."
       ]
+    },
+    {
+      "path": "packages/database/migrations/supabase/000018_reservation_management_tokens.sql",
+      "classification": "core-platform",
+      "intendedBackendDestination": [
+        "packages/database/migrations/supabase/000018_reservation_management_tokens.sql"
+      ],
+      "notes": [
+        "Backend-owned hashed, expiring, slug-scoped customer reservation management and cancellation tokens."
+      ]
     }
   ]
 }

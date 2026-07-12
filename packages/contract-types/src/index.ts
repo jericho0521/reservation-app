@@ -402,6 +402,8 @@ export interface ReservationResponse {
   metadata?: MetadataRecord;
   created_at?: string;
   updated_at?: string;
+  management_token?: string;
+  management_expires_at?: string;
 }
 
 export interface ListReservationsQuery {

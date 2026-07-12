@@ -428,6 +428,8 @@ export const reservationResponseSchema = strictObject({
   metadata: metadataRecordSchema.optional(),
   created_at: z.string().optional(),
   updated_at: z.string().optional(),
+  management_token: z.string().min(32).optional(),
+  management_expires_at: z.string().optional(),
 });
 
 export const listReservationsQuerySchema = strictObject({

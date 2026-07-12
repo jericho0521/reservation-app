@@ -24,12 +24,14 @@ import {
   createSupabaseOperatingHoursRepository,
   createSupabasePlatformCatalogRepository,
   createSupabaseReservationMutationRepository,
+  createSupabaseReservationManagementRepository,
   createSupabaseReservationReadRepository,
   createSupabaseReservationRepository,
   createSupabaseResourceMaintenanceRepository,
   createSupabaseTenantVenueRepository,
   type ExperienceSupabaseLikeClient,
   type ExperienceKnowledgeSupabaseClient,
+  type ReservationManagementSupabaseClient,
 } from "@project-play/reservations-supabase";
 import {
   BaileysWhatsAppSessionAdapter,
@@ -146,6 +148,7 @@ export interface StandaloneSupabaseRepositoryFactories {
   createReservationReadRepository(client: StandaloneSupabaseClient): NonNullable<StandaloneApiDependencies["reservationReadRepository"]>;
   createReservationCreateRepository(client: StandaloneSupabaseClient): NonNullable<StandaloneApiDependencies["reservationCreateRepository"]>;
   createReservationMutationRepository(client: StandaloneSupabaseClient): NonNullable<StandaloneApiDependencies["reservationMutationRepository"]>;
+  createReservationManagementRepository(client: StandaloneSupabaseClient): NonNullable<StandaloneApiDependencies["reservationManagementRepository"]>;
   createResourceMaintenanceRepository(client: StandaloneSupabaseClient): NonNullable<StandaloneApiDependencies["resourceMaintenanceRepository"]>;
   createIdempotencyRepository(client: StandaloneSupabaseClient): NonNullable<StandaloneApiDependencies["idempotencyRepository"]>;
   createExperienceStudioRepository(client: StandaloneSupabaseClient): NonNullable<StandaloneApiDependencies["experienceStudioRepository"]>;
@@ -189,6 +192,9 @@ const defaultRepositoryFactories: StandaloneSupabaseRepositoryFactories = {
   createReservationReadRepository: createSupabaseReservationReadRepository,
   createReservationCreateRepository: createSupabaseReservationRepository,
   createReservationMutationRepository: createSupabaseReservationMutationRepository,
+  createReservationManagementRepository: (client) => createSupabaseReservationManagementRepository(
+    client as unknown as ReservationManagementSupabaseClient,
+  ),
   createResourceMaintenanceRepository: createSupabaseResourceMaintenanceRepository,
   createIdempotencyRepository: createSupabaseIdempotencyRepository,
   createExperienceStudioRepository: (client) => createSupabaseExperienceStudioRepository(
@@ -237,6 +243,7 @@ export function createStandaloneSupabaseDependencies(
         reservationReadRepository: repositoryFactories.createReservationReadRepository(adminClient),
         reservationCreateRepository: repositoryFactories.createReservationCreateRepository(adminClient),
         reservationMutationRepository: repositoryFactories.createReservationMutationRepository(adminClient),
+        reservationManagementRepository: repositoryFactories.createReservationManagementRepository(adminClient),
         resourceMaintenanceRepository: repositoryFactories.createResourceMaintenanceRepository(adminClient),
         idempotencyRepository: repositoryFactories.createIdempotencyRepository(adminClient),
         experienceStudioRepository: repositoryFactories.createExperienceStudioRepository(adminClient),

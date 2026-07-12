@@ -40,6 +40,7 @@ import { experienceOperatingHoursResponseSchema } from "@reservation-platform/co
 export * from "./experience-studio.js";
 export * from "./experience-knowledge.js";
 export * from "./operating-hours.js";
+export * from "./reservation-management.js";
 
 export const RESERVATION_SUPABASE_TABLES = {
   platformTenants: "tenants",

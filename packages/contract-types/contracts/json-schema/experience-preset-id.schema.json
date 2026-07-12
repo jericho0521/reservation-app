@@ -1577,6 +1577,12 @@
         "end_time": {
           "type": "string"
         },
+        "management_expires_at": {
+          "type": "string"
+        },
+        "management_token": {
+          "type": "string"
+        },
         "metadata": {
           "$ref": "#/$defs/MetadataRecord"
         },

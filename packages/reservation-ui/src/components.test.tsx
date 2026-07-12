@@ -8,6 +8,7 @@ import {
   BookingFlow,
   BookingSetupError,
   ReservationError,
+  ReservationSuccess,
   ResourceSelector,
   getBookingControlVisibility,
   filterBookingServices,
@@ -214,4 +215,14 @@ test("service search matches names and descriptions with a useful empty result",
   assert.deepEqual(filterBookingServices(services, "video"), [services[0]]);
   assert.deepEqual(filterBookingServices(services, "missing"), []);
   assert.deepEqual(filterBookingServices(services, "  "), services);
+});
+
+test("reservation success exposes the opaque management link when issued", () => {
+  const token = "abcdefghijklmnopqrstuvwxyzABCDEFGH123456789";
+  const element = ReservationSuccess({
+    reservation: { reservation_id: "reservation_1", management_token: token },
+    managementBasePath: "/luma-studio/manage",
+  });
+  const hrefs = collectProps(element, (props) => typeof props.href === "string" ? props.href : undefined);
+  assert.deepEqual(hrefs, [`/luma-studio/manage/${token}`]);
 });

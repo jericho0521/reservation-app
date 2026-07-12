@@ -9,15 +9,15 @@ import {
 
 const indexPath = new URL("../migrations/supabase/migration-index.json", import.meta.url);
 
-test("core plan includes exactly 000001 through 000017 in order", async () => {
+test("core plan includes exactly 000001 through 000018 in order", async () => {
   const index = await readActualIndex();
   const plan = buildSupabaseMigrationPlan(index);
 
   assert.deepEqual(
     plan.migrations.map((entry) => entry.path.match(/\/(\d{6})_[^/]+\.sql$/)?.[1]),
-    Array.from({ length: 17 }, (_, index) => String(index + 1).padStart(6, "0")),
+    Array.from({ length: 18 }, (_, index) => String(index + 1).padStart(6, "0")),
   );
-  assert.equal(plan.migrations.length, 17);
+  assert.equal(plan.migrations.length, 18);
   assert.equal(plan.seeds.length, 0);
 });
 
@@ -49,6 +49,19 @@ test("experience knowledge migration is scoped, bounded, archival, and service-r
   assert.doesNotMatch(sql, /grant select .* to anon|grant select .* to authenticated/);
 });
 
+test("reservation management migration hashes tokens and scopes read/cancel by public slug", async () => {
+  const sql = (await readFile(new URL("../migrations/supabase/000018_reservation_management_tokens.sql", import.meta.url), "utf8")).toLowerCase();
+  assert.match(sql, /token_hash text not null unique/);
+  assert.doesNotMatch(sql, /token_plaintext|raw_token/);
+  assert.match(sql, /create or replace function public\.read_managed_reservation/);
+  assert.match(sql, /create or replace function public\.cancel_managed_reservation/);
+  assert.match(sql, /profiles\.public_slug = lower\(trim\(p_public_slug\)\)/);
+  assert.match(sql, /v_token\.expires_at <= now\(\)/);
+  assert.match(sql, /v_starts_at <= now\(\)/);
+  assert.match(sql, /revocation_reason = 'cancelled'/);
+  assert.match(sql, /revoke all on table public\.platform_reservation_management_tokens from public, anon, authenticated/);
+});
+
 test("default plan excludes optional AI retrieval and development seed entries", async () => {
   const index = await readActualIndex();
   const plan = buildSupabaseMigrationPlan(index);
@@ -62,7 +75,7 @@ test("AI retrieval option appends optional AI retrieval migrations after core mi
   const plan = buildSupabaseMigrationPlan(index, { includeAiRetrieval: true });
 
   assert.deepEqual(
-    plan.migrations.slice(17).map((entry) => entry.path),
+    plan.migrations.slice(18).map((entry) => entry.path),
     [
       "packages/database/migrations/supabase/optional/ai-retrieval/000001_knowledge_chunks.sql",
       "packages/database/migrations/supabase/optional/ai-retrieval/000002_langchain_checkpoints.sql",

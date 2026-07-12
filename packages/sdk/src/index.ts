@@ -302,20 +302,24 @@ function getMaxAttempts(
   requestRetry: RequestOptions["retry"],
 ) {
   const retry = requestRetry ?? clientRetry;
-  if (retry === false || config.method !== "GET" || config.stream) {
+  if (retry === false || !isRetrySafeRequest(config) || config.stream) {
     return 1;
   }
   return Math.max(1, Math.min(retry?.attempts ?? 1, 3));
 }
 
 function canRetry(config: RequestConfig, error: unknown, signal: AbortSignal) {
-  if (config.method !== "GET" || config.stream || signal.aborted) {
+  if (!isRetrySafeRequest(config) || config.stream || signal.aborted) {
     return false;
   }
   if (isPlatformError(error)) {
     return error.body.retryable === true || [429, 502, 503, 504].includes(error.body.status);
   }
   return error instanceof TypeError;
+}
+
+function isRetrySafeRequest(config: RequestConfig) {
+  return config.method === "GET" || Boolean(config.options?.idempotencyKey);
 }
 
 function mergeHeaders(headers: Headers, extra?: HeadersInit) {

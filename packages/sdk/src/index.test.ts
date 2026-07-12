@@ -304,6 +304,42 @@ test("SDK does not retry mutations by default", async () => {
   assert.equal(attempts, 1);
 });
 
+test("SDK retries mutations with an idempotency key when configured", async () => {
+  let attempts = 0;
+  const client = createReservationPlatformClient({
+    baseUrl: "https://api.example.test",
+    retry: { attempts: 2 },
+    fetch: async () => {
+      attempts += 1;
+      if (attempts === 1) {
+        return jsonResponse({
+          error: {
+            code: "temporarily_unavailable",
+            message: "Try again.",
+            status: 503,
+            retryable: true,
+          },
+        }, 503);
+      }
+      return jsonResponse({
+        reservation_id: "reservation_123",
+        service_id: "svc_123",
+        status: "confirmed",
+        quantity: 1,
+      });
+    },
+  });
+
+  const reservation = await client.createReservation({
+    service_id: "svc_123",
+    quantity: 1,
+    customer: { name: "Alex" },
+  }, { idempotencyKey: "booking_123" });
+
+  assert.equal(attempts, 2);
+  assert.equal(reservation.reservation_id, "reservation_123");
+});
+
 test("SDK does not retry aborted safe reads", async () => {
   let attempts = 0;
   const controller = new AbortController();

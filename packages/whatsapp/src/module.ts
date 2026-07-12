@@ -42,7 +42,19 @@ export interface WhatsAppBusinessModuleOptions {
   store?: WhatsAppModuleStore;
   sessionAdapter?: WhatsAppSessionAdapter & Partial<WhatsAppOutboundSender>;
   responder?: WhatsAppAgentResponder;
+  unifiedConversations?: WhatsAppUnifiedConversationBridge;
   now?: () => Date;
+}
+
+export interface WhatsAppUnifiedConversationBridgeResult {
+  content: string;
+  conversation_id: string;
+  automation_suppressed?: boolean;
+  metadata?: MetadataRecord;
+}
+
+export interface WhatsAppUnifiedConversationBridge {
+  handleInbound(input: WhatsAppInboundMessage): Promise<WhatsAppUnifiedConversationBridgeResult>;
 }
 
 export class WhatsAppBusinessModule {
@@ -51,6 +63,7 @@ export class WhatsAppBusinessModule {
   private readonly sender?: WhatsAppOutboundSender;
   private readonly responder: WhatsAppAgentResponder;
   private readonly automationEnabled: boolean;
+  private readonly unifiedConversations?: WhatsAppUnifiedConversationBridge;
 
   constructor(options: WhatsAppBusinessModuleOptions = {}) {
     this.store = options.store ?? new InMemoryWhatsAppModuleStore({ now: options.now });
@@ -63,6 +76,7 @@ export class WhatsAppBusinessModule {
     this.sender = isOutboundSender(options.sessionAdapter) ? options.sessionAdapter : undefined;
     this.responder = options.responder ?? defaultResponder;
     this.automationEnabled = options.automationEnabled ?? true;
+    this.unifiedConversations = options.unifiedConversations;
   }
 
   startSession(input: WhatsAppSessionStartInput): Promise<WhatsAppSessionSnapshot> {
@@ -164,6 +178,13 @@ export class WhatsAppBusinessModule {
   }
 
   async handleInboundMessage(input: WhatsAppInboundMessage) {
+    if (this.unifiedConversations) {
+      const response = await this.unifiedConversations.handleInbound(input);
+      if (response.content && !response.automation_suppressed) {
+        await this.sender?.sendMessage({ provider: input.provider, to: input.from.id, text: response.content, metadata: response.metadata });
+      }
+      return response;
+    }
     const normalized = normalizeWhatsAppInboundTextMessage(input);
     if (!normalized) {
       return this.handleUnsupportedInbound(input);

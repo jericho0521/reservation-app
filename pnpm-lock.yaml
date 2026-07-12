@@ -448,9 +448,6 @@ importers:
       '@whiskeysockets/baileys':
         specifier: 7.0.0-rc13
         version: 7.0.0-rc13(sharp@0.34.5)
-      qrcode-terminal:
-        specifier: ^0.12.0
-        version: 0.12.0
     devDependencies:
       tsx:
         specifier: ^4.21.0
@@ -1128,10 +1125,6 @@ packages:
     resolution: {integrity: sha512-+Owyggi9IxT1ePKGafcI87ubSmxol6smwJ+RAHDQlx9+9cPwFWDiKFFCPuWhr9ignlGpZ9vDQLw67N4dcTVFEA==}
     engines: {node: '>=20'}
 
-  qrcode-terminal@0.12.0:
-    resolution: {integrity: sha512-EXtzRZmC+YGmGlDFbXKxQiMZNwCLEO6BANKXG4iCtSIM0yqc/pappSx3RIKr4r0uh5JsBckOXeKrB3Iz7mdQpQ==}
-    hasBin: true
-
   quick-format-unescaped@4.0.4:
     resolution: {integrity: sha512-tYC1Q1hgyRuHgloV/YXs2w15unPVh8qfu/qCTfhTYamaw7fyhumKa2yGpdSo87vY32rIclj+4fWYQXUMs9EHvg==}
 
@@ -1807,8 +1800,6 @@ snapshots:
   qified@0.10.1:
     dependencies:
       hookified: 2.2.0
-
-  qrcode-terminal@0.12.0: {}
 
   quick-format-unescaped@4.0.4: {}
 

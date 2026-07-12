@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { mkdir } from "node:fs/promises";
 import path from "node:path";
 
@@ -10,7 +11,6 @@ import type { WhatsAppSessionAdapter } from "./session.js";
 export interface BaileysWhatsAppSessionAdapterOptions {
   authDirectory: string;
   qrTimeoutMs?: number;
-  printQrInTerminal?: boolean;
   maxReconnectAttempts?: number;
   sessionEncryptionKey?: string;
   onInboundMessage?: (message: WhatsAppInboundMessage) => void | Promise<void>;
@@ -46,7 +46,6 @@ export class BaileysWhatsAppSessionAdapter implements WhatsAppSessionAdapter {
   private socket: unknown;
   private readonly authDirectory: string;
   private readonly qrTimeoutMs: number;
-  private readonly printQrInTerminal: boolean;
   private readonly maxReconnectAttempts: number;
   private readonly sessionEncryptionKey?: string;
   private readonly onInboundMessage?: BaileysWhatsAppSessionAdapterOptions["onInboundMessage"];
@@ -55,7 +54,6 @@ export class BaileysWhatsAppSessionAdapter implements WhatsAppSessionAdapter {
   constructor(options: BaileysWhatsAppSessionAdapterOptions) {
     this.authDirectory = options.authDirectory;
     this.qrTimeoutMs = options.qrTimeoutMs ?? 60_000;
-    this.printQrInTerminal = options.printQrInTerminal ?? true;
     this.maxReconnectAttempts = options.maxReconnectAttempts ?? 5;
     this.sessionEncryptionKey = options.sessionEncryptionKey?.trim() || undefined;
     this.onInboundMessage = options.onInboundMessage;
@@ -98,13 +96,6 @@ export class BaileysWhatsAppSessionAdapter implements WhatsAppSessionAdapter {
           if (update.qr && !settled) {
             settled = true;
             clearTimeout(timeout);
-            if (this.printQrInTerminal) {
-              await printTerminalQr(update.qr);
-              console.log("");
-              console.log("WhatsApp login QR is ready.");
-              console.log("Scan the QR above in WhatsApp: Settings > Linked devices > Link a device.");
-              console.log("");
-            }
             await this.emitStatusChange("pending_qr", { session_id: input.session_id });
             resolve({
               qr_code: update.qr,
@@ -139,8 +130,8 @@ export class BaileysWhatsAppSessionAdapter implements WhatsAppSessionAdapter {
               return;
             }
 
-            if (attempt < this.maxReconnectAttempts) {
-              const nextAttempt = attempt + 1;
+            const nextAttempt = nextBaileysReconnectAttempt(attempt, this.maxReconnectAttempts, disconnectStatus);
+            if (nextAttempt !== undefined) {
               console.log(`WhatsApp connection closed; reconnecting (${nextAttempt}/${this.maxReconnectAttempts})...`);
               setTimeout(() => connect(nextAttempt), reconnectDelayMs(nextAttempt));
               return;
@@ -254,8 +245,8 @@ export class BaileysWhatsAppSessionAdapter implements WhatsAppSessionAdapter {
               return;
             }
 
-            if (attempt < this.maxReconnectAttempts) {
-              const nextAttempt = attempt + 1;
+            const nextAttempt = nextBaileysReconnectAttempt(attempt, this.maxReconnectAttempts, disconnectStatus);
+            if (nextAttempt !== undefined) {
               setTimeout(() => connect(nextAttempt), reconnectDelayMs(nextAttempt));
               return;
             }
@@ -368,26 +359,26 @@ interface BaileysMessage {
   pushName?: string;
 }
 
-function normalizeBaileysMessage(message: BaileysMessage): WhatsAppInboundMessage | null {
+export function normalizeBaileysMessage(message: BaileysMessage): WhatsAppInboundMessage | null {
   if (message.key?.fromMe) {
     return null;
   }
 
   const text = message.message?.conversation ?? message.message?.extendedTextMessage?.text;
   const remoteJid = message.key?.remoteJid;
-  if (!remoteJid || !text) {
+  if (!remoteJid) {
     return null;
   }
 
   return {
     provider: "session_qr",
-    messageId: message.key?.id ?? `${remoteJid}:${Date.now()}`,
+    messageId: message.key?.id ?? stableBaileysMessageId(remoteJid, text ?? "[unsupported]", message.messageTimestamp),
     from: {
       id: remoteJid,
       displayName: message.pushName,
       phoneNumber: remoteJid.split("@")[0],
     },
-    text,
+    ...(text ? { text } : {}),
     timestamp: message.messageTimestamp === undefined
       ? undefined
       : new Date(Number(message.messageTimestamp) * 1000).toISOString(),
@@ -397,14 +388,8 @@ function normalizeBaileysMessage(message: BaileysMessage): WhatsAppInboundMessag
   };
 }
 
-async function printTerminalQr(qrCode: string) {
-  try {
-    const qrTerminal = await import("qrcode-terminal");
-    const renderer = qrTerminal.default ?? qrTerminal;
-    renderer.generate(qrCode, { small: true });
-  } catch (error) {
-    console.warn("Could not render WhatsApp QR in terminal.", error);
-  }
+function stableBaileysMessageId(remoteJid: string, text: string, timestamp: number | undefined) {
+  return `baileys:${createHash("sha256").update(`${remoteJid}\u0000${timestamp ?? ""}\u0000${text}`).digest("hex")}`;
 }
 
 function readDisconnectStatus(update: BaileysConnectionUpdate) {
@@ -414,4 +399,8 @@ function readDisconnectStatus(update: BaileysConnectionUpdate) {
 
 function reconnectDelayMs(attempt: number) {
   return Math.min(500 * attempt, 3_000);
+}
+
+export function nextBaileysReconnectAttempt(attempt: number, maximum: number, disconnectStatus?: number) {
+  return disconnectStatus === 401 || attempt >= maximum ? undefined : attempt + 1;
 }

@@ -1737,6 +1737,7 @@ async function handleWhatsAppSimulationRequest(
   if (!text) {
     return platformError(400, "validation_failed", "text is required.");
   }
+  const context = createChatContext(request);
 
   return invokeWhatsAppModule(() => whatsappModule.handleInboundMessage({
     provider: "session_qr",
@@ -1748,7 +1749,11 @@ async function handleWhatsAppSimulationRequest(
     },
     text,
     timestamp: new Date().toISOString(),
-    raw: { simulated: true },
+    raw: {
+      simulated: true,
+      ...(context.tenantId ? { tenant_id: context.tenantId } : {}),
+      ...(context.venueId ? { venue_id: context.venueId } : {}),
+    },
   }));
 }
 

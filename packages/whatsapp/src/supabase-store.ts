@@ -42,7 +42,10 @@ export interface SupabaseResult<T> {
 }
 
 export class SupabaseWhatsAppModuleStore implements WhatsAppModuleStore {
-  constructor(private readonly client: SupabaseWhatsAppClient) {}
+  constructor(
+    private readonly client: SupabaseWhatsAppClient,
+    private readonly options: { requireEncryptedCredentials?: boolean } = {},
+  ) {}
 
   async load() {
     const result = await this.client
@@ -55,6 +58,7 @@ export class SupabaseWhatsAppModuleStore implements WhatsAppModuleStore {
   }
 
   async save(record: WhatsAppEncryptedSessionRecord) {
+    assertSessionCredentialStorage(record.encrypted_credentials, this.options.requireEncryptedCredentials === true);
     const result = await this.client
       .from("platform_whatsapp_sessions")
       .upsert(sessionToRow(record), { onConflict: "id" });
@@ -224,6 +228,18 @@ export class SupabaseWhatsAppModuleStore implements WhatsAppModuleStore {
       .single();
     assertNoError(result);
     return messageFromRow(asRecord(result.data));
+  }
+}
+
+export function assertSessionCredentialStorage(payload: string | undefined, encryptionRequired: boolean) {
+  if (!encryptionRequired || !payload) return;
+  try {
+    const parsed = JSON.parse(payload) as unknown;
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed) && "auth_directory" in parsed) {
+      throw new Error("WhatsApp session credentials must be encrypted before persistence.");
+    }
+  } catch (error) {
+    if (error instanceof Error && error.message === "WhatsApp session credentials must be encrypted before persistence.") throw error;
   }
 }
 

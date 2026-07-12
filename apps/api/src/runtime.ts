@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import {
   loadPlatformRuntimeConfigFromEnv,
@@ -8,9 +9,11 @@ import {
 import type { MetadataRecord } from "@reservation-platform/contract-types";
 import {
   createReservation,
+  confirmConversationBooking,
   createAgentConversationResponder,
   createDeterministicConversationResponder,
   getPlatformService,
+  handleConversationInbound,
   InMemoryConversationBookingStateStore,
   listAvailability,
   listExperienceKnowledge,
@@ -396,7 +399,7 @@ export function standaloneWhatsAppDependenciesFromEnv(
   env: StandaloneSupabaseEnv = process.env,
   options: StandaloneSupabaseRuntimeOptions = {},
   config?: Required<StandaloneSupabaseConfig>,
-  platformDependencies: Pick<StandaloneApiDependencies, "availabilityRepository" | "catalogRepository" | "reservationCreateRepository"> = {},
+  platformDependencies: Pick<StandaloneApiDependencies, "availabilityRepository" | "catalogRepository" | "reservationCreateRepository" | "conversationOrchestrator"> = {},
 ): Pick<StandaloneApiDependencies, "whatsappModule"> {
   const platformConfig = options.platformConfig;
   const whatsappConfig = platformConfig?.modules.whatsapp;
@@ -422,7 +425,7 @@ export function standaloneWhatsAppDependenciesFromEnv(
         config.supabaseUrl,
         config.supabaseServiceRoleKey,
         standaloneSupabaseClientOptions,
-      ) as unknown as SupabaseWhatsAppClient)
+      ) as unknown as SupabaseWhatsAppClient, { requireEncryptedCredentials: Boolean(sessionEncryptionKey?.trim()) })
     : new InMemoryWhatsAppModuleStore();
   let service: ReturnType<typeof createWhatsAppBusinessModuleFromEnv>;
   const sessionAdapter = provider === "meta_cloud"
@@ -454,6 +457,9 @@ export function standaloneWhatsAppDependenciesFromEnv(
   const staffTakeoverEnabled = platformConfig
     ? whatsappConfig?.automation.staffTakeover.enabled !== false
     : true;
+  const unifiedConversations = platformDependencies.conversationOrchestrator
+    ? createWhatsAppUnifiedConversationBridge(store, platformDependencies.conversationOrchestrator)
+    : undefined;
   service = createWhatsAppBusinessModuleFromEnv({
     ...env,
     RESERVATION_WHATSAPP_ENABLED: whatsappEnabled ? "true" : "false",
@@ -469,6 +475,7 @@ export function standaloneWhatsAppDependenciesFromEnv(
     automationEnabled: platformConfig ? whatsappConfig?.automation.enabled === true : true,
     sessionAdapter,
     store,
+    unifiedConversations,
   });
   if (sessionAdapter) {
     void service.restoreSessionConnection().catch((error) => {
@@ -576,6 +583,106 @@ function createWhatsAppReservationTools(input: {
       return result.body;
     },
   };
+}
+
+function createWhatsAppUnifiedConversationBridge(
+  store: WhatsAppModuleStore,
+  orchestrator: ConversationOrchestratorDependencies,
+) {
+  const pendingByThread = new Map<string, { conversationId: string; proposalId: string }>();
+  return {
+    async handleInbound(message: import("@reservation-platform/whatsapp").WhatsAppInboundMessage) {
+      const scope = await readWhatsAppConversationScope(store, message.raw);
+      const content = message.text?.trim() || "[Unsupported WhatsApp content]";
+      const participant = {
+        channelIdentifier: message.from.id,
+        identifierHash: createHash("sha256").update(message.from.id).digest("hex"),
+        displayName: message.from.displayName,
+        contactHint: contactHint(message.from.phoneNumber ?? message.from.id),
+      };
+      const pending = pendingByThread.get(message.from.id);
+      if (pending && /^(confirm|yes|confirm booking)$/iu.test(content)) {
+        const conversation = await orchestrator.conversations.getOrCreate(scope, {
+          channel: "whatsapp",
+          channelThreadId: message.from.id,
+          participant,
+        });
+        if (conversation.error || !conversation.data) throw new Error("WhatsApp conversation is unavailable.");
+        const inbound = await orchestrator.conversations.append(scope, conversation.data.conversation_id, {
+          channel: "whatsapp",
+          direction: "inbound",
+          senderType: "customer",
+          deliveryState: "delivered",
+          externalMessageId: message.messageId,
+          content,
+          metadata: { provider: message.provider, explicit_confirmation: true },
+        });
+        if (inbound.error) throw new Error("WhatsApp confirmation could not be recorded.");
+        const result = await confirmConversationBooking({
+          scope,
+          conversationId: pending.conversationId,
+          proposalId: pending.proposalId,
+          dependencies: orchestrator,
+        });
+        if ("error" in result.body) {
+          if (result.body.error.code === "conflict" && result.body.error.message.includes("Staff")) {
+            return { conversation_id: pending.conversationId, content: "", automation_suppressed: true };
+          }
+          throw new Error(result.body.error.message);
+        }
+        pendingByThread.delete(message.from.id);
+        return unifiedWhatsAppResult(result.body);
+      }
+
+      const result = await handleConversationInbound({
+        scope,
+        message: {
+          channel: "whatsapp",
+          channelThreadId: message.from.id,
+          externalMessageId: message.messageId,
+          content,
+          participant,
+        },
+        dependencies: orchestrator,
+      });
+      if ("error" in result.body) throw new Error(result.body.error.message);
+      if (result.body.proposal) {
+        pendingByThread.set(message.from.id, {
+          conversationId: result.body.conversation.conversation_id,
+          proposalId: result.body.proposal.proposalId,
+        });
+      }
+      return unifiedWhatsAppResult(result.body);
+    },
+  };
+}
+
+function unifiedWhatsAppResult(body: Exclude<Awaited<ReturnType<typeof handleConversationInbound>>["body"], { error: unknown }>) {
+  return {
+    conversation_id: body.conversation.conversation_id,
+    content: body.message?.direction === "outbound" ? body.message.content : "",
+    ...(body.automation_suppressed ? { automation_suppressed: true } : {}),
+    metadata: {
+      unified_conversation: true,
+      ...(body.proposal ? { proposal_id: body.proposal.proposalId } : {}),
+      ...(body.reservation ? { reservation_id: body.reservation.reservation_id } : {}),
+    },
+  };
+}
+
+async function readWhatsAppConversationScope(store: WhatsAppModuleStore, messageMetadata?: MetadataRecord): Promise<ExperienceScope> {
+  const session = await store.load();
+  const tenant = session?.metadata?.tenant_id ?? messageMetadata?.tenant_id;
+  const venue = session?.metadata?.venue_id ?? messageMetadata?.venue_id;
+  const tenantId = typeof tenant === "string" ? tenant.trim() : "";
+  const venueId = typeof venue === "string" ? venue.trim() : "";
+  if (!tenantId || !venueId) throw new Error("WhatsApp session tenant and venue scope are required.");
+  return { tenantId, venueId };
+}
+
+function contactHint(value: string) {
+  const normalized = value.replace(/@.*$/u, "").replace(/\s+/gu, "");
+  return normalized.length > 4 ? `***${normalized.slice(-4)}` : "***";
 }
 
 async function updateWhatsAppSessionConnectionStatus(

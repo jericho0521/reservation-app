@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { generateKeyPairSync, sign } from "node:crypto";
 import test from "node:test";
+import { InMemoryConversationBookingStateStore, type ConversationOrchestratorDependencies, type ConversationRepository } from "@reservation-platform/api";
 
 import { createStandaloneApiHandler } from "./routes.js";
 import type { StandaloneApiDependencies } from "./routes.js";
@@ -8,6 +9,7 @@ import {
   createStandaloneSupabaseDependencies,
   createStandaloneSupabaseDependenciesFromEnv,
   StandaloneSupabaseConfigError,
+  standaloneWhatsAppDependenciesFromEnv,
   type StandaloneSupabaseClient,
   type StandaloneSupabaseClientFactory,
   type StandaloneSupabasePublicAdminClients,
@@ -98,6 +100,45 @@ test("standalone Supabase env factory wires WhatsApp memory store only with expl
     "default_service_id",
     "whatsapp_connected",
   ]);
+});
+
+test("WhatsApp runtime bridge routes scoped inbound messages through unified conversations", async () => {
+  const observed: unknown[] = [];
+  const conversation = {
+    conversation_id: "conversation_1", tenant_id: "tenant_1", venue_id: "venue_1", channel: "whatsapp" as const,
+    status: "active" as const, automation_state: "automated" as const, created_at: "now", updated_at: "now",
+  };
+  const conversations: ConversationRepository = {
+    list: async () => ({ data: [conversation] }),
+    get: async () => ({ data: conversation }),
+    getOrCreate: async (scope, input) => { observed.push({ scope, input }); return { data: conversation }; },
+    listMessages: async () => ({ data: [] }),
+    append: async (_scope, id, input) => ({ data: {
+      message_id: `message_${input.direction}`, conversation_id: id, channel: input.channel, direction: input.direction,
+      sender_type: input.senderType, delivery_state: input.deliveryState ?? "sent", content: input.content, created_at: "now",
+    } }),
+    updateAutomation: async () => ({ data: conversation }),
+  };
+  const orchestrator: ConversationOrchestratorDependencies = {
+    conversations,
+    state: new InMemoryConversationBookingStateStore(),
+    responder: { respond: async () => ({ content: "Unified WhatsApp reply", supported: true }) },
+    tools: { getService: async () => undefined, checkAvailability: async () => ({ slots: [] }), createReservation: async () => { throw new Error("not called"); } },
+    loadExperience: async () => ({ businessName: "Apex", knowledge: [], services: [] }),
+  };
+  const dependencies = standaloneWhatsAppDependenciesFromEnv({
+    RESERVATION_WHATSAPP_ENABLED: "true",
+    RESERVATION_WHATSAPP_PROVIDER: "meta_cloud",
+    RESERVATION_WHATSAPP_ALLOW_MEMORY_STORE: "true",
+    RESERVATION_WHATSAPP_SIMULATION_ENABLED: "true",
+  }, {}, undefined, { conversationOrchestrator: orchestrator });
+  const result = await dependencies.whatsappModule?.handleInboundMessage({
+    provider: "meta_cloud", messageId: "wamid_1", from: { id: "60123@s.whatsapp.net", phoneNumber: "60123" }, text: "Hello",
+    raw: { tenant_id: "tenant_1", venue_id: "venue_1" },
+  }) as { content?: string; conversation_id?: string };
+  assert.equal(result.content, "Unified WhatsApp reply");
+  assert.equal(result.conversation_id, "conversation_1");
+  assert.deepEqual((observed[0] as { scope: unknown }).scope, { tenantId: "tenant_1", venueId: "venue_1" });
 });
 
 test("standalone Supabase env factory wires manifest-enabled WhatsApp without legacy enable env", async () => {

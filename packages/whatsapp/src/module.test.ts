@@ -223,3 +223,27 @@ test("staff replies send outbound and switch conversation to manual", async () =
     text: "A staff member will help you now.",
   });
 });
+
+test("unified conversation bridge owns inbound persistence, replies, and takeover suppression", async () => {
+  const bridged: string[] = [];
+  const sent: string[] = [];
+  let manual = false;
+  const module = new WhatsAppBusinessModule({
+    enabled: true,
+    unifiedConversations: {
+      async handleInbound(input) {
+        bridged.push(input.messageId);
+        return { conversation_id: "unified_1", content: manual ? "" : "Unified reply", automation_suppressed: manual };
+      },
+    },
+    sessionAdapter: { async sendMessage(input) { sent.push(input.text); } },
+  });
+  const message = { provider: "session_qr" as const, messageId: "wamid_unified_1", from: { id: "60123@s.whatsapp.net" }, text: "hello" };
+  const automated = await module.handleInboundMessage(message);
+  manual = true;
+  const suppressed = await module.handleInboundMessage({ ...message, messageId: "wamid_unified_2", text: undefined });
+  assert.equal(automated.conversation_id, "unified_1");
+  assert.equal(suppressed.automation_suppressed, true);
+  assert.deepEqual(bridged, ["wamid_unified_1", "wamid_unified_2"]);
+  assert.deepEqual(sent, ["Unified reply"]);
+});

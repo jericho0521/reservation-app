@@ -738,14 +738,16 @@ At this first candidate gate, live database E2E reset, responsive/keyboard walkt
 
 ### Release-candidate walkthrough evidence — 2026-07-13
 
-Verified code revision: `407ac5556c46738a193be1edfe41110f641ddee4`.
+Verified code revision: `d3f3d3e6d934dd8f282b83c56463a5bcebddbc8c`.
 
 - Applied all 20 core migrations to a disposable PostgreSQL 16 database, reset it with `demo:reset`, and verified exactly three published flagship businesses with `demo:verify`.
 - Ran the 26-test E2E suite from that fresh database: 24 passed and the two optional hosted-page probes skipped because deployed URLs were not configured.
 - Exercised the owner overview, Experience Studio draft/preview/publish flow, public racing booking and management link, simulated WhatsApp proposal/confirmation, unified staff takeover/reply/resume, maintenance-aware availability, and analytics against the database-backed local runtime.
 - Walked every owner route at 375px, 768px, and 1440px with no page-level horizontal overflow; inspected the public booking, chat, and management journeys at mobile and desktop widths.
 - Verified visible keyboard focus, the skip link, primary headings, and control labels. The audit found and fixed the booking date label, local-calendar defaults, public booking page heading, disabled WhatsApp setup state, Studio completion state, analytics date range, local CORS coverage, and conversational resource assignment.
+- Backup-recording preflight found and fixed the missing appointments development origin, stale `Phase 1 · Read only` Studio badge, and an SVG title hydration mismatch that exposed the Next.js issue overlay on Analytics.
 - The clean release gate passed: frozen install, build, package tests, root tests, authenticated smoke tests (3/3), E2E, package boundaries, migration bundle verification, deployment verification, database reset, and readiness verification.
+- A 69-second, 1440×900 H.264 fallback candidate was generated from seven deterministic, viewport-only states. Full decode and OCR sensitive-pattern scans passed; the file remains outside approved assets until reviewer sign-off.
 - The deployment verifier had no hosted environment values, so its live deployment probe remains skipped; source, bundle, Docker, and secret/QR logging checks passed.
 
 Remaining unchecked items require a deployed environment or human presentation/release sign-off: deployed-URL browser walkthrough, three timed spoken rehearsals, backup recording approval, 48-hour feature freeze, screenshot approval, and release tag selection. The earlier 2026-07-12 note is retained as historical evidence of the first candidate gate.
@@ -841,4 +843,4 @@ Update this table at each weekly gate.
 | 3. Customer Experiences | 2026-08-02 | Complete | React 14, UI 18, root E2E 15 passed with 2 documented optional live-URL skips; booking production build and package/frontend boundaries passed. Flagship builds and focused API, database, SDK, Supabase, security-token, concurrency, and all-eight-preset proofs also passed. | None |
 | 4. Omnichannel AI | 2026-08-09 | Complete | Chat core 38, AI chat 21, WhatsApp 29, standalone API 135, SDK 25, contract types 23, and console 12 passed; console production build passed. Root smoke command passed with 3 documented live-backend skips to be exercised in Phase 6. | None |
 | 5. Operations and Analytics | 2026-08-16 | Complete | Supabase adapter 56, SDK 27, standalone API 137, console 23, and console production build passed; migration bundle verified with 20 ordered core migrations and 18 inventoried SQL assets. | None |
-| 6. Hardening and Presentation | 2026-08-23 | Engineering complete; presentation sign-off pending | Clean source and database-backed release gates passed at `407ac55`; 24/24 runnable E2E tests, 3/3 authenticated smoke tests, responsive/keyboard local walkthrough, security/deployment verification, and deterministic three-business reset verified. | None; deployed walkthrough, rehearsals, backup recording, freeze, and release tag remain operational sign-offs. |
+| 6. Hardening and Presentation | 2026-08-23 | Engineering complete; presentation sign-off pending | Clean source and database-backed release gates passed at `d3f3d3e`; 24/24 runnable E2E tests, 3/3 authenticated smoke tests, responsive/keyboard local walkthrough, security/deployment verification, deterministic three-business reset, and a scanned fallback recording candidate verified. | None; deployed walkthrough, rehearsals, recording approval, freeze, and release tag remain operational sign-offs. |

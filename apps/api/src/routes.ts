@@ -536,42 +536,30 @@ function normalizeStandaloneApiAuthConfig(
   };
 }
 
+type RouteMatcher = string | RegExp | ((path: string) => boolean);
+
+const protectedRouteMetadata: Readonly<Record<string, readonly RouteMatcher[]>> = {
+  GET: [
+    "/v1/availability", "/v1/reservations", reservationPattern,
+    "/v1/resource-maintenance", "/v1/venues", venuePattern,
+    "/v1/services", servicePattern, "/v1/resources", resourcePattern,
+    resourceLayoutPattern, isWhatsAppOwnerRoute,
+  ],
+  POST: [
+    "/v1/reservations", reservationCancelPattern, reservationReschedulePattern,
+    "/v1/resource-maintenance", resourceMaintenanceEndPattern,
+    isChatReservationSessionRoute, isWhatsAppOwnerRoute,
+  ],
+  PATCH: [reservationPattern, isWhatsAppOwnerRoute],
+  DELETE: [isWhatsAppOwnerRoute],
+};
+
 function isProtectedPlatformDataRoute(method: string, path: string) {
-  if (method === "GET") {
-    return path === "/v1/availability"
-      || path === "/v1/reservations"
-      || reservationPattern.test(path)
-      || path === "/v1/resource-maintenance"
-      || path === "/v1/venues"
-      || venuePattern.test(path)
-      || path === "/v1/services"
-      || servicePattern.test(path)
-      || path === "/v1/resources"
-      || resourcePattern.test(path)
-      || resourceLayoutPattern.test(path)
-      || isWhatsAppOwnerRoute(path);
-  }
-
-  if (method === "POST") {
-    return path === "/v1/reservations"
-      || reservationCancelPattern.test(path)
-      || reservationReschedulePattern.test(path)
-      || path === "/v1/resource-maintenance"
-      || resourceMaintenanceEndPattern.test(path)
-      || isChatReservationSessionRoute(path)
-      || isWhatsAppOwnerRoute(path);
-  }
-
-  if (method === "PATCH") {
-    return reservationPattern.test(path)
-      || isWhatsAppOwnerRoute(path);
-  }
-
-  if (method === "DELETE") {
-    return isWhatsAppOwnerRoute(path);
-  }
-
-  return false;
+  return (protectedRouteMetadata[method] ?? []).some((matcher) => {
+    if (typeof matcher === "string") return matcher === path;
+    if (typeof matcher === "function") return matcher(path);
+    return matcher.test(path);
+  });
 }
 
 function isWhatsAppOwnerRoute(path: string) {

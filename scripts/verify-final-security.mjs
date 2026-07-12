@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const forbiddenClientNames = ["RESERVATION_SUPABASE_SERVICE_ROLE_KEY", "RESERVATION_PLATFORM_SERVICE_API_KEY", "RESERVATION_WHATSAPP_SESSION_ENCRYPTION_KEY", "encrypted_credentials"];
+const scannerFixtureFiles = new Set(["scripts/verify-final-security.mjs", "scripts/verify-final-security.test.mjs"]);
 
 export function securityFindingsForText(file, source) {
   const findings = [];
@@ -21,7 +22,7 @@ export function verifyFinalSecurity() {
   if (listed.status !== 0) throw new Error("Unable to enumerate tracked files for security review.");
   const findings = [];
   for (const file of listed.stdout.split("\0").filter(Boolean)) {
-    if (!/\.(?:ts|tsx|js|mjs|json|md|html)$/u.test(file)) continue;
+    if (scannerFixtureFiles.has(file) || !/\.(?:ts|tsx|js|mjs|json|md|html)$/u.test(file)) continue;
     findings.push(...securityFindingsForText(file, readFileSync(path.join(repoRoot, file), "utf8")));
   }
   for (const directory of ["apps/booking/.next/static", "apps/console/.next/static"]) {

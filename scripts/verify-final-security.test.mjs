@@ -10,3 +10,8 @@ test("security scan rejects secrets in client modules and QR logging", () => {
 test("security scan permits server-only environment-name validation without values", () => {
   assert.deepEqual(securityFindingsForText("server.ts", 'const required = "RESERVATION_PLATFORM_SERVICE_API_KEY";'), []);
 });
+
+test("repository security verification does not scan its own detection fixtures", async () => {
+  const { verifyFinalSecurity } = await import("./verify-final-security.mjs");
+  assert.doesNotThrow(() => verifyFinalSecurity());
+});

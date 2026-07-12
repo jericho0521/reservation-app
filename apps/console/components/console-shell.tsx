@@ -1,8 +1,6 @@
 import type { ReactNode } from "react";
 
-const futureSections = [
-  "Analytics",
-];
+const futureSections: string[] = [];
 
 export function ConsoleShell({ children }: { children: ReactNode }) {
   return (
@@ -22,6 +20,7 @@ export function ConsoleShell({ children }: { children: ReactNode }) {
           <a href="/reservations">Reservations</a>
           <a href="/resources">Resources & maintenance</a>
           <a href="/channels">Channels & AI</a>
+          <a href="/analytics">Analytics</a>
           {futureSections.map((section) => (
             <span aria-disabled="true" className="nav-disabled" key={section}>
               {section}

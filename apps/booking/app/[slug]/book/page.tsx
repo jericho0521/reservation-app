@@ -15,6 +15,11 @@ export default async function BookPage({ params }: { params: Promise<{ slug: str
   return <ExperienceTheme branding={configuration.branding}>
     <nav className="public-nav"><Link className="public-brand" href={`/${profile.public_slug}`}>← {configuration.branding.brand_name}</Link></nav>
     <main className="booking-journey-shell">
+      <header className="booking-page-header">
+        <span className="experience-eyebrow">Live booking</span>
+        <h1>Book {configuration.branding.brand_name}</h1>
+        <p>Choose an experience, check live availability, and review the details before confirming.</p>
+      </header>
       <PublicBookingJourney
         baseUrl={baseUrl}
         slug={profile.public_slug}

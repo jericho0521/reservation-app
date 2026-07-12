@@ -33,6 +33,9 @@ button, a { font: inherit; }
 .experience-proof strong { display: block; margin-top: .35rem; }
 .booking-placeholder { max-width: 48rem; margin: 4rem auto; padding: clamp(1.5rem, 5vw, 3rem); border: 1px solid #d8d7d2; border-radius: 1.5rem; background: rgba(255,255,255,.78); box-shadow: 0 2rem 5rem rgba(20,20,15,.08); }
 .booking-journey-shell { width: min(68rem, calc(100% - 2rem)); margin: 2rem auto 0; padding-bottom: 5rem; }
+.booking-page-header { max-width: 48rem; margin-bottom: 2rem; }
+.booking-page-header h1 { margin: 1rem 0 .5rem; font-size: clamp(2.4rem, 7vw, 4.5rem); line-height: 1; letter-spacing: -.055em; }
+.booking-page-header p { margin: 0; color: #5c6168; line-height: 1.6; }
 .chat-shell { width: min(52rem, calc(100% - 2rem)); margin: 1rem auto 0; padding-bottom: 5rem; }
 .booking-placeholder h1 { margin: 0 0 .75rem; font-size: clamp(2rem, 6vw, 4rem); letter-spacing: -.04em; }
 .booking-placeholder p { color: #5c6168; line-height: 1.6; }

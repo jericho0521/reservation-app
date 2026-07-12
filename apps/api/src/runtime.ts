@@ -32,6 +32,7 @@ import {
   createSupabaseExperienceKnowledgeRepository,
   createSupabaseIdempotencyRepository,
   createSupabaseOperatingHoursRepository,
+  createSupabaseOperationsOverviewRepository,
   createSupabasePlatformCatalogRepository,
   createSupabaseReservationMutationRepository,
   createSupabaseReservationManagementRepository,
@@ -43,6 +44,7 @@ import {
   type ExperienceKnowledgeSupabaseClient,
   type ReservationManagementSupabaseClient,
   type ConversationSupabaseClient,
+  type OperationsOverviewSupabaseClient,
 } from "@project-play/reservations-supabase";
 import {
   BaileysWhatsAppSessionAdapter,
@@ -166,6 +168,7 @@ export interface StandaloneSupabaseRepositoryFactories {
   createExperienceStudioRepository(client: StandaloneSupabaseClient): NonNullable<StandaloneApiDependencies["experienceStudioRepository"]>;
   createExperienceKnowledgeRepository(client: StandaloneSupabaseClient): NonNullable<StandaloneApiDependencies["experienceKnowledgeRepository"]>;
   createOperatingHoursRepository(client: StandaloneSupabaseClient): NonNullable<StandaloneApiDependencies["operatingHoursRepository"]>;
+  createOperationsOverviewRepository(client: StandaloneSupabaseClient): NonNullable<StandaloneApiDependencies["operationsOverviewRepository"]>;
   createTenantVenueRepository(client: StandaloneSupabaseClient): NonNullable<StandaloneApiDependencies["tenantVenueRepository"]>;
 }
 
@@ -220,6 +223,7 @@ const defaultRepositoryFactories: StandaloneSupabaseRepositoryFactories = {
     if (!client.rpc) throw new Error("Supabase client does not support RPC calls");
     return createSupabaseOperatingHoursRepository({ rpc: client.rpc.bind(client) });
   },
+  createOperationsOverviewRepository: (client) => createSupabaseOperationsOverviewRepository(client as unknown as OperationsOverviewSupabaseClient),
   createTenantVenueRepository: createSupabaseTenantVenueRepository,
 };
 
@@ -263,6 +267,7 @@ export function createStandaloneSupabaseDependencies(
         experienceStudioRepository: repositoryFactories.createExperienceStudioRepository(adminClient),
         experienceKnowledgeRepository: repositoryFactories.createExperienceKnowledgeRepository(adminClient),
         operatingHoursRepository: repositoryFactories.createOperatingHoursRepository(adminClient),
+        operationsOverviewRepository: repositoryFactories.createOperationsOverviewRepository(adminClient),
         tenantVenueRepository: repositoryFactories.createTenantVenueRepository(adminClient),
       }
     : {};

@@ -365,6 +365,7 @@ test("standalone Supabase runtime wires public and admin clients to repository f
     { name: "createExperienceStudioRepository", adminClient: clients[1] },
     { name: "createExperienceKnowledgeRepository", adminClient: clients[1] },
     { name: "createOperatingHoursRepository", adminClient: clients[1] },
+    { name: "createOperationsOverviewRepository", adminClient: clients[1] },
     { name: "createTenantVenueRepository", adminClient: clients[1] },
   ]);
 
@@ -381,6 +382,7 @@ test("standalone Supabase runtime wires public and admin clients to repository f
   assert.equal(Boolean(dependencies.experienceStudioRepository), true);
   assert.equal(Boolean(dependencies.experienceKnowledgeRepository), true);
   assert.equal(Boolean(dependencies.operatingHoursRepository), true);
+  assert.equal(Boolean(dependencies.operationsOverviewRepository), true);
   assert.equal(Boolean(dependencies.tenantVenueRepository), true);
 });
 
@@ -542,6 +544,10 @@ function recordingRepositoryFactories(
     createOperatingHoursRepository(client) {
       recordAdminFactoryCall(calls, "createOperatingHoursRepository", client);
       return repository as NonNullable<StandaloneApiDependencies["operatingHoursRepository"]>;
+    },
+    createOperationsOverviewRepository(client) {
+      recordAdminFactoryCall(calls, "createOperationsOverviewRepository", client);
+      return repository as NonNullable<StandaloneApiDependencies["operationsOverviewRepository"]>;
     },
     createTenantVenueRepository(client) {
       recordAdminFactoryCall(calls, "createTenantVenueRepository", client);

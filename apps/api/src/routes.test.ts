@@ -37,6 +37,7 @@ import type {
   ConversationRepository,
   ConversationOrchestratorDependencies,
   OperatingHoursRepository,
+  OperationsOverviewRepository,
   PlatformCatalogRepository,
   PlatformTenantVenueRepository,
   ReservationCreateRepositoryPort,
@@ -559,6 +560,27 @@ test("experience channel route separates desired settings from readiness", async
     web_chat: { desired_enabled: true, configured: false, ready: false, state: "not_configured", message: "Configure the AI chat module." },
     whatsapp: { desired_enabled: true, configured: false, ready: false, state: "not_configured", message: "Configure the WhatsApp module." },
   });
+});
+
+test("operations overview route preserves owner scope and merges channel readiness", async () => {
+  let observed: unknown;
+  const operationsOverviewRepository: OperationsOverviewRepository = {
+    async read(scope, now) {
+      observed = { scope, validNow: !Number.isNaN(now.valueOf()) };
+      return { data: {
+        generated_at: now.toISOString(), timezone: "Asia/Kuala_Lumpur", local_date: "2026-08-05",
+        reservations: { today: 0, pending: 0, confirmed: 0, completed: 0, cancelled: 0, timeline: [] },
+        resources: { total: 0, available: 0, maintenance: 0 }, conversations: { open: 0, staff_takeover: 0 },
+      } };
+    },
+  };
+  const response = await handleStandaloneApiRequest({
+    method: "GET", path: "/v1/operations/overview",
+    headers: { authorization: "Bearer secret", "x-reservation-tenant-id": "tenant_1", "x-reservation-venue-id": "venue_1" },
+  }, { serviceApiKey: "secret", operationsOverviewRepository, experienceStudioRepository: fakeExperienceRepository() });
+  assert.equal(response.status, 200);
+  assert.deepEqual(observed, { scope: { tenantId: "tenant_1", venueId: "venue_1" }, validNow: true });
+  assert.equal((response.body as { channel_readiness: { web_booking: { desired_enabled: boolean } } }).channel_readiness.web_booking.desired_enabled, true);
 });
 
 test("conversation owner routes preserve scope, filters, chronology, replies, and takeover", async () => {

@@ -323,6 +323,41 @@ export const experienceChannelSettingsResponseSchema = strictObject({
   }),
 });
 
+export const operationsReservationChannelSchema = z.enum(["web_booking", "web_chat", "whatsapp", "simulation"]);
+export const operationsTimelineReservationSchema = strictObject({
+  reservation_id: z.string(),
+  service_name: z.string(),
+  customer_name: z.string(),
+  start_time: z.string(),
+  end_time: z.string(),
+  quantity: z.number().int().nonnegative(),
+  status: z.string(),
+  channel: operationsReservationChannelSchema,
+});
+const boundedCountSchema = z.number().int().nonnegative();
+export const operationsOverviewDataSchema = strictObject({
+  generated_at: z.string(),
+  timezone: z.string().min(1),
+  local_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  reservations: strictObject({
+    today: boundedCountSchema,
+    pending: boundedCountSchema,
+    confirmed: boundedCountSchema,
+    completed: boundedCountSchema,
+    cancelled: boundedCountSchema,
+    timeline: z.array(operationsTimelineReservationSchema).max(20),
+  }),
+  resources: strictObject({ total: boundedCountSchema, available: boundedCountSchema, maintenance: boundedCountSchema }),
+  conversations: strictObject({ open: boundedCountSchema, staff_takeover: boundedCountSchema }),
+});
+export const operationsOverviewResponseSchema = operationsOverviewDataSchema.extend({
+  channel_readiness: strictObject({
+    web_booking: experienceChannelReadinessSchema,
+    web_chat: experienceChannelReadinessSchema,
+    whatsapp: experienceChannelReadinessSchema,
+  }),
+});
+
 export const conversationChannelSchema = z.enum(["web_chat", "whatsapp", "simulation"]);
 export const conversationAutomationStateSchema = z.enum(["automated", "manual"]);
 export const conversationDeliveryStateSchema = z.enum(["pending", "sent", "delivered", "failed"]);

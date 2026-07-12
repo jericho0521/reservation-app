@@ -42,6 +42,7 @@ import {
   publishExperienceDraft,
   readExperienceOperatingHours,
   readExperienceChannelSettings,
+  readOperationsOverview,
   readExperienceWorkspace,
   readConversation,
   readPublicExperience,
@@ -69,6 +70,7 @@ import {
   type ConversationRepository,
   type ConversationOrchestratorDependencies,
   type OperatingHoursRepository,
+  type OperationsOverviewRepository,
   type PlatformCatalogRepository,
   type PlatformRequestContext,
   type PlatformTenantVenueRepository,
@@ -96,6 +98,7 @@ import {
   type ChatConfirmReservationInput,
   type ChatCreateReservationSessionInput,
   type ChatMessageInput,
+  type ExperienceChannelSettingsResponse,
   type JsonValue,
   type ListConversationsQuery,
   type ListServicesResponse,
@@ -131,6 +134,7 @@ export interface StandaloneApiDependencies {
   experienceStudioRepository?: ExperienceStudioRepository;
   experienceKnowledgeRepository?: ExperienceKnowledgeRepository;
   operatingHoursRepository?: OperatingHoursRepository;
+  operationsOverviewRepository?: OperationsOverviewRepository;
   reservationCreateRepository?: ReservationCreateRepositoryPort;
   reservationMutationRepository?: ReservationMutationRepositoryPort;
   reservationManagementRepository?: ReservationManagementRepository;
@@ -433,6 +437,19 @@ export async function handleStandaloneApiRequest(
     const result = method === "GET"
       ? await readExperienceChannelSettings({ scope: scoped.scope, repository: dependencies.experienceStudioRepository, readiness })
       : await updateExperienceChannelSettings({ scope: scoped.scope, value: request.body, repository: dependencies.experienceStudioRepository, readiness });
+    return jsonResponse(result.status, result.body);
+  }
+  if (method === "GET" && path === "/v1/operations/overview") {
+    const scoped = readExperienceScope(request);
+    if (!scoped.ok) return scoped.response;
+    if (!dependencies.operationsOverviewRepository) return platformError(503, "bad_request", "Operations overview repository is not configured.");
+    const runtime = await readChannelRuntimeReadiness(dependencies);
+    let channelReadiness = channelReadinessForOperations(runtime);
+    if (dependencies.experienceStudioRepository) {
+      const settings = await readExperienceChannelSettings({ scope: scoped.scope, repository: dependencies.experienceStudioRepository, readiness: runtime });
+      if (settings.status === 200 && "readiness" in settings.body) channelReadiness = settings.body.readiness;
+    }
+    const result = await readOperationsOverview({ scope: scoped.scope, repository: dependencies.operationsOverviewRepository, channelReadiness });
     return jsonResponse(result.status, result.body);
   }
 
@@ -849,6 +866,7 @@ const protectedRouteMetadata: Readonly<Record<string, readonly RouteMatcher[]>> 
     "/v1/experience/presets", "/v1/experience/workspace", "/v1/experience/validation",
     "/v1/experience/services", "/v1/experience/resources", "/v1/experience/operating-hours",
     "/v1/experience/knowledge", "/v1/experience/channels",
+    "/v1/operations/overview",
     "/v1/availability", "/v1/reservations", reservationPattern,
     "/v1/conversations", conversationPattern, conversationMessagesPattern,
     "/v1/resource-maintenance", "/v1/venues", venuePattern,
@@ -917,6 +935,17 @@ async function readChannelRuntimeReadiness(
       message: whatsappMessage,
     },
   };
+}
+
+function channelReadinessForOperations(runtime: ExperienceChannelRuntimeReadiness): ExperienceChannelSettingsResponse["readiness"] {
+  const adapt = (value: { configured: boolean; ready: boolean; message?: string }) => ({
+    desired_enabled: true,
+    configured: value.configured,
+    ready: value.ready,
+    state: value.ready ? "ready" as const : value.configured ? "degraded" as const : "not_configured" as const,
+    ...(value.message ? { message: value.message } : {}),
+  });
+  return { web_booking: adapt(runtime.web_booking), web_chat: adapt(runtime.web_chat), whatsapp: adapt(runtime.whatsapp) };
 }
 
 async function handleExperienceWorkspaceReadRequest(

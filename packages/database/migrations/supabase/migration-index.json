@@ -157,6 +157,14 @@
       "scope": "reservation-platform",
       "sha256": "28766e690e7c3b37601c187f489d581b56ce440bd54df34b4652fb461c7719af",
       "bytes": 6841
+    },
+    {
+      "order": 20,
+      "path": "packages/database/migrations/supabase/000020_operations_analytics_rpc.sql",
+      "module": "core",
+      "scope": "reservation-platform",
+      "sha256": "5c61d12296d3e2350c65519d98222f7282ffbff886886d645986d3e094510dfe",
+      "bytes": 4406
     }
   ],
   "optionalMigrations": [

@@ -1613,6 +1613,182 @@
     "MetadataValue": {
       "$ref": "#/$defs/JsonPrimitive"
     },
+    "OperationsOverviewResponse": {
+      "additionalProperties": false,
+      "properties": {
+        "channel_readiness": {
+          "additionalProperties": false,
+          "properties": {
+            "web_booking": {
+              "$ref": "#/$defs/ExperienceChannelReadiness"
+            },
+            "web_chat": {
+              "$ref": "#/$defs/ExperienceChannelReadiness"
+            },
+            "whatsapp": {
+              "$ref": "#/$defs/ExperienceChannelReadiness"
+            }
+          },
+          "required": [
+            "web_booking",
+            "web_chat",
+            "whatsapp"
+          ],
+          "type": "object"
+        },
+        "conversations": {
+          "additionalProperties": false,
+          "properties": {
+            "open": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "staff_takeover": {
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "open",
+            "staff_takeover"
+          ],
+          "type": "object"
+        },
+        "generated_at": {
+          "type": "string"
+        },
+        "local_date": {
+          "type": "string"
+        },
+        "reservations": {
+          "additionalProperties": false,
+          "properties": {
+            "cancelled": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "completed": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "confirmed": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "pending": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "timeline": {
+              "items": {
+                "$ref": "#/$defs/OperationsTimelineReservation"
+              },
+              "maxItems": 20,
+              "type": "array"
+            },
+            "today": {
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "today",
+            "pending",
+            "confirmed",
+            "completed",
+            "cancelled",
+            "timeline"
+          ],
+          "type": "object"
+        },
+        "resources": {
+          "additionalProperties": false,
+          "properties": {
+            "available": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "maintenance": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "total": {
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "total",
+            "available",
+            "maintenance"
+          ],
+          "type": "object"
+        },
+        "timezone": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "generated_at",
+        "timezone",
+        "local_date",
+        "reservations",
+        "resources",
+        "conversations",
+        "channel_readiness"
+      ],
+      "type": "object"
+    },
+    "OperationsReservationChannel": {
+      "enum": [
+        "web_booking",
+        "web_chat",
+        "whatsapp",
+        "simulation"
+      ],
+      "type": "string"
+    },
+    "OperationsTimelineReservation": {
+      "additionalProperties": false,
+      "properties": {
+        "channel": {
+          "$ref": "#/$defs/OperationsReservationChannel"
+        },
+        "customer_name": {
+          "type": "string"
+        },
+        "end_time": {
+          "type": "string"
+        },
+        "quantity": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "reservation_id": {
+          "type": "string"
+        },
+        "service_name": {
+          "type": "string"
+        },
+        "start_time": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "reservation_id",
+        "service_name",
+        "customer_name",
+        "start_time",
+        "end_time",
+        "quantity",
+        "status",
+        "channel"
+      ],
+      "type": "object"
+    },
     "PaymentReference": {
       "additionalProperties": false,
       "properties": {

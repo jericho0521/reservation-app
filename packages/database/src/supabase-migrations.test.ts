@@ -9,16 +9,25 @@ import {
 
 const indexPath = new URL("../migrations/supabase/migration-index.json", import.meta.url);
 
-test("core plan includes exactly 000001 through 000019 in order", async () => {
+test("core plan includes exactly 000001 through 000020 in order", async () => {
   const index = await readActualIndex();
   const plan = buildSupabaseMigrationPlan(index);
 
   assert.deepEqual(
     plan.migrations.map((entry) => entry.path.match(/\/(\d{6})_[^/]+\.sql$/)?.[1]),
-    Array.from({ length: 19 }, (_, index) => String(index + 1).padStart(6, "0")),
+    Array.from({ length: 20 }, (_, index) => String(index + 1).padStart(6, "0")),
   );
-  assert.equal(plan.migrations.length, 19);
+  assert.equal(plan.migrations.length, 20);
   assert.equal(plan.seeds.length, 0);
+});
+
+test("operations overview migration is venue scoped, timezone aware, and bounded", async () => {
+  const sql = (await readFile(new URL("../migrations/supabase/000020_operations_analytics_rpc.sql", import.meta.url), "utf8")).toLowerCase();
+  assert.match(sql, /create or replace function public\.read_platform_operations_overview/);
+  assert.match(sql, /venues\.tenant_id = p_tenant_id and venues\.id = p_venue_id/);
+  assert.match(sql, /p_now at time zone/);
+  assert.match(sql, /limit 20/);
+  assert.match(sql, /revoke all on function public\.read_platform_operations_overview/);
 });
 
 test("experience availability migration owns normalized rules and shared snapshot integration", async () => {
@@ -88,7 +97,7 @@ test("AI retrieval option appends optional AI retrieval migrations after core mi
   const plan = buildSupabaseMigrationPlan(index, { includeAiRetrieval: true });
 
   assert.deepEqual(
-    plan.migrations.slice(19).map((entry) => entry.path),
+    plan.migrations.slice(20).map((entry) => entry.path),
     [
       "packages/database/migrations/supabase/optional/ai-retrieval/000001_knowledge_chunks.sql",
       "packages/database/migrations/supabase/optional/ai-retrieval/000002_langchain_checkpoints.sql",

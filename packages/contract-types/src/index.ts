@@ -258,6 +258,39 @@ export interface ExperienceChannelSettingsResponse {
   };
 }
 
+export type OperationsReservationChannel = "web_booking" | "web_chat" | "whatsapp" | "simulation";
+
+export interface OperationsTimelineReservation {
+  reservation_id: string;
+  service_name: string;
+  customer_name: string;
+  start_time: string;
+  end_time: string;
+  quantity: number;
+  status: string;
+  channel: OperationsReservationChannel;
+}
+
+export interface OperationsOverviewData {
+  generated_at: string;
+  timezone: string;
+  local_date: string;
+  reservations: {
+    today: number;
+    pending: number;
+    confirmed: number;
+    completed: number;
+    cancelled: number;
+    timeline: OperationsTimelineReservation[];
+  };
+  resources: { total: number; available: number; maintenance: number };
+  conversations: { open: number; staff_takeover: number };
+}
+
+export interface OperationsOverviewResponse extends OperationsOverviewData {
+  channel_readiness: ExperienceChannelSettingsResponse["readiness"];
+}
+
 export type ConversationChannel = "web_chat" | "whatsapp" | "simulation";
 export type ConversationAutomationState = "automated" | "manual";
 export type ConversationDeliveryState = "pending" | "sent" | "delivered" | "failed";

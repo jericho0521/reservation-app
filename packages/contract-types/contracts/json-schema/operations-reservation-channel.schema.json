@@ -2436,8 +2436,8 @@
       "type": "object"
     }
   },
-  "$id": "https://reservation-platform.local/contracts/json-schema/experience-branding.schema.json",
-  "$ref": "#/$defs/ExperienceBranding",
+  "$id": "https://reservation-platform.local/contracts/json-schema/operations-reservation-channel.schema.json",
+  "$ref": "#/$defs/OperationsReservationChannel",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "ExperienceBranding"
+  "title": "OperationsReservationChannel"
 }

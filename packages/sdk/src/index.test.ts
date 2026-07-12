@@ -283,6 +283,16 @@ test("conversation SDK methods preserve scoped owner paths, filters, and bodies"
   assert.deepEqual(JSON.parse(String(requests[4]!.init?.body)), { automation_state: "manual" });
 });
 
+test("operations overview SDK uses the scoped owner endpoint", async () => {
+  const requests: string[] = [];
+  const client = createReservationPlatformClient({
+    baseUrl: "https://platform.example", tenantId: "tenant_1", venueId: "venue_1",
+    fetch: async (url) => { requests.push(String(url)); return jsonResponse({}); },
+  });
+  await client.getOperationsOverview();
+  assert.equal(new URL(requests[0]!).pathname, "/v1/operations/overview");
+});
+
 test("WhatsApp owner SDK methods keep readiness, QR, and simulation behind scoped authenticated routes", async () => {
   const requests: Array<{ url: string; init?: RequestInit }> = [];
   const client = createReservationPlatformClient({

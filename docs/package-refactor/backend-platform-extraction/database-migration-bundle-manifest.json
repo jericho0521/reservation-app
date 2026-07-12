@@ -221,6 +221,17 @@
       ]
     },
     {
+      "kind": "core-migration",
+      "order": 20,
+      "targetPath": "packages/database/migrations/supabase/000020_operations_analytics_rpc.sql",
+      "sourceAssets": [
+        {
+          "path": "packages/database/migrations/supabase/000020_operations_analytics_rpc.sql",
+          "section": "Venue-scoped timezone-aware command center summaries and descriptive analytics RPCs"
+        }
+      ]
+    },
+    {
       "kind": "optional-ai-retrieval",
       "targetPath": "packages/database/migrations/supabase/optional/ai-retrieval/000001_knowledge_chunks.sql",
       "sourceAssets": [

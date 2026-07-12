@@ -314,12 +314,12 @@ export function standaloneWhatsAppDependenciesFromEnv(
     ? undefined
     : new BaileysWhatsAppSessionAdapter({
         authDirectory: env.RESERVATION_WHATSAPP_SESSION_AUTH_DIR?.trim() || ".reservation-whatsapp-sessions",
+        sessionEncryptionKey,
         onInboundMessage: async (message) => {
           await service.handleInboundMessage(message);
         },
         onStatusChange: (status, metadata) => updateWhatsAppSessionConnectionStatus(store, status, metadata),
       });
-  void sessionEncryptionKey;
   const aiSettings = platformConfig?.modules.ai.enabled ? platformConfig.modules.ai : undefined;
   const agentRuntime = platformConfig
     ? createWhatsAppAgentRuntimeFromSettings(aiSettings, env, { fetch: options.fetch })

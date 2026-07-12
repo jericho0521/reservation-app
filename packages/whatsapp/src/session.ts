@@ -55,6 +55,7 @@ export interface WhatsAppSessionAdapter {
 export interface WhatsAppSessionRestoreAdapter {
   restore(input: {
     session_id: string;
+    encrypted_credentials?: string;
     metadata?: MetadataRecord;
   }): Promise<{
     status: Exclude<WhatsAppSessionStatus, "disabled">;
@@ -68,7 +69,7 @@ export interface WhatsAppSessionServiceOptions {
   enabled?: boolean;
   provider?: WhatsAppProviderMode;
   store?: WhatsAppSessionStore;
-  adapter?: WhatsAppSessionAdapter;
+  adapter?: WhatsAppSessionAdapter & Partial<WhatsAppSessionRestoreAdapter>;
   now?: () => Date;
 }
 
@@ -251,6 +252,7 @@ export class WhatsAppSessionService {
 
     const restored = await this.adapter.restore({
       session_id: record.session_id,
+      encrypted_credentials: record.encrypted_credentials,
       metadata: record.metadata,
     });
     const updated: WhatsAppEncryptedSessionRecord = {

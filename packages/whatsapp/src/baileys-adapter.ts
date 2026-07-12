@@ -3,6 +3,7 @@ import path from "node:path";
 
 import type { MetadataRecord } from "@reservation-platform/contract-types";
 
+import { decryptJson, encryptJson } from "./crypto.js";
 import type { WhatsAppInboundMessage, WhatsAppOutboundMessage } from "./messages.js";
 import type { WhatsAppSessionAdapter } from "./session.js";
 
@@ -11,8 +12,34 @@ export interface BaileysWhatsAppSessionAdapterOptions {
   qrTimeoutMs?: number;
   printQrInTerminal?: boolean;
   maxReconnectAttempts?: number;
+  sessionEncryptionKey?: string;
   onInboundMessage?: (message: WhatsAppInboundMessage) => void | Promise<void>;
   onStatusChange?: (status: "pending_qr" | "connected" | "disconnected" | "expired", metadata?: MetadataRecord) => void | Promise<void>;
+}
+
+export interface BaileysSessionCredentials {
+  auth_directory: string;
+}
+
+export function serializeBaileysSessionCredentials(authDirectory: string, encryptionKey?: string): string {
+  const credentials: BaileysSessionCredentials = { auth_directory: authDirectory };
+  return encryptionKey ? encryptJson(credentials, encryptionKey) : JSON.stringify(credentials);
+}
+
+export function deserializeBaileysSessionCredentials(
+  payload: string,
+  encryptionKey?: string,
+): BaileysSessionCredentials {
+  const credentials = encryptionKey ? decryptJson<unknown>(payload, encryptionKey) : JSON.parse(payload) as unknown;
+  if (
+    typeof credentials !== "object"
+    || credentials === null
+    || typeof (credentials as { auth_directory?: unknown }).auth_directory !== "string"
+    || !(credentials as { auth_directory: string }).auth_directory
+  ) {
+    throw new Error("WhatsApp session credentials are invalid.");
+  }
+  return credentials as BaileysSessionCredentials;
 }
 
 export class BaileysWhatsAppSessionAdapter implements WhatsAppSessionAdapter {
@@ -21,6 +48,7 @@ export class BaileysWhatsAppSessionAdapter implements WhatsAppSessionAdapter {
   private readonly qrTimeoutMs: number;
   private readonly printQrInTerminal: boolean;
   private readonly maxReconnectAttempts: number;
+  private readonly sessionEncryptionKey?: string;
   private readonly onInboundMessage?: BaileysWhatsAppSessionAdapterOptions["onInboundMessage"];
   private readonly onStatusChange?: BaileysWhatsAppSessionAdapterOptions["onStatusChange"];
 
@@ -29,6 +57,7 @@ export class BaileysWhatsAppSessionAdapter implements WhatsAppSessionAdapter {
     this.qrTimeoutMs = options.qrTimeoutMs ?? 60_000;
     this.printQrInTerminal = options.printQrInTerminal ?? true;
     this.maxReconnectAttempts = options.maxReconnectAttempts ?? 5;
+    this.sessionEncryptionKey = options.sessionEncryptionKey?.trim() || undefined;
     this.onInboundMessage = options.onInboundMessage;
     this.onStatusChange = options.onStatusChange;
   }
@@ -74,13 +103,12 @@ export class BaileysWhatsAppSessionAdapter implements WhatsAppSessionAdapter {
               console.log("");
               console.log("WhatsApp login QR is ready.");
               console.log("Scan the QR above in WhatsApp: Settings > Linked devices > Link a device.");
-              console.log(`QR payload: ${update.qr}`);
               console.log("");
             }
             await this.emitStatusChange("pending_qr", { session_id: input.session_id });
             resolve({
               qr_code: update.qr,
-              encrypted_credentials: JSON.stringify({ auth_directory: sessionDirectory }),
+              encrypted_credentials: serializeBaileysSessionCredentials(sessionDirectory, this.sessionEncryptionKey),
               metadata: {
                 adapter: "baileys",
                 auth_directory: sessionDirectory,
@@ -145,14 +173,16 @@ export class BaileysWhatsAppSessionAdapter implements WhatsAppSessionAdapter {
     });
   }
 
-  async restore(input: { session_id: string; metadata?: MetadataRecord }) {
+  async restore(input: { session_id: string; encrypted_credentials?: string; metadata?: MetadataRecord }) {
     const baileys = await import("@whiskeysockets/baileys");
     const makeWASocket = (baileys.default ?? baileys.makeWASocket) as unknown as (options: Record<string, unknown>) => BaileysSocket;
     const useMultiFileAuthState = baileys.useMultiFileAuthState as unknown as (
       folder: string,
     ) => Promise<{ state: unknown; saveCreds: () => Promise<void> }>;
 
-    const sessionDirectory = path.join(this.authDirectory, input.session_id);
+    const sessionDirectory = input.encrypted_credentials
+      ? deserializeBaileysSessionCredentials(input.encrypted_credentials, this.sessionEncryptionKey).auth_directory
+      : path.join(this.authDirectory, input.session_id);
     await mkdir(sessionDirectory, { recursive: true });
     const { state, saveCreds } = await useMultiFileAuthState(sessionDirectory);
 
@@ -189,7 +219,7 @@ export class BaileysWhatsAppSessionAdapter implements WhatsAppSessionAdapter {
             resolve({
               status: "pending_qr",
               qr_code: update.qr,
-              encrypted_credentials: JSON.stringify({ auth_directory: sessionDirectory }),
+              encrypted_credentials: serializeBaileysSessionCredentials(sessionDirectory, this.sessionEncryptionKey),
               metadata: { adapter: "baileys", auth_directory: sessionDirectory, ...input.metadata },
             });
             return;
@@ -202,7 +232,7 @@ export class BaileysWhatsAppSessionAdapter implements WhatsAppSessionAdapter {
               clearTimeout(timeout);
               resolve({
                 status: "connected",
-                encrypted_credentials: JSON.stringify({ auth_directory: sessionDirectory }),
+                encrypted_credentials: serializeBaileysSessionCredentials(sessionDirectory, this.sessionEncryptionKey),
                 metadata: { adapter: "baileys", auth_directory: sessionDirectory, restored: true, ...input.metadata },
               });
             }

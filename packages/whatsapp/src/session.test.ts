@@ -61,6 +61,30 @@ test("markConnected removes QR and logout clears session", async () => {
   assert.equal((await service.status()).status, "disconnected");
 });
 
+test("restore passes persisted credentials to the session adapter", async () => {
+  let restoredCredentials: string | undefined;
+  const service = new WhatsAppSessionService({
+    enabled: true,
+    adapter: {
+      async start() {
+        return { qr_code: "qr", encrypted_credentials: "persisted-credentials" };
+      },
+      async restore(input) {
+        restoredCredentials = input.encrypted_credentials;
+        return { status: "connected" as const };
+      },
+      async logout() {
+        return undefined;
+      },
+    },
+  });
+
+  await service.start();
+  await service.restoreConnection();
+
+  assert.equal(restoredCredentials, "persisted-credentials");
+});
+
 test("normalizes inbound WhatsApp text and ignores unsupported messages", () => {
   assert.deepEqual(
     normalizeWhatsAppInboundTextMessage({

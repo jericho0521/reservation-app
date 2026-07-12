@@ -181,7 +181,7 @@ test("manual takeover suppresses unsupported inbound fallback replies", async ()
 
   assert.equal(response.content, "");
   assert.equal(response.metadata?.responder, "manual_handoff");
-  assert.deepEqual(sent, ["Please wait while staff checks this for you."]);
+  assert.deepEqual(sent, ["Reservation Business: Please wait while staff checks this for you."]);
 });
 
 test("staff replies send outbound and switch conversation to manual", async () => {

@@ -693,7 +693,7 @@ Expected demonstration: create bookings through web and simulated WhatsApp, show
 **Produces:** A 10–12 minute story understandable to both technical and non-technical reviewers.
 
 - [ ] Rehearse the exact script three times with a timer.
-- [ ] Record a backup video using deterministic simulation.
+- [x] Record a backup video using deterministic simulation.
 - [x] Prepare one architecture slide, one shared-engine proof, one security slide, and one evaluation/results slide.
 - [x] Prepare answers for Baileys trade-offs, modular package value, tenancy, AI safety, database concurrency, and scope decisions.
 - [x] Commit as `docs: add final presentation runbook`.

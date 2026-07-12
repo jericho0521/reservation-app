@@ -1,8 +1,50 @@
 @import "tailwindcss";
 
-body {
-  margin: 0;
-  background: #0f172a;
-  color: #e2e8f0;
-  font-family: Arial, Helvetica, sans-serif;
+:root { color-scheme: dark; font-family: Inter, ui-sans-serif, system-ui, sans-serif; background: #08090c; color: #f7f7f2; }
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body { margin: 0; background: #08090c; }
+a { color: inherit; }
+
+.apex-hero { min-height: 94vh; padding: 1.5rem clamp(1.25rem, 5vw, 5rem) 3rem; display: flex; flex-direction: column; position: relative; overflow: hidden; background: radial-gradient(circle at 78% 38%, rgba(255,77,0,.38), transparent 18rem), linear-gradient(125deg, #12151c 0 44%, #08090c 44%); }
+.apex-hero::before { content: "07"; position: absolute; right: -2vw; bottom: -14vw; color: rgba(255,255,255,.035); font-size: min(62vw, 46rem); font-weight: 950; line-height: .8; letter-spacing: -.12em; }
+.apex-hero nav { z-index: 1; display: flex; justify-content: space-between; padding-bottom: 1rem; border-bottom: 1px solid rgba(255,255,255,.16); font-family: ui-monospace, monospace; font-size: .72rem; letter-spacing: .15em; }
+.apex-hero nav strong { color: #ff4d00; }
+.apex-hero-copy { z-index: 1; width: min(62rem, 100%); margin: auto 0; padding-block: 5rem; }
+.apex-kicker, .apex-booking > header span { color: #ff4d00; font: 750 .7rem/1 ui-monospace, monospace; letter-spacing: .16em; text-transform: uppercase; }
+.apex-hero h1 { margin: 1.2rem 0; font-size: clamp(4.2rem, 13vw, 11rem); line-height: .78; letter-spacing: -.075em; text-transform: uppercase; }
+.apex-hero h1 em { color: transparent; -webkit-text-stroke: 2px #ff4d00; font-style: normal; }
+.apex-hero-copy p { max-width: 36rem; color: #a9adb7; font-size: clamp(1rem, 2vw, 1.25rem); line-height: 1.65; }
+.apex-hero-copy a { display: inline-flex; gap: 2rem; margin-top: 1.5rem; padding: 1rem 1.2rem; background: #ff4d00; color: #0c0d10; font-weight: 900; text-decoration: none; text-transform: uppercase; }
+.apex-telemetry { z-index: 1; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border-top: 1px solid rgba(255,255,255,.16); }
+.apex-telemetry div { padding: 1.25rem 1rem 0; border-right: 1px solid rgba(255,255,255,.16); }
+.apex-telemetry span { display: block; color: #777d89; font: .65rem ui-monospace, monospace; text-transform: uppercase; }
+.apex-telemetry strong { display: block; margin-top: .35rem; font-size: 1.3rem; }
+.apex-track-strip { padding: 1rem clamp(1.25rem, 5vw, 5rem); display: flex; gap: 2.5rem; overflow-x: auto; color: #090a0d; background: #ff4d00; white-space: nowrap; font: 800 .72rem ui-monospace, monospace; letter-spacing: .08em; }
+.apex-track-strip span { opacity: .55; text-transform: uppercase; }
+.apex-booking { padding: clamp(4rem, 10vw, 8rem) clamp(1rem, 5vw, 5rem); background: linear-gradient(#0e1117, #08090c); }
+.apex-booking > header { width: min(62rem, 100%); margin: 0 auto 2.5rem; }
+.apex-booking h2 { margin: .6rem 0; font-size: clamp(3rem, 8vw, 6.5rem); line-height: .9; letter-spacing: -.06em; text-transform: uppercase; }
+.apex-booking > header p { max-width: 42rem; color: #9096a2; line-height: 1.6; }
+.apex-booking-shell, .rp-public-journey { border: 1px solid #2a2e37; background: #11141a; color: #f5f5f2; box-shadow: 0 2rem 6rem rgba(0,0,0,.35); }
+.apex-booking-shell .rp-journey-progress li, .rp-public-journey .rp-journey-progress li { color: #666d79; }
+.apex-booking-shell .rp-journey-progress li.current, .apex-booking-shell .rp-journey-progress li.complete, .rp-public-journey .rp-journey-progress li.current { color: #f5f5f2; }
+.apex-booking-shell .rp-journey-progress li.current::after, .apex-booking-shell .rp-journey-progress li.complete::after { background: #ff4d00; }
+.apex-input { border: 1px solid #363b46; background: #090b0f; color: #fff; }
+.apex-selected, .apex-button { border-color: #ff4d00; background: #ff4d00; color: #0b0c0e; }
+.apex-button-disabled { background: #252932; color: #666d79; }
+.apex-summary { border: 1px solid #343944; background: #0b0d12; }
+.apex-muted { color: #8c929e; }
+.apex-error { border: 1px solid #ff4d00; padding: 1rem; color: #ffb199; }
+.apex-success { padding: 1.2rem; background: #ff4d00; color: #090a0d; }
+.apex-setup { width: min(62rem, 100%); margin: 0 auto; padding: 2rem; border: 1px solid #343944; background: #11141a; }
+.apex-setup p { color: #9096a2; }
+
+@media (max-width: 650px) {
+  .apex-hero { min-height: 48rem; }
+  .apex-hero nav span { display: none; }
+  .apex-telemetry { grid-template-columns: 1fr; }
+  .apex-telemetry div { display: flex; justify-content: space-between; align-items: center; border-right: 0; border-bottom: 1px solid rgba(255,255,255,.12); }
 }
+
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }

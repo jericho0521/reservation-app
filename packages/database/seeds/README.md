@@ -5,3 +5,7 @@ Development seeds are separated from core schema migrations.
 `development/project-play-compat.sql` tracks the current Project Play
 compatibility data source sections. Loading this seed is optional and must not
 be treated as part of a clean backend platform install.
+
+`racing-demo.sql` is the deterministic Apex Grid flagship fixture. It creates a
+published racing experience, six simulators, operating hours, one maintenance
+conflict, and one sample reservation. It is development/demo data only.

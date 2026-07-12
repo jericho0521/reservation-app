@@ -1,6 +1,6 @@
-# Backup recording candidates
+# Approved backup recording
 
-`reservation-platform-fallback-candidate.mp4` is the deterministic local fallback walkthrough for release candidate `d3f3d3e6d934dd8f282b83c56463a5bcebddbc8c`.
+`reservation-platform-fallback.mp4` is the approved deterministic local fallback walkthrough for release candidate `d3f3d3e6d934dd8f282b83c56463a5bcebddbc8c`.
 
 ## Verified properties
 
@@ -13,4 +13,4 @@
 
 ## Approval status
 
-The candidate is technically verified but still requires reviewer playback approval. Do not present it as approved, rename it as the accepted fallback, or add its source frames to `docs/demo/assets/` until the reviewer and approval date are recorded in the demonstration checklist.
+The project owner approved the recording on 2026-07-13. It may be used as the presentation fallback. Its source frames are not approved standalone screenshots and must not be copied into `docs/demo/assets/` without separate review.

@@ -50,15 +50,17 @@ Do not mark a rehearsal complete unless the full script and fallback transition 
 - [ ] Record reviewer and approval date in the asset manifest.
 - [x] Record the backup video using deterministic simulation and test playback offline.
 
-### Backup recording candidate
+### Approved backup recording
 
 - Candidate revision: `d3f3d3e6d934dd8f282b83c56463a5bcebddbc8c`.
 - Format: H.264 MP4, 1440×900, 30 fps, 69 seconds.
 - Content: command center, eight-preset Studio, maintenance-aware racing selection, simulated staff takeover, analytics, rooms, and appointments.
 - Safety proof: viewport-only captures were visually inspected; OCR found no email, phone, API key, bearer token, management token, QR payload, WhatsApp identifier, localhost URL, or loopback address.
 - Playback proof: `ffmpeg` decoded every frame without an error; SHA-256 is `e82db0350f4c8614a7a6f6b8dc5b4a29070347d942d3e36f3e4a3d39079d631c`.
-- Stored candidate: `docs/demo/recordings/reservation-platform-fallback-candidate.mp4`.
-- Status: pending reviewer playback and approval before renaming it as the accepted fallback or copying source frames into `docs/demo/assets/`.
+- Stored recording: `docs/demo/recordings/reservation-platform-fallback.mp4`.
+- Reviewer: project owner.
+- Approval date: 2026-07-13.
+- Status: approved for the deterministic presentation fallback. Source frames remain outside `docs/demo/assets/` because screenshot approval is tracked separately.
 
 ## Five-minute fallback
 

@@ -59,6 +59,23 @@ a { color: inherit; text-decoration: none; }
 .setup-error { max-width: 42rem; margin: 10vh auto; padding: 2rem; }
 .setup-error h1 { margin-bottom: .4rem; }
 .muted { color: var(--muted); }
+.studio-workspace { width: min(82rem, 100%); margin: 0 auto; display: grid; grid-template-columns: 14rem minmax(0, 1fr); gap: 2.5rem; }
+.studio-rail { min-width: 0; }
+.studio-navigation { display: grid; gap: .35rem; }
+.studio-navigation a { display: flex; align-items: center; gap: .7rem; padding: .65rem; border-radius: .75rem; color: var(--muted); }
+.studio-navigation a:hover, .studio-navigation a:focus-visible, .studio-navigation a.active { color: var(--text); background: var(--panel-soft); outline: none; }
+.studio-navigation a > span:last-child { display: grid; gap: .1rem; }
+.studio-navigation small { color: var(--muted); font-size: .65rem; text-transform: capitalize; }
+.step-index { width: 1.8rem; height: 1.8rem; flex: 0 0 auto; display: grid; place-items: center; border: 1px solid var(--border); border-radius: 50%; font-size: .72rem; }
+.step-index.complete { color: var(--accent-ink); border-color: var(--success); background: var(--success); }
+.step-index.invalid { color: #fecaca; border-color: #ef4444; }
+.studio-progress { display: grid; gap: .65rem; margin-bottom: 1.25rem; padding-bottom: 1.25rem; border-bottom: 1px solid var(--border); }
+.studio-progress > div:first-child { display: grid; gap: .2rem; }
+.studio-progress span { color: var(--muted); font-size: .72rem; }
+.studio-progress [role="progressbar"] { height: .35rem; overflow: hidden; border-radius: 999px; background: var(--panel-soft); }
+.studio-progress [role="progressbar"] span { display: block; height: 100%; border-radius: inherit; background: var(--accent); }
+.section-foundation h2 { margin: 1.25rem 0 .35rem; }
+.secondary-action { display: inline-block; margin-top: 1rem; padding: .7rem .9rem; border: 1px solid var(--border); border-radius: .7rem; }
 
 @media (max-width: 900px) {
   .console-frame { display: block; }
@@ -68,6 +85,9 @@ a { color: inherit; text-decoration: none; }
   .console-sidebar nav > a, .nav-disabled { flex: 0 0 auto; }
   .nav-disabled, .sidebar-note { display: none; }
   .metric-grid { grid-template-columns: 1fr; }
+  .studio-workspace { grid-template-columns: 1fr; gap: 1.5rem; }
+  .studio-navigation { display: flex; overflow-x: auto; padding-bottom: .3rem; }
+  .studio-navigation a { flex: 0 0 auto; }
 }
 
 @media (max-width: 620px) {

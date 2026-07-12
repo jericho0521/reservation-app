@@ -58,6 +58,10 @@ import type {
   TenantResponse,
   UpdateReservationPatch,
   VenueResponse,
+  WhatsAppChannelReadinessResponse,
+  WhatsAppOwnerSessionResponse,
+  WhatsAppSimulationInput,
+  WhatsAppSimulationResponse,
 } from "@reservation-platform/contract-types";
 
 export type * from "@reservation-platform/contract-types";
@@ -192,6 +196,12 @@ export interface ReservationPlatformClient {
   listConversationMessages(conversationId: string, input?: ListConversationMessagesQuery, options?: RequestOptions): Promise<ListConversationMessagesResponse>;
   sendConversationStaffReply(conversationId: string, input: ConversationStaffReplyInput, options?: RequestOptions): Promise<ConversationMessageResponse>;
   updateConversationAutomation(conversationId: string, input: ConversationAutomationInput, options?: RequestOptions): Promise<ConversationResponse>;
+  getWhatsAppReadiness(options?: RequestOptions): Promise<WhatsAppChannelReadinessResponse>;
+  startWhatsAppSession(options?: RequestOptions): Promise<WhatsAppOwnerSessionResponse>;
+  getWhatsAppSessionStatus(options?: RequestOptions): Promise<WhatsAppOwnerSessionResponse>;
+  getWhatsAppSessionQr(options?: RequestOptions): Promise<WhatsAppOwnerSessionResponse>;
+  logoutWhatsAppSession(options?: RequestOptions): Promise<WhatsAppOwnerSessionResponse>;
+  simulateWhatsAppMessage(input: WhatsAppSimulationInput, options?: RequestOptions): Promise<WhatsAppSimulationResponse>;
   updateReservation(reservationId: string, patch: UpdateReservationPatch, options?: RequestOptions): Promise<ReservationResponse>;
   cancelReservation(reservationId: string, input?: CancelReservationInput, options?: RequestOptions): Promise<ReservationResponse>;
   rescheduleReservation(reservationId: string, input: RescheduleReservationInput, options?: RequestOptions): Promise<ReservationResponse>;
@@ -334,6 +344,12 @@ export function createReservationPlatformClient(
     listConversationMessages: (conversationId, input, options) => request({ method: "GET", path: `/conversations/${encodeURIComponent(conversationId)}/messages`, query: input, options }),
     sendConversationStaffReply: (conversationId, input, options) => request({ method: "POST", path: `/conversations/${encodeURIComponent(conversationId)}/messages`, body: input, options }),
     updateConversationAutomation: (conversationId, input, options) => request({ method: "PUT", path: `/conversations/${encodeURIComponent(conversationId)}/automation`, body: input, options }),
+    getWhatsAppReadiness: (options) => request({ method: "GET", path: "/channels/whatsapp/readiness", options }),
+    startWhatsAppSession: (options) => request({ method: "POST", path: "/channels/whatsapp/session/start", body: {}, options }),
+    getWhatsAppSessionStatus: (options) => request({ method: "GET", path: "/channels/whatsapp/session/status", options }),
+    getWhatsAppSessionQr: (options) => request({ method: "GET", path: "/channels/whatsapp/session/qr", options }),
+    logoutWhatsAppSession: (options) => request({ method: "POST", path: "/channels/whatsapp/session/logout", body: {}, options }),
+    simulateWhatsAppMessage: (input, options) => request({ method: "POST", path: "/channels/whatsapp/messages:simulate", body: input, options }),
     updateReservation: (reservationId, patch, options) => request({ method: "PATCH", path: `/reservations/${encodeURIComponent(reservationId)}`, body: patch, options }),
     cancelReservation: (reservationId, input, options) => request({ method: "POST", path: `/reservations/${encodeURIComponent(reservationId)}/cancel`, body: input ?? {}, options }),
     rescheduleReservation: (reservationId, input, options) => request({ method: "POST", path: `/reservations/${encodeURIComponent(reservationId)}/reschedule`, body: input, options }),

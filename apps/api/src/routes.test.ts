@@ -1082,7 +1082,7 @@ test("enabled WhatsApp readiness and simulation routes delegate to the module", 
   assert.equal(readiness.status, 200);
   assert.equal((readiness.body as { simulation_enabled?: boolean }).simulation_enabled, true);
   assert.equal(simulation.status, 200);
-  assert.deepEqual(simulation.body, { content: "simulated reply" });
+  assert.deepEqual(simulation.body, { simulated: true, content: "simulated reply" });
   assert.deepEqual(calls, ["readiness", "simulate:Book a room tomorrow:+60111111111"]);
 });
 

@@ -283,6 +283,33 @@ test("conversation SDK methods preserve scoped owner paths, filters, and bodies"
   assert.deepEqual(JSON.parse(String(requests[4]!.init?.body)), { automation_state: "manual" });
 });
 
+test("WhatsApp owner SDK methods keep readiness, QR, and simulation behind scoped authenticated routes", async () => {
+  const requests: Array<{ url: string; init?: RequestInit }> = [];
+  const client = createReservationPlatformClient({
+    baseUrl: "https://platform.example",
+    tenantId: "tenant_1",
+    venueId: "venue_1",
+    getAccessToken: () => "owner-secret",
+    fetch: async (url, init) => { requests.push({ url: String(url), init }); return jsonResponse({}); },
+  });
+  await client.getWhatsAppReadiness();
+  await client.startWhatsAppSession();
+  await client.getWhatsAppSessionStatus();
+  await client.getWhatsAppSessionQr();
+  await client.logoutWhatsAppSession();
+  await client.simulateWhatsAppMessage({ text: "Book a room", message_id: "demo-step-1" });
+  assert.deepEqual(requests.map(({ url, init }) => [new URL(url).pathname, init?.method]), [
+    ["/v1/channels/whatsapp/readiness", "GET"],
+    ["/v1/channels/whatsapp/session/start", "POST"],
+    ["/v1/channels/whatsapp/session/status", "GET"],
+    ["/v1/channels/whatsapp/session/qr", "GET"],
+    ["/v1/channels/whatsapp/session/logout", "POST"],
+    ["/v1/channels/whatsapp/messages:simulate", "POST"],
+  ]);
+  requests.forEach(({ init }) => assert.equal(new Headers(init?.headers).get("authorization"), "Bearer owner-secret"));
+  assert.deepEqual(JSON.parse(String(requests[5]!.init?.body)), { text: "Book a room", message_id: "demo-step-1" });
+});
+
 test("public chat SDK methods stay slug scoped and omit owner credentials", async () => {
   const requests: Array<{ url: string; init?: RequestInit }> = [];
   const client = createReservationPlatformClient({

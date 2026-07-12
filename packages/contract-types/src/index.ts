@@ -323,6 +323,49 @@ export interface ConversationStaffReplyInput {
   content: string;
 }
 
+export interface ChannelRuntimeStatus {
+  configured: boolean;
+  connected: boolean;
+  healthy: boolean;
+  message: string;
+}
+
+export interface WhatsAppChannelReadinessResponse {
+  enabled: boolean;
+  provider: "meta_cloud" | "session_qr";
+  simulation_enabled: boolean;
+  production_ready: boolean;
+  missing_requirements: string[];
+  ai: ChannelRuntimeStatus;
+  whatsapp: ChannelRuntimeStatus;
+}
+
+export interface WhatsAppSimulationInput {
+  text: string;
+  from?: string;
+  phone?: string;
+  display_name?: string;
+  message_id?: string;
+}
+
+export interface WhatsAppSimulationResponse {
+  simulated: true;
+  conversation_id?: string;
+  content: string;
+  automation_suppressed?: boolean;
+  metadata?: MetadataRecord;
+}
+
+export interface WhatsAppOwnerSessionResponse {
+  provider: "meta_cloud" | "session_qr";
+  status: "disabled" | "disconnected" | "pending_qr" | "connected" | "expired";
+  session_id?: string;
+  qr_code?: string;
+  connected_at?: string;
+  updated_at: string;
+  metadata?: MetadataRecord;
+}
+
 export interface PublicChatMessageInput {
   thread_id: string;
   external_message_id?: string;

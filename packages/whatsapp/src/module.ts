@@ -187,7 +187,7 @@ export class WhatsAppBusinessModule {
   async handleInboundMessage(input: WhatsAppInboundMessage) {
     if (this.unifiedConversations) {
       const response = await this.unifiedConversations.handleInbound(input);
-      if (response.content && !response.automation_suppressed) {
+      if (response.content && !response.automation_suppressed && input.raw?.simulated !== true) {
         await this.sender?.sendMessage({ provider: input.provider, to: input.from.id, text: response.content, metadata: response.metadata });
       }
       return response;

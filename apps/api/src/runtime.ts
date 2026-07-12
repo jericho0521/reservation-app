@@ -521,6 +521,7 @@ export function standaloneWhatsAppDependenciesFromEnv(
         );
         const defaultServiceConfigured = Boolean(businessConfig?.default_service_id?.trim());
         const whatsappConnected = session?.status === "connected";
+        const aiHealthy = providerReady && reservationToolsReady;
         const missingRequirements = [
           databaseReady ? undefined : "database",
           providerReady ? undefined : "ai_provider",
@@ -542,6 +543,18 @@ export function standaloneWhatsAppDependenciesFromEnv(
           simulation_enabled: isEnabledEnv(env.RESERVATION_WHATSAPP_SIMULATION_ENABLED),
           production_ready: missingRequirements.length === 0,
           missing_requirements: missingRequirements,
+          ai: {
+            configured: providerReady,
+            connected: providerReady,
+            healthy: aiHealthy,
+            message: providerReady ? (aiHealthy ? "AI booking tools are ready." : "AI is configured but booking tools are unavailable.") : "Configure an AI provider.",
+          },
+          whatsapp: {
+            configured: businessConfigValid && defaultServiceConfigured,
+            connected: whatsappConnected,
+            healthy: missingRequirements.length === 0,
+            message: missingRequirements.length === 0 ? "WhatsApp automation is ready." : `Complete setup: ${missingRequirements.join(", ")}.`,
+          },
         };
       },
     },
@@ -595,22 +608,24 @@ function createWhatsAppUnifiedConversationBridge(
     async handleInbound(message: import("@reservation-platform/whatsapp").WhatsAppInboundMessage) {
       const scope = await readWhatsAppConversationScope(store, message.raw);
       const content = message.text?.trim() || "[Unsupported WhatsApp content]";
+      const channel = message.raw?.simulated === true ? "simulation" as const : "whatsapp" as const;
+      const channelThreadId = channel === "simulation" ? `simulation:${message.from.id}` : message.from.id;
       const participant = {
         channelIdentifier: message.from.id,
         identifierHash: createHash("sha256").update(message.from.id).digest("hex"),
         displayName: message.from.displayName,
         contactHint: contactHint(message.from.phoneNumber ?? message.from.id),
       };
-      const pending = pendingByThread.get(message.from.id);
+      const pending = pendingByThread.get(channelThreadId);
       if (pending && /^(confirm|yes|confirm booking)$/iu.test(content)) {
         const conversation = await orchestrator.conversations.getOrCreate(scope, {
-          channel: "whatsapp",
-          channelThreadId: message.from.id,
+          channel,
+          channelThreadId,
           participant,
         });
         if (conversation.error || !conversation.data) throw new Error("WhatsApp conversation is unavailable.");
         const inbound = await orchestrator.conversations.append(scope, conversation.data.conversation_id, {
-          channel: "whatsapp",
+          channel,
           direction: "inbound",
           senderType: "customer",
           deliveryState: "delivered",
@@ -631,15 +646,15 @@ function createWhatsAppUnifiedConversationBridge(
           }
           throw new Error(result.body.error.message);
         }
-        pendingByThread.delete(message.from.id);
+        pendingByThread.delete(channelThreadId);
         return unifiedWhatsAppResult(result.body);
       }
 
       const result = await handleConversationInbound({
         scope,
         message: {
-          channel: "whatsapp",
-          channelThreadId: message.from.id,
+          channel,
+          channelThreadId,
           externalMessageId: message.messageId,
           content,
           participant,
@@ -648,7 +663,7 @@ function createWhatsAppUnifiedConversationBridge(
       });
       if ("error" in result.body) throw new Error(result.body.error.message);
       if (result.body.proposal) {
-        pendingByThread.set(message.from.id, {
+        pendingByThread.set(channelThreadId, {
           conversationId: result.body.conversation.conversation_id,
           proposalId: result.body.proposal.proposalId,
         });

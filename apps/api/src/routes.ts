@@ -116,6 +116,7 @@ import type {
   WhatsAppSessionStartInput,
   WhatsAppInboundMessage,
 } from "@reservation-platform/whatsapp";
+import { createWhatsAppSimulationMessage } from "@reservation-platform/whatsapp";
 
 import { jsonResponse, platformError, type StandaloneApiRequest, type StandaloneApiResponse } from "./http.js";
 
@@ -1753,23 +1754,22 @@ async function handleWhatsAppSimulationRequest(
     return platformError(400, "validation_failed", "text is required.");
   }
   const context = createChatContext(request);
-
-  return invokeWhatsAppModule(() => whatsappModule.handleInboundMessage({
-    provider: "session_qr",
-    messageId: getStringField(body, "message_id") ?? `sim_${Date.now()}`,
-    from: {
-      id: from,
-      phoneNumber: getStringField(body, "phone") ?? from.split("@")[0],
-      displayName: getStringField(body, "display_name"),
-    },
+  const message = createWhatsAppSimulationMessage({
     text,
-    timestamp: new Date().toISOString(),
-    raw: {
-      simulated: true,
-      ...(context.tenantId ? { tenant_id: context.tenantId } : {}),
-      ...(context.venueId ? { venue_id: context.venueId } : {}),
-    },
-  }));
+    from,
+    ...(getStringField(body, "phone") ? { phone: getStringField(body, "phone") } : {}),
+    ...(getStringField(body, "display_name") ? { displayName: getStringField(body, "display_name") } : {}),
+    ...(getStringField(body, "message_id") ? { messageId: getStringField(body, "message_id") } : {}),
+  }, {
+    ...(context.tenantId ? { tenantId: context.tenantId } : {}),
+    ...(context.venueId ? { venueId: context.venueId } : {}),
+  });
+  return invokeWhatsAppModule(async () => {
+    const result = await whatsappModule.handleInboundMessage(message);
+    return typeof result === "object" && result !== null && !Array.isArray(result)
+      ? { simulated: true, ...result }
+      : { simulated: true, content: String(result ?? "") };
+  });
 }
 
 async function handleWhatsAppConfigUpdateRequest(

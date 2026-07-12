@@ -247,3 +247,21 @@ test("unified conversation bridge owns inbound persistence, replies, and takeove
   assert.deepEqual(bridged, ["wamid_unified_1", "wamid_unified_2"]);
   assert.deepEqual(sent, ["Unified reply"]);
 });
+
+test("simulated unified messages never use the live outbound sender", async () => {
+  let sent = false;
+  const module = new WhatsAppBusinessModule({
+    enabled: true,
+    sessionAdapter: { async sendMessage() { sent = true; } },
+    unifiedConversations: { async handleInbound() { return { conversation_id: "simulation_1", content: "Demo reply" }; } },
+  });
+  const result = await module.handleInboundMessage({
+    provider: "session_qr",
+    messageId: "sim_1",
+    from: { id: "demo@s.whatsapp.net" },
+    text: "Hello",
+    raw: { simulated: true },
+  });
+  assert.equal(result.content, "Demo reply");
+  assert.equal(sent, false);
+});

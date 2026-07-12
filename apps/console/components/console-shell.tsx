@@ -4,7 +4,6 @@ const futureSections = [
   "Reservations",
   "Resources & maintenance",
   "Analytics",
-  "Channels & AI",
 ];
 
 export function ConsoleShell({ children }: { children: ReactNode }) {
@@ -22,6 +21,7 @@ export function ConsoleShell({ children }: { children: ReactNode }) {
           <a href="/">Overview</a>
           <a href="/studio">Experience Studio</a>
           <a href="/conversations">Conversations</a>
+          <a href="/channels">Channels & AI</a>
           {futureSections.map((section) => (
             <span aria-disabled="true" className="nav-disabled" key={section}>
               {section}

@@ -6,5 +6,6 @@ export * from "./crypto.js";
 export * from "./messages.js";
 export * from "./module.js";
 export * from "./session.js";
+export * from "./simulation-adapter.js";
 export * from "./storage.js";
 export * from "./supabase-store.js";

@@ -139,6 +139,15 @@ test("WhatsApp runtime bridge routes scoped inbound messages through unified con
   assert.equal(result.content, "Unified WhatsApp reply");
   assert.equal(result.conversation_id, "conversation_1");
   assert.deepEqual((observed[0] as { scope: unknown }).scope, { tenantId: "tenant_1", venueId: "venue_1" });
+
+  observed.length = 0;
+  await dependencies.whatsappModule?.handleInboundMessage({
+    provider: "session_qr", messageId: "sim_1", from: { id: "demo@s.whatsapp.net" }, text: "Hello",
+    raw: { simulated: true, tenant_id: "tenant_1", venue_id: "venue_1" },
+  });
+  const simulatedInput = (observed[0] as { input: { channel: string; channelThreadId: string } }).input;
+  assert.equal(simulatedInput.channel, "simulation");
+  assert.equal(simulatedInput.channelThreadId, "simulation:demo@s.whatsapp.net");
 });
 
 test("standalone Supabase env factory wires manifest-enabled WhatsApp without legacy enable env", async () => {

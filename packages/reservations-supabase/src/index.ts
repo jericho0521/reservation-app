@@ -30,6 +30,8 @@ import type {
   ReservationReadRepositoryPort,
 } from "@reservation-platform/api";
 
+export * from "./experience-studio.js";
+
 export const RESERVATION_SUPABASE_TABLES = {
   platformTenants: "tenants",
   venues: "venues",

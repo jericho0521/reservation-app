@@ -44,11 +44,13 @@
   },
   "peerDependencies": {
     "@project-play/reservations-core": "0.0.0",
-    "@reservation-platform/api": "0.0.0"
+    "@reservation-platform/api": "0.0.0",
+    "@reservation-platform/contract-types": "0.1.0"
   },
   "devDependencies": {
     "@project-play/reservations-core": "workspace:*",
     "@reservation-platform/api": "workspace:*",
+    "@reservation-platform/contract-types": "workspace:*",
     "tsx": "^4.21.0",
     "typescript": "^5"
   }

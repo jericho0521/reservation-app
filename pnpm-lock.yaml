@@ -303,6 +303,9 @@ importers:
       '@reservation-platform/api':
         specifier: workspace:*
         version: link:../reservation-platform-api
+      '@reservation-platform/contract-types':
+        specifier: workspace:*
+        version: link:../contract-types
       tsx:
         specifier: ^4.21.0
         version: 4.21.0

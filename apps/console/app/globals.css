@@ -204,6 +204,42 @@ a { color: inherit; text-decoration: none; }
 .session-controls > div { display: grid; gap: .25rem; }
 .session-controls span { color: var(--muted); font-size: .75rem; text-transform: capitalize; }
 .session-controls button { margin: 0; border: 0; cursor: pointer; }
+.metric-card small { color: var(--muted); font-size: .72rem; }
+.overview-panel { border: 1px solid var(--border); border-radius: 1rem; background: var(--panel); overflow: hidden; }
+.overview-panel > header { display: flex; justify-content: space-between; align-items: center; gap: 1rem; padding: 1rem 1.15rem; border-bottom: 1px solid var(--border); }
+.overview-panel > header h2 { margin: .25rem 0 0; }
+.overview-panel > header > a { color: var(--accent); font-size: .8rem; }
+.attention-panel { border-color: #854d0e; }
+.attention-panel ul, .channel-status-list, .today-timeline { margin: 0; padding: 0; list-style: none; }
+.attention-panel li { display: flex; justify-content: space-between; align-items: center; gap: 1rem; padding: .9rem 1.15rem; border-left: .25rem solid var(--border); }
+.attention-panel li + li, .channel-status-list li + li, .today-timeline li + li { border-top: 1px solid var(--border); }
+.attention-panel li.is-urgent { border-left-color: #ef4444; }
+.attention-panel li.is-warning { border-left-color: var(--accent); }
+.attention-panel li.is-info { border-left-color: #22c55e; }
+.attention-panel p { margin: .25rem 0 0; color: var(--muted); font-size: .78rem; }
+.attention-panel a { flex: 0 0 auto; color: var(--accent); font-size: .78rem; }
+.overview-columns { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(17rem, .6fr); gap: 1rem; align-items: start; }
+.today-timeline li { display: grid; grid-template-columns: 4rem minmax(0, 1fr) auto; gap: .8rem; align-items: center; padding: .85rem 1.15rem; }
+.today-timeline time { color: var(--accent); font-weight: 800; }
+.today-timeline a, .today-timeline li > div { display: grid; gap: .2rem; }
+.today-timeline a span, .today-timeline small, .panel-footnote { color: var(--muted); font-size: .72rem; }
+.today-timeline li > div { justify-items: end; }
+.reservation-state { font-size: .7rem; text-transform: capitalize; }
+.reservation-state.is-cancelled { color: #fca5a5; }
+.reservation-state.is-confirmed { color: #bbf7d0; }
+.panel-footnote { display: block; padding: .8rem 1.15rem; border-top: 1px solid var(--border); }
+.overview-empty { padding: 2rem 1.15rem; text-align: center; }
+.overview-empty p { color: var(--muted); }
+.channel-status-list li { display: flex; justify-content: space-between; align-items: center; gap: 1rem; padding: .85rem 1.15rem; }
+.channel-status-list li > div { display: grid; gap: .2rem; }
+.channel-status-list li > div span { color: var(--muted); font-size: .72rem; }
+.partial-outage { padding: 1rem 1.15rem; border: 1px solid #854d0e; border-radius: 1rem; background: rgba(133,77,14,.12); }
+.partial-outage p { margin-bottom: 0; color: var(--muted); }
+.loading-line, .loading-card, .loading-panel { border-radius: .8rem; background: linear-gradient(90deg, var(--panel) 25%, var(--panel-soft) 50%, var(--panel) 75%); background-size: 200% 100%; animation: loading-shimmer 1.4s infinite; }
+.loading-line { width: 45%; height: 3.5rem; }
+.loading-card { height: 8rem; }
+.loading-panel { height: 20rem; }
+@keyframes loading-shimmer { to { background-position: -200% 0; } }
 
 @media (max-width: 900px) {
   .console-frame { display: block; }
@@ -219,6 +255,7 @@ a { color: inherit; text-decoration: none; }
   .conversation-detail-layout { grid-template-columns: 1fr; }
   .takeover-panel { position: static; }
   .readiness-grid, .simulator-panel { grid-template-columns: 1fr; }
+  .overview-columns { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 620px) {
@@ -234,4 +271,7 @@ a { color: inherit; text-decoration: none; }
   .conversation-list a, .conversation-thread-panel > header { align-items: stretch; flex-direction: column; }
   .conversation-list a > div:last-child { justify-items: start; }
   .owner-message { max-width: 92%; }
+  .today-timeline li { grid-template-columns: 3.5rem minmax(0, 1fr); }
+  .today-timeline li > div { grid-column: 2; justify-items: start; }
+  .attention-panel li, .session-controls { align-items: stretch; flex-direction: column; }
 }

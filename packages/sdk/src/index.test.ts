@@ -283,6 +283,25 @@ test("conversation SDK methods preserve scoped owner paths, filters, and bodies"
   assert.deepEqual(JSON.parse(String(requests[4]!.init?.body)), { automation_state: "manual" });
 });
 
+test("public chat SDK methods stay slug scoped and omit owner credentials", async () => {
+  const requests: Array<{ url: string; init?: RequestInit }> = [];
+  const client = createReservationPlatformClient({
+    baseUrl: "https://platform.example",
+    tenantId: "private",
+    getAccessToken: () => "owner-secret",
+    fetch: async (url, init) => { requests.push({ url: String(url), init }); return jsonResponse({ conversation_id: "conversation_1", automation_state: "automated", messages: [] }); },
+  });
+  await client.sendPublicChatMessage("apex racing", { thread_id: "thread_123", content: "Hello" });
+  await client.listPublicChatMessages("apex racing", "conversation/1", { limit: 20 });
+  await client.confirmPublicChatBooking("apex racing", "conversation/1", { proposal_id: "proposal_1" });
+  assert.deepEqual(requests.map(({ url, init }) => [new URL(url).pathname, init?.method]), [
+    ["/v1/public/experiences/apex%20racing/chat/messages", "POST"],
+    ["/v1/public/experiences/apex%20racing/chat/conversations/conversation%2F1/messages", "GET"],
+    ["/v1/public/experiences/apex%20racing/chat/conversations/conversation%2F1/confirm", "POST"],
+  ]);
+  requests.forEach(({ init }) => assert.equal(new Headers(init?.headers).has("Authorization"), false));
+});
+
 test("experience knowledge and channel SDK methods preserve owner paths", async () => {
   const requests: Array<{ url: string; init?: RequestInit }> = [];
   const knowledge = { question: "Where should I park?", answer: "Use the north entrance." };

@@ -1,5 +1,6 @@
 import {
   appendStaffReply,
+  confirmConversationBooking,
   authorizePlatformContext,
   archivePlatformResource,
   archivePlatformService,
@@ -30,6 +31,7 @@ import {
   requireIdempotencyKey,
   requirePlatformBearerToken,
   getPlatformMetadata,
+  handleConversationInbound,
   listExperiencePresets,
   listExperienceKnowledge,
   listConversationMessages,
@@ -65,6 +67,7 @@ import {
   type ExperienceChannelRuntimeReadiness,
   type ExperienceValidationDependencies,
   type ConversationRepository,
+  type ConversationOrchestratorDependencies,
   type OperatingHoursRepository,
   type PlatformCatalogRepository,
   type PlatformRequestContext,
@@ -88,6 +91,8 @@ import {
   experienceServiceInputSchema,
   archiveCatalogItemInputSchema,
   publishExperienceInputSchema,
+  publicChatConfirmationInputSchema,
+  publicChatMessageInputSchema,
   type ChatConfirmReservationInput,
   type ChatCreateReservationSessionInput,
   type ChatMessageInput,
@@ -96,6 +101,7 @@ import {
   type ListServicesResponse,
   type MetadataRecord,
   type PlatformErrorResponse,
+  type PublicChatConversationResponse,
   type ReservationResponse,
 } from "@reservation-platform/contract-types";
 import type {
@@ -118,6 +124,7 @@ export interface StandaloneApiDependencies {
   availabilityRepository?: AvailabilityRepositoryPort;
   catalogRepository?: PlatformCatalogRepository;
   conversationRepository?: ConversationRepository;
+  conversationOrchestrator?: ConversationOrchestratorDependencies;
   chatModule?: StandaloneApiChatModule;
   idempotencyRepository?: IdempotencyRepository;
   experienceStudioRepository?: ExperienceStudioRepository;
@@ -272,6 +279,9 @@ const publicExperienceAvailabilityPattern = /^\/v1\/public\/experiences\/([^/]+)
 const publicExperienceReservationsPattern = /^\/v1\/public\/experiences\/([^/]+)\/reservations$/;
 const publicExperienceManagementPattern = /^\/v1\/public\/experiences\/([^/]+)\/manage\/([^/]+)$/;
 const publicExperienceManagementCancelPattern = /^\/v1\/public\/experiences\/([^/]+)\/manage\/([^/]+)\/cancel$/;
+const publicExperienceChatMessagePattern = /^\/v1\/public\/experiences\/([^/]+)\/chat\/messages$/;
+const publicExperienceChatMessagesPattern = /^\/v1\/public\/experiences\/([^/]+)\/chat\/conversations\/([^/]+)\/messages$/;
+const publicExperienceChatConfirmPattern = /^\/v1\/public\/experiences\/([^/]+)\/chat\/conversations\/([^/]+)\/confirm$/;
 const publicExperienceSlugPattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const experienceServicePattern = /^\/v1\/experience\/services\/([^/]+)$/;
 const experienceServiceArchivePattern = /^\/v1\/experience\/services\/([^/]+)\/archive$/;
@@ -493,6 +503,18 @@ export async function handleStandaloneApiRequest(
   if (method === "POST") {
     const match = publicExperienceManagementCancelPattern.exec(path);
     if (match) return handlePublicReservationManagementRequest(match[1]!, match[2]!, dependencies, "cancel");
+  }
+
+  if (method === "POST") {
+    const match = publicExperienceChatMessagePattern.exec(path);
+    if (match) return handlePublicChatMessageRequest(match[1]!, request, dependencies);
+    const confirmMatch = publicExperienceChatConfirmPattern.exec(path);
+    if (confirmMatch) return handlePublicChatConfirmationRequest(confirmMatch[1]!, confirmMatch[2]!, request, dependencies);
+  }
+
+  if (method === "GET") {
+    const match = publicExperienceChatMessagesPattern.exec(path);
+    if (match) return handlePublicChatMessagesRequest(match[1]!, match[2]!, url, dependencies);
   }
 
   if (method === "GET") {
@@ -856,7 +878,7 @@ async function readChannelRuntimeReadiness(
     && dependencies.idempotencyRepository
     && dependencies.reservationManagementRepository
   );
-  const webChatReady = Boolean(dependencies.chatModule);
+  const webChatReady = Boolean(dependencies.chatModule || dependencies.conversationOrchestrator);
   let whatsappReady = false;
   let whatsappMessage = dependencies.whatsappModule ? "Connect and finish WhatsApp setup." : "Configure the WhatsApp module.";
   if (dependencies.whatsappModule) {
@@ -1143,6 +1165,131 @@ async function resolvePublicBookingExperience(
   } catch {
     return { ok: false, response: platformError(500, "internal_error", "Failed to read published booking experience.") };
   }
+}
+
+async function resolvePublicChatExperience(
+  encodedSlug: string,
+  dependencies: StandaloneApiDependencies,
+): Promise<
+  | { ok: true; slug: string; tenantId: string; venueId: string }
+  | { ok: false; response: StandaloneApiResponse }
+> {
+  let slug: string;
+  try {
+    slug = decodeURIComponent(encodedSlug);
+  } catch {
+    return { ok: false, response: platformError(400, "validation_failed", "Invalid experience slug.") };
+  }
+  if (!publicExperienceSlugPattern.test(slug)) {
+    return { ok: false, response: platformError(400, "validation_failed", "Invalid experience slug.") };
+  }
+  if (!dependencies.experienceStudioRepository) {
+    return { ok: false, response: experienceRepositoryUnavailable() };
+  }
+  try {
+    const published = await dependencies.experienceStudioRepository.readPublishedBySlug(slug);
+    if (!published || published.configuration.state !== "published" || !published.configuration.channels.web_chat) {
+      return { ok: false, response: platformError(404, "not_found", "Published chat experience not found.") };
+    }
+    return { ok: true, slug, tenantId: published.profile.tenant_id, venueId: published.profile.venue_id };
+  } catch {
+    return { ok: false, response: platformError(500, "internal_error", "Failed to read published chat experience.") };
+  }
+}
+
+async function handlePublicChatMessageRequest(
+  encodedSlug: string,
+  request: StandaloneApiRequest,
+  dependencies: StandaloneApiDependencies,
+) {
+  const experience = await resolvePublicChatExperience(encodedSlug, dependencies);
+  if (!experience.ok) return experience.response;
+  const parsed = publicChatMessageInputSchema.safeParse(request.body);
+  if (!parsed.success) return platformError(400, "validation_failed", "Invalid public chat message.");
+  if (!dependencies.conversationOrchestrator) return platformError(503, "bad_request", "Public chat is not configured.");
+  const result = await handleConversationInbound({
+    scope: { tenantId: experience.tenantId, venueId: experience.venueId },
+    message: {
+      channel: "web_chat",
+      channelThreadId: parsed.data.thread_id,
+      externalMessageId: parsed.data.external_message_id,
+      content: parsed.data.content,
+      participant: { displayName: parsed.data.display_name },
+    },
+    dependencies: dependencies.conversationOrchestrator,
+  });
+  return publicChatOrchestratorResponse(result);
+}
+
+async function handlePublicChatMessagesRequest(
+  encodedSlug: string,
+  encodedConversationId: string,
+  url: URL,
+  dependencies: StandaloneApiDependencies,
+) {
+  const experience = await resolvePublicChatExperience(encodedSlug, dependencies);
+  if (!experience.ok) return experience.response;
+  const conversationId = decodeConversationId(encodedConversationId);
+  if (!conversationId) return platformError(400, "validation_failed", "Invalid conversation id.");
+  if (!dependencies.conversationRepository) return platformError(503, "bad_request", "Conversation repository is not configured.");
+  const scope = { tenantId: experience.tenantId, venueId: experience.venueId };
+  const conversation = await readConversation({ scope, conversationId, repository: dependencies.conversationRepository });
+  if (conversation.status !== 200 || !("channel" in conversation.body) || conversation.body.channel !== "web_chat") {
+    return platformError(404, "not_found", "Conversation not found.");
+  }
+  const result = await listConversationMessages({
+    scope,
+    conversationId,
+    query: {
+      ...(url.searchParams.get("before") ? { before: url.searchParams.get("before")! } : {}),
+      ...(url.searchParams.get("limit") ? { limit: Number(url.searchParams.get("limit")) } : {}),
+    },
+    repository: dependencies.conversationRepository,
+  });
+  return jsonResponse(result.status, result.body);
+}
+
+async function handlePublicChatConfirmationRequest(
+  encodedSlug: string,
+  encodedConversationId: string,
+  request: StandaloneApiRequest,
+  dependencies: StandaloneApiDependencies,
+) {
+  const experience = await resolvePublicChatExperience(encodedSlug, dependencies);
+  if (!experience.ok) return experience.response;
+  const conversationId = decodeConversationId(encodedConversationId);
+  const parsed = publicChatConfirmationInputSchema.safeParse(request.body);
+  if (!conversationId || !parsed.success) return platformError(400, "validation_failed", "Invalid public chat confirmation.");
+  if (!dependencies.conversationOrchestrator) return platformError(503, "bad_request", "Public chat is not configured.");
+  const result = await confirmConversationBooking({
+    scope: { tenantId: experience.tenantId, venueId: experience.venueId },
+    conversationId,
+    proposalId: parsed.data.proposal_id,
+    dependencies: dependencies.conversationOrchestrator,
+  });
+  return publicChatOrchestratorResponse(result);
+}
+
+function publicChatOrchestratorResponse(result: Awaited<ReturnType<typeof handleConversationInbound>>) {
+  if ("error" in result.body) return jsonResponse(result.status, result.body);
+  const proposal = result.body.proposal;
+  const body: PublicChatConversationResponse = {
+    conversation_id: result.body.conversation.conversation_id,
+    automation_state: result.body.conversation.automation_state,
+    ...(result.body.message ? { message: result.body.message } : {}),
+    ...(proposal ? { proposal: {
+      proposal_id: proposal.proposalId,
+      service_id: proposal.booking.service_id,
+      service_name: proposal.booking.service_name,
+      date: proposal.booking.date,
+      start_time: proposal.booking.start_time,
+      end_time: proposal.booking.end_time,
+      quantity: proposal.booking.seats,
+    } } : {}),
+    ...(result.body.reservation ? { reservation: result.body.reservation } : {}),
+    ...(result.body.automation_suppressed ? { automation_suppressed: true } : {}),
+  };
+  return jsonResponse(result.status, body);
 }
 
 async function readPublicExperienceServices(

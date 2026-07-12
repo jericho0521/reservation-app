@@ -329,6 +329,43 @@
         ],
         "type": "string"
       },
+      "ConversationBookingProposalResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "date": {
+            "type": "string"
+          },
+          "end_time": {
+            "type": "string"
+          },
+          "proposal_id": {
+            "type": "string"
+          },
+          "quantity": {
+            "minimum": 1,
+            "type": "integer"
+          },
+          "service_id": {
+            "type": "string"
+          },
+          "service_name": {
+            "type": "string"
+          },
+          "start_time": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "proposal_id",
+          "service_id",
+          "service_name",
+          "date",
+          "start_time",
+          "end_time",
+          "quantity"
+        ],
+        "type": "object"
+      },
       "ConversationChannel": {
         "enum": [
           "web_chat",
@@ -1707,6 +1744,68 @@
           "name",
           "public_slug",
           "preset_id"
+        ],
+        "type": "object"
+      },
+      "PublicChatConfirmationInput": {
+        "additionalProperties": false,
+        "properties": {
+          "proposal_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "proposal_id"
+        ],
+        "type": "object"
+      },
+      "PublicChatConversationResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "automation_state": {
+            "$ref": "#/components/schemas/ConversationAutomationState"
+          },
+          "automation_suppressed": {
+            "type": "boolean"
+          },
+          "conversation_id": {
+            "type": "string"
+          },
+          "message": {
+            "$ref": "#/components/schemas/ConversationMessageResponse"
+          },
+          "proposal": {
+            "$ref": "#/components/schemas/ConversationBookingProposalResponse"
+          },
+          "reservation": {
+            "$ref": "#/components/schemas/ReservationResponse"
+          }
+        },
+        "required": [
+          "conversation_id",
+          "automation_state"
+        ],
+        "type": "object"
+      },
+      "PublicChatMessageInput": {
+        "additionalProperties": false,
+        "properties": {
+          "content": {
+            "type": "string"
+          },
+          "display_name": {
+            "type": "string"
+          },
+          "external_message_id": {
+            "type": "string"
+          },
+          "thread_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "thread_id",
+          "content"
         ],
         "type": "object"
       },
@@ -4396,6 +4495,210 @@
         "summary": "Read availability for a service in a published booking experience.",
         "tags": [
           "Public booking"
+        ]
+      }
+    },
+    "/v1/public/experiences/{slug}/chat/conversations/{conversation_id}/confirm": {
+      "post": {
+        "operationId": "confirmPublicChatBooking",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "conversation_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/TenantIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/VenueIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/CorrelationIdHeader"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PublicChatConfirmationInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicChatConversationResponse"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformErrorResponse"
+                }
+              }
+            },
+            "description": "Platform error response."
+          }
+        },
+        "summary": "Explicitly confirm a validated conversational booking proposal.",
+        "tags": [
+          "Public chat"
+        ]
+      }
+    },
+    "/v1/public/experiences/{slug}/chat/conversations/{conversation_id}/messages": {
+      "get": {
+        "operationId": "listPublicChatMessages",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "conversation_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "before",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/TenantIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/VenueIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/CorrelationIdHeader"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListConversationMessagesResponse"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformErrorResponse"
+                }
+              }
+            },
+            "description": "Platform error response."
+          }
+        },
+        "summary": "Restore a published experience conversation timeline.",
+        "tags": [
+          "Public chat"
+        ]
+      }
+    },
+    "/v1/public/experiences/{slug}/chat/messages": {
+      "post": {
+        "operationId": "sendPublicChatMessage",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/TenantIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/VenueIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/CorrelationIdHeader"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PublicChatMessageInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicChatConversationResponse"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformErrorResponse"
+                }
+              }
+            },
+            "description": "Platform error response."
+          }
+        },
+        "summary": "Send a customer message through a published web-chat experience.",
+        "tags": [
+          "Public chat"
         ]
       }
     },

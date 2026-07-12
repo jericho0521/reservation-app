@@ -46,6 +46,9 @@ import type {
   MetadataResponse,
   PlatformErrorBody,
   PublicExperienceResponse,
+  PublicChatConfirmationInput,
+  PublicChatConversationResponse,
+  PublicChatMessageInput,
   ReservationResponse,
   RescheduleReservationInput,
   ResourceLayoutResponse,
@@ -168,6 +171,9 @@ export interface ReservationPlatformClient {
   createPublicExperienceReservation(slug: string, input: CreateReservationInput, options?: RequestOptions): Promise<ReservationResponse>;
   getManagedReservation(slug: string, token: string, options?: RequestOptions): Promise<ReservationResponse>;
   cancelManagedReservation(slug: string, token: string, options?: RequestOptions): Promise<ReservationResponse>;
+  sendPublicChatMessage(slug: string, input: PublicChatMessageInput, options?: RequestOptions): Promise<PublicChatConversationResponse>;
+  listPublicChatMessages(slug: string, conversationId: string, input?: ListConversationMessagesQuery, options?: RequestOptions): Promise<ListConversationMessagesResponse>;
+  confirmPublicChatBooking(slug: string, conversationId: string, input: PublicChatConfirmationInput, options?: RequestOptions): Promise<PublicChatConversationResponse>;
   getMetadata(options?: RequestOptions): Promise<MetadataResponse>;
   getCurrentTenant(options?: RequestOptions): Promise<TenantResponse>;
   listVenues(input?: ListVenuesQuery, options?: RequestOptions): Promise<ListVenuesResponse>;
@@ -286,6 +292,27 @@ export function createReservationPlatformClient(
       method: "POST",
       path: `/public/experiences/${encodeURIComponent(slug)}/manage/${encodeURIComponent(token)}/cancel`,
       body: {},
+      options,
+      public: true,
+    }),
+    sendPublicChatMessage: (slug, input, options) => request({
+      method: "POST",
+      path: `/public/experiences/${encodeURIComponent(slug)}/chat/messages`,
+      body: input,
+      options,
+      public: true,
+    }),
+    listPublicChatMessages: (slug, conversationId, input, options) => request({
+      method: "GET",
+      path: `/public/experiences/${encodeURIComponent(slug)}/chat/conversations/${encodeURIComponent(conversationId)}/messages`,
+      query: input,
+      options,
+      public: true,
+    }),
+    confirmPublicChatBooking: (slug, conversationId, input, options) => request({
+      method: "POST",
+      path: `/public/experiences/${encodeURIComponent(slug)}/chat/conversations/${encodeURIComponent(conversationId)}/confirm`,
+      body: input,
       options,
       public: true,
     }),

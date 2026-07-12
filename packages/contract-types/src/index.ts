@@ -323,6 +323,36 @@ export interface ConversationStaffReplyInput {
   content: string;
 }
 
+export interface PublicChatMessageInput {
+  thread_id: string;
+  external_message_id?: string;
+  content: string;
+  display_name?: string;
+}
+
+export interface ConversationBookingProposalResponse {
+  proposal_id: string;
+  service_id: string;
+  service_name: string;
+  date: string;
+  start_time: string;
+  end_time: string;
+  quantity: number;
+}
+
+export interface PublicChatConversationResponse {
+  conversation_id: string;
+  automation_state: ConversationAutomationState;
+  message?: ConversationMessageResponse;
+  proposal?: ConversationBookingProposalResponse;
+  reservation?: ReservationResponse;
+  automation_suppressed?: boolean;
+}
+
+export interface PublicChatConfirmationInput {
+  proposal_id: string;
+}
+
 export interface ListServicesResponse {
   services: ServiceResponse[];
 }

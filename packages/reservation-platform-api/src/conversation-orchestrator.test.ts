@@ -52,7 +52,7 @@ test("a proposal waits for explicit confirmation and confirmation replays idempo
 
   const first = await confirmConversationBooking({ scope, conversationId: "conversation_1", proposalId: proposalId!, dependencies: fixture.dependencies });
   const replay = await confirmConversationBooking({ scope, conversationId: "conversation_1", proposalId: proposalId!, dependencies: fixture.dependencies });
-  assert.equal(first.status, 201);
+  assert.equal(first.status, 200);
   assert.equal(replay.status, 200);
   assert.equal(fixture.createCalls.length, 1);
   assert.equal(fixture.createCalls[0]?.idempotencyKey, "conversation-confirm-proposal_1");
@@ -150,7 +150,7 @@ function createFixture(options: {
     state,
     tools,
     responder: { async respond() { responderCalls += 1; return options.responder; } },
-    loadExperience: async () => ({ businessName: "Apex Racing", knowledge: [] }),
+    loadExperience: async () => ({ businessName: "Apex Racing", knowledge: [], services: [] }),
     createProposalId: () => "proposal_1",
     audit: { record(event) { audits.push({ type: event.type }); } },
   };

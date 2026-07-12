@@ -25,6 +25,7 @@ import {
   type PublicExperienceResponse,
 } from "@reservation-platform/contract-types";
 import { createAssignedResourcePolicy, type ReservationService } from "@project-play/reservations-core";
+import { InMemoryConversationBookingStateStore } from "@reservation-platform/api";
 import type {
   AuthenticatedPlatformPrincipal,
   AvailabilityRepositoryPort,
@@ -34,6 +35,7 @@ import type {
   ExperienceStudioRepository,
   ExperienceKnowledgeRepository,
   ConversationRepository,
+  ConversationOrchestratorDependencies,
   OperatingHoursRepository,
   PlatformCatalogRepository,
   PlatformTenantVenueRepository,
@@ -610,6 +612,53 @@ test("conversation owner routes reject missing authentication before repository 
   });
   assert.equal(response.status, 401);
   assert.equal(called, false);
+});
+
+test("published web chat is public, slug scoped, and omits private conversation scope", async () => {
+  const scopes: unknown[] = [];
+  const repository = conversationRepository({
+    async getOrCreate(scope) { scopes.push(scope); return { data: conversationFixture({ channel: "web_chat" }) }; },
+    async get(scope, id) { scopes.push({ scope, id }); return { data: id === "conversation/1" ? conversationFixture({ channel: "web_chat" }) : undefined }; },
+  });
+  const dependencies = {
+    serviceApiKey: "secret",
+    experienceStudioRepository: webChatExperienceRepository(),
+    conversationRepository: repository,
+    conversationOrchestrator: publicChatOrchestrator(repository),
+  };
+  const sent = await handleStandaloneApiRequest({
+    method: "POST",
+    path: "/v1/public/experiences/apex-racing/chat/messages",
+    headers: {},
+    body: { thread_id: "thread_123", content: "Hello" },
+  }, dependencies);
+  const restored = await handleStandaloneApiRequest({
+    method: "GET",
+    path: "/v1/public/experiences/apex-racing/chat/conversations/conversation%2F1/messages?limit=20",
+    headers: {},
+  }, dependencies);
+  assert.equal(sent.status, 200);
+  assert.equal(restored.status, 200);
+  assert.equal("tenant_id" in (sent.body as Record<string, unknown>), false);
+  assert.deepEqual(scopes, [
+    { tenantId: "tenant_1", venueId: "venue_1" },
+    { scope: { tenantId: "tenant_1", venueId: "venue_1" }, id: "conversation/1" },
+  ]);
+});
+
+test("public chat stays hidden when the published channel is disabled or conversation is outside scope", async () => {
+  const disabled = await handleStandaloneApiRequest({
+    method: "POST",
+    path: "/v1/public/experiences/apex-racing/chat/messages",
+    body: { thread_id: "thread_123", content: "Hello" },
+  }, { experienceStudioRepository: fakeExperienceRepository() });
+  const repository = conversationRepository({ async get() { return { data: undefined }; } });
+  const outsideScope = await handleStandaloneApiRequest({
+    method: "GET",
+    path: "/v1/public/experiences/apex-racing/chat/conversations/other/messages",
+  }, { experienceStudioRepository: webChatExperienceRepository(), conversationRepository: repository });
+  assert.equal(disabled.status, 404);
+  assert.equal(outsideScope.status, 404);
 });
 
 test("experience validation blocks publication until required sections pass", async () => {
@@ -4776,6 +4825,31 @@ function conversationRepository(overrides: Partial<ConversationRepository> = {})
     append: async () => ({ data: conversationMessageFixture() }),
     updateAutomation: async () => ({ data: conversationFixture() }),
     ...overrides,
+  };
+}
+
+function webChatExperienceRepository() {
+  const workspace = experienceWorkspaceFixture();
+  return fakeExperienceRepository({
+    readPublishedBySlug: async () => ({
+      profile: workspace.profile,
+      configuration: { ...workspace.published!, channels: { ...workspace.published!.channels, web_chat: true } },
+    }),
+  });
+}
+
+function publicChatOrchestrator(conversations: ConversationRepository): ConversationOrchestratorDependencies {
+  return {
+    conversations,
+    state: new InMemoryConversationBookingStateStore(),
+    responder: { respond: async () => ({ content: "How can I help?", supported: true }) },
+    tools: {
+      getService: async () => undefined,
+      checkAvailability: async () => ({ slots: [] }),
+      createReservation: async () => { throw new Error("explicit confirmation only"); },
+    },
+    loadExperience: async () => ({ businessName: "Apex Racing", knowledge: [], services: [] }),
+    createProposalId: () => "proposal_1",
   };
 }
 

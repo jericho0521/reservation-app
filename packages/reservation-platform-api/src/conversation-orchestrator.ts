@@ -29,6 +29,7 @@ export interface NormalizedConversationInbound {
 export interface ConversationExperienceContext {
   businessName: string;
   knowledge: Array<{ question: string; answer: string }>;
+  services: Array<{ serviceId: string; name: string }>;
 }
 
 export interface ConversationResponderResult {
@@ -204,7 +205,7 @@ export async function confirmConversationBooking(input: {
       });
       if (message.error || !message.data) throw message.error ?? new Error("confirmation message unavailable");
       await safeAudit(input.dependencies.audit, { type: "conversation.reservation.created", scope, conversationId: conversation.conversation_id, data: { proposal_id: proposal.proposalId, reservation_id: reservation.reservation_id } });
-      return { status: 201, body: { conversation, message: message.data, proposal: { ...proposal, status: "confirmed", reservation }, reservation } };
+      return { status: 200, body: { conversation, message: message.data, proposal: { ...proposal, status: "confirmed", reservation }, reservation } };
     } catch (error) {
       await input.dependencies.state.release(scope, proposal.proposalId);
       throw error;

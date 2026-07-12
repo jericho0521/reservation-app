@@ -321,6 +321,7 @@ test("standalone Supabase runtime wires public and admin clients to repository f
   assert.equal(Boolean(dependencies.catalogRepository), true);
   assert.equal(Boolean(dependencies.availabilityRepository), true);
   assert.equal(Boolean(dependencies.conversationRepository), true);
+  assert.equal(Boolean(dependencies.conversationOrchestrator), true);
   assert.equal(Boolean(dependencies.reservationReadRepository), true);
   assert.equal(Boolean(dependencies.reservationCreateRepository), true);
   assert.equal(Boolean(dependencies.reservationManagementRepository), true);

@@ -8,11 +8,17 @@ import {
 import type { MetadataRecord } from "@reservation-platform/contract-types";
 import {
   createReservation,
+  createAgentConversationResponder,
+  createDeterministicConversationResponder,
   getPlatformService,
+  InMemoryConversationBookingStateStore,
   listAvailability,
+  listExperienceKnowledge,
   listPlatformServices,
   prepareLegacyReservationCreate,
   type AvailabilityRepositoryPort,
+  type ConversationOrchestratorDependencies,
+  type ExperienceScope,
   type PlatformCatalogRepository,
   type ReservationCreateRepositoryPort,
 } from "@reservation-platform/api";
@@ -257,10 +263,12 @@ export function createStandaloneSupabaseDependencies(
         tenantVenueRepository: repositoryFactories.createTenantVenueRepository(adminClient),
       }
     : {};
+  const conversationOrchestrator = createWebChatOrchestrator(platformDependencies);
 
   return {
     ...authDependencies,
     ...platformDependencies,
+    ...(conversationOrchestrator ? { conversationOrchestrator } : {}),
   };
 }
 
@@ -288,10 +296,84 @@ export function createStandaloneSupabaseDependenciesFromEnv(
   }
 
   const supabaseDependencies = createStandaloneSupabaseDependencies(config, runtimeOptions);
+  const agentRuntime = createWebChatAgentRuntime(env, platformConfig, options.fetch);
+  if (platformConfig?.modules.ai.enabled && !agentRuntime) {
+    throw new PlatformRuntimeConfigError(["modules.ai.enabled requires AI_AGENT_API_KEY plus provider baseUrl and model"]);
+  }
+  const conversationOrchestrator = createWebChatOrchestrator(supabaseDependencies, agentRuntime);
   return {
     ...supabaseDependencies,
     ...authDependencies,
+    ...(conversationOrchestrator ? { conversationOrchestrator } : {}),
     ...standaloneWhatsAppDependenciesFromEnv(env, runtimeOptions, normalizedConfig, supabaseDependencies),
+  };
+}
+
+function createWebChatAgentRuntime(env: StandaloneSupabaseEnv, platformConfig: PlatformRuntimeConfig | undefined, fetchImpl?: typeof fetch) {
+  const settings = platformConfig?.modules.ai.enabled ? platformConfig.modules.ai : undefined;
+  return settings
+    ? createWhatsAppAgentRuntimeFromSettings(settings, env, { fetch: fetchImpl })
+    : createWhatsAppAgentRuntimeFromEnv(env, { fetch: fetchImpl });
+}
+
+function createWebChatOrchestrator(
+  dependencies: StandaloneApiDependencies,
+  agentRuntime?: ReturnType<typeof createWhatsAppAgentRuntimeFromEnv>,
+): ConversationOrchestratorDependencies | undefined {
+  const {
+    conversationRepository: conversations,
+    catalogRepository,
+    availabilityRepository,
+    reservationCreateRepository,
+    experienceStudioRepository,
+    experienceKnowledgeRepository,
+  } = dependencies;
+  if (!conversations || !catalogRepository || !availabilityRepository || !reservationCreateRepository || !experienceStudioRepository || !experienceKnowledgeRepository) return undefined;
+  const responder = agentRuntime
+    ? createAgentConversationResponder(agentRuntime)
+    : createDeterministicConversationResponder();
+  return {
+    conversations,
+    state: new InMemoryConversationBookingStateStore(),
+    responder,
+    async loadExperience(scope) {
+      const [workspace, knowledgeResult, servicesResult] = await Promise.all([
+        experienceStudioRepository.readWorkspace(scope),
+        listExperienceKnowledge({ scope, repository: experienceKnowledgeRepository }),
+        listPlatformServices(catalogRepository, { venueId: scope.venueId }),
+      ]);
+      if (!workspace || !("entries" in knowledgeResult.body) || !("services" in servicesResult.body)) throw new Error("Experience context unavailable.");
+      return {
+        businessName: workspace.profile.name,
+        knowledge: knowledgeResult.body.entries.map((entry) => ({ question: entry.question, answer: entry.answer })),
+        services: servicesResult.body.services.map((service) => ({ serviceId: service.service_id, name: service.name })),
+      };
+    },
+    tools: createConversationBookingTools({ catalogRepository, availabilityRepository, reservationCreateRepository }),
+  };
+}
+
+function createConversationBookingTools(input: {
+  catalogRepository: PlatformCatalogRepository;
+  availabilityRepository: AvailabilityRepositoryPort;
+  reservationCreateRepository: ReservationCreateRepositoryPort;
+}): ConversationOrchestratorDependencies["tools"] {
+  return {
+    async getService(_scope: ExperienceScope, serviceId: string) {
+      const result = await getPlatformService(input.catalogRepository, serviceId);
+      return "service_id" in result.body ? result.body : undefined;
+    },
+    async checkAvailability(_scope: ExperienceScope, { serviceId, date }) {
+      const result = await listAvailability({ repository: input.availabilityRepository, query: new URLSearchParams({ service_id: serviceId, date }) });
+      if (!("slots" in result.body)) throw new Error(result.body.error.message);
+      return result.body;
+    },
+    async createReservation(_scope: ExperienceScope, reservation) {
+      const legacy = prepareLegacyReservationCreate(reservation);
+      const result = await createReservation({ repository: input.reservationCreateRepository, legacyInput: legacy.legacyInput });
+      if (!("reservation_id" in result.body)) throw new Error(result.body.error.message);
+      return result.body;
+    },
   };
 }
 

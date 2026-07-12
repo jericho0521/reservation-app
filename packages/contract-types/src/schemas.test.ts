@@ -23,6 +23,8 @@ import {
   platformErrorResponseSchema,
   publicContractOperations,
   publicExperienceResponseSchema,
+  publicChatConversationResponseSchema,
+  publicChatMessageInputSchema,
   reservationResponseSchema,
   resourceLayoutResponseSchema,
   rescheduleReservationInputSchema,
@@ -96,6 +98,27 @@ test("conversation contracts expose display-safe participants and strict takeove
   assert.equal(conversationAutomationInputSchema.safeParse({ automation_state: "manual" }).success, true);
   assert.equal(conversationAutomationInputSchema.safeParse({ automation_state: "manual", unexpected: true }).success, false);
   assert.equal(conversationStaffReplyInputSchema.safeParse({ content: "  " }).success, false);
+});
+
+test("public chat contracts require opaque threads and omit private conversation scope", () => {
+  assert.equal(publicChatMessageInputSchema.safeParse({ thread_id: "thread_123", content: "Find a slot" }).success, true);
+  assert.equal(publicChatMessageInputSchema.safeParse({ thread_id: "short", content: "Find a slot" }).success, false);
+  const response = {
+    conversation_id: "conversation_1",
+    automation_state: "automated",
+    message: {
+      message_id: "message_1",
+      conversation_id: "conversation_1",
+      channel: "web_chat",
+      direction: "outbound",
+      sender_type: "automation",
+      delivery_state: "sent",
+      content: "How can I help?",
+      created_at: "2026-08-01T00:00:00.000Z",
+    },
+  };
+  assert.equal(publicChatConversationResponseSchema.safeParse(response).success, true);
+  assert.equal(publicChatConversationResponseSchema.safeParse({ ...response, tenant_id: "tenant_private" }).success, false);
 });
 
 test("experience draft rejects unknown preset ids", () => {

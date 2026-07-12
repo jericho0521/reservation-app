@@ -45,7 +45,7 @@ export default async function ExperiencePage({ params }: ExperiencePageProps) {
         <p>{branding.description ?? `Find the right ${terminology.resource.toLowerCase()} and reserve your ${terminology.booking.toLowerCase()} in a few focused steps.`}</p>
         <div className="hero-actions">
           {channels.web_booking ? <Link className="hero-action" href={`/${profile.public_slug}/book`}>Start your {terminology.booking.toLowerCase()}</Link> : null}
-          {channels.web_chat ? <span className="hero-secondary">AI chat available</span> : null}
+          {channels.web_chat ? <Link className="hero-secondary" href={`/${profile.public_slug}/chat`}>Chat with our booking assistant</Link> : null}
           {channels.whatsapp ? <span className="hero-secondary">WhatsApp available</span> : null}
         </div>
       </section>

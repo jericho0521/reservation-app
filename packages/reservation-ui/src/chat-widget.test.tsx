@@ -1,0 +1,22 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import { ChatWidget } from "./chat/chat-widget.js";
+
+function text(node: unknown): string {
+  if (typeof node === "string" || typeof node === "number") return String(node);
+  if (!node || typeof node !== "object") return "";
+  const children = (node as { props?: { children?: unknown } }).props?.children;
+  return (Array.isArray(children) ? children : [children]).map(text).join("");
+}
+
+test("chat widget renders proposal confirmation, retry, typing, and handoff states", () => {
+  const base = { brandName: "Apex", messages: [], draft: "", onDraftChange() {}, onSend() {}, onConfirm() {}, onRetry() {} };
+  const proposal = ChatWidget({ ...base, proposal: { proposal_id: "p1", service_id: "s1", service_name: "Sprint", date: "2026-08-10", start_time: "14:00", end_time: "15:00", quantity: 1 } });
+  assert.match(text(proposal), /Ready for confirmation.*Confirm booking.*No reservation is created/u);
+  const loading = ChatWidget({ ...base, loading: true });
+  assert.match(text(loading), /Assistant is checking/u);
+  const failed = ChatWidget({ ...base, error: "Offline", canRetry: true });
+  assert.match(text(failed), /OfflineRetry/u);
+  const handoff = ChatWidget({ ...base, handoff: true });
+  assert.match(text(handoff), /Staff joined.*Automated replies are paused/u);
+});

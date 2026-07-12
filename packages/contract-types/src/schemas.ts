@@ -376,6 +376,30 @@ export const listConversationMessagesResponseSchema = strictObject({
 });
 export const conversationAutomationInputSchema = strictObject({ automation_state: conversationAutomationStateSchema });
 export const conversationStaffReplyInputSchema = strictObject({ content: z.string().trim().min(1).max(4000) });
+export const publicChatMessageInputSchema = strictObject({
+  thread_id: z.string().trim().min(8).max(200),
+  external_message_id: z.string().trim().min(1).max(200).optional(),
+  content: z.string().trim().min(1).max(4000),
+  display_name: z.string().trim().min(1).max(120).optional(),
+});
+export const conversationBookingProposalResponseSchema = strictObject({
+  proposal_id: z.string().min(1),
+  service_id: z.string().min(1),
+  service_name: z.string().min(1),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  start_time: z.string().min(1),
+  end_time: z.string().min(1),
+  quantity: z.number().int().positive(),
+});
+export const publicChatConversationResponseSchema = strictObject({
+  conversation_id: z.string().min(1),
+  automation_state: conversationAutomationStateSchema,
+  message: conversationMessageResponseSchema.optional(),
+  proposal: conversationBookingProposalResponseSchema.optional(),
+  reservation: z.lazy(() => reservationResponseSchema).optional(),
+  automation_suppressed: z.boolean().optional(),
+});
+export const publicChatConfirmationInputSchema = strictObject({ proposal_id: z.string().trim().min(1).max(200) });
 
 export const listServicesResponseSchema = strictObject({
   services: z.array(serviceResponseSchema),

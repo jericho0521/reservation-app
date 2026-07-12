@@ -294,6 +294,43 @@
       ],
       "type": "string"
     },
+    "ConversationBookingProposalResponse": {
+      "additionalProperties": false,
+      "properties": {
+        "date": {
+          "type": "string"
+        },
+        "end_time": {
+          "type": "string"
+        },
+        "proposal_id": {
+          "type": "string"
+        },
+        "quantity": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "service_id": {
+          "type": "string"
+        },
+        "service_name": {
+          "type": "string"
+        },
+        "start_time": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "proposal_id",
+        "service_id",
+        "service_name",
+        "date",
+        "start_time",
+        "end_time",
+        "quantity"
+      ],
+      "type": "object"
+    },
     "ConversationChannel": {
       "enum": [
         "web_chat",
@@ -1672,6 +1709,68 @@
         "name",
         "public_slug",
         "preset_id"
+      ],
+      "type": "object"
+    },
+    "PublicChatConfirmationInput": {
+      "additionalProperties": false,
+      "properties": {
+        "proposal_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "proposal_id"
+      ],
+      "type": "object"
+    },
+    "PublicChatConversationResponse": {
+      "additionalProperties": false,
+      "properties": {
+        "automation_state": {
+          "$ref": "#/$defs/ConversationAutomationState"
+        },
+        "automation_suppressed": {
+          "type": "boolean"
+        },
+        "conversation_id": {
+          "type": "string"
+        },
+        "message": {
+          "$ref": "#/$defs/ConversationMessageResponse"
+        },
+        "proposal": {
+          "$ref": "#/$defs/ConversationBookingProposalResponse"
+        },
+        "reservation": {
+          "$ref": "#/$defs/ReservationResponse"
+        }
+      },
+      "required": [
+        "conversation_id",
+        "automation_state"
+      ],
+      "type": "object"
+    },
+    "PublicChatMessageInput": {
+      "additionalProperties": false,
+      "properties": {
+        "content": {
+          "type": "string"
+        },
+        "display_name": {
+          "type": "string"
+        },
+        "external_message_id": {
+          "type": "string"
+        },
+        "thread_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "thread_id",
+        "content"
       ],
       "type": "object"
     },

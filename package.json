@@ -40,7 +40,7 @@
     "backend-platform:live-proof:strict": "node scripts/verify-standalone-backend-live-proof.mjs --strict",
     "backend-platform:db-backed-live-parity-proof": "node scripts/verify-db-backed-standalone-live-parity.mjs",
     "backend-platform:db-backed-live-parity-proof:strict": "node scripts/verify-db-backed-standalone-live-parity.mjs --strict",
-    "deploy:verify": "pnpm run backend-platform:verify-standalone-deployment-config && node scripts/verify-docker-deployment-files.mjs",
+    "deploy:verify": "pnpm run backend-platform:verify-standalone-deployment-config && node scripts/verify-docker-deployment-files.mjs && node scripts/verify-final-security.mjs",
     "docker:build": "docker build -t reservation-platform-backend:local .",
     "docker:run": "docker run --rm --env-file .env -p 4100:4100 reservation-platform-backend:local",
     "docker:compose:up": "docker compose up --build reservation-api",

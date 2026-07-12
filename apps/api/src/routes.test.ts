@@ -599,6 +599,34 @@ test("analytics route validates and forwards a scoped descriptive query", async 
   assert.equal(invalid.status, 400);
 });
 
+test("new owner operations reject cross-tenant object and aggregate access", async () => {
+  const headers = { authorization: "Bearer secret", "x-reservation-tenant-id": "attacker", "x-reservation-venue-id": "attacker_venue" };
+  const conversation = await handleStandaloneApiRequest({ method: "GET", path: "/v1/conversations/victim_conversation", headers }, {
+    serviceApiKey: "secret",
+    conversationRepository: conversationRepository({ async get(scope) { return { data: scope.tenantId === "victim" ? conversationFixture() : undefined }; } }),
+  });
+  const overview = await handleStandaloneApiRequest({ method: "GET", path: "/v1/operations/overview", headers }, {
+    serviceApiKey: "secret",
+    operationsOverviewRepository: { async read(scope, now) { return { data: {
+      generated_at: now.toISOString(), timezone: "UTC", local_date: "2026-08-05",
+      reservations: { today: scope.tenantId === "victim" ? 99 : 0, pending: 0, confirmed: 0, completed: 0, cancelled: 0, timeline: [] },
+      resources: { total: 0, available: 0, maintenance: 0 }, conversations: { open: 0, staff_takeover: 0 },
+    } }; } },
+  });
+  const analytics = await handleStandaloneApiRequest({ method: "GET", path: "/v1/analytics?from=2026-08-01&to=2026-08-05", headers }, {
+    serviceApiKey: "secret",
+    analyticsRepository: { async read(scope, query) { return { data: {
+      generated_at: "2026-08-05T00:00:00Z", timezone: "UTC", from_date: query.from, to_date: query.to, include_simulation: false,
+      totals: { reservations: scope.tenantId === "victim" ? 99 : 0, cancelled: 0, cancellation_rate: 0 }, reservations_by_day: [], reservations_by_status: [], reservations_by_channel: [], channel_performance: [], reservations_by_service: [], popular_slots: [],
+      funnel: { conversations_started: 0, proposal_shown: 0, confirmation_requested: 0, reservations_created: 0 }, automation: { automated_conversations: 0, staff_takeovers: 0, containment_rate: 0, takeover_rate: 0 },
+    } }; } },
+  });
+  assert.equal(conversation.status, 404);
+  assert.equal((overview.body as { reservations: { today: number } }).reservations.today, 0);
+  assert.equal((analytics.body as { totals: { reservations: number } }).totals.reservations, 0);
+  assert.doesNotMatch(JSON.stringify([conversation.body, overview.body, analytics.body]), /victim_conversation|"reservations":99/u);
+});
+
 test("conversation owner routes preserve scope, filters, chronology, replies, and takeover", async () => {
   const observed: unknown[] = [];
   const delivered: unknown[] = [];

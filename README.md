@@ -1,12 +1,32 @@
 # Reservation Platform
 
-Backend modules, API host, database bundle, contracts, SDK, React hooks, reusable
-UI components, and forkable examples for a modular booking platform.
+An omnichannel reservation experience platform: owners configure and publish an
+industry-specific booking experience, customers reserve through web or an AI
+conversation, and staff operate every channel from one command center.
 
 This branch is the frontend-and-backend modular platform direction. Backend
 credentials stay in the backend API, while frontends consume the platform through
 `/v1`, `@reservation-platform/sdk`, `@reservation-platform/react`, or
 `@reservation-platform/ui`.
+
+## Final Demonstration
+
+The deterministic demo tells one complete story across three polished domains:
+
+1. Create, preview, validate, and publish an experience in Experience Studio.
+2. Book a racing simulator, capacity-matched room, or specialist appointment.
+3. Run the same proposal-and-confirmation workflow through AI chat or the
+   credential-free WhatsApp simulation.
+4. Pause automation, reply as staff, manage reservations and maintenance, and
+   inspect channel conversion and demand analytics.
+
+Eight industry presets share the same platform model. Racing, rooms, and
+appointments are the deliberately polished flagship examples; the other five
+prove configurability without introducing separate domain subsystems.
+
+For the full system design and presentation path, see
+[`docs/architecture/final-platform-architecture.md`](docs/architecture/final-platform-architecture.md)
+and [`docs/demo/final-demonstration-runbook.md`](docs/demo/final-demonstration-runbook.md).
 
 ## Project Intent
 
@@ -304,7 +324,10 @@ tests/
     backend-reservation.smoke.ts
     whatsapp-readiness.smoke.ts
   e2e/
-    examples-room-booking.e2e.ts
+    studio-publish-book.e2e.ts
+    omnichannel-booking.e2e.ts
+    staff-takeover.e2e.ts
+    operations-analytics.e2e.ts
 ```
 
 Run backend smoke checks against a running backend:
@@ -321,16 +344,15 @@ When no backend URL is explicitly configured and `localhost:4100` is not
 running, the smoke tests skip safely. Set `RESERVATION_SMOKE_STRICT=1` when CI
 should fail instead of skip.
 
-Run the room-booking example e2e readiness check:
+Run the deterministic presentation-critical e2e journeys:
 
 ```powershell
 pnpm run test:e2e
 ```
 
-Safe locally. Without `ROOM_BOOKING_E2E_BASE_URL`, it verifies the example app is
-wired to `@reservation-platform/react`, `@reservation-platform/ui`, and public
-backend env config. With `ROOM_BOOKING_E2E_BASE_URL`, it also performs a
-read-only page request.
+Safe locally. It validates and resets the checked-in demo seed, then proves the
+Studio-to-booking, omnichannel, staff-takeover, and operations/analytics paths.
+Optional live page checks run when their documented base URLs are configured.
 
 Live proof scripts such as `database:live-proof:strict`,
 `backend-platform:db-backed-live-parity-proof:strict`, and
@@ -339,7 +361,7 @@ database access, registry configuration, or external services.
 
 ## Branch Strategy
 
-This branch, `platform/frontend-backend-modules`, contains the modular platform
+This branch, `platform/backend-modules`, contains the modular platform
 monorepo direction: backend modules, frontend packages, SDK, database bundle,
 API host, and forkable example apps.
 
@@ -360,5 +382,9 @@ For a final-year-project submission, the clean story is:
 - SDK and contract packages are present for external consumers.
 - React hooks and reusable UI packages are present for frontend consumers.
 - Forkable frontend examples are present under `apps/examples`.
+- Experience Studio, owner operations, unified conversations, channel simulation,
+  and analytics are implemented in the owner console.
+- Deterministic final-demo reset, readiness, security, smoke, and e2e gates are
+  available from root package scripts.
 - Optional AI chat and WhatsApp backend modules are present, with production
   WhatsApp requiring database-backed storage and real provider/session config.

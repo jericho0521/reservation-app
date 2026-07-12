@@ -7,6 +7,81 @@ import {
   isPlatformError,
 } from "./index.js";
 
+test("experience SDK methods use scoped owner and public routes", async () => {
+  const requests: Array<{ url: string; init?: RequestInit }> = [];
+  const workspace = {
+    profile: {
+      business_id: "business_1",
+      tenant_id: "tenant_1",
+      venue_id: "venue_1",
+      name: "Apex Racing",
+      public_slug: "apex-racing",
+      preset_id: "racing_gaming",
+      status: "draft",
+    },
+  };
+  const client = createReservationPlatformClient({
+    baseUrl: "https://platform.example",
+    tenantId: "tenant_1",
+    venueId: "venue_1",
+    getAccessToken: () => "token",
+    fetch: async (url, init) => {
+      requests.push({ url: String(url), init });
+      return jsonResponse(String(url).includes("public/experiences")
+        ? {
+            profile: {
+              business_id: "business_1",
+              name: "Apex Racing",
+              public_slug: "apex-racing",
+              preset_id: "racing_gaming",
+            },
+            configuration: {
+              configuration_id: "configuration_1",
+              business_id: "business_1",
+              version: 1,
+              state: "published",
+              preset_id: "racing_gaming",
+              branding: { brand_name: "Apex Racing" },
+              terminology: { customer: "Driver", resource: "Simulator", booking: "Session" },
+              channels: { web_booking: true, web_chat: false, whatsapp: false },
+              updated_at: "2026-07-13T00:00:00.000Z",
+            },
+          }
+        : workspace);
+    },
+  });
+
+  await client.getExperienceWorkspace();
+  await client.saveExperienceDraft({
+    preset_id: "racing_gaming",
+    branding: { brand_name: "Apex Racing" },
+    terminology: { customer: "Driver", resource: "Simulator", booking: "Session" },
+    channels: { web_booking: true, web_chat: false, whatsapp: false },
+  });
+  await client.publishExperienceDraft("configuration_1");
+  await client.getPublicExperience("apex racing");
+
+  assert.equal(requests[0].url, "https://platform.example/v1/experience/workspace");
+  assert.equal(new Headers(requests[0].init?.headers).get("X-Reservation-Tenant-Id"), "tenant_1");
+  assert.equal(requests[1].init?.method, "PUT");
+  assert.deepEqual(JSON.parse(String(requests[1].init?.body)), {
+    preset_id: "racing_gaming",
+    branding: { brand_name: "Apex Racing" },
+    terminology: { customer: "Driver", resource: "Simulator", booking: "Session" },
+    channels: { web_booking: true, web_chat: false, whatsapp: false },
+  });
+  assert.equal(requests[2].init?.method, "POST");
+  assert.deepEqual(JSON.parse(String(requests[2].init?.body)), {
+    configuration_id: "configuration_1",
+  });
+  assert.equal(
+    requests[3].url,
+    "https://platform.example/v1/public/experiences/apex%20racing",
+  );
+  assert.equal(new Headers(requests[3].init?.headers).get("Authorization"), null);
+  assert.equal(new Headers(requests[3].init?.headers).get("X-Reservation-Tenant-Id"), null);
+});
+
 test("SDK maps createReservation to POST /v1/reservations with context headers", async () => {
   const calls: { url: string; init: RequestInit }[] = [];
   const client = createReservationPlatformClient({

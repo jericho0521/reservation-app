@@ -10,6 +10,9 @@ import type {
   CreateReservationInput,
   CreateResourceMaintenanceInput,
   EndResourceMaintenanceInput,
+  ExperienceDraftInput,
+  ExperiencePresetSummary,
+  ExperienceWorkspaceResponse,
   ListReservationsQuery,
   ListReservationsResponse,
   ListResourceMaintenanceQuery,
@@ -22,6 +25,7 @@ import type {
   ListVenuesResponse,
   MetadataResponse,
   PlatformErrorBody,
+  PublicExperienceResponse,
   ReservationResponse,
   RescheduleReservationInput,
   ResourceLayoutResponse,
@@ -116,6 +120,11 @@ export function createIdempotencyKey(prefix = "reservation-platform") {
 }
 
 export interface ReservationPlatformClient {
+  listExperiencePresets(options?: RequestOptions): Promise<{ presets: ExperiencePresetSummary[] }>;
+  getExperienceWorkspace(options?: RequestOptions): Promise<ExperienceWorkspaceResponse>;
+  saveExperienceDraft(input: ExperienceDraftInput, options?: RequestOptions): Promise<ExperienceWorkspaceResponse>;
+  publishExperienceDraft(configurationId: string, options?: RequestOptions): Promise<ExperienceWorkspaceResponse>;
+  getPublicExperience(slug: string, options?: RequestOptions): Promise<PublicExperienceResponse>;
   getMetadata(options?: RequestOptions): Promise<MetadataResponse>;
   getCurrentTenant(options?: RequestOptions): Promise<TenantResponse>;
   listVenues(input?: ListVenuesQuery, options?: RequestOptions): Promise<ListVenuesResponse>;
@@ -143,7 +152,7 @@ export interface ReservationPlatformClient {
   };
 }
 
-type HttpMethod = "GET" | "POST" | "PATCH";
+type HttpMethod = "GET" | "POST" | "PUT" | "PATCH";
 
 interface RequestConfig {
   method: HttpMethod;
@@ -152,6 +161,7 @@ interface RequestConfig {
   body?: unknown;
   options?: RequestOptions;
   stream?: boolean;
+  public?: boolean;
 }
 
 export function createReservationPlatformClient(
@@ -160,6 +170,21 @@ export function createReservationPlatformClient(
   const request = createRequester(clientOptions);
 
   return {
+    listExperiencePresets: (options) => request({ method: "GET", path: "/experience/presets", options }),
+    getExperienceWorkspace: (options) => request({ method: "GET", path: "/experience/workspace", options }),
+    saveExperienceDraft: (input, options) => request({ method: "PUT", path: "/experience/draft", body: input, options }),
+    publishExperienceDraft: (configurationId, options) => request({
+      method: "POST",
+      path: "/experience/publish",
+      body: { configuration_id: configurationId },
+      options,
+    }),
+    getPublicExperience: (slug, options) => request({
+      method: "GET",
+      path: `/public/experiences/${encodeURIComponent(slug)}`,
+      options,
+      public: true,
+    }),
     getMetadata: (options) => request({ method: "GET", path: "/metadata", options }),
     getCurrentTenant: (options) => request({ method: "GET", path: "/tenants/current", options }),
     listVenues: (input, options) => request({ method: "GET", path: "/venues", query: input, options }),
@@ -197,7 +222,7 @@ function createRequester(clientOptions: ReservationPlatformClientOptions) {
   }
 
   return async function request<T>(config: RequestConfig): Promise<T> {
-    const headers = await buildHeaders(clientOptions, config.options);
+    const headers = await buildHeaders(clientOptions, config.options, config.public === true);
     const url = buildUrl(clientOptions.baseUrl, apiVersion, config.path, config.query);
     const controller = createTimeoutController(config.options?.signal, config.options?.timeoutMs ?? clientOptions.timeoutMs);
     const init: RequestInit = {
@@ -256,17 +281,18 @@ function createRequester(clientOptions: ReservationPlatformClientOptions) {
 async function buildHeaders(
   clientOptions: ReservationPlatformClientOptions,
   requestOptions?: RequestOptions,
+  isPublic = false,
 ): Promise<Headers> {
   const headers = new Headers(await resolveHeaders(clientOptions.headers));
   mergeHeaders(headers, requestOptions?.headers);
 
-  const token = await resolveAccessToken(clientOptions.getAccessToken);
+  const token = isPublic ? undefined : await resolveAccessToken(clientOptions.getAccessToken);
   if (token) {
     headers.set("Authorization", `Bearer ${token}`);
   }
 
-  const tenantId = requestOptions?.tenantId ?? clientOptions.tenantId;
-  const venueId = requestOptions?.venueId ?? clientOptions.venueId;
+  const tenantId = isPublic ? undefined : requestOptions?.tenantId ?? clientOptions.tenantId;
+  const venueId = isPublic ? undefined : requestOptions?.venueId ?? clientOptions.venueId;
 
   if (tenantId) {
     headers.set("X-Reservation-Tenant-Id", tenantId);

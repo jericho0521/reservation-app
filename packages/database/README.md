@@ -27,9 +27,10 @@ This package makes the Phase 5 migration bundle concrete inside the workspace:
   search-path hardening and RPC privilege reassertions curated from
   `supabase/security-hardening.sql`, while excluding mixed-ownership
   seed/backfill, content/reporting, AI, and storage sections.
-- The atomic reservation RPC migration includes the canonical
-  `public.create_reservation_atomic(payload jsonb)` function, security
-  definer/search path configuration, and execute grant curated from
+- The reservation RPC migrations include the canonical
+  `public.create_reservation_atomic(payload jsonb)` mutation and
+  `public.read_reservation_availability_snapshot(uuid, date)` read function,
+  hardened search paths, and service-role-only execute grants curated from
   `supabase/create-reservation-atomic.sql`.
 - The platform idempotency migration includes the durable
   `platform_idempotency_records` table plus claim/store RPCs curated from

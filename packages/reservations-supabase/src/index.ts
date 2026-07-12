@@ -81,6 +81,10 @@ export const RESERVATION_SUPABASE_IDEMPOTENCY_RPCS = {
   storeCompleted: "platform_store_idempotency_record",
 } as const;
 
+export const RESERVATION_SUPABASE_AVAILABILITY_RPCS = {
+  readSnapshot: "read_reservation_availability_snapshot",
+} as const;
+
 const IDEMPOTENCY_UNSCOPED_TENANT = "__platform_unscoped__";
 
 export interface ServiceMetadataRow {
@@ -199,6 +203,14 @@ export interface SupabaseAvailabilityRead {
   maintenanceResourceLabels: string[];
 }
 
+interface SupabaseAvailabilitySnapshot {
+  service: ServiceMetadataRow;
+  bookings: LegacyBookingShape[];
+  maintenance: MaintenanceRow[];
+  resources: ResourceRow[];
+  layout: LayoutRow | null;
+}
+
 export interface SupabaseAvailabilityRepository {
   readAvailability(input: {
     serviceId: string;
@@ -301,6 +313,34 @@ function maybeSingleRpcRow(raw: unknown): Record<string, unknown> | null {
   }
 
   return isRecord(raw) ? raw : null;
+}
+
+function parseAvailabilitySnapshot(raw: unknown): SupabaseAvailabilitySnapshot | null {
+  if (raw === null) {
+    return null;
+  }
+
+  if (
+    !isRecord(raw)
+    || !isRecord(raw.service)
+    || !Array.isArray(raw.bookings)
+    || !Array.isArray(raw.maintenance)
+    || !Array.isArray(raw.resources)
+    || (raw.layout !== null && !isRecord(raw.layout))
+    || !raw.bookings.every(isRecord)
+    || !raw.maintenance.every(isRecord)
+    || !raw.resources.every(isRecord)
+  ) {
+    throw new Error("Availability snapshot RPC returned an invalid response");
+  }
+
+  return {
+    service: raw.service as unknown as ServiceMetadataRow,
+    bookings: raw.bookings as unknown as LegacyBookingShape[],
+    maintenance: raw.maintenance as MaintenanceRow[],
+    resources: raw.resources as unknown as ResourceRow[],
+    layout: raw.layout as LayoutRow | null,
+  };
 }
 
 function adaptIdempotencyRow(raw: unknown): IdempotencyRecord | null {
@@ -417,31 +457,18 @@ export function createSupabasePlatformCatalogRepository(
     },
 
     async listServices() {
-      let result = await fromTable(publicClient, RESERVATION_SUPABASE_TABLES.services)
+      const result = await fromTable(publicClient, RESERVATION_SUPABASE_TABLES.services)
         .select(RESERVATION_SUPABASE_SELECTS.catalogServiceWithResources)
         .order("name") as QueryResult<unknown>;
-
-      if (result.error) {
-        result = await fromTable(publicClient, RESERVATION_SUPABASE_TABLES.services)
-          .select("*")
-          .order("name") as QueryResult<unknown>;
-      }
 
       return toCatalogListResult(result);
     },
 
     async getService(id) {
-      let result = await fromTable(publicClient, RESERVATION_SUPABASE_TABLES.services)
+      const result = await fromTable(publicClient, RESERVATION_SUPABASE_TABLES.services)
         .select(RESERVATION_SUPABASE_SELECTS.catalogServiceWithResources)
         .eq("id", id)
         .single() as QueryResult<unknown>;
-
-      if (result.error) {
-        result = await fromTable(publicClient, RESERVATION_SUPABASE_TABLES.services)
-          .select("*")
-          .eq("id", id)
-          .single() as QueryResult<unknown>;
-      }
 
       return toCatalogReadResult(result);
     },
@@ -481,68 +508,35 @@ export function createSupabasePlatformCatalogRepository(
 export function createSupabaseAvailabilityRepository(
   input: SupabaseLikeClient | SupabasePlatformCatalogRepositoryClients,
 ): SupabaseAvailabilityRepository {
-  const { publicClient, adminClient } = resolvePlatformCatalogClients(input);
+  const { adminClient } = resolvePlatformCatalogClients(input);
 
   return {
     async readAvailability({ serviceId, date }) {
-      const serviceResult = await fromTable(publicClient, RESERVATION_SUPABASE_TABLES.services)
-        .select(RESERVATION_SUPABASE_SELECTS.service)
-        .eq("id", serviceId)
-        .single() as QueryResult<ServiceMetadataRow>;
-
-      if (serviceResult.error) {
-        throw serviceResult.error;
+      const admin = adminClient();
+      if (!admin.rpc) {
+        throw new Error("Supabase client does not support RPC calls");
       }
 
-      const service = serviceResult.data;
-      if (!service) {
+      const result = await admin.rpc(
+        RESERVATION_SUPABASE_AVAILABILITY_RPCS.readSnapshot,
+        { p_service_id: serviceId, p_date: date },
+      );
+      if (result.error) {
+        throw result.error;
+      }
+
+      const snapshot = parseAvailabilitySnapshot(result.data);
+      if (!snapshot) {
         throw createSupabaseNotFoundError(`Service not found: ${serviceId}`);
       }
 
-      const admin = adminClient();
-      const bookingsResult = await fromTable(admin, RESERVATION_SUPABASE_TABLES.bookings)
-        .select(RESERVATION_SUPABASE_SELECTS.booking)
-        .eq("service_id", serviceId)
-        .eq("booking_date", date)
-        .eq("status", "confirmed") as QueryResult<LegacyBookingShape[]>;
-      if (bookingsResult.error) {
-        throw bookingsResult.error;
-      }
-      const bookings = bookingsResult.data ?? [];
-
-      const maintenanceResult = await fromTable(admin, RESERVATION_SUPABASE_TABLES.serviceSeatMaintenance)
-        .select(RESERVATION_SUPABASE_SELECTS.maintenance)
-        .eq("service_id", serviceId)
-        .eq("is_active", true) as QueryResult<MaintenanceRow[]>;
-      if (maintenanceResult.error) {
-        throw maintenanceResult.error;
-      }
-      const maintenanceRows = maintenanceResult.data ?? [];
-
-      const resourcesResult = await fromTable(admin, RESERVATION_SUPABASE_TABLES.reservableResources)
-        .select(RESERVATION_SUPABASE_SELECTS.availabilityResource)
-        .eq("service_id", serviceId) as QueryResult<ResourceRow[]>;
-      if (resourcesResult.error) {
-        throw resourcesResult.error;
-      }
-      const resources = resourcesResult.data ?? [];
-
-      const layoutResult = await fromTable(admin, RESERVATION_SUPABASE_TABLES.resourceLayouts)
-        .select(RESERVATION_SUPABASE_SELECTS.availabilityLayout)
-        .eq("service_id", serviceId)
-        .eq("is_active", true)
-        .maybeSingle() as QueryResult<LayoutRow>;
-      if (layoutResult.error) {
-        throw layoutResult.error;
-      }
-
       return {
-        service: adaptServiceMetadata(service, resources, layoutResult.data),
-        bookings: adaptBookingRows(bookings.map((booking) => ({
+        service: adaptServiceMetadata(snapshot.service, snapshot.resources, snapshot.layout),
+        bookings: adaptBookingRows(snapshot.bookings.map((booking) => ({
           ...booking,
           interface_type: booking.interface_type === "chat" ? "chat" : "form",
         }))),
-        maintenanceResourceLabels: adaptMaintenanceRows(maintenanceRows),
+        maintenanceResourceLabels: adaptMaintenanceRows(snapshot.maintenance),
       };
     },
   };

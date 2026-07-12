@@ -15,6 +15,7 @@ import {
   createSupabaseTenantVenueRepository,
   getAvailabilityMetadata,
   getLegacyFallbackLabels,
+  RESERVATION_SUPABASE_AVAILABILITY_RPCS,
   RESERVATION_SUPABASE_IDEMPOTENCY_RPCS,
   RESERVATION_SUPABASE_SELECTS,
   RESERVATION_SUPABASE_TABLES,
@@ -339,16 +340,14 @@ test("catalog repository does not create admin client for public catalog reads",
   assert.deepEqual(calls.map((call) => call.client), ["public", "public"]);
 });
 
-test("catalog repository falls back to simple service selects on rich select errors", async () => {
+test("catalog repository preserves strict service query errors without fallback reads", async () => {
   const calls: RecordedCatalogRead[] = [];
   const publicClient = createCatalogReadClient(
     "public",
     {
       [RESERVATION_SUPABASE_TABLES.services]: [
         { data: null, error: { message: "relationship missing" } },
-        { data: [{ id: "service-1" }], error: null },
         { data: null, error: { message: "relationship missing" } },
-        { data: { id: "service-1" }, error: null },
       ],
     },
     calls,
@@ -358,8 +357,8 @@ test("catalog repository falls back to simple service selects on rich select err
   const listResult = await repository.listServices();
   const getResult = await repository.getService("service-1");
 
-  assert.deepEqual(listResult, { data: [{ id: "service-1" }] });
-  assert.deepEqual(getResult, { data: { id: "service-1" } });
+  assert.equal(listResult.error?.message, "relationship missing");
+  assert.equal(getResult.error?.message, "relationship missing");
   assert.deepEqual(calls, [
     {
       client: "public",
@@ -371,22 +370,7 @@ test("catalog repository falls back to simple service selects on rich select err
     {
       client: "public",
       table: RESERVATION_SUPABASE_TABLES.services,
-      select: "*",
-      filters: [],
-      orders: ["name"],
-    },
-    {
-      client: "public",
-      table: RESERVATION_SUPABASE_TABLES.services,
       select: RESERVATION_SUPABASE_SELECTS.catalogServiceWithResources,
-      filters: [{ column: "id", value: "service-1" }],
-      orders: [],
-      cardinality: "single",
-    },
-    {
-      client: "public",
-      table: RESERVATION_SUPABASE_TABLES.services,
-      select: "*",
       filters: [{ column: "id", value: "service-1" }],
       orders: [],
       cardinality: "single",
@@ -431,14 +415,22 @@ test("catalog repository applies resource service filter with admin client", asy
   ]);
 });
 
-test("availability repository owns legacy availability Supabase query shapes", async () => {
-  const calls: RecordedCatalogRead[] = [];
-  const publicClient = createCatalogReadClient(
-    "public",
-    {
-      [RESERVATION_SUPABASE_TABLES.services]: [
-        {
-          data: {
+test("availability repository reads and adapts one database snapshot", async () => {
+  const rpcCalls: Array<{ fn: string; params?: Record<string, unknown> }> = [];
+  const publicClient = {
+    from() {
+      throw new Error("public client should not read availability tables");
+    },
+  };
+  const adminClient = {
+    from() {
+      throw new Error("availability snapshot should not issue table reads");
+    },
+    async rpc(fn: string, params?: Record<string, unknown>) {
+      rpcCalls.push({ fn, params });
+      return {
+        data: {
+          service: {
             id: "service-1",
             name: "Racing Simulator",
             total_seats: 2,
@@ -447,18 +439,7 @@ test("availability repository owns legacy availability Supabase query shapes", a
             selection_mode: "assigned_resource",
             reservation_policy: { max_quantity: 2 },
           },
-          error: null,
-        },
-      ],
-    },
-    calls,
-  );
-  const adminClient = createCatalogReadClient(
-    "admin",
-    {
-      [RESERVATION_SUPABASE_TABLES.bookings]: [
-        {
-          data: [{
+          bookings: [{
             id: "booking-1",
             service_id: "service-1",
             user_name: "Ada",
@@ -472,40 +453,25 @@ test("availability repository owns legacy availability Supabase query shapes", a
             status: "confirmed",
             interface_type: "chat",
           }],
-          error: null,
-        },
-      ],
-      [RESERVATION_SUPABASE_TABLES.serviceSeatMaintenance]: [
-        { data: [{ seat_label: "RS2" }], error: null },
-      ],
-      [RESERVATION_SUPABASE_TABLES.reservableResources]: [
-        {
-          data: [
-            {
-              id: "resource-1",
-              service_id: "service-1",
-              label: "RS1",
-              kind: "seat",
-              is_active: true,
-              capacity: 1,
-              metadata: { row: 1 },
-            },
-          ],
-          error: null,
-        },
-      ],
-      [RESERVATION_SUPABASE_TABLES.resourceLayouts]: [
-        {
-          data: {
+          maintenance: [{ seat_label: "RS2" }],
+          resources: [{
+            id: "resource-1",
+            service_id: "service-1",
+            label: "RS1",
+            kind: "seat",
+            is_active: true,
+            capacity: 1,
+            metadata: { row: 1 },
+          }],
+          layout: {
             layout_kind: "grid",
             metadata: { columns: 2 },
           },
-          error: null,
         },
-      ],
+        error: null,
+      };
     },
-    calls,
-  );
+  };
   const repository = createSupabaseAvailabilityRepository({ publicClient, adminClient });
 
   const availability = await repository.readAvailability({
@@ -518,91 +484,65 @@ test("availability repository owns legacy availability Supabase query shapes", a
   assert.deepEqual(availability.service.resources?.map((resource) => resource.label), ["RS1"]);
   assert.deepEqual(availability.bookings.map((booking) => booking.interface_type), ["chat"]);
   assert.deepEqual(availability.maintenanceResourceLabels, ["RS2"]);
-  assert.deepEqual(calls, [
+  assert.deepEqual(rpcCalls, [
     {
-      client: "public",
-      table: RESERVATION_SUPABASE_TABLES.services,
-      select: RESERVATION_SUPABASE_SELECTS.service,
-      filters: [{ column: "id", value: "service-1" }],
-      orders: [],
-      cardinality: "single",
-    },
-    {
-      client: "admin",
-      table: RESERVATION_SUPABASE_TABLES.bookings,
-      select: RESERVATION_SUPABASE_SELECTS.booking,
-      filters: [
-        { column: "service_id", value: "service-1" },
-        { column: "booking_date", value: "2026-01-02" },
-        { column: "status", value: "confirmed" },
-      ],
-      orders: [],
-    },
-    {
-      client: "admin",
-      table: RESERVATION_SUPABASE_TABLES.serviceSeatMaintenance,
-      select: RESERVATION_SUPABASE_SELECTS.maintenance,
-      filters: [
-        { column: "service_id", value: "service-1" },
-        { column: "is_active", value: true },
-      ],
-      orders: [],
-    },
-    {
-      client: "admin",
-      table: RESERVATION_SUPABASE_TABLES.reservableResources,
-      select: RESERVATION_SUPABASE_SELECTS.availabilityResource,
-      filters: [{ column: "service_id", value: "service-1" }],
-      orders: [],
-    },
-    {
-      client: "admin",
-      table: RESERVATION_SUPABASE_TABLES.resourceLayouts,
-      select: RESERVATION_SUPABASE_SELECTS.availabilityLayout,
-      filters: [
-        { column: "service_id", value: "service-1" },
-        { column: "is_active", value: true },
-      ],
-      orders: [],
-      cardinality: "maybeSingle",
+      fn: RESERVATION_SUPABASE_AVAILABILITY_RPCS.readSnapshot,
+      params: { p_service_id: "service-1", p_date: "2026-01-02" },
     },
   ]);
 });
 
 test("availability repository propagates Supabase read errors unchanged", async () => {
   const supabaseError = { message: "bookings unavailable", code: "XX000" };
-  const calls: RecordedCatalogRead[] = [];
-  const publicClient = createCatalogReadClient(
-    "public",
-    {
-      [RESERVATION_SUPABASE_TABLES.services]: [
-        {
-          data: {
-            id: "service-1",
-            name: "Racing Simulator",
-            total_seats: 2,
-            created_at: "2026-01-01T00:00:00.000Z",
-          },
-          error: null,
-        },
-      ],
+  const repository = createSupabaseAvailabilityRepository({
+    from() {
+      throw new Error("availability snapshot should not issue table reads");
     },
-    calls,
-  );
-  const adminClient = createCatalogReadClient(
-    "admin",
-    {
-      [RESERVATION_SUPABASE_TABLES.bookings]: [
-        { data: null, error: supabaseError },
-      ],
+    async rpc() {
+      return { data: null, error: supabaseError };
     },
-    calls,
-  );
-  const repository = createSupabaseAvailabilityRepository({ publicClient, adminClient });
+  });
 
   await assert.rejects(
     () => repository.readAvailability({ serviceId: "service-1", date: "2026-01-02" }),
     (error) => error === supabaseError,
+  );
+});
+
+test("availability repository maps an empty snapshot to service not found", async () => {
+  const repository = createSupabaseAvailabilityRepository({
+    from() {
+      throw new Error("availability snapshot should not issue table reads");
+    },
+    async rpc() {
+      return { data: null, error: null };
+    },
+  });
+
+  await assert.rejects(
+    () => repository.readAvailability({ serviceId: "missing", date: "2026-01-02" }),
+    (error: unknown) => (
+      typeof error === "object"
+      && error !== null
+      && "code" in error
+      && error.code === "PGRST116"
+    ),
+  );
+});
+
+test("availability repository rejects malformed snapshot envelopes", async () => {
+  const repository = createSupabaseAvailabilityRepository({
+    from() {
+      throw new Error("availability snapshot should not issue table reads");
+    },
+    async rpc() {
+      return { data: { service: {}, bookings: null }, error: null };
+    },
+  });
+
+  await assert.rejects(
+    () => repository.readAvailability({ serviceId: "service-1", date: "2026-01-02" }),
+    /Availability snapshot RPC returned an invalid response/,
   );
 });
 

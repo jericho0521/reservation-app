@@ -38,7 +38,8 @@
       "path": "supabase/create-reservation-atomic.sql",
       "classification": "core-platform",
       "intendedBackendDestination": [
-        "packages/database/migrations/supabase/000008_atomic_reservation_rpc.sql"
+        "packages/database/migrations/supabase/000008_atomic_reservation_rpc.sql",
+        "packages/database/migrations/supabase/000014_availability_snapshot_rpc.sql"
       ],
       "duplicateGroup": "create-reservation-atomic"
     },

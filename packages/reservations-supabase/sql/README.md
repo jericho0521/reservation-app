@@ -22,9 +22,11 @@ Apply `create-reservation-atomic.sql` after the base schema to install:
 
 ```sql
 public.create_reservation_atomic(payload jsonb)
+public.read_reservation_availability_snapshot(p_service_id uuid, p_date date)
 ```
 
-The asset grants execute permission to `service_role` only. Public customers
+The asset grants execute permission for both functions to `service_role` only.
+Public customers
 should create bookings through the host app route or server action, and that
 server-side code should call the RPC with a service-role Supabase client.
 
@@ -101,6 +103,12 @@ Stable `error_code` values:
   date, and start time.
 - `not_enough_capacity`: requested quantity exceeds remaining slot capacity.
 
-The function locks the target `services` row and matching confirmed bookings for
+The booking function locks the target `services` row and matching confirmed bookings for
 the requested date/start time before checking capacity and conflicts, then
 inserts both `bookings` and `reservation_items` in the same database operation.
+
+The availability snapshot function performs the service, booking, maintenance,
+resource, and layout read as one database statement and returns one JSON object.
+Call it through `createSupabaseAvailabilityRepository` with a service-role
+client; the payload includes booking customer data and must not be exposed as a
+public RPC.

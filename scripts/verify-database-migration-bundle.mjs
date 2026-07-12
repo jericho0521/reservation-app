@@ -37,6 +37,7 @@ const expectedCoreTargets = [
   "packages/database/migrations/supabase/000011_platform_idempotency.sql",
   "packages/database/migrations/supabase/000012_whatsapp_business_agent.sql",
   "packages/database/migrations/supabase/000013_whatsapp_staff_takeover.sql",
+  "packages/database/migrations/supabase/000014_availability_snapshot_rpc.sql",
 ];
 
 const optionalAiPrefix = "packages/database/migrations/supabase/optional/ai-retrieval/";
@@ -408,6 +409,7 @@ async function validateCriticalMigrationSemantics() {
   const rlsPath = "packages/database/migrations/supabase/000009_core_rls_policies.sql";
   const coreSecurityHardeningPath = "packages/database/migrations/supabase/000010_core_security_hardening.sql";
   const idempotencyPath = "packages/database/migrations/supabase/000011_platform_idempotency.sql";
+  const availabilitySnapshotPath = "packages/database/migrations/supabase/000014_availability_snapshot_rpc.sql";
   const [
     extensionsSql,
     tenantAuthSql,
@@ -420,6 +422,7 @@ async function validateCriticalMigrationSemantics() {
     rlsSql,
     coreSecurityHardeningSql,
     idempotencySql,
+    availabilitySnapshotSql,
   ] = await Promise.all([
     readSqlAsset(extensionsPath),
     readSqlAsset(tenantAuthPath),
@@ -432,6 +435,7 @@ async function validateCriticalMigrationSemantics() {
     readSqlAsset(rlsPath),
     readSqlAsset(coreSecurityHardeningPath),
     readSqlAsset(idempotencyPath),
+    readSqlAsset(availabilitySnapshotPath),
   ]);
 
   validateExtensionsMigration(extensionsPath, extensionsSql);
@@ -445,6 +449,7 @@ async function validateCriticalMigrationSemantics() {
   validateCoreRlsMigration(rlsPath, rlsSql);
   validateCoreSecurityHardeningMigration(coreSecurityHardeningPath, coreSecurityHardeningSql);
   validatePlatformIdempotencyMigration(idempotencyPath, idempotencySql);
+  validateAvailabilitySnapshotMigration(availabilitySnapshotPath, availabilitySnapshotSql);
 }
 
 async function readSqlAsset(repoPath) {
@@ -791,6 +796,33 @@ function validateAtomicReservationRpcMigration(repoPath, sql) {
       errors.push(`${repoPath}: atomic RPC migration must not include non-platform content/reporting/analytics SQL.`);
     }
   }
+}
+
+function validateAvailabilitySnapshotMigration(repoPath, sql) {
+  assertSqlIncludesAll(repoPath, sql, [
+    "Source: supabase/create-reservation-atomic.sql",
+    "create or replace function public.read_reservation_availability_snapshot(",
+    "returns jsonb",
+    "language sql",
+    "stable",
+    "set search_path = public",
+    "from public.services",
+    "from public.bookings",
+    "from public.service_seat_maintenance",
+    "from public.reservable_resources",
+    "from public.resource_layouts",
+    "bookings.status = 'confirmed'",
+    "maintenance.is_active = true",
+    "layouts.is_active = true",
+    "revoke all on function public.read_reservation_availability_snapshot(uuid, date) from public",
+    "grant execute on function public.read_reservation_availability_snapshot(uuid, date) to service_role",
+  ]);
+
+  assertNotPlaceholderOnly(repoPath, sql, [
+    /create\s+or\s+replace\s+function\s+public\.read_reservation_availability_snapshot\s*\(/i,
+    /jsonb_build_object\s*\(/i,
+    /grant\s+execute\s+on\s+function\s+public\.read_reservation_availability_snapshot\(uuid,\s*date\)\s+to\s+service_role/i,
+  ]);
 }
 
 function validatePlatformIdempotencyMigration(repoPath, sql) {

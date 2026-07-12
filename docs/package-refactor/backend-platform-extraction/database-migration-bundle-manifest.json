@@ -155,6 +155,17 @@
       ]
     },
     {
+      "kind": "core-migration",
+      "order": 14,
+      "targetPath": "packages/database/migrations/supabase/000014_availability_snapshot_rpc.sql",
+      "sourceAssets": [
+        {
+          "path": "supabase/create-reservation-atomic.sql",
+          "section": "canonical public.read_reservation_availability_snapshot(uuid, date) RPC"
+        }
+      ]
+    },
+    {
       "kind": "optional-ai-retrieval",
       "targetPath": "packages/database/migrations/supabase/optional/ai-retrieval/000001_knowledge_chunks.sql",
       "sourceAssets": [

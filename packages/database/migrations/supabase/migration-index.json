@@ -109,6 +109,14 @@
       "scope": "reservation-platform",
       "sha256": "bcd2980eff0512dc9456b88c1952e576e4a769a8e6efbf53769f7fdb4b282740",
       "bytes": 771
+    },
+    {
+      "order": 14,
+      "path": "packages/database/migrations/supabase/000014_availability_snapshot_rpc.sql",
+      "module": "core",
+      "scope": "reservation-platform",
+      "sha256": "dff0ae01e938597cf46b5900cdc097fe664e362edae0299cf002ebfa509752a9",
+      "bytes": 3134
     }
   ],
   "optionalMigrations": [

@@ -30,6 +30,7 @@ const expectedCoreTargets = [
   "packages/database/migrations/supabase/000011_platform_idempotency.sql",
   "packages/database/migrations/supabase/000012_whatsapp_business_agent.sql",
   "packages/database/migrations/supabase/000013_whatsapp_staff_takeover.sql",
+  "packages/database/migrations/supabase/000014_availability_snapshot_rpc.sql",
 ];
 
 const optionalAiPrefix = "packages/database/migrations/supabase/optional/ai-retrieval/";
@@ -50,7 +51,7 @@ if (checkMode) {
     fail([
       "Database migration index is missing:",
       `- ${repoRelative(indexPath)}`,
-      "Run `corepack pnpm run database:migration-index:generate` to refresh it.",
+      "Run `pnpm run database:migration-index:generate` to refresh it.",
     ]);
   }
 
@@ -58,7 +59,7 @@ if (checkMode) {
     fail([
       "Database migration index is stale:",
       `- ${repoRelative(indexPath)}`,
-      "Run `corepack pnpm run database:migration-index:generate` to refresh it.",
+      "Run `pnpm run database:migration-index:generate` to refresh it.",
     ]);
   }
 

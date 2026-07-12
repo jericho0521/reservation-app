@@ -24,6 +24,8 @@ files are not exposed as package subpaths.
 Key exports:
 
 - `createSupabaseReservationRepository(client)` for repository access.
+- `createSupabaseAvailabilityRepository(client)` for a single-RPC availability
+  snapshot read.
 - `createReservationAtomic(input)` and `createReservationAtomically(input)` on
   the repository for transaction-safe booking creation through Supabase RPC.
 - Row adapters such as `adaptServiceMetadata`, `adaptBookingRows`,
@@ -94,6 +96,21 @@ Stable error codes are:
 but production booking writes should use `createReservationAtomic` or
 `createReservationAtomically` so validation and insert happen at the storage
 boundary.
+
+## Availability Snapshot RPC
+
+The same SQL asset installs:
+
+```sql
+public.read_reservation_availability_snapshot(p_service_id uuid, p_date date)
+```
+
+`createSupabaseAvailabilityRepository` calls this service-role-only RPC once per
+availability read. PostgreSQL assembles the service, confirmed bookings, active
+maintenance labels, resources, and active layout under one statement snapshot;
+the adapter then maps that envelope into the existing domain types. This avoids
+five sequential network round trips and prevents partially mixed results when
+related rows change during a read.
 
 ## Build and Test
 

@@ -69,7 +69,7 @@ export class OpenAiCompatibleAgentRuntime implements AgentRuntime {
 }
 
 export function createOpenAiCompatibleAgentRuntimeFromEnv(
-  env: Record<string, string | undefined> = process.env,
+  env: Record<string, string | undefined>,
   options: Pick<OpenAiCompatibleAgentOptions, "fetch"> = {},
 ): AgentRuntime | undefined {
   const provider = env.AI_AGENT_PROVIDER?.trim();
@@ -153,4 +153,3 @@ function compactMetadata(input: Record<string, string | undefined>): MetadataRec
     Object.entries(input).filter((entry): entry is [string, string] => typeof entry[1] === "string" && entry[1].length > 0),
   );
 }
-

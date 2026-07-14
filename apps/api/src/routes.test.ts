@@ -1349,6 +1349,23 @@ test("GET /v1/health/ready fails closed with safe component state", async () => 
   });
 });
 
+test("GET /v1/health/ready fails closed when its dependency exceeds the deadline", async () => {
+  const startedAt = Date.now();
+  const response = await createStandaloneApiHandler({
+    readinessCheckTimeoutMs: 10,
+    async readinessCheck() {
+      return await new Promise(() => undefined);
+    },
+  })({ method: "GET", path: "/v1/health/ready" });
+
+  assert.equal(response.status, 503);
+  assert.deepEqual(response.body, {
+    status: "not_ready",
+    components: { database: false, migrations: false },
+  });
+  assert.ok(Date.now() - startedAt < 500);
+});
+
 test("service-token and JWT auth leave health endpoints unprotected", async () => {
   let verifierCalls = 0;
   let tenantVenueCalls = 0;

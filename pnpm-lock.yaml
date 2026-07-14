@@ -35,6 +35,9 @@ importers:
       '@reservation-platform/contract-types':
         specifier: workspace:*
         version: link:../../packages/contract-types
+      '@reservation-platform/database':
+        specifier: workspace:*
+        version: link:../../packages/database
       '@reservation-platform/platform-config':
         specifier: workspace:*
         version: link:../../packages/platform-config

@@ -64,19 +64,26 @@ export function createStandaloneNodeServer(
       "x-correlation-id": correlationId,
     } as StandaloneApiRequest["headers"];
     const startedAt = performance.now();
-
-    response.setHeader("x-correlation-id", correlationId);
-    response.once("finish", () => {
+    let completionLogged = false;
+    const logCompletion = (status: number) => {
+      if (completionLogged) {
+        return;
+      }
+      completionLogged = true;
       writeStructuredLog(options.logger, {
-        level: response.statusCode >= 500 ? "error" : response.statusCode >= 400 ? "warn" : "info",
+        level: status >= 500 ? "error" : status >= 400 ? "warn" : "info",
         event: "http_request_completed",
         correlationId,
         method,
         path,
-        status: response.statusCode,
+        status,
         durationMs: Math.max(0, Math.round((performance.now() - startedAt) * 100) / 100),
       });
-    });
+    };
+
+    response.setHeader("x-correlation-id", correlationId);
+    response.once("finish", () => logCompletion(response.statusCode));
+    response.once("close", () => logCompletion(response.writableFinished ? response.statusCode : 499));
 
     try {
       if (method.toUpperCase() === "OPTIONS") {
@@ -246,44 +253,74 @@ type RawBodyReadResult = {
   tooLarge: boolean;
 };
 
-async function readRawBody(
+function readRawBody(
   request: IncomingMessage,
   maxBodyBytes: number,
 ): Promise<RawBodyReadResult> {
   if (request.method === "GET" || request.method === "HEAD") {
-    return { tooLarge: false };
+    return Promise.resolve({ tooLarge: false });
   }
 
-  const chunks: Buffer[] = [];
-  let byteCount = 0;
-  let tooLarge = false;
-  for await (const chunk of request) {
-    const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
-    byteCount += buffer.byteLength;
-    if (byteCount > maxBodyBytes) {
-      tooLarge = true;
-      chunks.length = 0;
-      continue;
-    }
-    if (!tooLarge) {
+  return new Promise((resolve, reject) => {
+    const chunks: Buffer[] = [];
+    let byteCount = 0;
+
+    const cleanup = () => {
+      request.removeListener("data", onData);
+      request.removeListener("end", onEnd);
+      request.removeListener("aborted", onAborted);
+      request.removeListener("error", onError);
+    };
+    const onData = (chunk: Buffer | string) => {
+      const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+      byteCount += buffer.byteLength;
+      if (byteCount > maxBodyBytes) {
+        cleanup();
+        drainRequestInBackground(request);
+        resolve({ tooLarge: true });
+        return;
+      }
       chunks.push(buffer);
-    }
-  }
+    };
+    const onEnd = () => {
+      cleanup();
+      if (chunks.length === 0) {
+        resolve({ tooLarge: false });
+        return;
+      }
+      const rawBody = Buffer.concat(chunks).toString("utf8").trim();
+      resolve(rawBody.length === 0
+        ? { tooLarge: false }
+        : { body: rawBody, tooLarge: false });
+    };
+    const onAborted = () => {
+      cleanup();
+      reject(new Error("Request body was aborted."));
+    };
+    const onError = () => {
+      cleanup();
+      reject(new Error("Request body could not be read."));
+    };
 
-  if (tooLarge) {
-    return { tooLarge: true };
-  }
+    request.on("data", onData);
+    request.once("end", onEnd);
+    request.once("aborted", onAborted);
+    request.once("error", onError);
+  });
+}
 
-  if (chunks.length === 0) {
-    return { tooLarge: false };
-  }
-
-  const rawBody = Buffer.concat(chunks).toString("utf8").trim();
-  if (rawBody.length === 0) {
-    return { tooLarge: false };
-  }
-
-  return { body: rawBody, tooLarge: false };
+function drainRequestInBackground(request: IncomingMessage) {
+  const cleanup = () => {
+    request.removeListener("aborted", cleanup);
+    request.removeListener("close", cleanup);
+    request.removeListener("end", cleanup);
+    request.removeListener("error", cleanup);
+  };
+  request.once("aborted", cleanup);
+  request.once("close", cleanup);
+  request.once("end", cleanup);
+  request.once("error", cleanup);
+  request.resume();
 }
 
 function parseJsonBody(rawBody: string | undefined): JsonBodyReadResult {
@@ -309,6 +346,7 @@ function writeStandaloneResponse(
   response.writeHead(result.status, {
     ...result.headers,
     ...corsResponseHeaders(requestHeaders, cors),
+    "x-correlation-id": response.getHeader("x-correlation-id") as string,
   });
   response.end(serializeStandaloneResponseBody(result));
 }

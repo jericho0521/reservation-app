@@ -1,6 +1,10 @@
 import { createHash } from "node:crypto";
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import {
+  loadBundledCoreMigrationPlan,
+  type CoreMigrationLedgerEntry,
+} from "@reservation-platform/database";
+import {
   loadPlatformRuntimeConfigFromEnv,
   PlatformRuntimeConfigError,
   platformConfigPathEnvName,
@@ -146,7 +150,7 @@ export interface StandaloneSupabaseQueryResult<T> {
 
 interface StandaloneSupabaseReadinessQuery {
   select(columns: string): StandaloneSupabaseReadinessQuery;
-  eq(column: string, value: string): StandaloneSupabaseReadinessQuery;
+  in(column: string, values: readonly string[]): StandaloneSupabaseReadinessQuery;
   limit(count: number): PromiseLike<StandaloneSupabaseQueryResult<unknown[]>>;
 }
 
@@ -184,6 +188,7 @@ export interface StandaloneSupabaseRepositoryFactories {
 export interface StandaloneSupabaseRuntimeOptions {
   createClient?: StandaloneSupabaseClientFactory;
   fetch?: typeof fetch;
+  loadCoreMigrationPlan?: () => Promise<readonly CoreMigrationLedgerEntry[]>;
   platformConfig?: PlatformRuntimeConfig;
   repositoryFactories?: Partial<StandaloneSupabaseRepositoryFactories>;
 }
@@ -209,11 +214,6 @@ const standaloneSupabaseClientOptions = {
     persistSession: false,
   },
 } as const satisfies StandaloneSupabaseClientOptions;
-
-const currentCoreMigration = {
-  filename: "packages/database/migrations/supabase/000020_operations_analytics_rpc.sql",
-  sha256: "01cce66fb87f9122efa5409ef4b9d4c730ee72ef44e37b0a21854f3e0b181d41",
-} as const;
 
 const defaultRepositoryFactories: StandaloneSupabaseRepositoryFactories = {
   createCatalogRepository: createSupabasePlatformCatalogRepository,
@@ -292,13 +292,17 @@ export function createStandaloneSupabaseDependencies(
   return {
     ...authDependencies,
     ...platformDependencies,
-    readinessCheck: createStandaloneSupabaseReadinessCheck(adminClient),
+    readinessCheck: createStandaloneSupabaseReadinessCheck(
+      adminClient,
+      options.loadCoreMigrationPlan ?? loadBundledCoreMigrationPlan,
+    ),
     ...(conversationOrchestrator ? { conversationOrchestrator } : {}),
   };
 }
 
 function createStandaloneSupabaseReadinessCheck(
   adminClient: StandaloneSupabaseClient,
+  loadCoreMigrationPlan: () => Promise<readonly CoreMigrationLedgerEntry[]>,
 ): NonNullable<StandaloneApiDependencies["readinessCheck"]> {
   return async () => {
     const databaseResult = await runStandaloneSupabaseReadinessQuery(() => (
@@ -310,19 +314,51 @@ function createStandaloneSupabaseReadinessCheck(
       return { database: false, migrations: false };
     }
 
+    let migrationPlan: readonly CoreMigrationLedgerEntry[];
+    try {
+      migrationPlan = await loadCoreMigrationPlan();
+    } catch {
+      return { database: true, migrations: false };
+    }
+    if (migrationPlan.length === 0) {
+      return { database: true, migrations: false };
+    }
+
     const migrationResult = await runStandaloneSupabaseReadinessQuery(() => (
       asReadinessQuery(adminClient.from("reservation_local_migration_ledger"))
         .select("filename, sha256")
-        .eq("filename", currentCoreMigration.filename)
-        .eq("sha256", currentCoreMigration.sha256)
-        .limit(1)
+        .in("filename", migrationPlan.map((entry) => entry.path))
+        .limit(migrationPlan.length)
     ));
 
     return {
       database: true,
-      migrations: migrationResult.ok && migrationResult.rows.length > 0,
+      migrations: migrationResult.ok && migrationLedgerMatchesPlan(migrationResult.rows, migrationPlan),
     };
   };
+}
+
+function migrationLedgerMatchesPlan(
+  rows: readonly unknown[],
+  migrationPlan: readonly CoreMigrationLedgerEntry[],
+) {
+  if (rows.length !== migrationPlan.length) {
+    return false;
+  }
+
+  const checksumsByPath = new Map<string, string>();
+  for (const row of rows) {
+    if (!isRecord(row) || typeof row.filename !== "string" || typeof row.sha256 !== "string") {
+      return false;
+    }
+    checksumsByPath.set(row.filename, row.sha256);
+  }
+
+  return migrationPlan.every((entry) => checksumsByPath.get(entry.path) === entry.sha256);
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function asReadinessQuery(value: unknown) {

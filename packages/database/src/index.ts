@@ -1,9 +1,11 @@
 export {
   buildSupabaseMigrationPlan,
+  loadBundledCoreMigrationPlan,
   loadSupabaseMigrationIndex,
 } from "./supabase-migrations.js";
 
 export type {
+  CoreMigrationLedgerEntry,
   MigrationExecutionPlan,
   MigrationExecutor,
   MigrationModule,

@@ -1,3 +1,5 @@
+import { readFile } from "node:fs/promises";
+
 export type MigrationModule = "core" | "ai-retrieval" | "development-seed";
 
 export type MigrationScope =
@@ -48,12 +50,26 @@ export interface MigrationExecutionPlan {
 
 export interface MigrationPlanEntry extends MigrationSqlSource {}
 
+export interface CoreMigrationLedgerEntry {
+  readonly path: string;
+  readonly sha256: string;
+}
+
 export interface MigrationExecutor<TResult = unknown> {
   execute(plan: MigrationExecutionPlan): Promise<TResult>;
 }
 
 const expectedArtifact = "@reservation-platform/database/supabase-migration-index";
 const requiredEntryFields = ["path", "module", "scope", "sha256", "bytes"] as const;
+const bundledMigrationIndexUrl = new URL("../migrations/supabase/migration-index.json", import.meta.url);
+
+export async function loadBundledCoreMigrationPlan(
+  indexUrl: URL = bundledMigrationIndexUrl,
+): Promise<readonly CoreMigrationLedgerEntry[]> {
+  const rawIndex = JSON.parse(await readFile(indexUrl, "utf8")) as unknown;
+  const index = loadSupabaseMigrationIndex(rawIndex);
+  return Object.freeze(index.coreMigrations.map(({ path, sha256 }) => Object.freeze({ path, sha256 })));
+}
 
 export function loadSupabaseMigrationIndex(input: unknown): SupabaseMigrationIndex {
   const value = expectRecord(input, "migration index");

@@ -1,9 +1,13 @@
-import { readFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import assert from "node:assert/strict";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { pathToFileURL } from "node:url";
 import test from "node:test";
 
 import {
   buildSupabaseMigrationPlan,
+  loadBundledCoreMigrationPlan,
   loadSupabaseMigrationIndex,
 } from "./supabase-migrations";
 
@@ -19,6 +23,38 @@ test("core plan includes exactly 000001 through 000020 in order", async () => {
   );
   assert.equal(plan.migrations.length, 20);
   assert.equal(plan.seeds.length, 0);
+});
+
+test("bundled core migration loader returns every indexed path and checksum", async () => {
+  const index = await readActualIndex();
+  const plan = await loadBundledCoreMigrationPlan();
+
+  assert.deepEqual(plan, index.coreMigrations.map(({ path, sha256 }) => ({ path, sha256 })));
+  assert.equal(Object.isFrozen(plan), true);
+});
+
+test("bundled core migration loader follows an extended validated index", async (t) => {
+  const rawIndex = await readActualRawIndex();
+  rawIndex.coreMigrations.push({
+    order: rawIndex.coreMigrations.length + 1,
+    path: "packages/database/migrations/supabase/000021_runtime_readiness_test.sql",
+    module: "core",
+    scope: "reservation-platform",
+    sha256: "a".repeat(64),
+    bytes: 1,
+  });
+  const directory = await mkdtemp(join(tmpdir(), "reservation-migration-index-"));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const extendedIndexPath = join(directory, "migration-index.json");
+  await writeFile(extendedIndexPath, JSON.stringify(rawIndex), "utf8");
+
+  const plan = await loadBundledCoreMigrationPlan(pathToFileURL(extendedIndexPath));
+
+  assert.equal(plan.length, 21);
+  assert.deepEqual(plan.at(-1), {
+    path: "packages/database/migrations/supabase/000021_runtime_readiness_test.sql",
+    sha256: "a".repeat(64),
+  });
 });
 
 test("operations overview migration is venue scoped, timezone aware, and bounded", async () => {

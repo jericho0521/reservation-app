@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { once } from "node:events";
-import type { Server } from "node:http";
+import { request as httpRequest, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import test from "node:test";
 
@@ -48,6 +48,25 @@ test("rejects a JSON body above the configured byte limit without resetting the 
   });
 });
 
+test("returns 413 before an oversized chunked upload finishes and drains it in background", async () => {
+  const server = createStandaloneNodeServer(async () => jsonResponse(200, { ok: true }), {
+    maxBodyBytes: 8,
+  });
+
+  await withListeningServer(server, async (baseUrl) => {
+    const response = await openChunkedRequestPastLimit(`${baseUrl}/v1/test`, Buffer.alloc(9, "x"));
+
+    assert.equal(response.statusCode, 413);
+    assert.deepEqual(JSON.parse(response.body), {
+      error: {
+        code: "payload_too_large",
+        message: "Request body is too large.",
+        status: 413,
+      },
+    });
+  });
+});
+
 test("accepts a multibyte JSON body exactly at the configured byte limit", async () => {
   let receivedBody: unknown;
   const server = createStandaloneNodeServer(async (request) => {
@@ -74,7 +93,10 @@ test("returns and safely logs one validated correlation id", async () => {
   let handlerCorrelationId: string | string[] | undefined;
   const server = createStandaloneNodeServer(async (request) => {
     handlerCorrelationId = request.headers?.["x-correlation-id"];
-    return jsonResponse(204, undefined);
+    return {
+      ...jsonResponse(204, undefined),
+      headers: { "x-correlation-id": "handler-must-not-override" },
+    };
   }, {
     logger: { write: (entry) => entries.push(entry) },
   });
@@ -98,6 +120,46 @@ test("returns and safely logs one validated correlation id", async () => {
   assert.equal(entries[0]?.status, 204);
   assert.doesNotMatch(JSON.stringify(entries), /must-not-be-logged|secret-management-token/);
   assert.equal(entries[0]?.path, "/v1/public/experiences/demo/manage/:redacted");
+});
+
+test("logs an aborted request exactly once without raw request data", async () => {
+  let markHandlerStarted: (() => void) | undefined;
+  const handlerStarted = new Promise<void>((resolve) => {
+    markHandlerStarted = resolve;
+  });
+  let recordEntry: ((entry: StructuredLogEntry) => void) | undefined;
+  const logged = new Promise<StructuredLogEntry>((resolve) => {
+    recordEntry = resolve;
+  });
+  const entries: StructuredLogEntry[] = [];
+  const server = createStandaloneNodeServer(async () => {
+    markHandlerStarted?.();
+    return await new Promise(() => undefined);
+  }, {
+    logger: {
+      write(entry) {
+        entries.push(entry);
+        recordEntry?.(entry);
+      },
+    },
+  });
+
+  await withListeningServer(server, async (baseUrl) => {
+    const target = new URL(`${baseUrl}/v1/test?secret=query-value`);
+    const request = httpRequest(target);
+    request.on("error", () => undefined);
+    request.end();
+    await handlerStarted;
+    request.destroy();
+
+    const entry = await logged;
+    assert.equal(entry.event, "http_request_completed");
+    assert.equal(entry.status, 499);
+    assert.equal(entry.path, "/v1/test");
+  });
+
+  assert.equal(entries.length, 1);
+  assert.doesNotMatch(JSON.stringify(entries), /query-value/);
 });
 
 test("replaces an invalid inbound correlation id", async () => {
@@ -310,5 +372,41 @@ async function closeServer(server: Server) {
         resolve();
       }
     });
+  });
+}
+
+function openChunkedRequestPastLimit(
+  url: string,
+  firstChunk: Buffer,
+): Promise<{ statusCode: number | undefined; body: string }> {
+  const target = new URL(url);
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    const timeout = setTimeout(() => {
+      request.destroy();
+      reject(new Error("Timed out waiting for an early oversized response."));
+    }, 1_000);
+    const request = httpRequest(target, { method: "POST" }, (response) => {
+      const chunks: Buffer[] = [];
+      response.on("data", (chunk: Buffer | string) => {
+        chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+      });
+      response.on("end", () => {
+        settled = true;
+        clearTimeout(timeout);
+        request.destroy();
+        resolve({
+          statusCode: response.statusCode,
+          body: Buffer.concat(chunks).toString("utf8"),
+        });
+      });
+    });
+    request.on("error", (error) => {
+      if (!settled) {
+        clearTimeout(timeout);
+        reject(error);
+      }
+    });
+    request.write(firstChunk);
   });
 }

@@ -143,6 +143,7 @@ export interface StandaloneApiDependencies {
   reservationManagementRepository?: ReservationManagementRepository;
   reservationReadRepository?: ReservationReadRepositoryPort;
   readinessCheck?: StandaloneApiReadinessCheck;
+  readinessCheckTimeoutMs?: number;
   resourceMaintenanceRepository?: ResourceMaintenanceRepositoryPort;
   serviceApiKey?: string;
   tenantVenueRepository?: PlatformTenantVenueRepository;
@@ -313,6 +314,7 @@ const standaloneHealthBody = {
   api_version: "v1",
   readiness: "alive",
 };
+const defaultReadinessCheckTimeoutMs = 2_000;
 
 export function createStandaloneApiHandler(dependencies: StandaloneApiDependencies = {}): StandaloneApiHandler {
   return async (request) => handleStandaloneApiRequest(request, dependencies);
@@ -342,7 +344,10 @@ export async function handleStandaloneApiRequest(
   }
 
   if (method === "GET" && path === "/v1/health/ready") {
-    return readStandaloneApiReadiness(dependencies.readinessCheck);
+    return readStandaloneApiReadiness(
+      dependencies.readinessCheck,
+      dependencies.readinessCheckTimeoutMs,
+    );
   }
 
   if (isProtectedPlatformDataRoute(method, path)) {
@@ -809,6 +814,7 @@ export async function handleStandaloneApiRequest(
 
 async function readStandaloneApiReadiness(
   readinessCheck: StandaloneApiReadinessCheck | undefined,
+  timeoutMs: number | undefined,
 ): Promise<StandaloneApiResponse> {
   let components: StandaloneApiReadinessState = {
     database: false,
@@ -817,7 +823,13 @@ async function readStandaloneApiReadiness(
 
   if (readinessCheck) {
     try {
-      components = await readinessCheck();
+      const result = await runReadinessCheckWithDeadline(
+        readinessCheck,
+        normalizeReadinessTimeout(timeoutMs),
+      );
+      if (result) {
+        components = result;
+      }
     } catch {
       // Readiness responses intentionally expose component state only.
     }
@@ -828,6 +840,31 @@ async function readStandaloneApiReadiness(
     status: ready ? "ready" : "not_ready",
     components,
   });
+}
+
+async function runReadinessCheckWithDeadline(
+  readinessCheck: StandaloneApiReadinessCheck,
+  timeoutMs: number,
+) {
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      readinessCheck(),
+      new Promise<undefined>((resolve) => {
+        timeout = setTimeout(() => resolve(undefined), timeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timeout) {
+      clearTimeout(timeout);
+    }
+  }
+}
+
+function normalizeReadinessTimeout(value: number | undefined) {
+  return typeof value === "number" && Number.isSafeInteger(value) && value > 0
+    ? value
+    : defaultReadinessCheckTimeoutMs;
 }
 
 async function authorizeStandalonePlatformDataRequest(

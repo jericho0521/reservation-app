@@ -4,8 +4,14 @@ import type { Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import test from "node:test";
 
+import { jsonResponse } from "./http.js";
 import { StandaloneSupabaseConfigError } from "./runtime.js";
-import { createStandaloneNodeServerFromEnv } from "./server.js";
+import {
+  closeStandaloneNodeServer,
+  createStandaloneNodeServer,
+  createStandaloneNodeServerFromEnv,
+  type StructuredLogEntry,
+} from "./server.js";
 
 const standaloneHealthBody = {
   status: "ok",
@@ -13,6 +19,125 @@ const standaloneHealthBody = {
   api_version: "v1",
   readiness: "alive",
 };
+
+test("rejects a JSON body above the configured byte limit without resetting the socket", async () => {
+  let handlerCalls = 0;
+  const server = createStandaloneNodeServer(async () => {
+    handlerCalls += 1;
+    return jsonResponse(200, { ok: true });
+  }, {
+    maxBodyBytes: 7,
+  });
+
+  await withListeningServer(server, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/v1/test`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: '"ééé"',
+    });
+
+    assert.equal(response.status, 413);
+    assert.deepEqual(await response.json(), {
+      error: {
+        code: "payload_too_large",
+        message: "Request body is too large.",
+        status: 413,
+      },
+    });
+    assert.equal(handlerCalls, 0);
+  });
+});
+
+test("accepts a multibyte JSON body exactly at the configured byte limit", async () => {
+  let receivedBody: unknown;
+  const server = createStandaloneNodeServer(async (request) => {
+    receivedBody = request.body;
+    return jsonResponse(200, { ok: true });
+  }, {
+    maxBodyBytes: Buffer.byteLength('"éé"'),
+  });
+
+  await withListeningServer(server, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/v1/test`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: '"éé"',
+    });
+
+    assert.equal(response.status, 200);
+    assert.equal(receivedBody, "éé");
+  });
+});
+
+test("returns and safely logs one validated correlation id", async () => {
+  const entries: StructuredLogEntry[] = [];
+  let handlerCorrelationId: string | string[] | undefined;
+  const server = createStandaloneNodeServer(async (request) => {
+    handlerCorrelationId = request.headers?.["x-correlation-id"];
+    return jsonResponse(204, undefined);
+  }, {
+    logger: { write: (entry) => entries.push(entry) },
+  });
+
+  await withListeningServer(server, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/v1/public/experiences/demo/manage/secret-management-token`, {
+      headers: {
+        Authorization: "Bearer must-not-be-logged",
+        "x-correlation-id": "request-123",
+      },
+    });
+
+    assert.equal(response.status, 204);
+    assert.equal(response.headers.get("x-correlation-id"), "request-123");
+    assert.equal(handlerCorrelationId, "request-123");
+  });
+
+  assert.equal(entries.length, 1);
+  assert.equal(entries[0]?.event, "http_request_completed");
+  assert.equal(entries[0]?.correlationId, "request-123");
+  assert.equal(entries[0]?.status, 204);
+  assert.doesNotMatch(JSON.stringify(entries), /must-not-be-logged|secret-management-token/);
+  assert.equal(entries[0]?.path, "/v1/public/experiences/demo/manage/:redacted");
+});
+
+test("replaces an invalid inbound correlation id", async () => {
+  const entries: StructuredLogEntry[] = [];
+  const server = createStandaloneNodeServer(async () => jsonResponse(200, { ok: true }), {
+    logger: { write: (entry) => entries.push(entry) },
+  });
+
+  await withListeningServer(server, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/v1/test`, {
+      headers: { "x-correlation-id": "invalid id with spaces" },
+    });
+    const correlationId = response.headers.get("x-correlation-id");
+
+    assert.match(correlationId ?? "", /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u);
+    assert.equal(entries[0]?.correlationId, correlationId);
+  });
+});
+
+test("configures bounded Node HTTP timeouts", () => {
+  const server = createStandaloneNodeServer(undefined, {
+    requestTimeoutMs: 30_000,
+    headersTimeoutMs: 10_000,
+    keepAliveTimeoutMs: 4_000,
+  });
+
+  assert.equal(server.requestTimeout, 30_000);
+  assert.equal(server.headersTimeout, 10_000);
+  assert.equal(server.keepAliveTimeout, 4_000);
+});
+
+test("closes a listening standalone server gracefully", async () => {
+  const server = createStandaloneNodeServer();
+  server.listen(0, "127.0.0.1");
+  await once(server, "listening");
+
+  await closeStandaloneNodeServer(server);
+
+  assert.equal(server.listening, false);
+});
 
 test("standalone env bootstrap serves health without Supabase env or client creation", async () => {
   let createClientCalls = 0;

@@ -142,11 +142,19 @@ export interface StandaloneApiDependencies {
   reservationMutationRepository?: ReservationMutationRepositoryPort;
   reservationManagementRepository?: ReservationManagementRepository;
   reservationReadRepository?: ReservationReadRepositoryPort;
+  readinessCheck?: StandaloneApiReadinessCheck;
   resourceMaintenanceRepository?: ResourceMaintenanceRepositoryPort;
   serviceApiKey?: string;
   tenantVenueRepository?: PlatformTenantVenueRepository;
   whatsappModule?: StandaloneApiWhatsAppModule;
 }
+
+export interface StandaloneApiReadinessState {
+  database: boolean;
+  migrations: boolean;
+}
+
+export type StandaloneApiReadinessCheck = () => Promise<StandaloneApiReadinessState>;
 
 export interface StandaloneApiChatContext {
   requestContext: PlatformRequestContext;
@@ -324,6 +332,17 @@ export async function handleStandaloneApiRequest(
 
   if (method === "GET" && (path === "/healthz" || path === "/v1/health")) {
     return jsonResponse(200, standaloneHealthBody);
+  }
+
+  if (method === "GET" && path === "/v1/health/live") {
+    return jsonResponse(200, {
+      status: "ok",
+      components: { process: true },
+    });
+  }
+
+  if (method === "GET" && path === "/v1/health/ready") {
+    return readStandaloneApiReadiness(dependencies.readinessCheck);
   }
 
   if (isProtectedPlatformDataRoute(method, path)) {
@@ -786,6 +805,29 @@ export async function handleStandaloneApiRequest(
   }
 
   return platformError(404, "not_found", "Route not found.");
+}
+
+async function readStandaloneApiReadiness(
+  readinessCheck: StandaloneApiReadinessCheck | undefined,
+): Promise<StandaloneApiResponse> {
+  let components: StandaloneApiReadinessState = {
+    database: false,
+    migrations: false,
+  };
+
+  if (readinessCheck) {
+    try {
+      components = await readinessCheck();
+    } catch {
+      // Readiness responses intentionally expose component state only.
+    }
+  }
+
+  const ready = components.database && components.migrations;
+  return jsonResponse(ready ? 200 : 503, {
+    status: ready ? "ready" : "not_ready",
+    components,
+  });
 }
 
 async function authorizeStandalonePlatformDataRequest(

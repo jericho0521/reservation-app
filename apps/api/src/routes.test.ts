@@ -1291,6 +1291,64 @@ test("GET health endpoints return public readiness metadata without dependencies
   }
 });
 
+test("GET /v1/health/live is shallow and /v1/health/ready reports injected dependencies", async () => {
+  let readinessCalls = 0;
+  const handler = createStandaloneApiHandler({
+    async readinessCheck() {
+      readinessCalls += 1;
+      return { database: true, migrations: true };
+    },
+  });
+
+  const live = await handler({ method: "GET", path: "/v1/health/live" });
+  const ready = await handler({ method: "GET", path: "/v1/health/ready" });
+
+  assert.equal(live.status, 200);
+  assert.deepEqual(live.body, {
+    status: "ok",
+    components: { process: true },
+  });
+  assert.equal(readinessCalls, 1);
+  assert.equal(ready.status, 200);
+  assert.deepEqual(ready.body, {
+    status: "ready",
+    components: { database: true, migrations: true },
+  });
+});
+
+test("GET /v1/health/ready fails closed with safe component state", async () => {
+  const unhealthy = await createStandaloneApiHandler({
+    async readinessCheck() {
+      return { database: true, migrations: false };
+    },
+  })({ method: "GET", path: "/v1/health/ready" });
+  const failedCheck = await createStandaloneApiHandler({
+    async readinessCheck() {
+      throw new Error("postgres://secret@database/internal");
+    },
+  })({ method: "GET", path: "/v1/health/ready" });
+  const missingCheck = await handleStandaloneApiRequest({ method: "GET", path: "/v1/health/ready" });
+
+  assert.deepEqual(unhealthy, {
+    status: 503,
+    headers: { "content-type": "application/json; charset=utf-8" },
+    body: {
+      status: "not_ready",
+      components: { database: true, migrations: false },
+    },
+  });
+  assert.equal(failedCheck.status, 503);
+  assert.deepEqual(failedCheck.body, {
+    status: "not_ready",
+    components: { database: false, migrations: false },
+  });
+  assert.doesNotMatch(JSON.stringify(failedCheck.body), /secret|postgres/iu);
+  assert.deepEqual(missingCheck.body, {
+    status: "not_ready",
+    components: { database: false, migrations: false },
+  });
+});
+
 test("service-token and JWT auth leave health endpoints unprotected", async () => {
   let verifierCalls = 0;
   let tenantVenueCalls = 0;
@@ -1315,11 +1373,13 @@ test("service-token and JWT auth leave health endpoints unprotected", async () =
     }),
   });
 
-  for (const path of ["/healthz", "/v1/health"]) {
+  for (const path of ["/healthz", "/v1/health", "/v1/health/live", "/v1/health/ready"]) {
     const response = await handler({ method: "GET", path });
 
-    assert.equal(response.status, 200, path);
-    assert.deepEqual(response.body, standaloneHealthBody, path);
+    assert.equal(response.status, path === "/v1/health/ready" ? 503 : 200, path);
+    if (path === "/healthz" || path === "/v1/health") {
+      assert.deepEqual(response.body, standaloneHealthBody, path);
+    }
   }
   assert.equal(verifierCalls, 0);
   assert.equal(tenantVenueCalls, 0);

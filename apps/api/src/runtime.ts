@@ -144,6 +144,12 @@ export interface StandaloneSupabaseQueryResult<T> {
   } | null;
 }
 
+interface StandaloneSupabaseReadinessQuery {
+  select(columns: string): StandaloneSupabaseReadinessQuery;
+  eq(column: string, value: string): StandaloneSupabaseReadinessQuery;
+  limit(count: number): PromiseLike<StandaloneSupabaseQueryResult<unknown[]>>;
+}
+
 export interface StandaloneSupabaseClientOptions {
   auth: {
     autoRefreshToken: false;
@@ -203,6 +209,11 @@ const standaloneSupabaseClientOptions = {
     persistSession: false,
   },
 } as const satisfies StandaloneSupabaseClientOptions;
+
+const currentCoreMigration = {
+  filename: "packages/database/migrations/supabase/000020_operations_analytics_rpc.sql",
+  sha256: "01cce66fb87f9122efa5409ef4b9d4c730ee72ef44e37b0a21854f3e0b181d41",
+} as const;
 
 const defaultRepositoryFactories: StandaloneSupabaseRepositoryFactories = {
   createCatalogRepository: createSupabasePlatformCatalogRepository,
@@ -281,8 +292,55 @@ export function createStandaloneSupabaseDependencies(
   return {
     ...authDependencies,
     ...platformDependencies,
+    readinessCheck: createStandaloneSupabaseReadinessCheck(adminClient),
     ...(conversationOrchestrator ? { conversationOrchestrator } : {}),
   };
+}
+
+function createStandaloneSupabaseReadinessCheck(
+  adminClient: StandaloneSupabaseClient,
+): NonNullable<StandaloneApiDependencies["readinessCheck"]> {
+  return async () => {
+    const databaseResult = await runStandaloneSupabaseReadinessQuery(() => (
+      asReadinessQuery(adminClient.from("tenants"))
+        .select("id")
+        .limit(1)
+    ));
+    if (!databaseResult.ok) {
+      return { database: false, migrations: false };
+    }
+
+    const migrationResult = await runStandaloneSupabaseReadinessQuery(() => (
+      asReadinessQuery(adminClient.from("reservation_local_migration_ledger"))
+        .select("filename, sha256")
+        .eq("filename", currentCoreMigration.filename)
+        .eq("sha256", currentCoreMigration.sha256)
+        .limit(1)
+    ));
+
+    return {
+      database: true,
+      migrations: migrationResult.ok && migrationResult.rows.length > 0,
+    };
+  };
+}
+
+function asReadinessQuery(value: unknown) {
+  return value as StandaloneSupabaseReadinessQuery;
+}
+
+async function runStandaloneSupabaseReadinessQuery(
+  query: () => PromiseLike<StandaloneSupabaseQueryResult<unknown[]>>,
+): Promise<{ ok: true; rows: unknown[] } | { ok: false; rows: [] }> {
+  try {
+    const result = await query();
+    if (result.error || !Array.isArray(result.data)) {
+      return { ok: false, rows: [] };
+    }
+    return { ok: true, rows: result.data };
+  } catch {
+    return { ok: false, rows: [] };
+  }
 }
 
 export function createStandaloneSupabaseDependenciesFromEnv(

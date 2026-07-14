@@ -445,6 +445,67 @@ test("standalone Supabase runtime carries service auth beside complete Supabase 
   assert.equal(Boolean(dependencies.tenantVenueRepository), true);
 });
 
+test("standalone Supabase readiness checks the database and current indexed migration", async () => {
+  const calls: Array<{ table: string; filters: Array<[string, string]> }> = [];
+  const dependencies = createStandaloneSupabaseDependencies({
+    supabaseUrl: "https://example.supabase.co",
+    supabaseAnonKey: "anon-key",
+    supabaseServiceRoleKey: "service-role-key",
+  }, {
+    createClient: (_url, key) => key === "service-role-key"
+      ? readinessSupabaseClient(calls)
+      : fakeSupabaseClient(key),
+    repositoryFactories: recordingRepositoryFactories([]),
+  });
+
+  assert.deepEqual(await dependencies.readinessCheck?.(), {
+    database: true,
+    migrations: true,
+  });
+  assert.deepEqual(calls, [
+    { table: "tenants", filters: [] },
+    {
+      table: "reservation_local_migration_ledger",
+      filters: [
+        ["filename", "packages/database/migrations/supabase/000020_operations_analytics_rpc.sql"],
+        ["sha256", "01cce66fb87f9122efa5409ef4b9d4c730ee72ef44e37b0a21854f3e0b181d41"],
+      ],
+    },
+  ]);
+});
+
+test("standalone Supabase readiness distinguishes database and migration failures", async () => {
+  const databaseFailure = createStandaloneSupabaseDependencies({
+    supabaseUrl: "https://example.supabase.co",
+    supabaseAnonKey: "anon-key",
+    supabaseServiceRoleKey: "service-role-key",
+  }, {
+    createClient: (_url, key) => key === "service-role-key"
+      ? failingReadinessSupabaseClient("tenants")
+      : fakeSupabaseClient(key),
+    repositoryFactories: recordingRepositoryFactories([]),
+  });
+  const migrationFailure = createStandaloneSupabaseDependencies({
+    supabaseUrl: "https://example.supabase.co",
+    supabaseAnonKey: "anon-key",
+    supabaseServiceRoleKey: "service-role-key",
+  }, {
+    createClient: (_url, key) => key === "service-role-key"
+      ? failingReadinessSupabaseClient("reservation_local_migration_ledger")
+      : fakeSupabaseClient(key),
+    repositoryFactories: recordingRepositoryFactories([]),
+  });
+
+  assert.deepEqual(await databaseFailure.readinessCheck?.(), {
+    database: false,
+    migrations: false,
+  });
+  assert.deepEqual(await migrationFailure.readinessCheck?.(), {
+    database: true,
+    migrations: false,
+  });
+});
+
 test("standalone runtime service token bypasses env JWT verifier", async () => {
   const fixture = createJwtFixture();
   let fetchCalls = 0;
@@ -485,6 +546,54 @@ function fakeSupabaseClient(key: string): FakeSupabaseClient {
     },
     async rpc() {
       return { data: null, error: null };
+    },
+  };
+}
+
+function readinessSupabaseClient(
+  calls: Array<{ table: string; filters: Array<[string, string]> }>,
+): StandaloneSupabaseClient {
+  return {
+    from(table: string) {
+      const filters: Array<[string, string]> = [];
+      const query = {
+        select() {
+          return query;
+        },
+        eq(column: string, value: string) {
+          filters.push([column, value]);
+          return query;
+        },
+        async limit() {
+          calls.push({ table, filters });
+          return {
+            data: table === "reservation_local_migration_ledger" ? [{ filename: "current" }] : [],
+            error: null,
+          };
+        },
+      };
+      return query;
+    },
+  };
+}
+
+function failingReadinessSupabaseClient(failingTable: string): StandaloneSupabaseClient {
+  return {
+    from(table: string) {
+      const query = {
+        select() {
+          return query;
+        },
+        eq() {
+          return query;
+        },
+        async limit() {
+          return table === failingTable
+            ? { data: null, error: { message: "sensitive database detail" } }
+            : { data: table === "reservation_local_migration_ledger" ? [{ filename: "current" }] : [], error: null };
+        },
+      };
+      return query;
     },
   };
 }

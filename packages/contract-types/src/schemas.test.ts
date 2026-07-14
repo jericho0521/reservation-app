@@ -19,6 +19,7 @@ import {
   experienceWorkspaceResponseSchema,
   listReservationsResponseSchema,
   platformErrorBodySchema,
+  platformErrorCodeSchema,
   metadataRecordSchema,
   platformErrorResponseSchema,
   publicContractOperations,
@@ -30,6 +31,19 @@ import {
   rescheduleReservationInputSchema,
   serviceResponseSchema,
 } from "./index.js";
+
+test("platform error codes include payload_too_large", async () => {
+  assert.equal(platformErrorCodeSchema.parse("payload_too_large"), "payload_too_large");
+
+  const artifact = JSON.parse(
+    await readFile(new URL("../contracts/json-schema/platform-error-code.schema.json", import.meta.url), "utf8"),
+  ) as { $defs?: { PlatformErrorCode?: { anyOf?: Array<{ enum?: string[] }> } } };
+  assert.equal(
+    artifact.$defs?.PlatformErrorCode?.anyOf?.some((schema) => schema.enum?.includes("payload_too_large")) ?? false,
+    true,
+  );
+  assert.equal(platformErrorCodeSchema.parse("compatible_extension_code"), "compatible_extension_code");
+});
 
 test("experience workspace accepts venue-scoped profile and draft", () => {
   const result = experienceWorkspaceResponseSchema.parse({

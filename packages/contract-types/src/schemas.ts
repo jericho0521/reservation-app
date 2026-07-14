@@ -643,8 +643,30 @@ export const endResourceMaintenanceInputSchema = strictObject({
   metadata: metadataRecordSchema.optional(),
 });
 
+export const knownPlatformErrorCodeSchema = z.enum([
+  "bad_request",
+  "unauthorized",
+  "forbidden",
+  "not_found",
+  "conflict",
+  "validation_failed",
+  "missing_idempotency_key",
+  "idempotency_key_reused_with_different_request",
+  "idempotency_replay_unavailable",
+  "chat_module_disabled",
+  "whatsapp_module_disabled",
+  "internal_error",
+  "rate_limited",
+  "payload_too_large",
+]);
+
+export const platformErrorCodeSchema = z.union([
+  knownPlatformErrorCodeSchema,
+  z.string(),
+]);
+
 export const platformErrorBodySchema = strictObject({
-  code: z.string(),
+  code: platformErrorCodeSchema,
   message: z.string(),
   status: z.number().int(),
   request_id: z.string().optional(),

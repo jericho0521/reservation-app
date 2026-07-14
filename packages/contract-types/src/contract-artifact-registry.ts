@@ -501,8 +501,29 @@ export const publicJsonSchemaDefinitions: Record<string, JsonSchema> = {
     metadata: ref("MetadataRecord"),
   }),
   PlatformErrorCode: {
-    type: "string",
-    description: "Stable machine-readable platform error code. Known codes include bad_request, unauthorized, forbidden, not_found, conflict, validation_failed, missing_idempotency_key, idempotency_key_reused_with_different_request, idempotency_replay_unavailable, and chat_module_disabled.",
+    anyOf: [
+      {
+        type: "string",
+        enum: [
+          "bad_request",
+          "unauthorized",
+          "forbidden",
+          "not_found",
+          "conflict",
+          "validation_failed",
+          "missing_idempotency_key",
+          "idempotency_key_reused_with_different_request",
+          "idempotency_replay_unavailable",
+          "chat_module_disabled",
+          "whatsapp_module_disabled",
+          "internal_error",
+          "rate_limited",
+          "payload_too_large",
+        ],
+      },
+      { type: "string" },
+    ],
+    description: "Stable machine-readable platform error code. The enum lists codes defined by this release; compatible extensions remain valid strings.",
   },
   IdempotencyMetadata: objectSchema({
     key: stringSchema,

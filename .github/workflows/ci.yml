@@ -46,17 +46,5 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Install current frontend platform smoke browser
-        run: pnpm run current-frontend:platform-smoke:install
-
-      - name: Run tests
-        run: pnpm test
-
-      - name: Run linter
-        run: pnpm lint
-
-      - name: Run SDK release gate
-        run: pnpm run sdk:release-gate
-
-      - name: Build application
-        run: pnpm build
+      - name: Verify repository
+        run: pnpm run ci:verify

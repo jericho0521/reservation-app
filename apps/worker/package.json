@@ -1,0 +1,17 @@
+{
+  "name": "@reservation-platform/worker",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Durable background worker host for the reservation platform.",
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/server.js",
+    "test": "tsc -p tsconfig.json --noEmit && node --import tsx --test \"src/**/*.test.ts\""
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "tsx": "^4.21.0",
+    "typescript": "^5"
+  }
+}

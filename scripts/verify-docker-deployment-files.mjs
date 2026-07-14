@@ -81,6 +81,7 @@ function verifyDockerDeploymentFiles() {
   assertIncludes(dockerignore, ".env", ".dockerignore must exclude local env files.", errors);
   assertIncludes(dockerignore, "node_modules", ".dockerignore must exclude local node_modules.", errors);
   assertIncludes(dockerignore, ".git", ".dockerignore must exclude git metadata.", errors);
+  assertIncludes(dockerignore, ".superpowers", ".dockerignore must exclude local Superpowers state.", errors);
   assertIncludes(dockerignore, "dist-packages", ".dockerignore must exclude packaged release artifacts.", errors);
 
   for (const envName of manifest.requiredSupabaseEnv ?? []) {

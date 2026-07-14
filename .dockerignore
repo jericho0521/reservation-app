@@ -2,6 +2,7 @@
 .github
 .agents
 .codex
+.superpowers
 .next
 .pnpm-store
 node_modules

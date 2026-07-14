@@ -7,9 +7,9 @@ export function createBookingPlatformClient(
   env: Record<string, string | undefined> = process.env,
   fetchImpl: typeof fetch = fetch,
 ) {
-  const { baseUrl } = readBookingPlatformConfig(env);
+  const { serverBaseUrl } = readBookingPlatformConfig(env);
   return createReservationPlatformClient({
-    baseUrl,
+    baseUrl: serverBaseUrl,
     fetch: (input, init) => fetchImpl(input, { ...init, cache: "no-store" }),
   });
 }

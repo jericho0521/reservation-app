@@ -11,6 +11,7 @@ const files = {
   dockerignore: ".dockerignore",
   envExample: ".env.example",
   compose: "docker-compose.yml",
+  localStackConfig: "scripts/local-stack-config.mjs",
   deploymentDocs: "docs/operations/backend-deployment.md",
 };
 
@@ -56,6 +57,7 @@ function verifyDockerDeploymentFiles() {
   const dockerignore = readText(files.dockerignore);
   const envExample = readText(files.envExample);
   const compose = readText(files.compose);
+  const localStackConfig = readText(files.localStackConfig);
   const deploymentDocs = readText(files.deploymentDocs);
   const errors = [];
 
@@ -89,9 +91,9 @@ function verifyDockerDeploymentFiles() {
       errors,
     );
     assertIncludes(
-      compose,
-      `${envName}: "\${${envName}}"`,
-      `docker-compose.yml must pass backend Supabase env ${envName}.`,
+      localStackConfig,
+      `${envName}:`,
+      `Docker-contained local configuration must generate backend Supabase env ${envName}.`,
       errors,
     );
   }
@@ -106,12 +108,12 @@ function verifyDockerDeploymentFiles() {
 
   assertIncludes(compose, "reservation-api:", "docker-compose.yml must define the reservation-api service.", errors);
   assertIncludes(compose, 'target: runtime', "docker-compose.yml must build the Dockerfile runtime target.", errors);
-  assertIncludes(compose, '"${PORT:-4100}:4100"', "docker-compose.yml must expose the configured PORT to container port 4100.", errors);
+  assertIncludes(compose, '"127.0.0.1:4100:4100"', "docker-compose.yml must bind API port 4100 to localhost.", errors);
   assertIncludes(compose, 'PORT: "4100"', "docker-compose.yml must set the container PORT for the API server.", errors);
   assertIncludes(
-    compose,
+    localStackConfig,
     "RESERVATION_PLATFORM_CORS_ALLOWED_ORIGINS",
-    "docker-compose.yml must pass backend CORS origin config.",
+    "Docker-contained local configuration must set exact backend CORS origins.",
     errors,
   );
   assertIncludes(
@@ -122,19 +124,13 @@ function verifyDockerDeploymentFiles() {
   );
   assertIncludes(
     compose,
-    'RESERVATION_PLATFORM_CONFIG_PATH: "${RESERVATION_PLATFORM_CONFIG_PATH:-}"',
-    "docker-compose.yml must keep the backend module manifest opt-in.",
+    '"/usr/local/bin/run-with-config", "/run/reservation-stack/api.env"',
+    "docker-compose.yml must load generated API config from the private stack volume.",
     errors,
   );
   assertIncludes(
     compose,
-    "./configs/racing-sim.platform.json:/app/config/platform.json:ro",
-    "docker-compose.yml must mount the example platform config read-only.",
-    errors,
-  );
-  assertIncludes(
-    compose,
-    "./data/whatsapp-sessions:/app/.reservation-whatsapp-sessions",
+    "reservation-whatsapp-sessions:/app/.reservation-whatsapp-sessions",
     "docker-compose.yml must persist WhatsApp session auth state.",
     errors,
   );

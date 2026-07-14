@@ -16,5 +16,10 @@ apps/*/dist
 packages/*/dist
 packages/*/tsconfig.tsbuildinfo
 .reservation-whatsapp-sessions
+data/whatsapp-sessions
+tmp
+**/.next
+**/.turbo
+**/database-data
 **/.DS_Store
 **/Thumbs.db

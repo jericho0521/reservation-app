@@ -5,6 +5,8 @@ import { fileURLToPath } from "node:url";
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 
 const nextConfig: NextConfig = {
+  output: "standalone",
+  outputFileTracingRoot: repoRoot,
   transpilePackages: ["@reservation-platform/sdk"],
   turbopack: { root: repoRoot },
 };

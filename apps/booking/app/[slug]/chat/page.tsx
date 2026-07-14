@@ -11,9 +11,9 @@ export default async function ChatPage({ params }: { params: Promise<{ slug: str
   const result = await loadPublicExperience(createBookingPlatformClient(), slug);
   if (!result.found || !result.experience.configuration.channels.web_chat) notFound();
   const { profile, configuration } = result.experience;
-  const { baseUrl } = readBookingPlatformConfig(process.env);
+  const { publicBaseUrl } = readBookingPlatformConfig(process.env);
   return <ExperienceTheme branding={configuration.branding}>
     <nav className="public-nav"><Link className="public-brand" href={`/${profile.public_slug}`}>← {configuration.branding.brand_name}</Link></nav>
-    <main className="chat-shell"><PublicChat baseUrl={baseUrl} slug={profile.public_slug} brandName={configuration.branding.brand_name} /></main>
+    <main className="chat-shell"><PublicChat baseUrl={publicBaseUrl} slug={profile.public_slug} brandName={configuration.branding.brand_name} /></main>
   </ExperienceTheme>;
 }

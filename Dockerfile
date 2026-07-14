@@ -41,6 +41,8 @@ COPY --from=build --chown=reservation:reservation /app/apps/api/node_modules ./a
 COPY --from=build --chown=reservation:reservation /app/apps/api/dist ./apps/api/dist
 COPY --from=build --chown=reservation:reservation /app/apps/api/deployment.config.json ./apps/api/deployment.config.json
 COPY --from=build --chown=reservation:reservation /app/packages ./packages
+COPY --from=build /app/docker/local-stack/run-with-config.sh /usr/local/bin/run-with-config
+RUN chmod 755 /usr/local/bin/run-with-config
 
 USER reservation
 EXPOSE 4100

@@ -11,7 +11,7 @@ export default async function BookPage({ params }: { params: Promise<{ slug: str
   const result = await loadPublicExperience(createBookingPlatformClient(), slug);
   if (!result.found || !result.experience.configuration.channels.web_booking) notFound();
   const { profile, configuration } = result.experience;
-  const { baseUrl } = readBookingPlatformConfig(process.env);
+  const { publicBaseUrl } = readBookingPlatformConfig(process.env);
   return <ExperienceTheme branding={configuration.branding}>
     <nav className="public-nav"><Link className="public-brand" href={`/${profile.public_slug}`}>← {configuration.branding.brand_name}</Link></nav>
     <main className="booking-journey-shell">
@@ -21,7 +21,7 @@ export default async function BookPage({ params }: { params: Promise<{ slug: str
         <p>Choose an experience, check live availability, and review the details before confirming.</p>
       </header>
       <PublicBookingJourney
-        baseUrl={baseUrl}
+        baseUrl={publicBaseUrl}
         slug={profile.public_slug}
         labels={{
           service: configuration.terminology.booking,

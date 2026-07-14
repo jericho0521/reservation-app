@@ -1,57 +1,225 @@
 services:
+  reservation-config:
+    build:
+      context: .
+      dockerfile: Dockerfile.local-stack
+    image: reservation-platform-stack-tools:local
+    command: ["node", "scripts/local-stack-config.mjs"]
+    environment:
+      RESERVATION_STACK_CONFIG_DIR: /run/reservation-stack
+    volumes:
+      - reservation-stack-config:/run/reservation-stack
+    networks:
+      - reservation-stack
+    restart: "no"
+
+  reservation-db:
+    image: postgres:16-alpine
+    depends_on:
+      reservation-config:
+        condition: service_completed_successfully
+    environment:
+      POSTGRES_DB: reservation
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD_FILE: /run/reservation-stack/database-password
+    volumes:
+      - reservation-db-data:/var/lib/postgresql/data
+      - reservation-stack-config:/run/reservation-stack:ro
+    networks:
+      - reservation-stack
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d reservation"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 5s
+    restart: unless-stopped
+
+  reservation-migrate:
+    image: reservation-platform-stack-tools:local
+    pull_policy: never
+    depends_on:
+      reservation-db:
+        condition: service_healthy
+    entrypoint: ["/usr/local/bin/run-with-config", "/run/reservation-stack/stack.env"]
+    command: ["node", "scripts/local-stack-migrate.mjs"]
+    user: "1001:1001"
+    volumes:
+      - reservation-stack-config:/run/reservation-stack:ro
+    networks:
+      - reservation-stack
+    restart: "no"
+
+  reservation-seed:
+    image: reservation-platform-stack-tools:local
+    pull_policy: never
+    depends_on:
+      reservation-migrate:
+        condition: service_completed_successfully
+    entrypoint: ["/usr/local/bin/run-with-config", "/run/reservation-stack/stack.env"]
+    command: ["node", "scripts/local-stack-seed.mjs"]
+    environment:
+      RESERVATION_STACK_SEED_MODE: first-run
+    user: "1001:1001"
+    volumes:
+      - reservation-stack-config:/run/reservation-stack:ro
+    networks:
+      - reservation-stack
+    restart: "no"
+
+  reservation-rest:
+    image: postgrest/postgrest:v12.2.12
+    depends_on:
+      reservation-migrate:
+        condition: service_completed_successfully
+    entrypoint: ["postgrest"]
+    command: ["/run/reservation-stack/postgrest.conf"]
+    user: "1001:1001"
+    volumes:
+      - reservation-stack-config:/run/reservation-stack:ro
+    networks:
+      - reservation-stack
+    restart: unless-stopped
+
+  reservation-gateway:
+    image: nginx:1.27.5-alpine
+    depends_on:
+      reservation-rest:
+        condition: service_started
+    volumes:
+      - ./docker/local-stack/nginx.conf:/etc/nginx/nginx.conf:ro
+    networks:
+      - reservation-stack
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 5s
+    restart: unless-stopped
+
   reservation-api:
     build:
       context: .
       target: runtime
     image: reservation-platform-backend:local
+    depends_on:
+      reservation-seed:
+        condition: service_completed_successfully
+      reservation-gateway:
+        condition: service_healthy
+    entrypoint: ["/usr/local/bin/run-with-config", "/run/reservation-stack/api.env"]
+    command: ["node", "apps/api/dist/server.js"]
     ports:
-      - "${PORT:-4100}:4100"
+      - "127.0.0.1:4100:4100"
     environment:
       PORT: "4100"
-      RESERVATION_SUPABASE_URL: "${RESERVATION_SUPABASE_URL}"
-      RESERVATION_SUPABASE_ANON_KEY: "${RESERVATION_SUPABASE_ANON_KEY}"
-      RESERVATION_SUPABASE_SERVICE_ROLE_KEY: "${RESERVATION_SUPABASE_SERVICE_ROLE_KEY}"
-      RESERVATION_PLATFORM_SERVICE_API_KEY: "${RESERVATION_PLATFORM_SERVICE_API_KEY}"
-      RESERVATION_PLATFORM_AUTH_JWKS_URL: "${RESERVATION_PLATFORM_AUTH_JWKS_URL}"
-      RESERVATION_PLATFORM_AUTH_ISSUER: "${RESERVATION_PLATFORM_AUTH_ISSUER}"
-      RESERVATION_PLATFORM_AUTH_AUDIENCE: "${RESERVATION_PLATFORM_AUTH_AUDIENCE}"
-      RESERVATION_PLATFORM_AUTH_ALGORITHMS: "${RESERVATION_PLATFORM_AUTH_ALGORITHMS}"
-      RESERVATION_PLATFORM_AUTH_CLOCK_TOLERANCE_SECONDS: "${RESERVATION_PLATFORM_AUTH_CLOCK_TOLERANCE_SECONDS}"
-      RESERVATION_PLATFORM_AUTH_JWKS_CACHE_TTL_SECONDS: "${RESERVATION_PLATFORM_AUTH_JWKS_CACHE_TTL_SECONDS}"
-      RESERVATION_PLATFORM_AUTH_SUBJECT_CLAIM: "${RESERVATION_PLATFORM_AUTH_SUBJECT_CLAIM}"
-      RESERVATION_PLATFORM_AUTH_TENANT_IDS_CLAIM: "${RESERVATION_PLATFORM_AUTH_TENANT_IDS_CLAIM}"
-      RESERVATION_PLATFORM_AUTH_VENUE_IDS_CLAIM: "${RESERVATION_PLATFORM_AUTH_VENUE_IDS_CLAIM}"
-      RESERVATION_PLATFORM_AUTH_ROLES_CLAIM: "${RESERVATION_PLATFORM_AUTH_ROLES_CLAIM}"
-      RESERVATION_PLATFORM_AUTH_SCOPES_CLAIM: "${RESERVATION_PLATFORM_AUTH_SCOPES_CLAIM}"
-      RESERVATION_PLATFORM_CORS_ALLOWED_ORIGINS: "${RESERVATION_PLATFORM_CORS_ALLOWED_ORIGINS:-http://localhost:4000,http://127.0.0.1:4000,http://localhost:4200,http://127.0.0.1:4200,http://localhost:4201,http://127.0.0.1:4201,http://localhost:4202,http://127.0.0.1:4202}"
-      RESERVATION_PLATFORM_CONFIG_PATH: "${RESERVATION_PLATFORM_CONFIG_PATH:-}"
-      GOOGLE_GENERATIVE_AI_API_KEY: "${GOOGLE_GENERATIVE_AI_API_KEY}"
-      GOOGLE_GENERATIVE_AI_MODEL: "${GOOGLE_GENERATIVE_AI_MODEL}"
-      OPENROUTER_API_KEY: "${OPENROUTER_API_KEY}"
-      OPENROUTER_CHAT_MODEL: "${OPENROUTER_CHAT_MODEL}"
-      AI_AGENT_PROVIDER: "${AI_AGENT_PROVIDER}"
-      AI_AGENT_BASE_URL: "${AI_AGENT_BASE_URL}"
-      AI_AGENT_API_KEY: "${AI_AGENT_API_KEY}"
-      AI_AGENT_MODEL: "${AI_AGENT_MODEL}"
-      RESERVATION_WHATSAPP_ENABLED: "${RESERVATION_WHATSAPP_ENABLED:-false}"
-      RESERVATION_WHATSAPP_PROVIDER: "${RESERVATION_WHATSAPP_PROVIDER:-session_qr}"
-      RESERVATION_WHATSAPP_SESSION_AUTH_DIR: "${RESERVATION_WHATSAPP_SESSION_AUTH_DIR:-/app/.reservation-whatsapp-sessions}"
-      RESERVATION_WHATSAPP_SESSION_ENCRYPTION_KEY: "${RESERVATION_WHATSAPP_SESSION_ENCRYPTION_KEY}"
-      RESERVATION_WHATSAPP_ALLOW_MEMORY_STORE: "${RESERVATION_WHATSAPP_ALLOW_MEMORY_STORE:-false}"
-      RESERVATION_WHATSAPP_SIMULATION_ENABLED: "${RESERVATION_WHATSAPP_SIMULATION_ENABLED:-false}"
     volumes:
-      - ./configs/racing-sim.platform.json:/app/config/platform.json:ro
-      - ./data/whatsapp-sessions:/app/.reservation-whatsapp-sessions
+      - reservation-stack-config:/run/reservation-stack:ro
+      - reservation-whatsapp-sessions:/app/.reservation-whatsapp-sessions
+    networks:
+      - reservation-stack
+      - reservation-edge
     healthcheck:
-      test:
-        [
-          "CMD",
-          "node",
-          "-e",
-          "fetch('http://127.0.0.1:4100/v1/health').then((r) => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
-        ]
-      interval: 30s
-      timeout: 10s
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4100/v1/health').then((response) => process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
       start_period: 10s
-      retries: 3
     restart: unless-stopped
+
+  reservation-console:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+      target: console-runtime
+    image: reservation-platform-console:local
+    depends_on:
+      reservation-api:
+        condition: service_healthy
+    entrypoint: ["/usr/local/bin/run-with-config", "/run/reservation-stack/console.env"]
+    command: ["node", "apps/console/server.js"]
+    ports:
+      - "127.0.0.1:4300:4300"
+    volumes:
+      - reservation-stack-config:/run/reservation-stack:ro
+    networks:
+      - reservation-stack
+      - reservation-edge
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4300/').then((response) => process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+    restart: unless-stopped
+
+  reservation-booking:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+      target: booking-runtime
+    image: reservation-platform-booking:local
+    depends_on:
+      reservation-api:
+        condition: service_healthy
+    entrypoint: ["/usr/local/bin/run-with-config", "/run/reservation-stack/booking.env"]
+    command: ["node", "apps/booking/server.js"]
+    ports:
+      - "127.0.0.1:4400:4400"
+    volumes:
+      - reservation-stack-config:/run/reservation-stack:ro
+    networks:
+      - reservation-stack
+      - reservation-edge
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4400/apex-racing-demo').then((response) => process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+    restart: unless-stopped
+
+  reservation-reset:
+    profiles: ["operations"]
+    image: reservation-platform-stack-tools:local
+    pull_policy: never
+    depends_on:
+      reservation-migrate:
+        condition: service_completed_successfully
+    entrypoint: ["/usr/local/bin/run-with-config", "/run/reservation-stack/stack.env"]
+    command: ["node", "scripts/local-stack-seed.mjs"]
+    environment:
+      RESERVATION_STACK_SEED_MODE: reset
+    user: "1001:1001"
+    volumes:
+      - reservation-stack-config:/run/reservation-stack:ro
+    networks:
+      - reservation-stack
+    restart: "no"
+
+  reservation-destroy:
+    profiles: ["operations"]
+    image: reservation-platform-stack-tools:local
+    pull_policy: never
+    command: ["node", "scripts/local-stack-destroy.mjs"]
+    environment:
+      RESERVATION_STACK_DESTROY_CONFIRM: "${RESERVATION_STACK_DESTROY_CONFIRM:-}"
+    volumes:
+      - reservation-db-data:/volumes/database
+      - reservation-stack-config:/volumes/config
+      - reservation-whatsapp-sessions:/volumes/whatsapp
+    network_mode: none
+    restart: "no"
+
+volumes:
+  reservation-db-data:
+  reservation-stack-config:
+  reservation-whatsapp-sessions:
+
+networks:
+  reservation-stack:
+    driver: bridge
+    internal: true
+  reservation-edge:
+    driver: bridge

@@ -1,0 +1,62 @@
+# syntax=docker/dockerfile:1.7
+
+FROM node:24-alpine AS base
+WORKDIR /app
+ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0
+RUN corepack enable
+
+FROM base AS deps
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.json ./
+COPY apps/console/package.json apps/console/package.json
+COPY apps/booking/package.json apps/booking/package.json
+COPY packages/contract-types/package.json packages/contract-types/package.json
+COPY packages/reservation-react/package.json packages/reservation-react/package.json
+COPY packages/reservation-ui/package.json packages/reservation-ui/package.json
+COPY packages/sdk/package.json packages/sdk/package.json
+RUN pnpm install --frozen-lockfile
+
+FROM deps AS source
+COPY apps/console apps/console
+COPY apps/booking apps/booking
+COPY packages/contract-types packages/contract-types
+COPY packages/reservation-react packages/reservation-react
+COPY packages/reservation-ui packages/reservation-ui
+COPY packages/sdk packages/sdk
+COPY docker/local-stack/run-with-config.sh /usr/local/bin/run-with-config
+RUN chmod 755 /usr/local/bin/run-with-config && \
+    pnpm --filter @reservation-platform/contract-types run build && \
+    pnpm --filter @reservation-platform/sdk run build && \
+    pnpm --filter @reservation-platform/react run build && \
+    pnpm --filter @reservation-platform/ui run build
+
+FROM source AS console-build
+RUN pnpm --filter @reservation-platform/console run build
+
+FROM source AS booking-build
+RUN pnpm --filter @reservation-platform/booking run build
+
+FROM node:24-alpine AS console-runtime
+WORKDIR /app
+ENV NODE_ENV=production
+ENV HOSTNAME=0.0.0.0
+ENV PORT=4300
+RUN addgroup -g 1001 -S reservation && adduser -S reservation -u 1001 -G reservation
+COPY --from=console-build --chown=reservation:reservation /app/apps/console/.next/standalone ./
+COPY --from=console-build --chown=reservation:reservation /app/apps/console/.next/static ./apps/console/.next/static
+COPY --from=console-build /usr/local/bin/run-with-config /usr/local/bin/run-with-config
+USER reservation
+EXPOSE 4300
+CMD ["node", "apps/console/server.js"]
+
+FROM node:24-alpine AS booking-runtime
+WORKDIR /app
+ENV NODE_ENV=production
+ENV HOSTNAME=0.0.0.0
+ENV PORT=4400
+RUN addgroup -g 1001 -S reservation && adduser -S reservation -u 1001 -G reservation
+COPY --from=booking-build --chown=reservation:reservation /app/apps/booking/.next/standalone ./
+COPY --from=booking-build --chown=reservation:reservation /app/apps/booking/.next/static ./apps/booking/.next/static
+COPY --from=booking-build /usr/local/bin/run-with-config /usr/local/bin/run-with-config
+USER reservation
+EXPOSE 4400
+CMD ["node", "apps/booking/server.js"]

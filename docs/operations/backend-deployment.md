@@ -1,225 +1,234 @@
-# Backend Deployment
+# Backend Deployment and Local Stack Operations
 
-This backend branch is container-first. The Docker image runs only the
-standalone reservation platform API from `apps/api`; frontend demos run
-separately and connect through `/v1` or `@reservation-platform/sdk`.
+The repository supports two distinct operating models:
 
-## Deployment Model
+- A self-contained Docker Compose stack for local development, evaluation, and demonstrations.
+- Separately deployed API, console, booking, and database services for production-style environments.
 
-- Runtime command: `node apps/api/dist/server.js`
-- Health check: `GET /v1/health`
-- Default container port: `4100`
-- Database mode: external Supabase/Postgres
-- Migration mode: explicit operator action, not automatic container startup
+The local stack is not the complete official Supabase product and is not a production deployment template.
 
-Supabase keys and service credentials are backend-only. Frontends should receive
-only the deployed API URL through `NEXT_PUBLIC_RESERVATION_PLATFORM_BASE_URL`.
+## Start the Local Development Stack
 
-## Prepare Environment
+The only host prerequisite is Docker with Docker Compose.
 
-```powershell
-Copy-Item .env.example .env
+```bash
+git clone <repository-url>
+cd reservation-app
+docker compose up --build -d
+docker compose ps
 ```
 
-Safe: creates a local env file from placeholders. Fill `.env` with backend-only
-values before running the API. Do not commit `.env`.
+Open:
 
-Required Supabase values:
+- API health: `http://localhost:4100/v1/health`
+- Owner console: `http://localhost:4300`
+- Public booking: `http://localhost:4400/apex-racing-demo`
 
-```powershell
+The initial startup:
+
+1. Generates random local database, JWT, service API, and WhatsApp encryption values.
+2. Starts PostgreSQL 16.
+3. Applies indexed core migrations `000001` through `000020` in order.
+4. Records each migration filename and SHA-256 in a local ledger.
+5. Seeds the deterministic `final_demo` dataset when its marker is absent.
+6. Starts PostgREST, the narrow `/rest/v1` gateway, API, console, and booking app.
+
+Generated credentials live in the private `reservation-stack-config` volume. They are not written to a host `.env` file or printed in logs.
+
+## Inspect and Troubleshoot the Local Stack
+
+```bash
+docker compose ps --all
+docker compose logs -f
+```
+
+Inspect a failed layer without exposing every service log:
+
+```bash
+docker compose logs reservation-config
+docker compose logs reservation-db reservation-migrate reservation-seed
+docker compose logs reservation-rest reservation-gateway reservation-api
+docker compose logs reservation-console reservation-booking
+```
+
+The stack is ready only after PostgreSQL, gateway, API, console, and booking health checks succeed. Migration drift fails closed: if an applied SQL file no longer matches its ledger checksum, restore the indexed file instead of editing the ledger.
+
+The published ports bind to `127.0.0.1`:
+
+| Service | Host port | Exposure |
+| --- | ---: | --- |
+| API | 4100 | Localhost |
+| Owner console | 4300 | Localhost |
+| Public booking | 4400 | Localhost |
+| PostgreSQL | None | Private Compose network |
+| PostgREST | None | Private Compose network |
+| REST gateway | None | Private Compose network |
+
+## Preserve, Reset, or Destroy Local Data
+
+Stop containers while preserving all named volumes:
+
+```bash
+docker compose down
+```
+
+Restarting later reuses the same credentials, database, migration ledger, demo marker, and WhatsApp session data.
+
+Replace only deterministic final-demo records:
+
+```bash
+docker compose run --rm reservation-reset
+```
+
+Reset accepts only the fixed Compose-managed database identity. It does not accept an arbitrary database URL.
+
+Destroy all three Compose-managed local data sets:
+
+```bash
+docker compose down
+RESERVATION_STACK_DESTROY_CONFIRM=DESTROY_LOCAL_STACK docker compose run --rm reservation-destroy
+```
+
+The exact confirmation is required. The destroy service has networking disabled, mounts only the database, generated-config, and WhatsApp-session volumes, and clears only those fixed mount paths.
+
+## Verify the Local Stack
+
+Static topology and guard checks do not require a running stack:
+
+```bash
+pnpm run local-stack:test
+pnpm run stack:verify
+```
+
+With the stack running, verify the three applications, seeded database, and authenticated owner API path:
+
+```bash
+pnpm run stack:verify:live
+```
+
+The persistence proof intentionally performs `docker compose down` followed by `docker compose up -d` and confirms a database marker survives:
+
+```bash
+pnpm run stack:verify:persistence
+```
+
+## Local Stack Boundaries
+
+The local stack provides PostgreSQL, PostgREST, and the REST compatibility path used by `@supabase/supabase-js`. It does not provide:
+
+- Supabase Auth or GoTrue
+- Storage
+- Realtime
+- Studio
+- Edge Functions
+- Supabase analytics infrastructure
+- TLS termination, production backups, monitoring, or incident controls
+
+WhatsApp simulation is enabled by default so evaluators do not need a phone credential. Live Baileys linked-device mode remains opt-in. QR pairing payloads are returned only through the authorized API/store path and must never appear in logs.
+
+## Production-Style API Deployment
+
+The root `Dockerfile` remains the standalone API image:
+
+- Runtime command: `node apps/api/dist/server.js`
+- Health path: `GET /v1/health`
+- Default container port: `4100`
+- Runtime user: non-root `reservation`
+- Database mode: external PostgreSQL/Supabase REST endpoint
+
+The standalone production API image does not apply migrations on startup and does not seed demo data. Apply migrations through the target environment's controlled database release process before accepting traffic.
+
+Prepare environment placeholders:
+
+```bash
+cp .env.example .env
+```
+
+Required database values:
+
+```dotenv
 RESERVATION_SUPABASE_URL=
 RESERVATION_SUPABASE_ANON_KEY=
 RESERVATION_SUPABASE_SERVICE_ROLE_KEY=
 ```
 
-Use one auth mode:
+Configure service-key owner authentication:
 
-```powershell
+```dotenv
 RESERVATION_PLATFORM_SERVICE_API_KEY=
 ```
 
-or configure JWT/JWKS:
+Or configure the complete JWT/JWKS alternative:
 
-```powershell
+```dotenv
 RESERVATION_PLATFORM_AUTH_JWKS_URL=
 RESERVATION_PLATFORM_AUTH_ISSUER=
 RESERVATION_PLATFORM_AUTH_AUDIENCE=
 ```
 
-Allow demo frontend origins:
+Set exact frontend origins and optional module configuration:
 
-```powershell
-RESERVATION_PLATFORM_CORS_ALLOWED_ORIGINS=http://localhost:4000
-```
-
-Select backend modules with a manifest:
-
-```powershell
+```dotenv
+RESERVATION_PLATFORM_CORS_ALLOWED_ORIGINS=https://console.example.com,https://booking.example.com
 RESERVATION_PLATFORM_CONFIG_PATH=/app/config/platform.json
 ```
 
-Safe: the manifest chooses modules such as reservations, WhatsApp, and AI
-automation for one backend/business. Docker Compose mounts
-`configs/racing-sim.platform.json` to this path read-only, but does not load it
-unless `RESERVATION_PLATFORM_CONFIG_PATH` is set. Keep API keys and session
-secrets in env vars, not the JSON manifest.
+Keep service-role, service API, AI provider, and WhatsApp encryption values in the deployment secret store. Never put them in `NEXT_PUBLIC_*` variables.
 
-Optional WhatsApp booking automation:
+Verify and build:
 
-```powershell
-RESERVATION_WHATSAPP_ENABLED=true
-RESERVATION_WHATSAPP_PROVIDER=session_qr
-RESERVATION_WHATSAPP_SESSION_AUTH_DIR=.reservation-whatsapp-sessions
-RESERVATION_WHATSAPP_SESSION_ENCRYPTION_KEY=
-RESERVATION_WHATSAPP_ALLOW_MEMORY_STORE=false
-AI_AGENT_PROVIDER=openai-compatible
-AI_AGENT_BASE_URL=https://openrouter.ai/api/v1
-AI_AGENT_API_KEY=
-AI_AGENT_MODEL=
+```bash
+pnpm run deploy:verify
+pnpm run test
+pnpm run docker:build
 ```
 
-Safe when used with a disposable or intended backend environment. Keep
-`AI_AGENT_API_KEY`, Supabase keys, and the WhatsApp session encryption key
-backend-only. The session auth directory must be persisted as a protected server
-volume if you want WhatsApp linked-device login to survive container restarts;
-Compose persists it at `./data/whatsapp-sessions`.
-Production WhatsApp automation requires Supabase/Postgres storage. Leave
-`RESERVATION_WHATSAPP_ALLOW_MEMORY_STORE=false` outside local `pnpm dev:memory`
-testing.
+Run the API image locally against a deliberately configured non-production environment:
 
-Optional dev/test inbound simulation:
-
-```powershell
-RESERVATION_WHATSAPP_SIMULATION_ENABLED=true
+```bash
+pnpm run docker:run
+curl --fail http://localhost:4100/v1/health
 ```
 
-Safe only in local development or protected test environments. It enables
-`POST /v1/channels/whatsapp/messages:simulate` so developers can test the
-WhatsApp conversation runtime without sending messages from a phone.
+## Deploy the Console and Booking Applications
 
-## Verify Before Building
+Deploy both Next.js applications separately from the API in production-style environments.
 
-```powershell
-corepack pnpm run deploy:verify
+Console server variables:
+
+```dotenv
+RESERVATION_PLATFORM_BASE_URL=https://api.example.com
+RESERVATION_PLATFORM_SERVICE_API_KEY=
+RESERVATION_CONSOLE_TENANT_ID=
+RESERVATION_CONSOLE_VENUE_ID=
 ```
 
-Safe: checks deployment config, Docker/Compose/env files, and forbidden public
-secret names. It does not build images, deploy services, call the network, or
-touch production data.
+Booking server variables:
 
-```powershell
-corepack pnpm run test
+```dotenv
+RESERVATION_PLATFORM_BASE_URL=http://internal-api:4100
+RESERVATION_PLATFORM_PUBLIC_BASE_URL=https://api.example.com
 ```
 
-Safe: runs package tests, standalone API tests, and database migration bundle
-checks. It does not run strict live database proofs unless explicitly requested.
+`RESERVATION_PLATFORM_BASE_URL` is used by server rendering. `RESERVATION_PLATFORM_PUBLIC_BASE_URL` is passed to browser-side public booking and chat clients. The booking application receives no database or owner credential.
 
-## Build The Docker Image
+Existing integrations that use `NEXT_PUBLIC_RESERVATION_PLATFORM_BASE_URL` should expose only the public API origin. They must never expose `RESERVATION_SUPABASE_SERVICE_ROLE_KEY`, `RESERVATION_PLATFORM_SERVICE_API_KEY`, or `RESERVATION_WHATSAPP_SESSION_ENCRYPTION_KEY`.
 
-```powershell
-corepack pnpm run docker:build
-```
+## Production Readiness Requirements
 
-Safe locally: builds `reservation-platform-backend:local` from the current
-source tree. It does not push the image or deploy it.
+Before describing a target environment as production-ready, provide environment-specific evidence for:
 
-## Run With Docker
+- TLS and trusted ingress
+- Database backups and tested restoration
+- Migration rollback or forward-fix procedure
+- Exact CORS and authentication policy
+- Tenant and venue isolation
+- Structured logs with secret and QR redaction
+- Health, latency, error, capacity, and certificate monitoring
+- Rate limiting and abuse controls
+- Secret rotation
+- Load testing
+- Dependency incident response
+- Operational ownership and incident procedures
 
-```powershell
-corepack pnpm run docker:run
-```
-
-Safe locally when `.env` points at a non-production Supabase project. It starts
-one backend API container on `http://localhost:4100`.
-
-Health check:
-
-```powershell
-Invoke-RestMethod http://localhost:4100/v1/health
-```
-
-Safe: performs a read-only health request. It does not require auth or database
-access.
-
-## Run With Docker Compose
-
-```powershell
-corepack pnpm run docker:compose:up
-```
-
-Safe locally when `.env` points at non-production services. It builds and starts
-only the backend API container. It does not start a frontend or database.
-
-```powershell
-corepack pnpm run docker:compose:down
-```
-
-Safe: stops and removes the local Compose API container. It does not delete
-external Supabase data.
-
-## Database And Migrations
-
-The container does not apply migrations on startup. Before production traffic,
-verify the package-owned migration bundle:
-
-```powershell
-corepack pnpm run database:verify-migration-bundle
-```
-
-Safe: validates local migration metadata and SQL ownership. It does not connect
-to a live database.
-
-For disposable/live database proof, use the existing strict proof scripts only
-after configuring the target database intentionally:
-
-```powershell
-corepack pnpm run database:live-proof:strict
-```
-
-Potentially destructive if pointed at shared data: applies migrations and runs
-database behavior checks against the configured target. Use only with disposable
-or explicitly approved environments.
-
-WhatsApp automation requires the WhatsApp migration bundle, including
-`packages/database/migrations/supabase/000012_whatsapp_business_agent.sql` and
-`packages/database/migrations/supabase/000013_whatsapp_staff_takeover.sql`.
-Production mode should use Supabase/Postgres, not memory mode, because the
-module persists session status, business config, text knowledge, conversations,
-messages, booking drafts, confirmations, and audit metadata.
-
-Configure the owner-facing WhatsApp module through backend APIs:
-
-- `POST /v1/channels/whatsapp/session/start`
-- `GET /v1/channels/whatsapp/session/status`
-- `GET /v1/channels/whatsapp/session/qr`
-- `POST /v1/channels/whatsapp/session/logout`
-- `GET/PATCH /v1/channels/whatsapp/config`
-- `GET/POST/PATCH/DELETE /v1/channels/whatsapp/knowledge`
-- `GET /v1/channels/whatsapp/conversations`
-- `PATCH /v1/channels/whatsapp/conversations/{id}`
-- `POST /v1/channels/whatsapp/conversations/{id}/messages`
-- `GET /v1/channels/whatsapp/conversations/{id}/messages`
-- `GET /v1/channels/whatsapp/readiness`
-
-Use readiness before exposing the channel to customers. Production readiness
-requires database storage, AI provider config, reservation tools, a valid
-business config/default service id, and a connected WhatsApp session.
-
-## Hosted Container Deployment
-
-Any container host should use:
-
-- Build command: `docker build -t reservation-platform-backend .`
-- Start command: image default command
-- Health path: `/v1/health`
-- Port env: `PORT`
-- Required backend env from `.env.example`
-
-For frontend demos, configure the frontend environment with:
-
-```powershell
-NEXT_PUBLIC_RESERVATION_PLATFORM_BASE_URL=https://your-backend.example.com
-```
-
-Safe for frontend exposure: this is only the public backend origin. Do not expose
-Supabase service-role keys or backend auth secrets to frontend branches.
+The repository verification scripts prove source and local-stack behavior. They do not prove an arbitrary hosted environment is secure, backed up, observable, or scalable.

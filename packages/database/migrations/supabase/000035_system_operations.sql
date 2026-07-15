@@ -326,7 +326,7 @@ as $$
     'last_verified_backup', (select to_jsonb(b) from public.platform_backup_records b where status = 'verified' order by completed_at desc limit 1),
     'latest_upgrade', (select to_jsonb(u) from public.platform_upgrade_records u order by started_at desc limit 1),
     'integrations', coalesce((select jsonb_object_agg(kind, jsonb_build_object('enabled', enabled, 'updated_at', updated_at)) from public.platform_integration_settings), '{}'::jsonb),
-    'whatsapp', (select jsonb_build_object('status', status, 'last_connected_at', last_connected_at, 'updated_at', updated_at) from public.platform_whatsapp_sessions order by updated_at desc limit 1)
+    'whatsapp', (select jsonb_build_object('status', status, 'last_connected_at', connected_at, 'updated_at', updated_at) from public.platform_whatsapp_sessions order by updated_at desc limit 1)
   );
 $$;
 

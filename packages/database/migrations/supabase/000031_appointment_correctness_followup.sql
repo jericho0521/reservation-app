@@ -265,14 +265,17 @@ begin
     return jsonb_build_object('ok', false, 'error_code', 'invalid_reservation', 'message', 'Appointment details or duration are invalid');
   end if;
 
-  select staff, resource
-  into v_staff, v_resource
+  select staff.* into v_staff
   from public.platform_staff_profiles as staff
-  join public.reservable_resources as resource on resource.id = staff.reservable_resource_id
   where staff.id = v_staff_id
     and staff.status = 'active'
+  for update of staff;
+
+  select resource.* into v_resource
+  from public.reservable_resources as resource
+  where resource.id = v_staff.reservable_resource_id
     and resource.status = 'available'
-  for update of staff, resource;
+  for update of resource;
 
   if not found
     or not exists (
@@ -392,13 +395,16 @@ begin
     return jsonb_build_object('ok', false, 'error_code', 'conflict', 'message', 'Reservation can no longer be rescheduled');
   end if;
 
-  select service, venue.id, venue.tenant_id,
-    coalesce(settings.timezone, 'UTC'), coalesce(settings.minimum_notice_minutes, 0)
-  into v_service, v_venue_id, v_tenant_id, v_timezone, v_minimum_notice_minutes
+  select service.* into v_service
   from public.services as service
-  join public.venues as venue on venue.id = service.venue_id
-  left join public.platform_availability_settings as settings on settings.venue_id = venue.id
   where service.id = v_booking.service_id;
+
+  select venue.id, venue.tenant_id,
+    coalesce(settings.timezone, 'UTC'), coalesce(settings.minimum_notice_minutes, 0)
+  into v_venue_id, v_tenant_id, v_timezone, v_minimum_notice_minutes
+  from public.venues as venue
+  left join public.platform_availability_settings as settings on settings.venue_id = venue.id
+  where venue.id = v_service.venue_id;
 
   if v_service.booking_mode <> 'appointment' then
     return jsonb_build_object('ok', false, 'error_code', 'conflict', 'message', 'Reservation is not an appointment');
@@ -417,13 +423,15 @@ begin
     return jsonb_build_object('ok', false, 'error_code', 'conflict', 'message', 'Appointment time is outside the booking policy');
   end if;
 
-  select staff, resource
-  into v_staff, v_resource
+  select staff.* into v_staff
   from public.platform_staff_profiles as staff
-  join public.reservable_resources as resource on resource.id = staff.reservable_resource_id
   where staff.id = p_staff_id and staff.status = 'active'
-    and resource.status = 'available'
-  for update of staff, resource;
+  for update of staff;
+
+  select resource.* into v_resource
+  from public.reservable_resources as resource
+  where resource.id = v_staff.reservable_resource_id and resource.status = 'available'
+  for update of resource;
   if not found
     or not exists (
       select 1 from public.platform_staff_services

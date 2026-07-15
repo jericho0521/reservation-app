@@ -75,6 +75,8 @@ test("system operations persist atomic abuse limits and guarded release state", 
   assert.match(sql, /platform_validate_release_state_transition[\s\S]*invalid backup state transition/);
   assert.match(sql, /record_platform_upgrade[\s\S]*status = 'verified'/);
   assert.match(sql, /read_platform_operational_events[\s\S]*least\(coalesce\(p_limit, 50\), 100\)/);
+  assert.match(sql, /'last_connected_at', connected_at/);
+  assert.doesNotMatch(sql, /'last_connected_at', last_connected_at/);
   assert.match(sql, /revoke all on table public\.platform_component_heartbeats[\s\S]*service_role/);
   assert.doesNotMatch(sql, /grant select, insert, update, delete on table public\.platform_component_heartbeats/);
   assert.match(sql, /grant execute on function public\.transition_platform_upgrade\(uuid, text, text\) to service_role/);
@@ -156,7 +158,9 @@ test("appointment availability migration serializes practitioner writes and clos
   const sql = (await readFile(new URL("../migrations/supabase/000028_appointment_availability_management.sql", import.meta.url), "utf8")).toLowerCase();
 
   assert.match(sql, /alter function public\.create_reservation_atomic\(jsonb\)\s+rename to create_reservation_atomic_legacy/);
-  assert.match(sql, /for update of staff, resource/);
+  assert.match(sql, /select staff\.\*[\s\S]*into v_staff[\s\S]*for update of staff/);
+  assert.match(sql, /select resource\.label[\s\S]*into v_resource_label[\s\S]*for update of resource/);
+  assert.doesNotMatch(sql, /into v_staff, v_resource_label/);
   assert.match(sql, /existing\.staff_id = v_staff_id[\s\S]*make_interval\(mins => existing_service\.buffer_before_minutes\)[\s\S]*make_interval\(mins => v_service\.buffer_after_minutes\)/);
   assert.match(sql, /create or replace function public\.reschedule_managed_reservation\(\s*p_public_slug text,\s*p_token_hash text,\s*p_date date,\s*p_start_time time,\s*p_staff_id uuid/);
   assert.match(sql, /existing\.id <> v_booking\.id[\s\S]*existing\.staff_id = p_staff_id/);
@@ -178,6 +182,7 @@ test("appointment correctness follow-up keeps stable modes and self-excluding ma
   assert.match(sql, /where entry ->> 'id' <> v_booking_id::text/);
   assert.match(sql, /v_before := jsonb_build_object\([\s\S]*'date'[\s\S]*'staff_id'[\s\S]*'status'/);
   assert.doesNotMatch(sql, /v_before := to_jsonb\(v_booking\)/);
+  assert.doesNotMatch(sql, /into v_(?:service|staff),/);
   assert.match(sql, /grant execute on function public\.read_managed_reservation_availability_snapshot\(text, text, date\) to service_role/);
 });
 
@@ -238,6 +243,7 @@ test("appointment staff operations are actor-scoped, atomic, and PII-minimized",
   assert.match(sql, /'reservation\.status_changed'/);
   assert.doesNotMatch(sql, /v_before := to_jsonb\(v_booking\)/);
   assert.doesNotMatch(sql, /before_value[^;]*user_email/);
+  assert.doesNotMatch(sql, /into v_(?:booking|staff),/);
   assert.match(sql, /grant execute on function public\.platform_staff_create_appointment[^;]+to service_role/);
 });
 

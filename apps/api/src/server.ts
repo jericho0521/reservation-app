@@ -48,6 +48,11 @@ const defaultRequestTimeoutMs = 30_000;
 const defaultHeadersTimeoutMs = 10_000;
 const defaultKeepAliveTimeoutMs = 5_000;
 const correlationIdPattern = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u;
+const structuredConsoleLogger = {
+  write(entry: StructuredLogEntry) {
+    console.log(JSON.stringify(safeStructuredLogEntry(entry)));
+  },
+};
 
 export function createStandaloneNodeServer(
   handler: StandaloneApiHandler = handleStandaloneApiRequest,
@@ -565,11 +570,6 @@ function writeStructuredLog(
   }
 }
 
-const structuredConsoleLogger = {
-  write(entry: StructuredLogEntry) {
-    console.log(JSON.stringify(safeStructuredLogEntry(entry)));
-  },
-};
 
 function isDirectRun() {
   return process.argv[1] !== undefined && fileURLToPath(import.meta.url) === process.argv[1];

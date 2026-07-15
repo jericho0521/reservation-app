@@ -59,8 +59,10 @@ language plpgsql
 set search_path = public
 as $$
 declare
-  v_resource public.reservable_resources%rowtype;
   v_resource_tenant_id text;
+  v_resource_capacity integer;
+  v_resource_kind text;
+  v_resource_staff_id text;
 begin
   if new.user_id is not null and not exists (
     select 1
@@ -73,8 +75,16 @@ begin
       message = 'Staff user must belong to the staff tenant.';
   end if;
 
-  select resource, venue.tenant_id
-  into v_resource, v_resource_tenant_id
+  select
+    venue.tenant_id,
+    resource.capacity,
+    resource.resource_kind,
+    resource.metadata ->> 'platform_staff_id'
+  into
+    v_resource_tenant_id,
+    v_resource_capacity,
+    v_resource_kind,
+    v_resource_staff_id
   from public.reservable_resources as resource
   join public.services as service on service.id = resource.service_id
   join public.venues as venue on venue.id = service.venue_id
@@ -82,9 +92,9 @@ begin
 
   if not found
     or v_resource_tenant_id <> new.tenant_id
-    or v_resource.capacity <> 1
-    or v_resource.resource_kind <> 'custom'
-    or v_resource.metadata ->> 'platform_staff_id' <> new.id::text
+    or v_resource_capacity <> 1
+    or v_resource_kind <> 'custom'
+    or v_resource_staff_id <> new.id::text
   then
     raise exception using
       errcode = '23514',

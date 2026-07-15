@@ -70,14 +70,23 @@ begin
     return jsonb_build_object('ok', false, 'error_code', 'invalid_reservation', 'message', 'Appointment details or duration are invalid');
   end if;
 
-  select staff, resource.label
-  into v_staff, v_resource_label
+  select staff.*
+  into v_staff
   from public.platform_staff_profiles as staff
-  join public.reservable_resources as resource on resource.id = staff.reservable_resource_id
   where staff.id = v_staff_id
     and staff.status = 'active'
+  for update of staff;
+
+  if not found then
+    return jsonb_build_object('ok', false, 'error_code', 'invalid_staff', 'message', 'Practitioner is not assigned to this service and location');
+  end if;
+
+  select resource.label
+  into v_resource_label
+  from public.reservable_resources as resource
+  where resource.id = v_staff.reservable_resource_id
     and resource.status = 'available'
-  for update of staff, resource;
+  for update of resource;
 
   if not found
     or not exists (
@@ -190,13 +199,16 @@ begin
     return jsonb_build_object('ok', false, 'error_code', 'conflict', 'message', 'Reservation can no longer be rescheduled');
   end if;
 
-  select service, venue.id, venue.tenant_id,
-    coalesce(settings.timezone, 'UTC'), coalesce(settings.minimum_notice_minutes, 0)
-  into v_service, v_venue_id, v_tenant_id, v_timezone, v_minimum_notice_minutes
+  select service.* into v_service
   from public.services as service
-  join public.venues as venue on venue.id = service.venue_id
-  left join public.platform_availability_settings as settings on settings.venue_id = venue.id
   where service.id = v_booking.service_id;
+
+  select venue.id, venue.tenant_id,
+    coalesce(settings.timezone, 'UTC'), coalesce(settings.minimum_notice_minutes, 0)
+  into v_venue_id, v_tenant_id, v_timezone, v_minimum_notice_minutes
+  from public.venues as venue
+  left join public.platform_availability_settings as settings on settings.venue_id = venue.id
+  where venue.id = v_service.venue_id;
 
   v_end_time := p_start_time + make_interval(mins => v_service.duration_minutes);
   v_starts_at := (p_date + p_start_time) at time zone v_timezone;
@@ -208,13 +220,15 @@ begin
     return jsonb_build_object('ok', false, 'error_code', 'conflict', 'message', 'The reschedule cutoff has passed');
   end if;
 
-  select staff, resource.label
-  into v_staff, v_resource_label
+  select staff.* into v_staff
   from public.platform_staff_profiles as staff
-  join public.reservable_resources as resource on resource.id = staff.reservable_resource_id
   where staff.id = p_staff_id and staff.status = 'active'
-    and resource.status = 'available'
-  for update of staff, resource;
+  for update of staff;
+
+  select resource.label into v_resource_label
+  from public.reservable_resources as resource
+  where resource.id = v_staff.reservable_resource_id and resource.status = 'available'
+  for update of resource;
   if not found
     or not exists (
       select 1 from public.platform_staff_services

@@ -8,7 +8,7 @@ RUN apk add --no-cache curl postgresql-client && \
     adduser -S reservation -u 1001 -G reservation
 
 COPY package.json ./package.json
-COPY packages/database/migrations/supabase ./packages/database/migrations/supabase
+COPY --chown=1001:1001 packages/database/migrations/supabase ./packages/database/migrations/supabase
 COPY packages/database/seeds/final-demo.sql ./packages/database/seeds/final-demo.sql
 COPY scripts/local-stack-config.mjs ./scripts/local-stack-config.mjs
 COPY scripts/local-stack-migrate.mjs ./scripts/local-stack-migrate.mjs

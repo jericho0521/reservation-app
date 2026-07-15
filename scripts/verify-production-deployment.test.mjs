@@ -98,10 +98,12 @@ test("Caddy preserves the required route order and security headers", async () =
 });
 
 test("production image targets stay non-root after protected secret loading", async () => {
-  const [apiDockerfile, webDockerfile, consoleConfig] = await Promise.all([
+  const [apiDockerfile, webDockerfile, toolsDockerfile, consoleConfig, dockerignore] = await Promise.all([
     readFile("Dockerfile", "utf8"),
     readFile("Dockerfile.web", "utf8"),
+    readFile("Dockerfile.production-tools", "utf8"),
     readFile("apps/console/next.config.ts", "utf8"),
+    readFile(".dockerignore", "utf8"),
   ]);
 
   assert.match(apiDockerfile, /^FROM node:24-alpine AS worker-runtime$/mu);
@@ -110,6 +112,8 @@ test("production image targets stay non-root after protected secret loading", as
   assert.match(webDockerfile, /^FROM node:24-alpine AS console-runtime$/mu);
   assert.match(webDockerfile, /^FROM node:24-alpine AS booking-runtime$/mu);
   assert.doesNotMatch(webDockerfile, /COPY --from=.*\/src(?:\s|$)/mu);
+  assert.match(toolsDockerfile, /COPY --chown=1001:1001 packages\/database\/migrations\/supabase/u);
+  assert.match(dockerignore, /^\*\*\/node_modules$/mu);
   assert.match(consoleConfig, /output:\s*"standalone"/u);
   assert.match(consoleConfig, /basePath:\s*"\/admin"/u);
 });

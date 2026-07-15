@@ -6,6 +6,7 @@
 .next
 .pnpm-store
 node_modules
+**/node_modules
 dist-packages
 coverage
 *.log
@@ -16,6 +17,7 @@ tsconfig.tsbuildinfo
 apps/*/dist
 packages/*/dist
 packages/*/tsconfig.tsbuildinfo
+apps/*/tsconfig.tsbuildinfo
 .reservation-whatsapp-sessions
 data/whatsapp-sessions
 .reservation-production

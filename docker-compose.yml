@@ -36,6 +36,9 @@ services:
     restart: unless-stopped
 
   reservation-migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile.local-stack
     image: reservation-platform-stack-tools:local
     pull_policy: never
     depends_on:

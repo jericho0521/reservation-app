@@ -26,3 +26,8 @@ test("tracked stack sources contain no usable generated credential literals", as
   })));
   assert.deepEqual(secretLiteralFindings(sources), []);
 });
+
+test("local migration image assigns the migration bundle to its non-root runner", async () => {
+  const dockerfile = await readFile(new URL("../Dockerfile.local-stack", import.meta.url), "utf8");
+  assert.match(dockerfile, /COPY --chown=1001:1001 packages\/database\/migrations\/supabase/u);
+});

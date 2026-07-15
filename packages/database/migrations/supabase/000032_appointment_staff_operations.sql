@@ -137,14 +137,17 @@ begin
   for share;
   if not found then return jsonb_build_object('ok', false, 'error_code', 'forbidden'); end if;
 
-  select booking, service
-  into v_booking, v_service
+  select booking.*
+  into v_booking
   from public.bookings as booking
   join public.services as service on service.id = booking.service_id
   join public.venues as venue on venue.id = service.venue_id
   where booking.id = p_booking_id and venue.id = p_venue_id and venue.tenant_id = p_tenant_id
   for update of booking;
   if not found then return jsonb_build_object('ok', false, 'error_code', 'not_found'); end if;
+  select service.* into v_service
+  from public.services as service
+  where service.id = v_booking.service_id;
   if v_booking.status <> p_expected_status then return jsonb_build_object('ok', false, 'error_code', 'stale'); end if;
   if v_booking.status not in ('pending', 'confirmed') then return jsonb_build_object('ok', false, 'error_code', 'invalid_transition'); end if;
   if length(trim(coalesce(p_reason, ''))) = 0 then return jsonb_build_object('ok', false, 'error_code', 'reason_required'); end if;
@@ -175,12 +178,15 @@ begin
     )
   then return jsonb_build_object('ok', false, 'error_code', 'outside_availability'); end if;
 
-  select staff, resource into v_staff, v_resource
+  select staff.* into v_staff
   from public.platform_staff_profiles as staff
-  join public.reservable_resources as resource on resource.id = staff.reservable_resource_id
   where staff.id = p_staff_id and staff.tenant_id = p_tenant_id
-    and staff.status = 'active' and resource.status = 'available'
-  for update of staff, resource;
+    and staff.status = 'active'
+  for update of staff;
+  select resource.* into v_resource
+  from public.reservable_resources as resource
+  where resource.id = v_staff.reservable_resource_id and resource.status = 'available'
+  for update of resource;
   if not found or not exists (
     select 1 from public.platform_staff_services where staff_id = p_staff_id and service_id = v_service.id
   ) or not exists (

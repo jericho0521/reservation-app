@@ -211,8 +211,8 @@
       "path": "packages/database/migrations/supabase/000026_appointment_staff_timing.sql",
       "module": "core",
       "scope": "reservation-platform",
-      "sha256": "05a90c7f77e741985478c0eac731b71670e603911007058e6867e06cb2073163",
-      "bytes": 16101
+      "sha256": "064a837974fb60d39a0b0c4050a74457afb935999c566fc40e4bbb65f49bc0e0",
+      "bytes": 16256
     },
     {
       "order": 27,
@@ -227,8 +227,8 @@
       "path": "packages/database/migrations/supabase/000028_appointment_availability_management.sql",
       "module": "core",
       "scope": "reservation-platform",
-      "sha256": "86640e4d83e763ffb624a663d33a07824cc8b17f87f6f580249b3168c11546bd",
-      "bytes": 15291
+      "sha256": "fe3f907eccf662f8ca8123e02d295cd187cd589f20eb85c16c383b260a760692",
+      "bytes": 15564
     },
     {
       "order": 29,
@@ -251,16 +251,16 @@
       "path": "packages/database/migrations/supabase/000031_appointment_correctness_followup.sql",
       "module": "core",
       "scope": "reservation-platform",
-      "sha256": "c9071c8c179fc9e6dd569b16aa3df87ca6364495a749d6f57092612c687f3f1e",
-      "bytes": 26683
+      "sha256": "ee89b3d9046a5211c51d0f345d9bb8d45cc83acf5cdf53ef3a956cd3a7d3c28a",
+      "bytes": 26778
     },
     {
       "order": 32,
       "path": "packages/database/migrations/supabase/000032_appointment_staff_operations.sql",
       "module": "core",
       "scope": "reservation-platform",
-      "sha256": "ad863fecbad97201e61acc4133e29b07aa81eed00ae4518c16b4b976bcb58145",
-      "bytes": 13193
+      "sha256": "a9894e8c61245d9993c69172a58920f8a7709dc232f1bff41139f16219044cd8",
+      "bytes": 13325
     },
     {
       "order": 33,
@@ -283,8 +283,8 @@
       "path": "packages/database/migrations/supabase/000035_system_operations.sql",
       "module": "core",
       "scope": "reservation-platform",
-      "sha256": "aa574311982ac4b1a070b37cd34982ecc3e15d88fee4e25cc929e35e66856a41",
-      "bytes": 15237
+      "sha256": "f9910f91341a2acf014a81c0606f641d138b03467a250553b6b14eeb0be1d1b3",
+      "bytes": 15232
     },
     {
       "order": 36,

@@ -30,7 +30,7 @@ COPY --chmod=0755 scripts/production/support-bundle.sh ./scripts/production/supp
 COPY scripts/production/support-bundle-sanitize.mjs ./scripts/production/support-bundle-sanitize.mjs
 COPY scripts/production/smoke.mjs ./scripts/production/smoke.mjs
 COPY scripts/production/release-manifest.mjs ./release-manifest.mjs
-COPY packages/database/migrations/supabase ./packages/database/migrations/supabase
+COPY --chown=1001:1001 packages/database/migrations/supabase ./packages/database/migrations/supabase
 
 VOLUME ["/run/reservation-config"]
 

@@ -232,10 +232,8 @@ export function authorizeVenue(
   principal: AuthenticatedPrincipal,
   requestedVenueId?: string,
 ): string | undefined {
+  if (!requestedVenueId) return principal.venueIds.length === 1 ? principal.venueIds[0] : undefined;
   if (principal.role === "owner") return requestedVenueId;
-  if (!requestedVenueId) {
-    return principal.venueIds.length === 1 ? principal.venueIds[0] : undefined;
-  }
   return principal.venueIds.includes(requestedVenueId) ? requestedVenueId : undefined;
 }
 

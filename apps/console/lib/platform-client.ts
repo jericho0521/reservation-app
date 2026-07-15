@@ -2,21 +2,25 @@ import "server-only";
 
 import { createReservationPlatformClient } from "@reservation-platform/sdk";
 import { cookies, headers } from "next/headers";
-import { buildSessionForwardHeaders } from "./auth-session";
+import { buildInternalApiFetchInit, buildPlatformForwardHeaders } from "./auth-session";
 import { readConsolePlatformConfig } from "./platform-client-config";
 
 export function createConsolePlatformClient(
   env: Record<string, string | undefined> = process.env,
   fetchImpl: typeof fetch = fetch,
+  options: { includeActiveVenue?: boolean } = {},
 ) {
   const { baseUrl } = readConsolePlatformConfig(env);
   return createReservationPlatformClient({
     baseUrl,
     credentials: "include",
-    headers: async () => buildSessionForwardHeaders(
+    headers: async () => buildPlatformForwardHeaders(
       (await cookies()).toString(),
-      (await headers()).get("origin"),
+      options,
     ),
-    fetch: fetchImpl,
+    fetch: async (input, init) => fetchImpl(
+      input,
+      buildInternalApiFetchInit(init, await headers()),
+    ),
   });
 }

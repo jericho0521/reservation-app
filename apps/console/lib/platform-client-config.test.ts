@@ -19,7 +19,8 @@ test("platform client module is guarded as server-only", async () => {
   const source = await readFile(new URL("./platform-client.ts", import.meta.url), "utf8");
   assert.match(source, /import "server-only"/u);
   assert.match(source, /headers: async/u);
-  assert.match(source, /buildSessionForwardHeaders/u);
+  assert.match(source, /buildPlatformForwardHeaders/u);
+  assert.match(source, /buildInternalApiFetchInit/u);
   assert.doesNotMatch(source, /NEXT_PUBLIC_/u);
   assert.doesNotMatch(source, /SERVICE_API_KEY|CONSOLE_TENANT_ID|CONSOLE_VENUE_ID/u);
 });

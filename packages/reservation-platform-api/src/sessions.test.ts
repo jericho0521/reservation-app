@@ -83,6 +83,8 @@ test("session authentication and logout hash opaque tokens before storage", asyn
 
 test("venue authorization follows owner and assigned-staff scope", () => {
   assert.equal(authorizeVenue({ userId: "owner", tenantId: "tenant", role: "owner", venueIds: [] }, "venue-b"), "venue-b");
+  assert.equal(authorizeVenue({ userId: "owner", tenantId: "tenant", role: "owner", venueIds: ["venue-a"] }), "venue-a");
+  assert.equal(authorizeVenue({ userId: "owner", tenantId: "tenant", role: "owner", venueIds: ["venue-a", "venue-b"] }), undefined);
   assert.equal(authorizeVenue({ userId: "staff", tenantId: "tenant", role: "staff", venueIds: ["venue-a"] }, "venue-b"), undefined);
   assert.equal(authorizeVenue({ userId: "staff", tenantId: "tenant", role: "staff", venueIds: ["venue-a"] }), "venue-a");
   assert.throws(() => requireOwner({ userId: "staff", tenantId: "tenant", role: "staff", venueIds: [] }), PlatformAuthError);

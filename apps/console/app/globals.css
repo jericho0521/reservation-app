@@ -31,7 +31,10 @@ button, input, select, textarea { font: inherit; }
 .console-sidebar nav > a, .nav-disabled { min-height: 2.8rem; padding: .75rem; display: flex; justify-content: space-between; align-items: center; border-radius: .7rem; }
 .console-sidebar nav > a:hover, .console-sidebar nav > a:focus-visible { background: var(--panel-soft); outline: none; }
 .nav-disabled { color: #687589; cursor: not-allowed; }
-.sidebar-note { margin-top: auto; color: var(--muted); font-size: .8rem; }
+.sidebar-context { margin-top: auto; color: var(--muted); font-size: .8rem; }
+.sidebar-context p { margin: .35rem 0; }
+.sidebar-context code { overflow-wrap: anywhere; color: var(--text); }
+.sidebar-context a { color: var(--accent); text-decoration: underline; }
 .console-main { min-width: 0; padding: clamp(1.5rem, 4vw, 4.5rem); }
 .page-stack { width: min(75rem, 100%); margin: 0 auto; display: grid; gap: 2rem; }
 .page-header h1 { margin: .35rem 0 .6rem; max-width: 18ch; font-size: clamp(2rem, 5vw, 4.5rem); line-height: .98; letter-spacing: -.045em; }

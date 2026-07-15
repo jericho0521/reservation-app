@@ -1,8 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 
-import { authRedirect, isPublicAdminPath } from "./lib/auth-session";
-
-const publicRouteHeader = "x-reservation-console-public-route";
+import { authRedirect, buildMiddlewareRequestHeaders } from "./lib/auth-session";
 
 export function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
@@ -12,9 +10,7 @@ export function middleware(request: NextRequest) {
   });
   if (destination) return NextResponse.redirect(new URL(destination, request.url));
 
-  const requestHeaders = new Headers(request.headers);
-  if (isPublicAdminPath(pathname)) requestHeaders.set(publicRouteHeader, "1");
-  else requestHeaders.delete(publicRouteHeader);
+  const requestHeaders = buildMiddlewareRequestHeaders(pathname, request.headers);
   return NextResponse.next({ request: { headers: requestHeaders } });
 }
 

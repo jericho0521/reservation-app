@@ -1,8 +1,18 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import { readFile } from "node:fs/promises";
+import { fileURLToPath } from "node:url";
 import test from "node:test";
 
-import { authRedirect, buildSessionForwardHeaders } from "./auth-session.js";
+import {
+  authRedirect,
+  buildInternalApiFetchInit,
+  buildMiddlewareRequestHeaders,
+  buildPlatformForwardHeaders,
+  buildSessionForwardHeaders,
+  resolveActiveLocation,
+  validateActiveVenueSelection,
+} from "./auth-session.js";
 
 test("protected route redirects an anonymous request to login", () => {
   assert.equal(
@@ -20,11 +30,9 @@ test("login and setup remain public without a session", () => {
 test("server API headers forward only session cookies and add CSRF for writes", () => {
   assert.deepEqual(buildSessionForwardHeaders(
     "other=value; reservation_session=session-token; reservation_csrf=csrf-token; setup_token=secret",
-    "https://booking.example",
   ), {
     cookie: "reservation_session=session-token; reservation_csrf=csrf-token",
     "X-CSRF-Token": "csrf-token",
-    Origin: "https://booking.example",
   });
 });
 
@@ -33,6 +41,84 @@ test("server API headers omit malformed and duplicate auth cookies", () => {
   assert.deepEqual(buildSessionForwardHeaders(
     "reservation_session=one; reservation_session=two; reservation_csrf=csrf",
   ), { "X-CSRF-Token": "csrf" });
+});
+
+test("server API writes forward only narrow auth, active venue, and exact same-origin headers", () => {
+  const forwarded = buildPlatformForwardHeaders(
+    "other=value; reservation_session=session-token; reservation_csrf=csrf-token; reservation_active_venue=venue-a; setup_token=secret",
+  );
+  const init = buildInternalApiFetchInit(
+    { method: "PATCH", headers: forwarded },
+    new Headers({
+      host: "booking.example",
+      origin: "https://booking.example",
+      "x-forwarded-proto": "https",
+    }),
+  );
+  const headers = new Headers(init.headers);
+  assert.equal(headers.get("cookie"), "reservation_session=session-token; reservation_csrf=csrf-token");
+  assert.equal(headers.get("x-csrf-token"), "csrf-token");
+  assert.equal(headers.get("x-reservation-venue-id"), "venue-a");
+  assert.equal(headers.get("origin"), "https://booking.example");
+  assert.equal(headers.has("setup_token"), false);
+
+  const readHeaders = new Headers(buildInternalApiFetchInit(
+    { method: "GET", headers: { Origin: "https://spoofed.example" } },
+    new Headers({ host: "booking.example", origin: "https://booking.example" }),
+  ).headers);
+  assert.equal(readHeaders.has("origin"), false);
+
+  for (const incoming of [
+    new Headers({ host: "booking.example", origin: "https://attacker.example" }),
+    new Headers({ host: "booking.example", origin: "https://booking.example", "x-forwarded-proto": "http" }),
+  ]) {
+    const rejected = new Headers(buildInternalApiFetchInit({ method: "POST" }, incoming).headers);
+    assert.equal(rejected.has("origin"), false);
+  }
+});
+
+test("active location defaults only a sole assignment and requires an explicit valid multi-location selection", () => {
+  assert.deepEqual(resolveActiveLocation([], undefined), { kind: "onboarding" });
+  assert.deepEqual(resolveActiveLocation(["venue-a"], undefined), {
+    kind: "ready",
+    venueId: "venue-a",
+    canChange: false,
+  });
+  assert.deepEqual(resolveActiveLocation(["venue-a", "venue-b"], undefined), {
+    kind: "selection_required",
+    venueIds: ["venue-a", "venue-b"],
+  });
+  assert.deepEqual(resolveActiveLocation(["venue-a", "venue-b"], "venue-b"), {
+    kind: "ready",
+    venueId: "venue-b",
+    canChange: true,
+  });
+  assert.equal(validateActiveVenueSelection(["venue-a", "venue-b"], "venue-b"), "venue-b");
+  assert.equal(validateActiveVenueSelection(["venue-a", "venue-b"], "venue-c"), undefined);
+});
+
+test("middleware derives trusted route headers and compiles relative to the admin base path", () => {
+  const spoofed = new Headers({
+    "x-reservation-console-public-route": "1",
+    "x-reservation-console-location-route": "1",
+  });
+  const protectedHeaders = buildMiddlewareRequestHeaders("/admin/reservations", spoofed);
+  assert.equal(protectedHeaders.has("x-reservation-console-public-route"), false);
+  assert.equal(protectedHeaders.has("x-reservation-console-location-route"), false);
+  assert.equal(buildMiddlewareRequestHeaders("/admin/login", spoofed).get("x-reservation-console-public-route"), "1");
+  assert.equal(buildMiddlewareRequestHeaders("/admin/setup", spoofed).get("x-reservation-console-public-route"), "1");
+
+  const probe = spawnSync(process.execPath, ["--eval", [
+    "const { getMiddlewareMatchers } = require('next/dist/build/analysis/get-page-static-info.js');",
+    "const matchers = getMiddlewareMatchers(['/:path*'], { basePath: '/admin' });",
+    "const matches = (pathname) => matchers.some(({ regexp }) => new RegExp(regexp, 'u').test(pathname));",
+    "process.stdout.write(JSON.stringify(['/admin', '/admin/login', '/admin/setup', '/admin/reservations', '/reservations'].map(matches)));",
+  ].join("\n")], {
+    cwd: fileURLToPath(new URL("..", import.meta.url)),
+    encoding: "utf8",
+  });
+  assert.equal(probe.status, 0, probe.stderr);
+  assert.deepEqual(JSON.parse(probe.stdout), [true, true, true, true, false]);
 });
 
 test("browser auth forms use same-origin cookie requests and replace token-bearing history", async () => {

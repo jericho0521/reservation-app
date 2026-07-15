@@ -2,7 +2,15 @@ import type { ReactNode } from "react";
 
 const futureSections: string[] = [];
 
-export function ConsoleShell({ children, role }: { children: ReactNode; role?: "owner" | "staff" }) {
+export function ConsoleShell({
+  activeLocation,
+  children,
+  role,
+}: {
+  activeLocation?: { venueId: string; canChange: boolean };
+  children: ReactNode;
+  role?: "owner" | "staff";
+}) {
   return (
     <div className="console-frame">
       <a className="skip-link" href="#console-main">Skip to main content</a>
@@ -29,7 +37,10 @@ export function ConsoleShell({ children, role }: { children: ReactNode; role?: "
             </span>
           ))}
         </nav>
-        <p className="sidebar-note">{role ? `${role} session` : "Authenticated session"} · One engine. Every booking channel.</p>
+        <div className="sidebar-context">
+          {activeLocation ? <p>Location <code>{activeLocation.venueId}</code>{activeLocation.canChange ? <> · <a href="/admin/location">Change</a></> : null}</p> : null}
+          <p>{role ? `${role} session` : "Authenticated session"} · One engine. Every booking channel.</p>
+        </div>
       </aside>
       <main className="console-main" id="console-main" tabIndex={-1}>{children}</main>
     </div>

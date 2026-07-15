@@ -5,8 +5,8 @@ export function SetupError({ message }: { message: string }) {
       <h1>Connect the owner console</h1>
       <p>{message}</p>
       <p className="muted">
-        Configure the server-only platform URL, service key, tenant, and venue values, then restart
-        the console.
+        Configure the server-only platform URL, then restart the console. Tenant and location scope
+        come from the authenticated session.
       </p>
     </section>
   );

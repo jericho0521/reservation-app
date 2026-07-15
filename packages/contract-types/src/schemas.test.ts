@@ -38,6 +38,7 @@ import {
   reservationResponseSchema,
   resourceLayoutResponseSchema,
   rescheduleReservationInputSchema,
+  rescheduleManagedReservationInputSchema,
   requestPasswordResetInputSchema,
   serviceResponseSchema,
   setupStatusResponseSchema,
@@ -558,6 +559,7 @@ test("contract artifact registry covers current public /v1 API and SDK paths", (
     "PATCH /v1/reservations/{reservation_id}",
     "POST /v1/reservations/{reservation_id}/cancel",
     "POST /v1/reservations/{reservation_id}/reschedule",
+    "POST /v1/public/experiences/{slug}/manage/{token}/reschedule",
     "GET /v1/resource-maintenance",
     "POST /v1/resource-maintenance",
     "POST /v1/resource-maintenance/{maintenance_id}/end",
@@ -571,6 +573,17 @@ test("contract artifact registry covers current public /v1 API and SDK paths", (
 });
 
 test("lifecycle and chat schemas accept public SDK payloads", () => {
+  assert.equal(rescheduleManagedReservationInputSchema.safeParse({
+    date: "2026-08-01",
+    start_time: "10:30",
+    staff_id: "11111111-1111-4111-8111-111111111111",
+  }).success, true);
+  assert.equal(rescheduleManagedReservationInputSchema.safeParse({
+    date: "2026-02-30",
+    start_time: "25:00",
+    staff_id: "not-a-uuid",
+  }).success, false);
+
   assert.equal(rescheduleReservationInputSchema.safeParse({
     start_at: "2026-06-08T12:00:00+08:00",
     end_at: "2026-06-08T13:00:00+08:00",

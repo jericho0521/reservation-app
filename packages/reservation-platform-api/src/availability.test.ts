@@ -268,6 +268,76 @@ test("availability intersects operating windows, minimum notice, horizon, and cl
   assert.equal(beyondHorizon.body.slots.length, 0);
 });
 
+test("availability scopes buffered conflicts to the requested practitioner", async () => {
+  const repositoryCalls: unknown[] = [];
+  const repository: AvailabilityRepositoryPort = {
+    async readAvailability(input) {
+      repositoryCalls.push(input);
+      return {
+        service: {
+          ...service,
+          total_seats: 1,
+          duration_minutes: 30,
+          buffer_before_minutes: 10,
+          buffer_after_minutes: 10,
+        },
+        bookings: [{
+          ...reservation,
+          staff_id: "staff-1",
+          start_time: "10:30",
+          end_time: "11:00",
+        }],
+        maintenanceResourceLabels: [],
+        operatingHours: {
+          timezone: "UTC",
+          booking_horizon_days: 30,
+          slot_interval_minutes: 30,
+          minimum_notice_minutes: 0,
+          intervals: [{ day_of_week: 1, start_time: "10:00", end_time: "11:30" }],
+          closures: [],
+        },
+        durationMinutes: 30,
+      };
+    },
+  };
+
+  const result = await listAvailability({
+    repository,
+    query: { service_id: "svc_123", date: "2026-07-20", staff_id: "staff-2" },
+    now: new Date("2026-07-19T00:00:00.000Z"),
+  });
+
+  assert.deepEqual(repositoryCalls, [{
+    serviceId: "svc_123",
+    date: "2026-07-20",
+    staffId: "staff-2",
+  }]);
+  assert.equal(result.status, 200);
+  assert.ok(!("error" in result.body));
+  assert.deepEqual(result.body.slots.map((slot) => slot.is_available), [true, true, true]);
+});
+
+test("availability marks a selected practitioner unavailable when their resource needs attention", async () => {
+  const result = await listAvailability({
+    repository: {
+      async readAvailability() {
+        return {
+          service: { ...service, total_seats: 4 },
+          bookings: [],
+          maintenanceResourceLabels: [],
+          staffUnavailable: true,
+        };
+      },
+    },
+    query: { service_id: "svc_123", date: "2026-07-20", staff_id: "staff-1" },
+  });
+
+  assert.equal(result.status, 200);
+  assert.ok(!("error" in result.body));
+  assert.equal(result.body.slots[0]?.available_quantity, 0);
+  assert.equal(result.body.slots[0]?.is_available, false);
+});
+
 test("availability list service maps storage not found errors", async () => {
   const missing = await listAvailability({
     repository: {

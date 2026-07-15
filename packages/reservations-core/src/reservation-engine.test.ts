@@ -7,6 +7,7 @@ import {
   getCapacityResult,
   getConflictingResourceLabels,
   getMaintenanceResourceConflicts,
+  hasAppointmentConflict,
   validateReservationRequest,
   type Reservation,
   type ReservationService,
@@ -176,6 +177,69 @@ test("availability generates interval slots inside configured local windows", ()
     ["09:30", "10:30"],
     ["10:00", "11:00"],
   ]);
+});
+
+test("staff buffer blocks an otherwise adjacent appointment", () => {
+  assert.equal(hasAppointmentConflict({
+    staff_id: "staff-1",
+    start_time: "10:35",
+    end_time: "11:05",
+    buffer_before_minutes: 10,
+  }, [{
+    staff_id: "staff-1",
+    start_time: "10:00",
+    end_time: "10:30",
+  }]), true);
+});
+
+test("the same buffered interval remains available for another practitioner", () => {
+  const slots = generateAvailabilityTimeSlots(makeService({ total_seats: 1 }), [makeReservation({
+    staff_id: "staff-1",
+    start_time: "10:00",
+    end_time: "10:30",
+  })], {
+    operatingWindows: [{ start_time: "10:00", end_time: "11:00", interval_minutes: 30 }],
+    durationMinutes: 30,
+    staffId: "staff-2",
+    bufferBeforeMinutes: 10,
+    bufferAfterMinutes: 10,
+  });
+
+  assert.equal(slots[0]?.is_available, true);
+  assert.equal(slots[0]?.staff_id, "staff-2");
+});
+
+test("staff buffers remove overlapping adjacent slots for the same practitioner", () => {
+  const slots = generateAvailabilityTimeSlots(makeService({ total_seats: 4 }), [makeReservation({
+    staff_id: "staff-1",
+    start_time: "10:30",
+    end_time: "11:00",
+  })], {
+    operatingWindows: [{ start_time: "09:30", end_time: "11:30", interval_minutes: 30 }],
+    durationMinutes: 30,
+    staffId: "staff-1",
+    bufferBeforeMinutes: 10,
+    bufferAfterMinutes: 10,
+  });
+
+  assert.deepEqual(slots.filter((slot) => !slot.is_available).map((slot) => slot.start_time), [
+    "10:00",
+    "10:30",
+    "11:00",
+  ]);
+  assert.deepEqual(slots.filter((slot) => !slot.is_available).map((slot) => slot.available_quantity), [0, 0, 0]);
+});
+
+test("a selected practitioner under maintenance has no available capacity", () => {
+  const [slot] = generateAvailabilityTimeSlots(makeService({ total_seats: 4 }), [], {
+    operatingWindows: [{ start_time: "10:00", end_time: "10:30", interval_minutes: 30 }],
+    durationMinutes: 30,
+    staffId: "staff-1",
+    staffUnavailable: true,
+  });
+
+  assert.equal(slot?.available_quantity, 0);
+  assert.equal(slot?.is_available, false);
 });
 
 test("overlapping appointments mark a specialist unavailable across interval starts", () => {

@@ -3,6 +3,7 @@ import type { ReservationManagementRepository } from "@reservation-platform/api"
 export const RESERVATION_MANAGEMENT_TOKENS_TABLE = "platform_reservation_management_tokens";
 export const READ_MANAGED_RESERVATION_RPC = "read_managed_reservation";
 export const CANCEL_MANAGED_RESERVATION_RPC = "cancel_managed_reservation";
+export const RESCHEDULE_MANAGED_RESERVATION_RPC = "reschedule_managed_reservation";
 
 type QueryResult = { data: unknown; error: unknown | null };
 interface ManagementQueryBuilder {
@@ -39,6 +40,15 @@ export function createSupabaseReservationManagementRepository(
       return normalize(await client.rpc(CANCEL_MANAGED_RESERVATION_RPC, {
         p_public_slug: input.publicSlug,
         p_token_hash: input.tokenHash,
+      }));
+    },
+    async reschedule(input) {
+      return normalize(await client.rpc(RESCHEDULE_MANAGED_RESERVATION_RPC, {
+        p_public_slug: input.publicSlug,
+        p_token_hash: input.tokenHash,
+        p_date: input.date,
+        p_start_time: input.startTime,
+        p_staff_id: input.staffId,
       }));
     },
   };

@@ -3254,8 +3254,8 @@
       "type": "object"
     }
   },
-  "$id": "https://reservation-platform.local/contracts/json-schema/experience-knowledge-input.schema.json",
-  "$ref": "#/$defs/ExperienceKnowledgeInput",
+  "$id": "https://reservation-platform.local/contracts/json-schema/reschedule-managed-reservation-input.schema.json",
+  "$ref": "#/$defs/RescheduleManagedReservationInput",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "ExperienceKnowledgeInput"
+  "title": "RescheduleManagedReservationInput"
 }

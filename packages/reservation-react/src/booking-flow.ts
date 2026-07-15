@@ -11,9 +11,9 @@ import type {
 } from "@reservation-platform/contract-types";
 
 export type BookingStrategy = "quantity" | "assigned_resource" | "hybrid";
-export type BookingJourneyStep = "date" | "slot" | "options" | "details" | "review" | "success";
+export type BookingJourneyStep = "practitioner" | "date" | "slot" | "options" | "details" | "review" | "success";
 
-export const bookingJourneySteps = ["date", "slot", "options", "details", "review"] as const;
+export const bookingJourneySteps = ["practitioner", "date", "slot", "options", "details", "review"] as const;
 
 export function localDateInputValue(date = new Date()): string {
   const year = date.getFullYear();
@@ -32,6 +32,7 @@ export interface BookingFlowState {
   selectedResourceIds: string[];
   selectedResourceLabels: string[];
   selectedResourceCapacities?: number[];
+  selectedStaffId?: string;
   customer: CustomerSnapshot;
   purpose: string;
   submitting: boolean;
@@ -152,6 +153,7 @@ export function canAdvanceBookingJourney(step: BookingJourneyStep, state: Bookin
   const currentSlot = resolveSelectedAvailabilitySlot(state);
   const strategy = getServiceStrategy(state.service);
   switch (step) {
+    case "practitioner": return appointmentPractitioners(state.service).length === 0 || Boolean(state.selectedStaffId);
     case "date": return Boolean(state.serviceId && state.date && state.availability);
     case "slot": return isSlotBookable(currentSlot, state.quantity);
     case "options": {
@@ -183,14 +185,27 @@ function getSelectedResourceCapacity(
 
 export function nextBookingJourneyStep(step: BookingJourneyStep, state: BookingFlowState): BookingJourneyStep {
   if (!canAdvanceBookingJourney(step, state)) return step;
+  if (step === "slot" && appointmentPractitioners(state.service).length > 0) return "details";
   const index = bookingJourneySteps.indexOf(step as typeof bookingJourneySteps[number]);
   return bookingJourneySteps[index + 1] ?? "review";
 }
 
-export function previousBookingJourneyStep(step: BookingJourneyStep): BookingJourneyStep {
+export function previousBookingJourneyStep(step: BookingJourneyStep, state?: BookingFlowState): BookingJourneyStep {
   if (step === "success") return "review";
+  if (step === "details" && appointmentPractitioners(state?.service).length > 0) return "slot";
   const index = bookingJourneySteps.indexOf(step as typeof bookingJourneySteps[number]);
-  return bookingJourneySteps[Math.max(0, index - 1)] ?? "date";
+  return bookingJourneySteps[Math.max(0, index - 1)] ?? "practitioner";
+}
+
+export function appointmentPractitioners(service?: ServiceResponse): ResourceResponse[] {
+  return (service?.resources ?? []).filter((resource) => (
+    resource.is_active && typeof resource.metadata?.platform_staff_id === "string"
+  ));
+}
+
+export function staffIdFromResource(resource: ResourceResponse | undefined) {
+  const value = resource?.metadata?.platform_staff_id;
+  return typeof value === "string" && value.length > 0 ? value : undefined;
 }
 
 export function bookingErrorMessage(error: unknown) {
@@ -222,6 +237,7 @@ export function createReservationPayload(state: BookingFlowState): CreateReserva
     start_time: start,
     end_time: end,
     quantity: state.quantity,
+    ...(state.selectedStaffId ? { staff_id: state.selectedStaffId } : {}),
     ...(state.selectedResourceIds.length > 0 ? { resource_ids: state.selectedResourceIds } : {}),
     ...(state.selectedResourceLabels.length > 0
       ? {
@@ -269,6 +285,7 @@ export async function submitBookingFlow(input: {
     resource_ids: input.state.selectedResourceIds.length > 0
       ? input.state.selectedResourceIds
       : undefined,
+    staff_id: input.state.selectedStaffId,
   });
 
   return { reservation, availability };

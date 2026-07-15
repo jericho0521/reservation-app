@@ -7,6 +7,37 @@ export interface ResourceReservationLike {
   resource_labels?: string[] | null;
 }
 
+export interface AppointmentReservationLike {
+  booking_date?: string;
+  start_time: string;
+  end_time: string;
+  staff_id?: string;
+  buffer_before_minutes?: number;
+  buffer_after_minutes?: number;
+}
+
+export function hasAppointmentConflict(
+  requested: AppointmentReservationLike,
+  existingReservations: AppointmentReservationLike[],
+) {
+  if (!requested.staff_id) return false;
+  const requestedStart = timeToMinutes(requested.start_time) - (requested.buffer_before_minutes ?? 0);
+  const requestedEnd = timeToMinutes(requested.end_time) + (requested.buffer_after_minutes ?? 0);
+
+  return existingReservations.some((existing) => {
+    if (existing.staff_id !== requested.staff_id) return false;
+    if (requested.booking_date && existing.booking_date && requested.booking_date !== existing.booking_date) return false;
+    const existingStart = timeToMinutes(existing.start_time) - (existing.buffer_before_minutes ?? 0);
+    const existingEnd = timeToMinutes(existing.end_time) + (existing.buffer_after_minutes ?? 0);
+    return existingStart < requestedEnd && existingEnd > requestedStart;
+  });
+}
+
+function timeToMinutes(value: string) {
+  const [hours, minutes] = normalizeSlotTime(value).split(":").map(Number);
+  return (hours ?? 0) * 60 + (minutes ?? 0);
+}
+
 export function normalizeSlotTime(time: string) {
   return time.slice(0, 5);
 }

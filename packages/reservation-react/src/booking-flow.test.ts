@@ -230,7 +230,35 @@ test("booking journey advances and returns only when the current step is complet
     customer: { name: "Alex", email: "alex@example.com" },
   }), "review");
   assert.equal(previousBookingJourneyStep("review"), "details");
-  assert.equal(previousBookingJourneyStep("date"), "date");
+  assert.equal(previousBookingJourneyStep("date"), "practitioner");
+});
+
+test("appointment journey requires a practitioner before date selection and forwards staff id", () => {
+  const appointmentState: BookingFlowState = {
+    ...baseState,
+    service: {
+      service_id: "svc_123",
+      name: "Consultation",
+      resource_strategy: "assigned_resource",
+      resources: [{
+        resource_id: "res_staff",
+        label: "Dr Rivera",
+        kind: "custom",
+        is_active: true,
+        metadata: { platform_staff_id: "33333333-3333-4333-8333-333333333333" },
+      }],
+    },
+    quantity: 1,
+    selectedResourceIds: ["res_staff"],
+    selectedResourceLabels: ["Dr Rivera"],
+    selectedResourceCapacities: [1],
+    selectedStaffId: "33333333-3333-4333-8333-333333333333",
+  };
+  assert.equal(canAdvanceBookingJourney("practitioner", { ...appointmentState, selectedStaffId: undefined }), false);
+  assert.equal(nextBookingJourneyStep("practitioner", appointmentState), "date");
+  assert.equal(nextBookingJourneyStep("slot", appointmentState), "details");
+  assert.equal(previousBookingJourneyStep("details", appointmentState), "slot");
+  assert.equal(createReservationPayload(appointmentState).staff_id, appointmentState.selectedStaffId);
 });
 
 test("booking journey maps stale API validation to a recovery instruction", () => {

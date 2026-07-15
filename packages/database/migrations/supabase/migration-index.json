@@ -221,6 +221,14 @@
       "scope": "reservation-platform",
       "sha256": "5e17bc373bc1282e6d2d4dce2f0b0c49435aa1c921bd42995051861ad458105a",
       "bytes": 9428
+    },
+    {
+      "order": 28,
+      "path": "packages/database/migrations/supabase/000028_appointment_availability_management.sql",
+      "module": "core",
+      "scope": "reservation-platform",
+      "sha256": "86640e4d83e763ffb624a663d33a07824cc8b17f87f6f580249b3168c11546bd",
+      "bytes": 15291
     }
   ],
   "optionalMigrations": [

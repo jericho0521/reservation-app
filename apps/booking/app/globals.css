@@ -57,6 +57,21 @@ button, a { font: inherit; }
 .manage-card form { margin-top: 2rem; padding: 1.2rem; border: 1px solid #f1b9b4; border-radius: 1rem; background: #fff5f4; }
 .manage-card form button { padding: .8rem 1rem; border: 0; border-radius: 999px; background: #9f2922; color: white; cursor: pointer; font-weight: 800; }
 .manage-cancelled { margin-top: 2rem; padding: 1rem; border-radius: 1rem; background: #e9f6ed; color: #245b35; }
+.manage-success, .manage-error { padding: .8rem 1rem; border-radius: .8rem; }
+.manage-success { background: #e9f6ed; color: #245b35 !important; }
+.manage-error { background: #fff0ee; color: #8b211b !important; }
+.manage-card form.manage-reschedule { border-color: #c7d9ee; background: #f4f8fd; }
+.manage-reschedule h2 { margin-top: 0; }
+.manage-reschedule label { display: grid; gap: .35rem; margin-top: 1rem; font-weight: 700; }
+.manage-reschedule input { min-height: 2.8rem; padding: .55rem .7rem; border: 1px solid #b8c4d1; border-radius: .55rem; background: white; color: inherit; }
+.manage-card form.manage-reschedule button { margin-top: 1rem; background: #174f82; }
+.manage-slot-fieldset { margin: 1.2rem 0 0; padding: 0; border: 0; }
+.manage-slot-fieldset legend { font-weight: 700; }
+.manage-slot-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(6rem, 1fr)); gap: .6rem; margin-top: .7rem; }
+.manage-slot-grid label { display: block; margin: 0; padding: .7rem; border: 1px solid #b8c4d1; border-radius: .55rem; background: white; cursor: pointer; text-align: center; }
+.manage-slot-grid label.selected { border-color: #174f82; background: #e9f2fc; box-shadow: 0 0 0 1px #174f82; }
+.manage-slot-grid input { position: absolute; opacity: 0; pointer-events: none; }
+.manage-reschedule button:disabled { cursor: not-allowed; opacity: .55; }
 
 @keyframes pulse { to { background-position: -200% 0; } }
 

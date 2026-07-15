@@ -973,12 +973,16 @@ test("public booking creates only against a published venue service and scopes i
   assert.notEqual((managementIssue as { tokenHash?: string }).tokenHash, body.management_token);
 });
 
-test("public management routes read and replay cancellation without owner auth", async () => {
+test("public management routes read, reschedule, and replay cancellation without owner auth", async () => {
   const token = "abcdefghijklmnopqrstuvwxyzABCDEFGH123456789";
   const calls: string[] = [];
   const repository = reservationManagementRepository({
     read: async () => { calls.push("read"); return { data: { ok: true, booking: reservationRow() } }; },
     cancel: async () => { calls.push("cancel"); return { data: { ok: true, replayed: true, booking: reservationRow({ status: "cancelled" }) } }; },
+    reschedule: async (input) => {
+      calls.push(`reschedule:${input.date}:${input.startTime}:${input.staffId}`);
+      return { data: { ok: true, booking: reservationRow({ booking_date: input.date, start_time: input.startTime }) } };
+    },
   });
   const read = await handleStandaloneApiRequest({
     method: "GET",
@@ -991,11 +995,22 @@ test("public management routes read and replay cancellation without owner auth",
     headers: {},
     body: {},
   }, { serviceApiKey: "secret", reservationManagementRepository: repository });
+  const rescheduled = await handleStandaloneApiRequest({
+    method: "POST",
+    path: `/v1/public/experiences/apex-racing/manage/${token}/reschedule`,
+    headers: {},
+    body: {
+      date: "2026-08-02",
+      start_time: "10:30",
+      staff_id: "33333333-3333-4333-8333-333333333333",
+    },
+  }, { serviceApiKey: "secret", reservationManagementRepository: repository });
 
   assert.equal(read.status, 200);
   assert.equal(cancelled.status, 200);
   assert.equal((cancelled.body as { status: string }).status, "cancelled");
-  assert.deepEqual(calls, ["read", "cancel"]);
+  assert.equal(rescheduled.status, 200);
+  assert.deepEqual(calls, ["read", "cancel", "reschedule:2026-08-02:10:30:33333333-3333-4333-8333-333333333333"]);
 });
 
 test("public booking routes disappear when web booking is disabled", async () => {
@@ -5697,6 +5712,7 @@ function reservationManagementRepository(overrides: Partial<ReservationManagemen
     issue: async () => ({ data: {} }),
     read: async () => ({ data: { ok: false, error_code: "not_found" } }),
     cancel: async () => ({ data: { ok: false, error_code: "not_found" } }),
+    reschedule: async () => ({ data: { ok: false, error_code: "not_found" } }),
     ...overrides,
   };
 }

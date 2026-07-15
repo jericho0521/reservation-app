@@ -619,6 +619,7 @@ export interface AvailabilityQuery {
   end_at?: string;
   quantity?: number;
   resource_ids?: string[];
+  staff_id?: string;
 }
 
 export interface AvailabilitySlot {
@@ -631,6 +632,7 @@ export interface AvailabilitySlot {
   resource_ids?: string[];
   taken_resource_labels?: string[];
   maintenance_resource_labels?: string[];
+  staff_id?: string;
 }
 
 export interface AvailabilityResponse {
@@ -677,6 +679,7 @@ export interface CreateReservationInput {
   end_time?: string;
   quantity: number;
   resource_ids?: string[];
+  staff_id?: string;
   reservation_items?: ReservationItemInput[];
   customer: CustomerSnapshot;
   source?: string;
@@ -690,6 +693,7 @@ export interface ReservationResponse {
   tenant_id?: string;
   venue_id?: string;
   service_id: string;
+  staff_id?: string;
   start_at?: string;
   end_at?: string;
   date?: string;
@@ -704,6 +708,12 @@ export interface ReservationResponse {
   updated_at?: string;
   management_token?: string;
   management_expires_at?: string;
+}
+
+export interface RescheduleManagedReservationInput {
+  date: string;
+  start_time: string;
+  staff_id: string;
 }
 
 export interface ListReservationsQuery {

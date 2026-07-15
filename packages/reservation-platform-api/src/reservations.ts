@@ -75,6 +75,7 @@ export interface LegacyCoreReservation {
 
 export type ReservationCreateAtomicErrorCode =
   | "invalid_service"
+  | "invalid_staff"
   | "invalid_reservation"
   | "invalid_resource_labels"
   | "missing_resource_labels"
@@ -523,6 +524,13 @@ function platformAtomicCreateErrorBody(
     return {
       status: 404,
       body: platformErrorBody("not_found", "Service not found", 404),
+    };
+  }
+
+  if (error === "invalid_staff") {
+    return {
+      status: 400,
+      body: platformErrorBody("validation_failed", "Selected practitioner is not available for this service", 400),
     };
   }
 

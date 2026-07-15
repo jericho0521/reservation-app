@@ -607,6 +607,9 @@ test("availability repository reads and adapts one database snapshot", async () 
             selection_mode: "assigned_resource",
             reservation_policy: { max_quantity: 2 },
             metadata: { duration_minutes: 45 },
+            duration_minutes: 30,
+            buffer_before_minutes: 10,
+            buffer_after_minutes: 5,
           },
           bookings: [{
             id: "booking-1",
@@ -621,6 +624,7 @@ test("availability repository reads and adapts one database snapshot", async () 
             seat_labels: ["RS1"],
             status: "confirmed",
             interface_type: "chat",
+            staff_id: "staff-1",
           }],
           maintenance: [{ seat_label: "RS2" }],
           resources: [{
@@ -646,6 +650,7 @@ test("availability repository reads and adapts one database snapshot", async () 
             intervals: [{ day_of_week: 1, start_time: "09:00", end_time: "17:00" }],
             closures: [{ date: "2026-08-31" }],
           },
+          staff: [{ staff_id: "staff-1", display_name: "Ada", resource_status: "maintenance" }],
         },
         error: null,
       };
@@ -656,6 +661,7 @@ test("availability repository reads and adapts one database snapshot", async () 
   const availability = await repository.readAvailability({
     serviceId: "service-1",
     date: "2026-01-02",
+    staffId: "staff-1",
   });
 
   assert.equal(availability.service.id, "service-1");
@@ -663,7 +669,11 @@ test("availability repository reads and adapts one database snapshot", async () 
   assert.deepEqual(availability.service.resources?.map((resource) => resource.label), ["RS1"]);
   assert.deepEqual(availability.bookings.map((booking) => booking.interface_type), ["chat"]);
   assert.deepEqual(availability.maintenanceResourceLabels, ["RS2"]);
-  assert.equal(availability.durationMinutes, 45);
+  assert.equal(availability.durationMinutes, 30);
+  assert.equal(availability.service.buffer_before_minutes, 10);
+  assert.equal(availability.service.buffer_after_minutes, 5);
+  assert.equal(availability.bookings[0]?.staff_id, "staff-1");
+  assert.equal(availability.staffUnavailable, true);
   assert.deepEqual(availability.operatingHours, {
     timezone: "Asia/Kuala_Lumpur",
     booking_horizon_days: 60,
@@ -678,6 +688,43 @@ test("availability repository reads and adapts one database snapshot", async () 
       params: { p_service_id: "service-1", p_date: "2026-01-02" },
     },
   ]);
+});
+
+test("availability repository rejects staff outside the service and location assignments", async () => {
+  const repository = createSupabaseAvailabilityRepository({
+    from() {
+      throw new Error("availability snapshot should not issue table reads");
+    },
+    async rpc() {
+      return {
+        data: {
+          service: {
+            id: "service-1",
+            venue_id: "venue-1",
+            name: "Consultation",
+            total_seats: 1,
+            created_at: "2026-01-01T00:00:00.000Z",
+          },
+          bookings: [],
+          maintenance: [],
+          resources: [],
+          layout: null,
+          staff: [{ staff_id: "staff-1" }],
+        },
+        error: null,
+      };
+    },
+  });
+
+  await assert.rejects(
+    () => repository.readAvailability({
+      serviceId: "service-1",
+      date: "2026-01-02",
+      venueId: "venue-1",
+      staffId: "staff-other",
+    }),
+    (error: unknown) => typeof error === "object" && error !== null && "code" in error && error.code === "PGRST116",
+  );
 });
 
 test("availability repository propagates Supabase read errors unchanged", async () => {
@@ -1729,6 +1776,7 @@ test("repository maps venue-scoped atomic RPC payload and successful booking res
             seat_labels: ["Room A"],
             status: "confirmed",
             interface_type: "form",
+            staff_id: "staff-1",
           },
           validation: { ok: true },
         },
@@ -1750,6 +1798,7 @@ test("repository maps venue-scoped atomic RPC payload and successful booking res
       quantity: 2,
       items: [{ resource_label: "Room A", quantity: 2 }],
       interface_type: "form",
+      staff_id: "staff-1",
       seats_booked: 2,
       seat_labels: ["Room A"],
     },
@@ -1777,6 +1826,7 @@ test("repository maps venue-scoped atomic RPC payload and successful booking res
       ],
       status: "confirmed",
       interface_type: "form",
+      staff_id: "staff-1",
     },
   });
   assert.equal(result.ok, true);
@@ -1786,6 +1836,7 @@ test("repository maps venue-scoped atomic RPC payload and successful booking res
     assert.equal(result.booking.id, "booking-atomic");
     assert.equal(result.reservation.id, "booking-atomic");
     assert.equal(result.reservation.quantity, 2);
+    assert.equal(result.reservation.staff_id, "staff-1");
     assert.equal(result.validation.ok, true);
   }
 });
@@ -2001,6 +2052,7 @@ test("idempotency repository surfaces store identity mismatch errors", async () 
 
 const atomicErrorCodes = [
   "invalid_service",
+  "invalid_staff",
   "invalid_reservation",
   "invalid_resource_labels",
   "missing_resource_labels",

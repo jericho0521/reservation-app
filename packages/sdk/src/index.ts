@@ -67,6 +67,7 @@ import type {
   ReservationResponse,
   RequestPasswordResetInput,
   RescheduleReservationInput,
+  RescheduleManagedReservationInput,
   ResourceLayoutResponse,
   ResourceMaintenanceResponse,
   ResourceResponse,
@@ -213,6 +214,7 @@ export interface ReservationPlatformClient {
   createPublicExperienceReservation(slug: string, input: CreateReservationInput, options?: RequestOptions): Promise<ReservationResponse>;
   getManagedReservation(slug: string, token: string, options?: RequestOptions): Promise<ReservationResponse>;
   cancelManagedReservation(slug: string, token: string, options?: RequestOptions): Promise<ReservationResponse>;
+  rescheduleManagedReservation(slug: string, token: string, input: RescheduleManagedReservationInput, options?: RequestOptions): Promise<ReservationResponse>;
   sendPublicChatMessage(slug: string, input: PublicChatMessageInput, options?: RequestOptions): Promise<PublicChatConversationResponse>;
   listPublicChatMessages(slug: string, conversationId: string, input?: ListConversationMessagesQuery, options?: RequestOptions): Promise<ListConversationMessagesResponse>;
   confirmPublicChatBooking(slug: string, conversationId: string, input: PublicChatConfirmationInput, options?: RequestOptions): Promise<PublicChatConversationResponse>;
@@ -392,6 +394,13 @@ export function createReservationPlatformClient(
       method: "POST",
       path: `/public/experiences/${encodeURIComponent(slug)}/manage/${encodeURIComponent(token)}/cancel`,
       body: {},
+      options,
+      public: true,
+    }),
+    rescheduleManagedReservation: (slug, token, input, options) => request({
+      method: "POST",
+      path: `/public/experiences/${encodeURIComponent(slug)}/manage/${encodeURIComponent(token)}/reschedule`,
+      body: input,
       options,
       public: true,
     }),

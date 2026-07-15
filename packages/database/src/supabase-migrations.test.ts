@@ -13,7 +13,7 @@ import {
 
 const indexPath = new URL("../migrations/supabase/migration-index.json", import.meta.url);
 
-test("core plan includes exactly 000001 through 000027 in order", async () => {
+test("core plan includes exactly 000001 through 000028 in order", async () => {
   const index = await readActualIndex();
   const plan = buildSupabaseMigrationPlan(index);
 
@@ -47,10 +47,24 @@ test("core plan includes exactly 000001 through 000027 in order", async () => {
       "000025_availability_snapshot_venue_scope.sql",
       "000026_appointment_staff_timing.sql",
       "000027_staff_access_administration.sql",
+      "000028_appointment_availability_management.sql",
     ],
   );
-  assert.equal(plan.migrations.length, 27);
+  assert.equal(plan.migrations.length, 28);
   assert.equal(plan.seeds.length, 0);
+});
+
+test("appointment availability migration serializes practitioner writes and closes the legacy bypass", async () => {
+  const sql = (await readFile(new URL("../migrations/supabase/000028_appointment_availability_management.sql", import.meta.url), "utf8")).toLowerCase();
+
+  assert.match(sql, /alter function public\.create_reservation_atomic\(jsonb\)\s+rename to create_reservation_atomic_legacy/);
+  assert.match(sql, /for update of staff, resource/);
+  assert.match(sql, /existing\.staff_id = v_staff_id[\s\S]*make_interval\(mins => existing_service\.buffer_before_minutes\)[\s\S]*make_interval\(mins => v_service\.buffer_after_minutes\)/);
+  assert.match(sql, /create or replace function public\.reschedule_managed_reservation\(\s*p_public_slug text,\s*p_token_hash text,\s*p_date date,\s*p_start_time time,\s*p_staff_id uuid/);
+  assert.match(sql, /existing\.id <> v_booking\.id[\s\S]*existing\.staff_id = p_staff_id/);
+  assert.match(sql, /resource_status', resource\.status/);
+  assert.match(sql, /revoke all on function public\.create_reservation_atomic_legacy\(jsonb\) from public, anon, authenticated, service_role/);
+  assert.doesNotMatch(sql, /grant execute on function public\.create_reservation_atomic_legacy/);
 });
 
 test("staff access administration is tenant-safe, audited, and blocks placeholder activation", async () => {
@@ -136,7 +150,7 @@ test("bundled core migration loader follows an extended validated index", async 
   const rawIndex = await readActualRawIndex();
   rawIndex.coreMigrations.push({
     order: rawIndex.coreMigrations.length + 1,
-    path: "packages/database/migrations/supabase/000028_runtime_readiness_test.sql",
+    path: "packages/database/migrations/supabase/000029_runtime_readiness_test.sql",
     module: "core",
     scope: "reservation-platform",
     sha256: "a".repeat(64),
@@ -149,9 +163,9 @@ test("bundled core migration loader follows an extended validated index", async 
 
   const plan = await loadBundledCoreMigrationPlan(pathToFileURL(extendedIndexPath));
 
-  assert.equal(plan.length, 28);
+  assert.equal(plan.length, 29);
   assert.deepEqual(plan.at(-1), {
-    path: "packages/database/migrations/supabase/000028_runtime_readiness_test.sql",
+    path: "packages/database/migrations/supabase/000029_runtime_readiness_test.sql",
     sha256: "a".repeat(64),
   });
 });

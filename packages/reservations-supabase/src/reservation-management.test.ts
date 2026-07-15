@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   CANCEL_MANAGED_RESERVATION_RPC,
   READ_MANAGED_RESERVATION_RPC,
+  RESCHEDULE_MANAGED_RESERVATION_RPC,
   RESERVATION_MANAGEMENT_TOKENS_TABLE,
   createSupabaseReservationManagementRepository,
   type ReservationManagementSupabaseClient,
@@ -30,6 +31,13 @@ test("management repository persists hashes and owns slug-scoped RPC shapes", as
   await repository.issue({ bookingId: "booking_1", tokenHash, expiresAt: "2027-01-01T00:00:00.000Z" });
   await repository.read({ publicSlug: "luma-studio", tokenHash });
   await repository.cancel({ publicSlug: "luma-studio", tokenHash });
+  await repository.reschedule({
+    publicSlug: "luma-studio",
+    tokenHash,
+    date: "2026-08-01",
+    startTime: "10:30",
+    staffId: "33333333-3333-4333-8333-333333333333",
+  });
 
   assert.deepEqual(calls, [
     ["from", RESERVATION_MANAGEMENT_TOKENS_TABLE],
@@ -37,5 +45,12 @@ test("management repository persists hashes and owns slug-scoped RPC shapes", as
     ["select", "id"],
     ["rpc", READ_MANAGED_RESERVATION_RPC, { p_public_slug: "luma-studio", p_token_hash: tokenHash }],
     ["rpc", CANCEL_MANAGED_RESERVATION_RPC, { p_public_slug: "luma-studio", p_token_hash: tokenHash }],
+    ["rpc", RESCHEDULE_MANAGED_RESERVATION_RPC, {
+      p_public_slug: "luma-studio",
+      p_token_hash: tokenHash,
+      p_date: "2026-08-01",
+      p_start_time: "10:30",
+      p_staff_id: "33333333-3333-4333-8333-333333333333",
+    }],
   ]);
 });

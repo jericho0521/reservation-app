@@ -21,6 +21,8 @@ import {
   submitBookingFlowOnce,
   validateBookingFlow,
   localDateInputValue,
+  appointmentPractitioners,
+  staffIdFromResource,
   type BookingFlowState,
 } from "./booking-flow.js";
 
@@ -52,6 +54,7 @@ function availabilityQueryKey(input: AvailabilityQuery | undefined) {
   if (input.end_at) params.set("end_at", input.end_at);
   if (input.quantity !== undefined) params.set("quantity", String(input.quantity));
   if (input.venue_id) params.set("venue_id", input.venue_id);
+  if (input.staff_id) params.set("staff_id", input.staff_id);
   for (const resourceId of input.resource_ids ?? []) {
     params.append("resource_ids", resourceId);
   }
@@ -166,6 +169,7 @@ export function useAvailability(input: AvailabilityQuery | undefined): AsyncStat
     resourceIdsKey,
     input?.service_id,
     input?.start_at,
+    input?.staff_id,
     input?.venue_id,
   ]);
 
@@ -238,7 +242,11 @@ export function useBookingFlow({
   const [error, setError] = useState<Error>();
   const submissionGuard = useRef({});
 
-  const availability = useAvailability({ service_id: serviceId, date, quantity });
+  const selectedStaffId = staffIdFromResource(selectedResources.find((resource) => staffIdFromResource(resource)));
+  const requiresPractitioner = appointmentPractitioners(service.data).length > 0;
+  const availability = useAvailability(requiresPractitioner && !selectedStaffId
+    ? undefined
+    : { service_id: serviceId, date, quantity, staff_id: selectedStaffId });
   const unavailableResourceLabelsKey = [
     ...(selectedSlot?.taken_resource_labels ?? []),
     ...(selectedSlot?.maintenance_resource_labels ?? []),
@@ -298,6 +306,7 @@ export function useBookingFlow({
     selectedResourceIds: selectedResources.map((resource: ResourceResponse) => resource.resource_id),
     selectedResourceLabels: selectedResources.map((resource: ResourceResponse) => resource.label),
     selectedResourceCapacities: selectedResources.map((resource: ResourceResponse) => resource.capacity ?? 1),
+    selectedStaffId,
     customer,
     purpose,
     submitting,
@@ -312,6 +321,7 @@ export function useBookingFlow({
     quantity,
     reservation,
     selectedResources,
+    selectedStaffId,
     selectedSlot,
     service.data,
     serviceId,

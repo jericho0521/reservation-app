@@ -74,9 +74,9 @@ export const RESERVATION_SUPABASE_SELECTS = {
   catalogResource: "id, service_id, label, resource_kind, status, capacity, metadata",
   catalogResourceLayout: "id, service_id, layout_kind, metadata",
   service:
-    "id, name, description, total_seats, created_at, resource_kind, selection_mode, reservation_policy",
+    "id, name, description, total_seats, created_at, resource_kind, selection_mode, reservation_policy, duration_minutes, buffer_before_minutes, buffer_after_minutes",
   booking:
-    "id, service_id, user_name, user_email, user_phone, booking_date, start_time, end_time, seats_booked, seat_labels, status, interface_type",
+    "id, service_id, user_name, user_email, user_phone, booking_date, start_time, end_time, seats_booked, seat_labels, status, interface_type, staff_id",
   reservationCompatibility: "*, services(name)",
   availabilityResource:
     "id, service_id, label, kind, is_active, capacity, metadata",
@@ -117,6 +117,9 @@ export interface ServiceMetadataRow {
   selection_mode?: ResourceSelectionMode | null;
   reservation_policy?: unknown;
   metadata?: Record<string, unknown> | null;
+  duration_minutes?: number | null;
+  buffer_before_minutes?: number | null;
+  buffer_after_minutes?: number | null;
 }
 
 export interface ResourceRow {
@@ -159,6 +162,7 @@ export interface CreateReservationSupabaseResult {
 
 export type SupabaseAtomicReservationErrorCode =
   | "invalid_service"
+  | "invalid_staff"
   | "invalid_reservation"
   | "invalid_resource_labels"
   | "missing_resource_labels"
@@ -224,6 +228,7 @@ export interface SupabaseAvailabilityRead {
   maintenanceResourceLabels: string[];
   operatingHours?: ExperienceOperatingHoursInput;
   durationMinutes?: number;
+  staffUnavailable?: boolean;
 }
 
 interface SupabaseAvailabilitySnapshot {
@@ -233,6 +238,8 @@ interface SupabaseAvailabilitySnapshot {
   resources: ResourceRow[];
   layout: LayoutRow | null;
   operatingHours?: ExperienceOperatingHoursInput;
+  staffIds?: string[];
+  unavailableStaffIds?: string[];
 }
 
 export interface SupabaseAvailabilityRepository {
@@ -240,6 +247,7 @@ export interface SupabaseAvailabilityRepository {
     serviceId: string;
     date: string;
     venueId?: string;
+    staffId?: string;
   }): Promise<SupabaseAvailabilityRead>;
 }
 
@@ -386,6 +394,22 @@ function parseAvailabilitySnapshot(raw: unknown): SupabaseAvailabilitySnapshot |
     intervals: operatingHoursResponse.data.intervals,
     closures: operatingHoursResponse.data.closures,
   } : undefined;
+  const staffIds = Array.isArray(raw.staff)
+    ? raw.staff.flatMap((entry) => {
+        const staffId = isRecord(entry) ? getString(entry.staff_id) : null;
+        return staffId ? [staffId] : [];
+      })
+    : undefined;
+  const unavailableStaffIds = Array.isArray(raw.staff)
+    ? raw.staff.flatMap((entry) => {
+        const staffId = isRecord(entry) ? getString(entry.staff_id) : null;
+        return staffId
+          && typeof entry.resource_status === "string"
+          && entry.resource_status !== "available"
+          ? [staffId]
+          : [];
+      })
+    : undefined;
 
   return {
     service: raw.service as unknown as ServiceMetadataRow,
@@ -394,6 +418,8 @@ function parseAvailabilitySnapshot(raw: unknown): SupabaseAvailabilitySnapshot |
     resources: raw.resources as unknown as ResourceRow[],
     layout: raw.layout as LayoutRow | null,
     ...(operatingHours ? { operatingHours } : {}),
+    ...(staffIds ? { staffIds } : {}),
+    ...(unavailableStaffIds ? { unavailableStaffIds } : {}),
   };
 }
 
@@ -712,7 +738,7 @@ export function createSupabaseAvailabilityRepository(
   const { adminClient } = resolvePlatformCatalogClients(input);
 
   return {
-    async readAvailability({ serviceId, date, venueId }) {
+    async readAvailability({ serviceId, date, venueId, staffId }) {
       const admin = adminClient();
       if (!admin.rpc) {
         throw new Error("Supabase client does not support RPC calls");
@@ -727,7 +753,11 @@ export function createSupabaseAvailabilityRepository(
       }
 
       const snapshot = parseAvailabilitySnapshot(result.data);
-      if (!snapshot || (venueId && snapshot.service.venue_id !== venueId)) {
+      if (
+        !snapshot
+        || (venueId && snapshot.service.venue_id !== venueId)
+        || (staffId && !snapshot.staffIds?.includes(staffId))
+      ) {
         throw createSupabaseNotFoundError(`Service not found: ${serviceId}`);
       }
 
@@ -739,9 +769,11 @@ export function createSupabaseAvailabilityRepository(
         }))),
         maintenanceResourceLabels: adaptMaintenanceRows(snapshot.maintenance),
         ...(snapshot.operatingHours ? { operatingHours: snapshot.operatingHours } : {}),
-        ...(getNumber(snapshot.service.metadata?.duration_minutes) ? {
-          durationMinutes: getNumber(snapshot.service.metadata?.duration_minutes)!,
+        ...(getNumber(snapshot.service.duration_minutes) || getNumber(snapshot.service.metadata?.duration_minutes) ? {
+          durationMinutes: getNumber(snapshot.service.duration_minutes)
+            ?? getNumber(snapshot.service.metadata?.duration_minutes)!,
         } : {}),
+        ...(staffId ? { staffUnavailable: snapshot.unavailableStaffIds?.includes(staffId) ?? false } : {}),
       };
     },
   };
@@ -1203,6 +1235,9 @@ export function adaptServiceMetadata(
         end_time: rule.end_time,
         interval_minutes: rule.interval_minutes ?? 60,
       })),
+    ...(getNumber(service.duration_minutes) ? { duration_minutes: getNumber(service.duration_minutes)! } : {}),
+    buffer_before_minutes: getNumber(service.buffer_before_minutes) ?? 0,
+    buffer_after_minutes: getNumber(service.buffer_after_minutes) ?? 0,
   };
 }
 
@@ -1253,6 +1288,7 @@ function reservationToBookingInsert(reservation: Reservation) {
     })),
     status: reservation.status ?? "confirmed",
     interface_type: reservation.interface_type,
+    ...(reservation.staff_id ? { staff_id: reservation.staff_id } : {}),
   };
 }
 
@@ -1272,6 +1308,7 @@ function bookingRowToLegacyBooking(booking: Record<string, unknown>) {
       : [],
     status: getString(booking.status) ?? "confirmed",
     interface_type: booking.interface_type === "chat" ? "chat" : "form",
+    staff_id: getString(booking.staff_id) ?? undefined,
   } satisfies LegacyBookingShape;
 }
 
@@ -1280,6 +1317,7 @@ function atomicErrorCodeFromUnknown(
 ): SupabaseAtomicReservationErrorCode {
   switch (value) {
     case "invalid_service":
+    case "invalid_staff":
     case "invalid_reservation":
     case "invalid_resource_labels":
     case "missing_resource_labels":
@@ -1304,7 +1342,7 @@ function atomicValidationFromRpc(
 
   return {
     ok: false,
-    error: error === "invalid_service" || error === "invalid_reservation" || error === "invalid_resource_labels"
+    error: error === "invalid_service" || error === "invalid_staff" || error === "invalid_reservation" || error === "invalid_resource_labels"
       ? undefined
       : error,
     available_quantity: availableQuantity,

@@ -2,6 +2,7 @@ import { getCapacityResult } from "./capacity.js";
 import {
   getReservationResourceLabels,
   getReservationsForSlot,
+  hasAppointmentConflict,
   naturalLabelSort,
   normalizeResourceLabels,
 } from "./conflicts.js";
@@ -25,6 +26,10 @@ export interface GenerateAvailabilityOptions {
   durationMinutes?: number;
   maintenanceResourceLabels?: string[];
   legacyFallbackLabels?: string[];
+  staffId?: string;
+  bufferBeforeMinutes?: number;
+  bufferAfterMinutes?: number;
+  staffUnavailable?: boolean;
 }
 
 function getFallbackLabels(
@@ -81,7 +86,19 @@ export function generateAvailabilityTimeSlots(
   const maintenanceResourceLabels = normalizeResourceLabels(options.maintenanceResourceLabels ?? []);
 
   return slotTimes.map(({ startTime, endTime }) => {
-    const slotReservations = getReservationsForSlot(reservations, startTime, endTime);
+    const slotReservations = options.staffId
+      ? reservations.filter((reservation) => hasAppointmentConflict({
+          start_time: startTime,
+          end_time: endTime,
+          staff_id: options.staffId,
+          buffer_before_minutes: options.bufferBeforeMinutes,
+          buffer_after_minutes: options.bufferAfterMinutes,
+        }, [{
+          ...reservation,
+          buffer_before_minutes: options.bufferBeforeMinutes,
+          buffer_after_minutes: options.bufferAfterMinutes,
+        }]))
+      : getReservationsForSlot(reservations, startTime, endTime);
     const unavailableResourceLabels = getUnavailableResourceLabels(
       slotReservations,
       maintenanceResourceLabels,
@@ -93,7 +110,9 @@ export function generateAvailabilityTimeSlots(
     const unavailableQuantity = service.policy.kind === "capacity" || hasVariableResourceCapacity
       ? capacityResult.unavailable_quantity
       : unavailableResourceLabels.length;
-    const availableQuantity = Math.max(0, capacityResult.capacity - unavailableQuantity);
+    const availableQuantity = options.staffId
+      ? (slotReservations.length === 0 && !options.staffUnavailable ? 1 : 0)
+      : Math.max(0, capacityResult.capacity - unavailableQuantity);
 
     return {
       start_time: startTime,
@@ -102,6 +121,7 @@ export function generateAvailabilityTimeSlots(
       is_available: availableQuantity > 0,
       taken_resource_labels: unavailableResourceLabels,
       maintenance_resource_labels: maintenanceResourceLabels,
+      ...(options.staffId ? { staff_id: options.staffId } : {}),
       available_seats: availableQuantity,
       taken_seat_labels: unavailableResourceLabels,
       ...(maintenanceResourceLabels.length > 0

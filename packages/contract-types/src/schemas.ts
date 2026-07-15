@@ -584,6 +584,7 @@ export const availabilityQuerySchema = strictObject({
   end_at: z.string().optional(),
   quantity: z.number().int().positive().optional(),
   resource_ids: z.array(z.string()).optional(),
+  staff_id: z.string().uuid().optional(),
 });
 
 export const availabilitySlotSchema = strictObject({
@@ -596,6 +597,7 @@ export const availabilitySlotSchema = strictObject({
   resource_ids: z.array(z.string()).optional(),
   taken_resource_labels: z.array(z.string()).optional(),
   maintenance_resource_labels: z.array(z.string()).optional(),
+  staff_id: z.string().uuid().optional(),
 });
 
 export const availabilityResponseSchema = strictObject({
@@ -642,6 +644,7 @@ export const createReservationInputSchema = strictObject({
   end_time: z.string().optional(),
   quantity: z.number().int().positive(),
   resource_ids: z.array(z.string()).optional(),
+  staff_id: z.string().uuid().optional(),
   reservation_items: z.array(reservationItemInputSchema).optional(),
   customer: customerSnapshotSchema,
   source: z.string().optional(),
@@ -655,6 +658,7 @@ export const reservationResponseSchema = strictObject({
   tenant_id: z.string().optional(),
   venue_id: z.string().optional(),
   service_id: z.string(),
+  staff_id: z.string().uuid().optional(),
   start_at: z.string().optional(),
   end_at: z.string().optional(),
   date: z.string().optional(),
@@ -715,6 +719,12 @@ export const rescheduleReservationInputSchema = strictObject({
   resource_ids: z.array(z.string()).optional(),
   reservation_items: z.array(reservationItemInputSchema).optional(),
   metadata: metadataRecordSchema.optional(),
+});
+
+export const rescheduleManagedReservationInputSchema = strictObject({
+  date: localDateSchema,
+  start_time: localTimeSchema,
+  staff_id: z.string().uuid(),
 });
 
 export const listResourceMaintenanceQuerySchema = strictObject({

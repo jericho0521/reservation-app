@@ -117,6 +117,7 @@ export interface LegacyBookingShape {
   seat_labels?: string[];
   status?: string;
   interface_type: "form" | "chat";
+  staff_id?: string;
 }
 
 // Stable public API shape used only as adapter input during migration.
@@ -140,6 +141,9 @@ export interface ReservationService {
   layout: ResourceLayout;
   resources?: ReservableResource[];
   availability_windows?: AvailabilityWindow[];
+  duration_minutes?: number;
+  buffer_before_minutes?: number;
+  buffer_after_minutes?: number;
   created_at?: string;
 
   // Stable migration compatibility field from the current public API.
@@ -167,6 +171,7 @@ export interface Reservation {
   items: ReservationItem[];
   status?: string;
   interface_type: LegacyBookingShape["interface_type"];
+  staff_id?: string;
 
   // Stable migration compatibility fields from the current public API.
   seats_booked: number;
@@ -181,6 +186,7 @@ export interface ReservationTimeSlot {
   is_available: boolean;
   taken_resource_labels: string[];
   maintenance_resource_labels: string[];
+  staff_id?: string;
 
   // Stable migration compatibility fields from the current public API.
   available_seats: number;
@@ -278,6 +284,7 @@ export function adaptLegacyBooking(booking: LegacyBookingShape): Reservation {
         : [{ quantity: booking.seats_booked }],
     status: booking.status,
     interface_type: booking.interface_type,
+    staff_id: booking.staff_id,
     seats_booked: booking.seats_booked,
     seat_labels: seatLabels,
   };

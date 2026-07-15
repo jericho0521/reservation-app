@@ -1,4 +1,8 @@
-import type { ReservationResponse } from "@reservation-platform/contract-types";
+import {
+  rescheduleManagedReservationInputSchema,
+  type ReservationResponse,
+  type RescheduleManagedReservationInput,
+} from "@reservation-platform/contract-types";
 import { platformErrorBody } from "./errors.js";
 import { toPlatformReservation } from "./platform-adapters.js";
 
@@ -11,6 +15,13 @@ export interface ReservationManagementRepository {
   issue(input: { bookingId: string; tokenHash: string; expiresAt: string }): Promise<ReservationManagementRepositoryResult>;
   read(input: { publicSlug: string; tokenHash: string }): Promise<ReservationManagementRepositoryResult>;
   cancel(input: { publicSlug: string; tokenHash: string }): Promise<ReservationManagementRepositoryResult>;
+  reschedule(input: {
+    publicSlug: string;
+    tokenHash: string;
+    date: string;
+    startTime: string;
+    staffId: string;
+  }): Promise<ReservationManagementRepositoryResult>;
 }
 
 export type ReservationManagementResult = {
@@ -67,9 +78,32 @@ export async function cancelManagedReservation(input: {
   return runManagedReservationOperation(input, "cancel");
 }
 
+export async function rescheduleManagedReservation(input: {
+  repository: ReservationManagementRepository;
+  publicSlug: string;
+  token: string;
+  input: RescheduleManagedReservationInput;
+}): Promise<ReservationManagementResult> {
+  const parsed = rescheduleManagedReservationInputSchema.safeParse(input.input);
+  if (!parsed.success) {
+    return { status: 400, body: platformErrorBody("validation_failed", "Reschedule details are invalid.", 400) };
+  }
+  return runManagedReservationOperation({
+    repository: input.repository,
+    publicSlug: input.publicSlug,
+    token: input.token,
+    reschedule: parsed.data,
+  }, "reschedule");
+}
+
 async function runManagedReservationOperation(
-  input: { repository: ReservationManagementRepository; publicSlug: string; token: string },
-  operation: "read" | "cancel",
+  input: {
+    repository: ReservationManagementRepository;
+    publicSlug: string;
+    token: string;
+    reschedule?: RescheduleManagedReservationInput;
+  },
+  operation: "read" | "cancel" | "reschedule",
 ): Promise<ReservationManagementResult> {
   const publicSlug = input.publicSlug.trim().toLowerCase();
   const tokenHash = await hashReservationManagementToken(input.token);
@@ -77,12 +111,26 @@ async function runManagedReservationOperation(
     return hiddenTokenFailure();
   }
   try {
-    const result = await input.repository[operation]({ publicSlug, tokenHash });
+    const result = operation === "reschedule"
+      ? await input.repository.reschedule({
+          publicSlug,
+          tokenHash,
+          date: input.reschedule!.date,
+          startTime: input.reschedule!.start_time,
+          staffId: input.reschedule!.staff_id,
+        })
+      : await input.repository[operation]({ publicSlug, tokenHash });
     if (result.error) throw result.error;
     const record = asRecord(result.data);
     if (record.ok !== true) {
       if (record.error_code === "cancellation_closed") {
         return { status: 409, body: platformErrorBody("conflict", "This reservation can no longer be cancelled online.", 409) };
+      }
+      if (record.error_code === "reschedule_closed") {
+        return { status: 409, body: platformErrorBody("conflict", "This reservation can no longer be rescheduled online.", 409) };
+      }
+      if (record.error_code === "conflict" || record.error_code === "unavailable") {
+        return { status: 409, body: platformErrorBody("conflict", "That appointment time is no longer available.", 409) };
       }
       return hiddenTokenFailure();
     }

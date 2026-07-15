@@ -51,6 +51,7 @@ import {
   readReservationById,
   readManagedReservation,
   cancelManagedReservation,
+  rescheduleManagedReservation,
   rescheduleReservationWithLegacyPatch,
   saveExperienceDraft,
   updateExperienceIdentity,
@@ -116,6 +117,7 @@ import {
   requestPasswordResetInputSchema,
   staffInvitationInputSchema,
   staffAccessPatchSchema,
+  rescheduleManagedReservationInputSchema,
   chatConfirmReservationInputSchema,
   chatCreateReservationSessionInputSchema,
   chatMessageInputSchema,
@@ -342,6 +344,7 @@ const publicExperienceAvailabilityPattern = /^\/v1\/public\/experiences\/([^/]+)
 const publicExperienceReservationsPattern = /^\/v1\/public\/experiences\/([^/]+)\/reservations$/;
 const publicExperienceManagementPattern = /^\/v1\/public\/experiences\/([^/]+)\/manage\/([^/]+)$/;
 const publicExperienceManagementCancelPattern = /^\/v1\/public\/experiences\/([^/]+)\/manage\/([^/]+)\/cancel$/;
+const publicExperienceManagementReschedulePattern = /^\/v1\/public\/experiences\/([^/]+)\/manage\/([^/]+)\/reschedule$/;
 const publicExperienceChatMessagePattern = /^\/v1\/public\/experiences\/([^/]+)\/chat\/messages$/;
 const publicExperienceChatMessagesPattern = /^\/v1\/public\/experiences\/([^/]+)\/chat\/conversations\/([^/]+)\/messages$/;
 const publicExperienceChatConfirmPattern = /^\/v1\/public\/experiences\/([^/]+)\/chat\/conversations\/([^/]+)\/confirm$/;
@@ -671,6 +674,8 @@ export async function handleStandaloneApiRequest(
   if (method === "POST") {
     const match = publicExperienceManagementCancelPattern.exec(path);
     if (match) return handlePublicReservationManagementRequest(match[1]!, match[2]!, dependencies, "cancel");
+    const rescheduleMatch = publicExperienceManagementReschedulePattern.exec(path);
+    if (rescheduleMatch) return handlePublicReservationManagementRescheduleRequest(rescheduleMatch[1]!, rescheduleMatch[2]!, request, dependencies);
   }
 
   if (method === "POST") {
@@ -2079,6 +2084,34 @@ async function handlePublicReservationManagementRequest(
   const result = operation === "read"
     ? await readManagedReservation({ repository: dependencies.reservationManagementRepository, publicSlug, token })
     : await cancelManagedReservation({ repository: dependencies.reservationManagementRepository, publicSlug, token });
+  return jsonResponse(result.status, result.body);
+}
+
+async function handlePublicReservationManagementRescheduleRequest(
+  encodedSlug: string,
+  encodedToken: string,
+  request: StandaloneApiRequest,
+  dependencies: StandaloneApiDependencies,
+) {
+  if (!dependencies.reservationManagementRepository) {
+    return platformError(503, "bad_request", "Reservation management repository is not configured.");
+  }
+  let publicSlug: string;
+  let token: string;
+  try {
+    publicSlug = decodeURIComponent(encodedSlug);
+    token = decodeURIComponent(encodedToken);
+  } catch {
+    return platformError(404, "not_found", "Reservation management link is invalid or expired.");
+  }
+  const parsed = rescheduleManagedReservationInputSchema.safeParse(request.body);
+  if (!parsed.success) return platformError(400, "validation_failed", "Reschedule details are invalid.");
+  const result = await rescheduleManagedReservation({
+    repository: dependencies.reservationManagementRepository,
+    publicSlug,
+    token,
+    input: parsed.data,
+  });
   return jsonResponse(result.status, result.body);
 }
 

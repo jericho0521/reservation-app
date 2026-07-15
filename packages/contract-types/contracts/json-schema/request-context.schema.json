@@ -397,6 +397,10 @@
         "service_id": {
           "type": "string"
         },
+        "staff_id": {
+          "format": "uuid",
+          "type": "string"
+        },
         "start_at": {
           "type": "string"
         },
@@ -473,6 +477,10 @@
             "type": "string"
           },
           "type": "array"
+        },
+        "staff_id": {
+          "format": "uuid",
+          "type": "string"
         },
         "start_at": {
           "type": "string"
@@ -945,6 +953,10 @@
           "type": "string"
         },
         "source": {
+          "type": "string"
+        },
+        "staff_id": {
+          "format": "uuid",
           "type": "string"
         },
         "start_at": {
@@ -2658,6 +2670,29 @@
       ],
       "type": "object"
     },
+    "RescheduleManagedReservationInput": {
+      "additionalProperties": false,
+      "properties": {
+        "date": {
+          "format": "date",
+          "type": "string"
+        },
+        "staff_id": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "start_time": {
+          "pattern": "^(?:[01]\\d|2[0-3]):[0-5]\\d$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "date",
+        "start_time",
+        "staff_id"
+      ],
+      "type": "object"
+    },
     "RescheduleReservationInput": {
       "additionalProperties": false,
       "properties": {
@@ -2775,6 +2810,10 @@
           "type": "array"
         },
         "service_id": {
+          "type": "string"
+        },
+        "staff_id": {
+          "format": "uuid",
           "type": "string"
         },
         "start_at": {

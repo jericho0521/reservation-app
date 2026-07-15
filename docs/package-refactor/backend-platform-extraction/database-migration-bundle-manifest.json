@@ -309,6 +309,17 @@
       ]
     },
     {
+      "kind": "core-migration",
+      "order": 28,
+      "targetPath": "packages/database/migrations/supabase/000028_appointment_availability_management.sql",
+      "sourceAssets": [
+        {
+          "path": "packages/database/migrations/supabase/000028_appointment_availability_management.sql",
+          "section": "Practitioner-aware buffered availability, atomic appointment creation, and managed rescheduling"
+        }
+      ]
+    },
+    {
       "kind": "optional-ai-retrieval",
       "targetPath": "packages/database/migrations/supabase/optional/ai-retrieval/000001_knowledge_chunks.sql",
       "sourceAssets": [

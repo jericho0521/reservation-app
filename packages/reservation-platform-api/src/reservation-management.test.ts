@@ -5,6 +5,7 @@ import {
   hashReservationManagementToken,
   issueReservationManagement,
   readManagedReservation,
+  rescheduleManagedReservation,
   type ReservationManagementRepository,
 } from "./reservation-management.js";
 
@@ -78,6 +79,58 @@ test("cancellation policy conflicts are public-safe and cancellation replay succ
   assert.equal("status" in replayed.body && replayed.body.status, "cancelled");
 });
 
+test("managed reschedule hashes the token and maps cutoff and stale-slot conflicts", async () => {
+  let rescheduleInput: unknown;
+  const repositoryWithReschedule = repository({
+    reschedule: async (input) => {
+      rescheduleInput = input;
+      return { data: { ok: false, error_code: "reschedule_closed" } };
+    },
+  });
+  const closed = await rescheduleManagedReservation({
+    repository: repositoryWithReschedule,
+    publicSlug: " LUMA-STUDIO ",
+    token,
+    input: {
+      date: "2026-08-02",
+      start_time: "10:30",
+      staff_id: "33333333-3333-4333-8333-333333333333",
+    },
+  });
+  assert.equal(closed.status, 409);
+  assert.deepEqual(rescheduleInput, {
+    publicSlug: "luma-studio",
+    tokenHash: await hashReservationManagementToken(token),
+    date: "2026-08-02",
+    startTime: "10:30",
+    staffId: "33333333-3333-4333-8333-333333333333",
+  });
+
+  const stale = await rescheduleManagedReservation({
+    repository: repository({ reschedule: async () => ({ data: { ok: false, error_code: "conflict" } }) }),
+    publicSlug: "luma-studio",
+    token,
+    input: {
+      date: "2026-08-03",
+      start_time: "11:00",
+      staff_id: "33333333-3333-4333-8333-333333333333",
+    },
+  });
+  assert.equal(stale.status, 409);
+});
+
+test("managed reschedule validates date, time, and staff before repository access", async () => {
+  let called = false;
+  const result = await rescheduleManagedReservation({
+    repository: repository({ reschedule: async () => { called = true; return {}; } }),
+    publicSlug: "luma-studio",
+    token,
+    input: { date: "2026-02-30", start_time: "25:00", staff_id: "bad" },
+  });
+  assert.equal(result.status, 400);
+  assert.equal(called, false);
+});
+
 test("malformed tokens are rejected before repository access", async () => {
   let called = false;
   const result = await readManagedReservation({
@@ -94,6 +147,7 @@ function repository(overrides: Partial<ReservationManagementRepository>): Reserv
     issue: async () => ({ data: {} }),
     read: async () => ({ data: { ok: false, error_code: "not_found" } }),
     cancel: async () => ({ data: { ok: false, error_code: "not_found" } }),
+    reschedule: async () => ({ data: { ok: false, error_code: "not_found" } }),
     ...overrides,
   };
 }

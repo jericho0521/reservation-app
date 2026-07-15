@@ -392,9 +392,15 @@ test("customer management SDK methods encode opaque token paths and stay public"
   });
   await client.getManagedReservation("luma studio", "opaque/token");
   await client.cancelManagedReservation("luma studio", "opaque/token");
+  await client.rescheduleManagedReservation("luma studio", "opaque/token", {
+    date: "2026-08-02",
+    start_time: "10:30",
+    staff_id: "33333333-3333-4333-8333-333333333333",
+  });
   assert.deepEqual(requests.map(({ url, init }) => [new URL(url).pathname, init?.method]), [
     ["/v1/public/experiences/luma%20studio/manage/opaque%2Ftoken", "GET"],
     ["/v1/public/experiences/luma%20studio/manage/opaque%2Ftoken/cancel", "POST"],
+    ["/v1/public/experiences/luma%20studio/manage/opaque%2Ftoken/reschedule", "POST"],
   ]);
   requests.forEach((request) => assert.equal(new Headers(request.init?.headers).has("Authorization"), false));
 });

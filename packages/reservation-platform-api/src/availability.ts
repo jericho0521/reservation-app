@@ -19,6 +19,7 @@ export interface AvailabilityReadInput {
   serviceId: string;
   date: string;
   venueId?: string;
+  staffId?: string;
 }
 
 export interface AvailabilityRead {
@@ -27,6 +28,7 @@ export interface AvailabilityRead {
   maintenanceResourceLabels: string[];
   operatingHours?: ExperienceOperatingHoursInput;
   durationMinutes?: number;
+  staffUnavailable?: boolean;
 }
 
 export interface AvailabilityRepositoryPort {
@@ -102,6 +104,7 @@ export async function listAvailability({
 
   const serviceId = preparedQuery.searchParams.get("service_id")!;
   const date = preparedQuery.searchParams.get("date")!;
+  const staffId = preparedQuery.searchParams.get("staff_id") ?? undefined;
 
   try {
     const resolvedRepository = typeof repository === "function" ? repository() : repository;
@@ -109,6 +112,7 @@ export async function listAvailability({
       serviceId,
       date,
       ...(venueId ? { venueId } : {}),
+      ...(staffId ? { staffId } : {}),
     });
     const windows = availability.operatingHours
       ? getOperatingWindowsForDate(availability.operatingHours, date, now)
@@ -123,6 +127,12 @@ export async function listAvailability({
         } : {}),
         maintenanceResourceLabels: availability.maintenanceResourceLabels,
         legacyFallbackLabels: getLegacyFallbackLabels(availability.service),
+        ...(staffId ? {
+          staffId,
+          bufferBeforeMinutes: availability.service.buffer_before_minutes ?? 0,
+          bufferAfterMinutes: availability.service.buffer_after_minutes ?? 0,
+          staffUnavailable: availability.staffUnavailable ?? false,
+        } : {}),
       },
     ).filter((slot) => (
       !availability.operatingHours

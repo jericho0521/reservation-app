@@ -9,6 +9,7 @@ import {
   ReservationProvider,
   PublicExperienceReservationProvider,
   bookingErrorMessage,
+  appointmentPractitioners,
   canAdvanceBookingJourney,
   getServiceStrategy,
   getSlotEnd,
@@ -21,7 +22,7 @@ import {
   type BookingJourneyStep,
   type BookingFlowState,
 } from "@reservation-platform/react";
-import { useState, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
 
 import { cn } from "./class-names.js";
 import {
@@ -44,6 +45,7 @@ export interface BookingFlowProps {
   setupErrorTitle?: string;
   setupErrorMessage?: string;
   managementBasePath?: string;
+  includeLocationStep?: boolean;
 }
 
 export interface ExperiencePreviewProps {
@@ -145,6 +147,7 @@ export function BookingFlow({
   setupErrorTitle = "Reservation backend configuration required",
   setupErrorMessage = "Set the backend base URL and service id, or wrap BookingFlow in ReservationProvider and pass a service id.",
   managementBasePath,
+  includeLocationStep = false,
 }: BookingFlowProps) {
   if (!serviceId || (!baseUrl && !useExistingProvider)) {
     return (
@@ -165,6 +168,7 @@ export function BookingFlow({
       initialDate={initialDate}
       initialQuantity={initialQuantity}
       managementBasePath={managementBasePath}
+      includeLocationStep={includeLocationStep}
     />
   );
 
@@ -200,10 +204,21 @@ function PublicBookingJourneyInner({
   className?: string;
   managementBasePath: string;
 }) {
+  const [locationSelected, setLocationSelected] = useState(false);
   const [serviceId, setServiceId] = useState<string>();
+  if (!locationSelected) {
+    return <section className={cn("rp-public-journey", className)}>
+      <BookingStepProgress step="location" appointment includeLocation />
+      <header className="rp-service-step-header"><span>Start here</span><h2>Confirm the location</h2><p>This booking is for the business location shown below.</p></header>
+      <button type="button" className="rp-location-card" onClick={() => setLocationSelected(true)}>
+        <strong>{theme?.brandName ?? "Main location"}</strong>
+        <span>Book at this location →</span>
+      </button>
+    </section>;
+  }
   if (!serviceId) {
     return <section className={cn("rp-public-journey", className)}>
-      <BookingStepProgress step="service" />
+      <BookingStepProgress step="service" appointment includeLocation />
       <header className="rp-service-step-header"><span>Start here</span><h2>Choose an experience</h2><p>Select the service you want to reserve.</p></header>
       <ServicePicker onSelect={(service) => setServiceId(service.service_id)} />
     </section>;
@@ -215,6 +230,7 @@ function PublicBookingJourneyInner({
     className={className}
     useExistingProvider
     managementBasePath={managementBasePath}
+    includeLocationStep
   />;
 }
 
@@ -243,21 +259,28 @@ function BookingFlowInner({
   initialDate,
   initialQuantity,
   managementBasePath,
+  includeLocationStep,
 }: Omit<BookingFlowProps, "baseUrl" | "serviceId"> & { serviceId: string }) {
   const mergedLabels = mergeLabels(labels);
   const mergedTheme = mergeTheme(theme);
   const flow = useBookingFlow({ serviceId, initialDate, initialQuantity });
-  const [step, setStep] = useState<BookingJourneyStep>("date");
+  const [step, setStep] = useState<BookingJourneyStep>("practitioner");
   const [submitError, setSubmitError] = useState<string>();
+  const [anyPractitioner, setAnyPractitioner] = useState(false);
 
   const resources = flow.state.availability?.resources ?? [];
   const slots = flow.state.availability?.slots ?? [];
   const selectedResourceIds = new Set(flow.state.selectedResourceIds);
   const bookingStrategy = getServiceStrategy(flow.state.service);
+  const practitioners = appointmentPractitioners(flow.state.service);
   const controlVisibility = getBookingControlVisibility(
     bookingStrategy,
     resources.length,
   );
+
+  useEffect(() => {
+    if (step === "practitioner" && flow.state.service && practitioners.length === 0) setStep("date");
+  }, [flow.state.service, practitioners.length, step]);
 
   async function submit() {
     setSubmitError(undefined);
@@ -272,7 +295,10 @@ function BookingFlowInner({
   }
 
   const canContinue = canAdvanceBookingJourney(step, flow.state);
-  const stepIndex = step === "success" ? 5 : (["date", "slot", "options", "details", "review"] as const).indexOf(step);
+  const journey: readonly BookingJourneyStep[] = practitioners.length > 0
+    ? ["practitioner", "date", "slot", "details", "review"]
+    : ["date", "slot", "options", "details", "review"];
+  const stepIndex = step === "success" ? journey.length : journey.indexOf(step);
 
   return (
     <section className={cn(mergedTheme.shell, className)}>
@@ -297,9 +323,43 @@ function BookingFlowInner({
           </div>
         )}
       </div>
-      <BookingStepProgress step={step} />
+      <BookingStepProgress step={step} appointment={practitioners.length > 0} includeLocation={includeLocationStep} />
       <div className="rp-layout rp-journey-layout">
         <div className="rp-main">
+          {step === "practitioner" ? <BookingStepPanel step={step} title="Choose a practitioner" description="Select who you would like to see before choosing a date and time.">
+            <div className="rp-practitioner-grid" role="list">
+              {practitioners.length > 0 ? <button
+                type="button"
+                role="listitem"
+                aria-pressed={anyPractitioner}
+                className={cn("rp-practitioner-card", anyPractitioner && "selected")}
+                onClick={() => {
+                  setAnyPractitioner(true);
+                  flow.actions.setSelectedResources([practitioners[0]!]);
+                }}
+              >
+                <strong>Any available</strong>
+                <span>{anyPractitioner ? "We will assign a practitioner" : "Choose the earliest option"}</span>
+              </button> : null}
+              {practitioners.map((practitioner) => {
+                const selected = !anyPractitioner && flow.state.selectedResourceIds.includes(practitioner.resource_id);
+                return <button
+                  key={practitioner.resource_id}
+                  type="button"
+                  role="listitem"
+                  aria-pressed={selected}
+                  className={cn("rp-practitioner-card", selected && "selected")}
+                  onClick={() => {
+                    setAnyPractitioner(false);
+                    flow.actions.setSelectedResources([practitioner]);
+                  }}
+                >
+                  <strong>{String(practitioner.metadata?.practitioner_display_name ?? practitioner.label).replace(/\s+\[[0-9a-f-]+\]$/iu, "")}</strong>
+                  <span>{selected ? "Selected" : "Choose practitioner"}</span>
+                </button>;
+              })}
+            </div>
+          </BookingStepPanel> : null}
           {step === "date" ? <BookingStepPanel step={step} title="Choose a date" description="We will check the latest opening hours and booking notice rules.">
             <DatePicker label={mergedLabels.date} value={flow.state.date} onChange={flow.actions.setDate} className={mergedTheme.input} />
           </BookingStepPanel> : null}
@@ -307,7 +367,7 @@ function BookingFlowInner({
             <AvailabilityTimeline label={mergedLabels.time} slots={slots} selectedSlot={flow.state.selectedSlot} quantity={flow.state.quantity} loading={flow.availability.loading} onSelect={flow.actions.setSelectedSlot} />
           </BookingStepPanel> : null}
           {step === "options" ? <BookingStepPanel step={step} title={`Choose ${mergedLabels.resource.toLowerCase()} and quantity`} description="Unavailable options cannot be selected.">
-            {controlVisibility.showResourceSelector ? <ResourceSelector
+            {practitioners.length > 0 ? <p className="rp-practitioner-confirmation">Practitioner selected: <strong>{flow.state.selectedResourceLabels[0]}</strong></p> : controlVisibility.showResourceSelector ? <ResourceSelector
               label={mergedLabels.resource}
               resources={resources}
               selectedResourceIds={selectedResourceIds}
@@ -337,7 +397,7 @@ function BookingFlowInner({
             canContinue={canContinue}
             canGoBack={stepIndex > 0}
             continueLabel={step === "review" ? (flow.state.submitting ? "Confirming…" : "Confirm reservation") : "Continue"}
-            onBack={() => setStep(previousBookingJourneyStep(step))}
+            onBack={() => setStep(previousBookingJourneyStep(step, flow.state))}
             onContinue={() => step === "review" ? void submit() : setStep(nextBookingJourneyStep(step, flow.state))}
           /> : null}
         </div>

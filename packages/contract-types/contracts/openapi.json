@@ -432,6 +432,10 @@
           "service_id": {
             "type": "string"
           },
+          "staff_id": {
+            "format": "uuid",
+            "type": "string"
+          },
           "start_at": {
             "type": "string"
           },
@@ -508,6 +512,10 @@
               "type": "string"
             },
             "type": "array"
+          },
+          "staff_id": {
+            "format": "uuid",
+            "type": "string"
           },
           "start_at": {
             "type": "string"
@@ -980,6 +988,10 @@
             "type": "string"
           },
           "source": {
+            "type": "string"
+          },
+          "staff_id": {
+            "format": "uuid",
             "type": "string"
           },
           "start_at": {
@@ -2693,6 +2705,29 @@
         ],
         "type": "object"
       },
+      "RescheduleManagedReservationInput": {
+        "additionalProperties": false,
+        "properties": {
+          "date": {
+            "format": "date",
+            "type": "string"
+          },
+          "staff_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "start_time": {
+            "pattern": "^(?:[01]\\d|2[0-3]):[0-5]\\d$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "date",
+          "start_time",
+          "staff_id"
+        ],
+        "type": "object"
+      },
       "RescheduleReservationInput": {
         "additionalProperties": false,
         "properties": {
@@ -2810,6 +2845,10 @@
             "type": "array"
           },
           "service_id": {
+            "type": "string"
+          },
+          "staff_id": {
+            "format": "uuid",
             "type": "string"
           },
           "start_at": {
@@ -3868,6 +3907,15 @@
                 "type": "string"
               },
               "type": "array"
+            }
+          },
+          {
+            "in": "query",
+            "name": "staff_id",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
             }
           },
           {
@@ -6274,6 +6322,15 @@
             }
           },
           {
+            "in": "query",
+            "name": "staff_id",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
             "$ref": "#/components/parameters/TenantIdHeader"
           },
           {
@@ -6626,6 +6683,74 @@
           }
         },
         "summary": "Cancel one future reservation through an opaque customer management token.",
+        "tags": [
+          "Public booking"
+        ]
+      }
+    },
+    "/v1/public/experiences/{slug}/manage/{token}/reschedule": {
+      "post": {
+        "operationId": "rescheduleManagedReservation",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "token",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/TenantIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/VenueIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/CorrelationIdHeader"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RescheduleManagedReservationInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReservationResponse"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformErrorResponse"
+                }
+              }
+            },
+            "description": "Platform error response."
+          }
+        },
+        "summary": "Reschedule one future reservation through an opaque customer management token.",
         "tags": [
           "Public booking"
         ]

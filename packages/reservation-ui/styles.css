@@ -206,6 +206,53 @@
   padding: 1rem;
 }
 
+.rp-practitioner-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+  gap: .75rem;
+}
+
+.rp-practitioner-card {
+  display: grid;
+  gap: .35rem;
+  padding: 1rem;
+  border: 1px solid var(--rp-border, #d4d4d4);
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.rp-practitioner-card.selected {
+  border-color: currentColor;
+  box-shadow: inset 0 0 0 1px currentColor;
+}
+
+.rp-practitioner-card span,
+.rp-practitioner-confirmation {
+  color: var(--rp-muted, #666);
+  font-size: .85rem;
+}
+
+.rp-location-card {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.25rem;
+  border: 1px solid var(--rp-border, #d4d4d4);
+  background: #fff;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.rp-location-card span {
+  color: var(--rp-muted, #666);
+  font-size: .85rem;
+}
+
 .rp-service-card:hover,
 .rp-slot-available:hover,
 .rp-resource-available:hover {

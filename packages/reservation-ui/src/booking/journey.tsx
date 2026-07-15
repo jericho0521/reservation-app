@@ -2,8 +2,7 @@ import type { BookingJourneyStep } from "@reservation-platform/react";
 import type { ReactNode } from "react";
 import { cn } from "../class-names.js";
 
-const labels: Record<BookingJourneyStep | "location" | "service", string> = {
-  location: "Location",
+const labels: Record<BookingJourneyStep | "service", string> = {
   service: "Service",
   practitioner: "Practitioner",
   date: "Date",
@@ -17,15 +16,13 @@ const labels: Record<BookingJourneyStep | "location" | "service", string> = {
 export function BookingStepProgress({
   step,
   appointment = false,
-  includeLocation = false,
 }: {
-  step: BookingJourneyStep | "location" | "service";
+  step: BookingJourneyStep | "service";
   appointment?: boolean;
-  includeLocation?: boolean;
 }) {
-  const steps: Array<BookingJourneyStep | "location" | "service"> = appointment
-    ? [...(includeLocation ? ["location" as const] : []), "service", "practitioner", "date", "slot", "details", "review"]
-    : [...(includeLocation ? ["location" as const] : []), "service", "date", "slot", "options", "details", "review"];
+  const steps: Array<BookingJourneyStep | "service"> = appointment
+    ? ["service", "practitioner", "date", "slot", "details", "review"]
+    : ["service", "date", "slot", "options", "details", "review"];
   const current = step === "success" ? steps.length : steps.indexOf(step);
   return <nav className="rp-journey-progress" aria-label="Booking progress">
     <ol>

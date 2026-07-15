@@ -202,9 +202,9 @@ test("booking progress exposes the guided service-to-review sequence", () => {
   assert.equal(collectProps(element, (props) => props["aria-current"] === "step" ? true : undefined).length, 1);
 });
 
-test("appointment progress uses the fixed location-to-confirmation sequence", () => {
-  const element = BookingStepProgress({ step: "practitioner", appointment: true, includeLocation: true });
-  assert.match(flattenText(element), /Location.*Service.*Practitioner.*Date.*Time.*Details.*Review/u);
+test("appointment progress uses the fixed practitioner booking sequence", () => {
+  const element = BookingStepProgress({ step: "practitioner", appointment: true });
+  assert.match(flattenText(element), /Service.*Practitioner.*Date.*Time.*Details.*Review/u);
   assert.doesNotMatch(flattenText(element), /Options/u);
   assert.equal(collectProps(element, (props) => props["aria-current"] === "step" ? true : undefined).length, 1);
 });

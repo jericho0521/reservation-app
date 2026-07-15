@@ -45,7 +45,6 @@ export interface BookingFlowProps {
   setupErrorTitle?: string;
   setupErrorMessage?: string;
   managementBasePath?: string;
-  includeLocationStep?: boolean;
 }
 
 export interface ExperiencePreviewProps {
@@ -147,7 +146,6 @@ export function BookingFlow({
   setupErrorTitle = "Reservation backend configuration required",
   setupErrorMessage = "Set the backend base URL and service id, or wrap BookingFlow in ReservationProvider and pass a service id.",
   managementBasePath,
-  includeLocationStep = false,
 }: BookingFlowProps) {
   if (!serviceId || (!baseUrl && !useExistingProvider)) {
     return (
@@ -168,7 +166,6 @@ export function BookingFlow({
       initialDate={initialDate}
       initialQuantity={initialQuantity}
       managementBasePath={managementBasePath}
-      includeLocationStep={includeLocationStep}
     />
   );
 
@@ -204,21 +201,10 @@ function PublicBookingJourneyInner({
   className?: string;
   managementBasePath: string;
 }) {
-  const [locationSelected, setLocationSelected] = useState(false);
   const [serviceId, setServiceId] = useState<string>();
-  if (!locationSelected) {
-    return <section className={cn("rp-public-journey", className)}>
-      <BookingStepProgress step="location" appointment includeLocation />
-      <header className="rp-service-step-header"><span>Start here</span><h2>Confirm the location</h2><p>This booking is for the business location shown below.</p></header>
-      <button type="button" className="rp-location-card" onClick={() => setLocationSelected(true)}>
-        <strong>{theme?.brandName ?? "Main location"}</strong>
-        <span>Book at this location →</span>
-      </button>
-    </section>;
-  }
   if (!serviceId) {
     return <section className={cn("rp-public-journey", className)}>
-      <BookingStepProgress step="service" appointment includeLocation />
+      <BookingStepProgress step="service" appointment />
       <header className="rp-service-step-header"><span>Start here</span><h2>Choose an experience</h2><p>Select the service you want to reserve.</p></header>
       <ServicePicker onSelect={(service) => setServiceId(service.service_id)} />
     </section>;
@@ -230,7 +216,6 @@ function PublicBookingJourneyInner({
     className={className}
     useExistingProvider
     managementBasePath={managementBasePath}
-    includeLocationStep
   />;
 }
 
@@ -259,14 +244,12 @@ function BookingFlowInner({
   initialDate,
   initialQuantity,
   managementBasePath,
-  includeLocationStep,
 }: Omit<BookingFlowProps, "baseUrl" | "serviceId"> & { serviceId: string }) {
   const mergedLabels = mergeLabels(labels);
   const mergedTheme = mergeTheme(theme);
   const flow = useBookingFlow({ serviceId, initialDate, initialQuantity });
   const [step, setStep] = useState<BookingJourneyStep>("practitioner");
   const [submitError, setSubmitError] = useState<string>();
-  const [anyPractitioner, setAnyPractitioner] = useState(false);
 
   const resources = flow.state.availability?.resources ?? [];
   const slots = flow.state.availability?.slots ?? [];
@@ -323,36 +306,20 @@ function BookingFlowInner({
           </div>
         )}
       </div>
-      <BookingStepProgress step={step} appointment={practitioners.length > 0} includeLocation={includeLocationStep} />
+      <BookingStepProgress step={step} appointment={practitioners.length > 0} />
       <div className="rp-layout rp-journey-layout">
         <div className="rp-main">
           {step === "practitioner" ? <BookingStepPanel step={step} title="Choose a practitioner" description="Select who you would like to see before choosing a date and time.">
             <div className="rp-practitioner-grid" role="list">
-              {practitioners.length > 0 ? <button
-                type="button"
-                role="listitem"
-                aria-pressed={anyPractitioner}
-                className={cn("rp-practitioner-card", anyPractitioner && "selected")}
-                onClick={() => {
-                  setAnyPractitioner(true);
-                  flow.actions.setSelectedResources([practitioners[0]!]);
-                }}
-              >
-                <strong>Any available</strong>
-                <span>{anyPractitioner ? "We will assign a practitioner" : "Choose the earliest option"}</span>
-              </button> : null}
               {practitioners.map((practitioner) => {
-                const selected = !anyPractitioner && flow.state.selectedResourceIds.includes(practitioner.resource_id);
+                const selected = flow.state.selectedResourceIds.includes(practitioner.resource_id);
                 return <button
                   key={practitioner.resource_id}
                   type="button"
                   role="listitem"
                   aria-pressed={selected}
                   className={cn("rp-practitioner-card", selected && "selected")}
-                  onClick={() => {
-                    setAnyPractitioner(false);
-                    flow.actions.setSelectedResources([practitioner]);
-                  }}
+                  onClick={() => flow.actions.setSelectedResources([practitioner])}
                 >
                   <strong>{String(practitioner.metadata?.practitioner_display_name ?? practitioner.label).replace(/\s+\[[0-9a-f-]+\]$/iu, "")}</strong>
                   <span>{selected ? "Selected" : "Choose practitioner"}</span>

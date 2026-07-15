@@ -199,6 +199,7 @@ test("ExperiencePreview renders draft branding, terminology, channels, and servi
 test("booking progress exposes the guided service-to-review sequence", () => {
   const element = BookingStepProgress({ step: "details" });
   assert.match(flattenText(element), /Service.*Date.*Time.*Options.*Details.*Review/u);
+  assert.equal(element.props.tabIndex, 0);
   assert.equal(collectProps(element, (props) => props["aria-current"] === "step" ? true : undefined).length, 1);
 });
 

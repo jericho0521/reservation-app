@@ -6,6 +6,10 @@ import {
   type Locator,
   type Page,
 } from "@playwright/test";
+import {
+  hasConsoleAuthentication,
+  openAuthenticatedConsole,
+} from "./support/release-fixture";
 
 const consoleOrigin = originFromEnv(
   "RESERVATION_BROWSER_CONSOLE_ORIGIN",
@@ -18,8 +22,6 @@ const bookingOrigin = originFromEnv(
 const bookingSlug = process.env.RESERVATION_BROWSER_BOOKING_SLUG?.trim()
   || "apex-racing-demo";
 const managementToken = process.env.RESERVATION_BROWSER_MANAGEMENT_TOKEN?.trim();
-const ownerEmail = process.env.RESERVATION_BROWSER_OWNER_EMAIL?.trim();
-const ownerPassword = process.env.RESERVATION_BROWSER_OWNER_PASSWORD;
 
 test.describe("console accessibility", () => {
   let consoleAvailable = false;
@@ -46,8 +48,8 @@ test.describe("console accessibility", () => {
 
   test("overview", async ({ page }) => {
     test.skip(!consoleAvailable, `Console origin unavailable: ${consoleOrigin}`);
-    await authenticateConsole(page);
-    await openRoute(page, `${consoleOrigin}/admin`);
+    test.skip(!hasConsoleAuthentication(), "Owner credentials or a storage state are required for the protected journey.");
+    await openAuthenticatedConsole(page, "/admin");
     await expect(page.getByText("Operations command center", { exact: true })).toBeVisible();
     await expectAccessiblePage(page);
     await expectKeyboardReachable(page, page.getByRole("link", { name: "Open Studio" }));
@@ -55,8 +57,8 @@ test.describe("console accessibility", () => {
 
   test("inbox", async ({ page }) => {
     test.skip(!consoleAvailable, `Console origin unavailable: ${consoleOrigin}`);
-    await authenticateConsole(page);
-    await openRoute(page, `${consoleOrigin}/admin/conversations`);
+    test.skip(!hasConsoleAuthentication(), "Owner credentials or a storage state are required for the protected journey.");
+    await openAuthenticatedConsole(page, "/admin/conversations");
     await expect(page.getByRole("heading", { level: 1, name: "Every customer conversation" })).toBeVisible();
     await expectAccessiblePage(page);
     await expectKeyboardReachable(page, page.getByRole("button", { name: "Apply" }));
@@ -64,8 +66,8 @@ test.describe("console accessibility", () => {
 
   test("system status", async ({ page }) => {
     test.skip(!consoleAvailable, `Console origin unavailable: ${consoleOrigin}`);
-    await authenticateConsole(page);
-    await openRoute(page, `${consoleOrigin}/admin/system`);
+    test.skip(!hasConsoleAuthentication(), "Owner credentials or a storage state are required for the protected journey.");
+    await openAuthenticatedConsole(page, "/admin/system");
     await expect(page.getByRole("heading", { level: 1, name: "System status" })).toBeVisible();
     await expectAccessiblePage(page);
     await expectKeyboardReachable(page, page.getByRole("link", { name: "System status" }));
@@ -90,10 +92,7 @@ test.describe("public booking accessibility", () => {
 
   test("management", async ({ page }) => {
     test.skip(!bookingAvailable, `Booking origin unavailable: ${bookingOrigin}`);
-    expect(
-      managementToken,
-      "Set RESERVATION_BROWSER_MANAGEMENT_TOKEN to a current reservation management token.",
-    ).toBeTruthy();
+    test.skip(!managementToken, "A current reservation management token is required for the management journey.");
     await openRoute(
       page,
       `${bookingOrigin}/${encodeURIComponent(bookingSlug)}/manage/${encodeURIComponent(managementToken!)}`,
@@ -107,19 +106,6 @@ test.describe("public booking accessibility", () => {
     await expectKeyboardReachable(page, primaryAction);
   });
 });
-
-async function authenticateConsole(page: Page): Promise<void> {
-  if (!ownerEmail && !ownerPassword) return;
-  expect(
-    Boolean(ownerEmail && ownerPassword),
-    "Set both RESERVATION_BROWSER_OWNER_EMAIL and RESERVATION_BROWSER_OWNER_PASSWORD.",
-  ).toBe(true);
-  await openRoute(page, `${consoleOrigin}/admin/login`);
-  await page.getByLabel("Email address").fill(ownerEmail!);
-  await page.getByLabel("Password").fill(ownerPassword!);
-  await page.getByRole("button", { name: "Sign in" }).click();
-  await expect(page).not.toHaveURL(/\/admin\/login(?:\?|$)/u);
-}
 
 async function expectAccessiblePage(page: Page): Promise<void> {
   const results = await new AxeBuilder({ page }).analyze();

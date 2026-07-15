@@ -24,7 +24,7 @@ export function BookingStepProgress({
     ? ["service", "practitioner", "date", "slot", "details", "review"]
     : ["service", "date", "slot", "options", "details", "review"];
   const current = step === "success" ? steps.length : steps.indexOf(step);
-  return <nav className="rp-journey-progress" aria-label="Booking progress">
+  return <nav className="rp-journey-progress" aria-label="Booking progress" tabIndex={0}>
     <ol>
       {steps.map((candidate, index) => <li
         key={candidate}

@@ -4,6 +4,9 @@ import { authRedirect, buildMiddlewareRequestHeaders } from "./lib/auth-session"
 
 export function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
+  if (pathname.startsWith("/admin/_next/") || pathname.startsWith("/_next/")) {
+    return NextResponse.next();
+  }
   const destination = authRedirect({
     pathname,
     hasSessionCookie: request.cookies.has("reservation_session"),
@@ -15,5 +18,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/:path*"],
+  matcher: ["/", "/((?!_next/static|_next/image|favicon.ico).*)"],
 };

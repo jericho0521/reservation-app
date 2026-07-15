@@ -116,15 +116,15 @@ test("middleware derives trusted route headers and compiles relative to the admi
 
   const probe = spawnSync(process.execPath, ["--eval", [
     "const { getMiddlewareMatchers } = require('next/dist/build/analysis/get-page-static-info.js');",
-    "const matchers = getMiddlewareMatchers(['/:path*'], { basePath: '/admin' });",
+    "const matchers = getMiddlewareMatchers(['/', '/((?!_next/static|_next/image|favicon.ico).*)'], { basePath: '/admin' });",
     "const matches = (pathname) => matchers.some(({ regexp }) => new RegExp(regexp, 'u').test(pathname));",
-    "process.stdout.write(JSON.stringify(['/admin', '/admin/login', '/admin/setup', '/admin/reservations', '/reservations'].map(matches)));",
+    "process.stdout.write(JSON.stringify(['/admin', '/admin/login', '/admin/setup', '/admin/reservations', '/admin/_next/static/chunk.js', '/reservations'].map(matches)));",
   ].join("\n")], {
     cwd: fileURLToPath(new URL("..", import.meta.url)),
     encoding: "utf8",
   });
   assert.equal(probe.status, 0, probe.stderr);
-  assert.deepEqual(JSON.parse(probe.stdout), [true, true, true, true, false]);
+  assert.deepEqual(JSON.parse(probe.stdout), [true, true, true, true, false, false]);
 });
 
 test("browser auth forms use same-origin cookie requests and replace token-bearing history", async () => {
@@ -146,7 +146,8 @@ test("browser auth forms use same-origin cookie requests and replace token-beari
     assert.doesNotMatch(source, /localStorage|sessionStorage|console\./u);
   }
   assert.match(setup, /history\.replaceState\(null, "", "\/admin\/setup"\)/u);
-  assert.match(middleware, /matcher: \["\/:path\*"\]/u);
+  assert.match(middleware, /pathname\.startsWith\("\/admin\/_next\/"\)/u);
+  assert.match(middleware, /matcher: \["\/", "\/\(\(\?!_next\/static\|_next\/image\|favicon\.ico\)\.\*\)"\]/u);
   assert.match(layout, /getSession\(\)/u);
   assert.match(layout, /redirect\("\/login"\)/u);
   assert.match(layout, /redirect\("\/onboarding"\)/u);

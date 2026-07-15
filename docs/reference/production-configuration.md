@@ -1,0 +1,49 @@
+# Production configuration reference
+
+The supported deployment runs one appointment business per installation. Only the edge service publishes ports 80 and 443; PostgreSQL, PostgREST, API, worker, console, booking, and operations services remain on private Docker networks.
+
+## Configuration ownership
+
+| Configuration | Owner | Supported interface |
+| --- | --- | --- |
+| Domain, release, image identities | Operator | Signed release bundle and `install.sh` arguments |
+| Database and internal service secrets | Installer | Protected Docker configuration volumes |
+| Business, location, services, staff, hours | Business owner | Console setup workspace |
+| Email, AI, WhatsApp | Business owner | Write-only console settings and connection tests |
+| Staff identity and location scope | Business owner | Staff access console |
+| Backup and restore confirmation | Operator | One-shot operations profile |
+
+Do not maintain a hand-written production `.env`. `/opt/reservation-platform/release.env` is generated non-secret release selection and must not be edited to configure the business or providers.
+
+## Installer arguments
+
+`scripts/production/install.sh` accepts:
+
+- `--domain <dns-name>` — required public DNS name in non-interactive mode;
+- `--release <semver>` — exact release version;
+- `--host-ip <public-ip>` — public address to compare with DNS when host discovery is insufficient;
+- `--resume` — repeat the same interrupted installation without rotating retained secrets.
+
+The supported installation directory is `/opt/reservation-platform`. A release is identified by a signed manifest, digest-pinned API, worker, console, booking, and tools images, and required migration `000036` for the 0.2.0 candidate.
+
+## Public routes
+
+| Route | Audience | Purpose |
+| --- | --- | --- |
+| `/` | Customer | Published business landing page |
+| `/<slug>/book` | Customer | Public appointment booking |
+| `/admin/login` | Owner/staff | Console authentication |
+| `/admin/setup?token=...` | First owner only | One-time installation setup |
+| `/admin` | Owner/staff | Operations console |
+| `/v1/health/live` | Monitor | Process liveness |
+| `/v1/health/ready` | Edge/monitor | Traffic readiness and migration safety |
+
+Opaque customer-management URLs and the setup URL are capabilities. Do not put them in logs or public evidence.
+
+## Protected configuration groups
+
+The installer creates and distributes database credentials, JWT material, an internal service key, the installation master key, the WhatsApp session-encryption key, and a backup-recovery key. Services receive only the values they need. The recovery key must also be held offline and separate from backup archives.
+
+Business owners supply email and AI credentials through write-only console fields. WhatsApp uses authorized linked-device pairing and never requires a QR payload in a log or environment file.
+
+For command-level procedures, see [Production first run](../tutorials/production-first-run.md), [Encrypted backup and verified restore](../operations/backup-restore.md), and [Versioned upgrades and recovery](../operations/upgrades.md).

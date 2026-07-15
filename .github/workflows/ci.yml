@@ -48,3 +48,58 @@ jobs:
 
       - name: Verify repository
         run: pnpm run ci:verify
+
+      - name: Verify release publication contracts
+        run: pnpm run production:release:test
+
+  browser:
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      CI: true
+      RESERVATION_BROWSER_MUTATIONS: "false"
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.2
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Chromium
+        run: pnpm run browser:install:ci
+
+      - name: Start the deterministic local stack
+        run: pnpm run stack:up
+
+      - name: Verify stack readiness
+        run: pnpm run stack:verify:live
+
+      - name: Run browser, mobile, and accessibility journeys
+        run: pnpm run test:browser
+
+      - name: Upload failure-only browser evidence
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-failure-evidence
+          path: |
+            test-results/
+            playwright-report/
+          if-no-files-found: ignore
+
+      - name: Stop the local stack
+        if: always()
+        run: pnpm run stack:down

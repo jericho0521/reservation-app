@@ -1,6 +1,6 @@
 {
   "name": "reservation-platform",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "packageManager": "pnpm@10.33.2",
   "description": "Backend modules, API host, SDK, React hooks, UI components, and examples for a modular booking platform.",
@@ -69,6 +69,13 @@
     "production:support-bundle": "bash scripts/production/support-bundle.sh",
     "production:support-bundle:test": "node --test scripts/production/support-bundle.test.mjs",
     "production:operations:test": "pnpm run production:backup:test && pnpm run production:upgrade:test && pnpm run production:support-bundle:test && node --test scripts/production/operations-shell.test.mjs",
+    "production:proof:test": "node --test \"tests/production/*.test.mjs\"",
+    "production:proof:clean-install": "node scripts/production/verify-clean-install.mjs",
+    "production:proof:clean-install:strict": "node scripts/production/verify-clean-install.mjs --strict",
+    "production:proof:drills": "node scripts/production/run-release-drills.mjs",
+    "production:proof:drills:strict": "node scripts/production/run-release-drills.mjs --strict",
+    "production:release:test": "node --test scripts/production/release-manifest.test.mjs scripts/production/release-workflow.test.mjs scripts/production/verify-signatures.test.mjs",
+    "production:docs:test": "node --test scripts/production/verify-release-docs.test.mjs scripts/production/validate-acceptance-evidence.test.mjs && node scripts/production/verify-release-docs.mjs",
     "production:installer:test": "pnpm run production:preflight:test && pnpm run production:release-manifest:test && pnpm run production:release-manifest:check && node --import tsx --test apps/console/lib/setup-landing.test.ts",
     "production:smoke": "node scripts/production/smoke.mjs",
     "production:compose:check": "docker compose -f compose.production.yml config --quiet",
@@ -88,7 +95,7 @@
     "demo:reset": "node scripts/reset-final-demo.mjs",
     "demo:verify": "node scripts/verify-final-demo-readiness.mjs",
     "test": "pnpm run packages:test && pnpm run backend-platform:verify-standalone-api-skeleton && pnpm run database:verify-migration-bundle",
-    "ci:verify": "pnpm run ci:verify-scripts && pnpm test && pnpm run sdk:release-gate && pnpm build && pnpm run deploy:verify && pnpm run production:installer:test"
+    "ci:verify": "pnpm run ci:verify-scripts && pnpm test && pnpm run sdk:release-gate && pnpm build && pnpm run deploy:verify && pnpm run production:installer:test && pnpm run production:release:test && pnpm run production:proof:test && pnpm run production:docs:test && pnpm run local-stack:test"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.12.1",

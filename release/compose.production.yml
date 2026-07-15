@@ -1,0 +1,4 @@
+# Source-tree reference. The release workflow replaces this file in the staged
+# archive with the exact root compose.production.yml covered by the manifest.
+include:
+  - path: ../compose.production.yml

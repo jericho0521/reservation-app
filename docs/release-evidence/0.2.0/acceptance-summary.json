@@ -1,0 +1,7 @@
+{
+  "schema_version": 1,
+  "release_version": "0.2.0",
+  "evidence_status": "pending",
+  "release_gate": "blocked",
+  "reason": "Independent eight-hour non-developer acceptance has not been conducted."
+}

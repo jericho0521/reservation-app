@@ -1,17 +1,17 @@
 {
   "schema_version": 1,
-  "release": "0.1.0",
+  "release": "0.2.0",
   "images": {
-    "api": "ghcr.io/jericho0521/reservation-app-api:0.1.0",
-    "worker": "ghcr.io/jericho0521/reservation-app-worker:0.1.0",
-    "console": "ghcr.io/jericho0521/reservation-app-console:0.1.0",
-    "booking": "ghcr.io/jericho0521/reservation-app-booking:0.1.0",
-    "tools": "ghcr.io/jericho0521/reservation-app-tools:0.1.0"
+    "api": "ghcr.io/jericho0521/reservation-app-api:0.2.0",
+    "worker": "ghcr.io/jericho0521/reservation-app-worker:0.2.0",
+    "console": "ghcr.io/jericho0521/reservation-app-console:0.2.0",
+    "booking": "ghcr.io/jericho0521/reservation-app-booking:0.2.0",
+    "tools": "ghcr.io/jericho0521/reservation-app-tools:0.2.0"
   },
   "assets": [
     {
       "path": "package.json",
-      "sha256": "a16a7c8648f8ddc4de14de622d4127f5a567e6772eadd4a628a8ad043440006e"
+      "sha256": "bf4a01d46aad3bad489b6c9c71180d2402b53dad6d9649c08a6691e4fdc54aa8"
     },
     {
       "path": "compose.production.yml",
@@ -47,7 +47,7 @@
     },
     {
       "path": "scripts/production/release-manifest.mjs",
-      "sha256": "32395645babb6fd55c2994f020b88ae18bfc6fd8092c6edfcda30b8d28854297"
+      "sha256": "2604f7abb191ff1a5df98dda6bf4669933dc93c83853825d0528fc3141b89862"
     },
     {
       "path": "scripts/production/smoke.mjs",

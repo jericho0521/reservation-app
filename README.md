@@ -28,6 +28,18 @@ For the full system design and presentation path, see
 [`docs/architecture/final-platform-architecture.md`](docs/architecture/final-platform-architecture.md)
 and [`docs/demo/final-demonstration-runbook.md`](docs/demo/final-demonstration-runbook.md).
 
+## Production Operator Path
+
+The supported product deployment is one appointment business per Docker installation. Operators install a verified release without hand-editing an application `.env`; owners configure the business and optional providers in the console.
+
+- [Production first-run tutorial](docs/tutorials/production-first-run.md)
+- [Owner onboarding](docs/how-to/owner-onboarding.md)
+- [Staff working day](docs/how-to/staff-working-day.md)
+- [AI](docs/how-to/connect-ai.md) and [WhatsApp](docs/how-to/connect-whatsapp.md) connection guides
+- [Installation recovery](docs/how-to/recover-installation.md)
+- [Production configuration](docs/reference/production-configuration.md) and [release compatibility](docs/reference/release-compatibility.md)
+- [Full-day acceptance evidence template](docs/release-evidence/full-day-acceptance-template.md)
+
 ## Project Intent
 
 The goal of this project is to make booking infrastructure reusable across

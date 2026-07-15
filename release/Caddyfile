@@ -1,0 +1,3 @@
+# Source-tree reference. The release workflow replaces this file in the staged
+# archive with docker/production/Caddyfile covered by the release manifest.
+import ../docker/production/Caddyfile

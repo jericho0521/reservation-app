@@ -1,38 +1,45 @@
-name: Deploy
+name: Validate Published Self-Hosted Release
 
 on:
   workflow_dispatch:
     inputs:
       environment:
-        description: Deployment target
+        description: Protected validation environment
         required: true
         type: choice
         options:
           - staging
           - production
+      release_version:
+        description: Exact published semantic version without the v prefix
+        required: true
+        type: string
+      domain:
+        description: Installation domain used to render the operator command
+        required: true
+        type: string
 
 permissions:
   contents: read
 
 concurrency:
-  group: deploy-${{ github.ref }}
-  cancel-in-progress: true
+  group: validate-release-${{ inputs.environment }}-${{ inputs.release_version }}
+  cancel-in-progress: false
 
 defaults:
   run:
     shell: bash
 
 jobs:
-  verify:
+  verify-source:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     env:
       CI: true
       NEXT_PUBLIC_SUPABASE_URL: ${{ vars.NEXT_PUBLIC_SUPABASE_URL || 'https://example.supabase.co' }}
       NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'ci-placeholder-anon-key' }}
       GOOGLE_GENERATIVE_AI_API_KEY: ${{ secrets.GOOGLE_GENERATIVE_AI_API_KEY || 'ci-placeholder-google-key' }}
       OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY || 'ci-placeholder-openrouter-key' }}
-
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -52,34 +59,57 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Verify repository
-        run: pnpm run ci:verify
-
-      - name: Verify backup and upgrade fixtures
-        run: pnpm run production:operations:test
-
-  deploy-staging:
-    if: ${{ inputs.environment == 'staging' }}
-    needs: verify
-    runs-on: ubuntu-latest
-    environment:
-      name: staging
-
-    steps:
-      - name: Deployment placeholder
+      - name: Verify source and operations tooling
         run: |
-          echo "Staging deployment skeleton is active."
-          echo "Add your staging deploy command here, for example a Vercel, Docker, or SSH deploy step."
+          pnpm run ci:verify
+          pnpm run production:operations:test
 
-  deploy-production:
-    if: ${{ inputs.environment == 'production' }}
-    needs: verify
+  validate-published-release:
+    needs: verify-source
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     environment:
-      name: production
-
+      name: ${{ inputs.environment }}
+    env:
+      GH_TOKEN: ${{ github.token }}
     steps:
-      - name: Deployment placeholder
+      - name: Validate workflow inputs
+        env:
+          RELEASE_VERSION: ${{ inputs.release_version }}
+          DOMAIN: ${{ inputs.domain }}
         run: |
-          echo "Production deployment skeleton is active."
-          echo "Add your production deploy command here after you decide on the deployment provider."
+          node -e 'if (!/^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$/.test(process.env.RELEASE_VERSION)) process.exit(1)'
+          node -e 'if (!/^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z][a-z0-9-]{0,62}$/.test(process.env.DOMAIN)) process.exit(1)'
+
+      - name: Download the chosen published bundle
+        env:
+          RELEASE_VERSION: ${{ inputs.release_version }}
+        run: |
+          gh release download "v$RELEASE_VERSION" --repo "$GITHUB_REPOSITORY" --pattern "reservation-platform-$RELEASE_VERSION.tar.gz" --pattern "reservation-platform-$RELEASE_VERSION.tar.gz.sha256"
+          sha256sum -c "reservation-platform-$RELEASE_VERSION.tar.gz.sha256"
+          mkdir extracted
+          tar -xzf "reservation-platform-$RELEASE_VERSION.tar.gz" -C extracted
+          echo "BUNDLE_ROOT=$PWD/extracted/reservation-platform-$RELEASE_VERSION" >> "$GITHUB_ENV"
+
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@v3.9.2
+
+      - name: Verify bundle checksums, image signatures, provenance, and SBOMs
+        run: |
+          (cd "$BUNDLE_ROOT" && sha256sum -c SHA256SUMS)
+          RELEASE_ROOT="$BUNDLE_ROOT" "$BUNDLE_ROOT/verify-signatures.sh" "$BUNDLE_ROOT/release-manifest.json"
+
+      - name: Produce safe operator validation evidence
+        env:
+          RELEASE_VERSION: ${{ inputs.release_version }}
+          DOMAIN: ${{ inputs.domain }}
+        run: |
+          node -e 'const fs=require("node:fs");const manifest=JSON.parse(fs.readFileSync(`${process.env.BUNDLE_ROOT}/release-manifest.json`,"utf8"));const images=Object.fromEntries(Object.entries(manifest.images).map(([name,value])=>[name,value.digest]));fs.writeFileSync("release-validation.json",JSON.stringify({status:"verified",version:manifest.version,commit:manifest.commit,requiredMigration:manifest.requiredMigration,images},null,2)+"\n")'
+          printf 'Validated release bundle: v%s\nOperator install command: sudo ./install.sh --domain %s\n' "$RELEASE_VERSION" "$DOMAIN" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload validation evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-validation-${{ inputs.environment }}-${{ inputs.release_version }}
+          path: release-validation.json
+          if-no-files-found: error

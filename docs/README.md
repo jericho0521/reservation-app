@@ -31,6 +31,10 @@ large historical plan trees.
 
 | Goal | Document |
 | --- | --- |
+| Install one production appointment business | [Production first-run tutorial](tutorials/production-first-run.md) |
+| Configure and operate the business | [Owner onboarding](how-to/owner-onboarding.md) and [Staff working day](how-to/staff-working-day.md) |
+| Connect optional booking channels | [AI](how-to/connect-ai.md) and [WhatsApp](how-to/connect-whatsapp.md) |
+| Recover or upgrade production | [Recover an installation](how-to/recover-installation.md) and [Release compatibility](reference/release-compatibility.md) |
 | Understand the backend product branch | [Repository README](../README.md) |
 | Implement or operate backend modules | [Backend Modules Developer and User Manual](manuals/backend-modules-dev-user-manual.html) |
 | Deploy or run the backend container | [Operations: Backend Deployment](operations/backend-deployment.md) |
@@ -44,6 +48,9 @@ large historical plan trees.
 | Area | Path | Purpose |
 | --- | --- | --- |
 | Operations | [operations](operations) | Deployment, hosting URLs, and restart runbooks. |
+| Tutorials | [tutorials](tutorials) | End-to-end learning paths for a production installation. |
+| How-to guides | [how-to](how-to) | Goal-oriented owner, staff, provider, and recovery procedures. |
+| Reference | [reference](reference) | Production configuration and release compatibility contracts. |
 | Manuals | [manuals](manuals) | Long-form developer and user manuals. |
 | Supabase | [supabase](supabase) | Local/self-hosted Supabase setup and troubleshooting notes. |
 | Backend platform plans | [package-refactor/backend-platform-extraction](package-refactor/backend-platform-extraction) | Backend product boundary, contracts, SDK readiness, and extraction manifests. |

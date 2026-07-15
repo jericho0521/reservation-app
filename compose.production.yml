@@ -1,0 +1,272 @@
+name: reservation-platform-production
+
+services:
+  reservation-config:
+    image: ${RESERVATION_TOOLS_IMAGE:?set RESERVATION_TOOLS_IMAGE to the immutable release image}
+    command: ["/usr/local/bin/configure-production", "--domain", "${RESERVATION_DOMAIN:?set RESERVATION_DOMAIN}", "--release", "${RESERVATION_RELEASE:?set RESERVATION_RELEASE}"]
+    environment:
+      RESERVATION_PRODUCTION_CONFIG_DIR: /run/reservation-config
+    volumes:
+      - reservation-protected-config:/run/reservation-config
+      - reservation-db-secrets:/run/reservation-db-secrets
+      - reservation-migrate-secrets:/run/reservation-migrate-secrets
+      - reservation-rest-secrets:/run/reservation-rest-secrets
+      - reservation-api-secrets:/run/reservation-api-secrets
+      - reservation-console-secrets:/run/reservation-console-secrets
+      - reservation-worker-secrets:/run/reservation-worker-secrets
+      - reservation-whatsapp-sessions:/run/reservation-whatsapp-sessions
+    network_mode: none
+    restart: "no"
+
+  reservation-db:
+    image: postgres:16-alpine@sha256:57c72fd2a128e416c7fcc499958864df5301e940bca0a56f58fddf30ffc07777
+    depends_on:
+      reservation-config:
+        condition: service_completed_successfully
+    environment:
+      POSTGRES_DB: reservation
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD_FILE: /run/reservation-secrets/database-password
+    volumes:
+      - reservation-db-data:/var/lib/postgresql/data
+      - reservation-db-secrets:/run/reservation-secrets:ro
+    networks:
+      - reservation-backend
+    healthcheck:
+      test: ["CMD", "pg_isready", "-h", "127.0.0.1", "-U", "postgres", "-d", "reservation"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 10s
+    restart: unless-stopped
+
+  reservation-migrate:
+    image: ${RESERVATION_TOOLS_IMAGE:?set RESERVATION_TOOLS_IMAGE to the immutable release image}
+    depends_on:
+      reservation-config:
+        condition: service_completed_successfully
+      reservation-db:
+        condition: service_healthy
+    entrypoint: ["/usr/local/bin/run-with-secrets", "/etc/reservation-secrets/migrate.env", "--"]
+    command: ["node", "/opt/reservation-tools/scripts/production/migrate.mjs"]
+    environment:
+      RESERVATION_DATABASE_URL: postgresql://postgres@reservation-db:5432/reservation
+      RESERVATION_RUN_AS_UID: "1001"
+      RESERVATION_RUN_AS_GID: "1001"
+    volumes:
+      - reservation-migrate-secrets:/run/reservation-secrets:ro
+    configs:
+      - source: migrate-secret-allowlist
+        target: /etc/reservation-secrets/migrate.env
+        mode: 0400
+    networks:
+      - reservation-backend
+    restart: "no"
+
+  reservation-rest:
+    image: postgrest/postgrest:v14.12@sha256:54000f24847d01a2c2302e0041cf0618b875c57fb48507d743cfa9aaa50bf43c
+    depends_on:
+      reservation-migrate:
+        condition: service_completed_successfully
+    command: ["postgrest", "/etc/postgrest.conf"]
+    user: "1000:1000"
+    volumes:
+      - reservation-rest-secrets:/run/reservation-secrets:ro
+    configs:
+      - source: postgrest-config
+        target: /etc/postgrest.conf
+        mode: 0444
+    networks:
+      - reservation-backend
+    healthcheck:
+      test: ["CMD", "postgrest", "--ready"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 10s
+    restart: unless-stopped
+
+  reservation-api:
+    image: ${RESERVATION_API_IMAGE:?load the generated release.env}
+    depends_on:
+      reservation-migrate:
+        condition: service_completed_successfully
+      reservation-rest:
+        condition: service_healthy
+    user: "0:0"
+    entrypoint: ["/usr/local/bin/run-with-secrets", "/etc/reservation-secrets/api.env", "--"]
+    command: ["node", "apps/api/dist/server.js"]
+    environment:
+      PORT: "4100"
+      RESERVATION_RUN_AS_UID: "1001"
+      RESERVATION_RUN_AS_GID: "1001"
+      RESERVATION_SUPABASE_URL: http://reservation-rest:3000
+      RESERVATION_PLATFORM_CORS_ALLOWED_ORIGINS: https://${RESERVATION_DOMAIN:?set RESERVATION_DOMAIN}
+      RESERVATION_WHATSAPP_ENABLED: "false"
+      RESERVATION_WHATSAPP_ALLOW_MEMORY_STORE: "false"
+      RESERVATION_WHATSAPP_SESSION_AUTH_DIR: /app/.reservation-whatsapp-sessions
+    volumes:
+      - reservation-api-secrets:/run/reservation-secrets:ro
+    configs:
+      - source: api-secret-allowlist
+        target: /etc/reservation-secrets/api.env
+        mode: 0400
+    networks:
+      - reservation-backend
+      - reservation-edge
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4100/v1/health/ready').then((response) => process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 15s
+    restart: unless-stopped
+
+  reservation-worker:
+    image: ${RESERVATION_WORKER_IMAGE:?load the generated release.env}
+    depends_on:
+      reservation-migrate:
+        condition: service_completed_successfully
+      reservation-rest:
+        condition: service_healthy
+    user: "0:0"
+    entrypoint: ["/usr/local/bin/run-with-secrets", "/etc/reservation-secrets/worker.env", "--"]
+    command: ["node", "apps/worker/dist/server.js"]
+    environment:
+      RESERVATION_RUN_AS_UID: "1001"
+      RESERVATION_RUN_AS_GID: "1001"
+      RESERVATION_SUPABASE_URL: http://reservation-rest:3000
+      RESERVATION_WHATSAPP_SESSION_AUTH_DIR: /app/.reservation-whatsapp-sessions
+    volumes:
+      - reservation-worker-secrets:/run/reservation-secrets:ro
+      - reservation-whatsapp-sessions:/app/.reservation-whatsapp-sessions
+    configs:
+      - source: worker-secret-allowlist
+        target: /etc/reservation-secrets/worker.env
+        mode: 0400
+    networks:
+      - reservation-backend
+    healthcheck:
+      test: ["CMD", "node", "-e", "try { process.kill(1, 0); process.exit(0); } catch { process.exit(1); }"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+
+  reservation-console:
+    image: ${RESERVATION_CONSOLE_IMAGE:?load the generated release.env}
+    depends_on:
+      reservation-api:
+        condition: service_healthy
+    user: "0:0"
+    entrypoint: ["/usr/local/bin/run-with-secrets", "/etc/reservation-secrets/console.env", "--"]
+    command: ["node", "apps/console/server.js"]
+    environment:
+      HOSTNAME: 0.0.0.0
+      PORT: "4300"
+      RESERVATION_RUN_AS_UID: "1001"
+      RESERVATION_RUN_AS_GID: "1001"
+      RESERVATION_PLATFORM_BASE_URL: http://reservation-api:4100
+    volumes:
+      - reservation-console-secrets:/run/reservation-secrets:ro
+    configs:
+      - source: console-secret-allowlist
+        target: /etc/reservation-secrets/console.env
+        mode: 0400
+    networks:
+      - reservation-edge
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4300/admin').then((response) => process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 15s
+    restart: unless-stopped
+
+  reservation-booking:
+    image: ${RESERVATION_BOOKING_IMAGE:?load the generated release.env}
+    depends_on:
+      reservation-api:
+        condition: service_healthy
+    environment:
+      HOSTNAME: 0.0.0.0
+      PORT: "4400"
+      RESERVATION_PLATFORM_BASE_URL: http://reservation-api:4100
+      RESERVATION_PLATFORM_PUBLIC_BASE_URL: https://${RESERVATION_DOMAIN:?set RESERVATION_DOMAIN}
+    networks:
+      - reservation-edge
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4400/').then((response) => process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 15s
+    restart: unless-stopped
+
+  reservation-edge:
+    image: caddy:2.10.0-alpine@sha256:ae4458638da8e1a91aafffb231c5f8778e964bca650c8a8cb23a7e8ac557aa3c
+    depends_on:
+      reservation-api:
+        condition: service_healthy
+      reservation-console:
+        condition: service_healthy
+      reservation-booking:
+        condition: service_healthy
+    environment:
+      RESERVATION_DOMAIN: ${RESERVATION_DOMAIN:?set RESERVATION_DOMAIN}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - reservation-caddy-data:/data
+      - reservation-caddy-config:/config
+    configs:
+      - source: caddy-config
+        target: /etc/caddy/Caddyfile
+        mode: 0444
+    networks:
+      - reservation-edge
+      - reservation-public
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1:2019/config/"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+    restart: unless-stopped
+
+configs:
+  api-secret-allowlist:
+    file: ./docker/production/allowlists/api.env
+  console-secret-allowlist:
+    file: ./docker/production/allowlists/console.env
+  migrate-secret-allowlist:
+    file: ./docker/production/allowlists/migrate.env
+  worker-secret-allowlist:
+    file: ./docker/production/allowlists/worker.env
+  postgrest-config:
+    file: ./docker/production/postgrest.conf
+  caddy-config:
+    file: ./docker/production/Caddyfile
+
+volumes:
+  reservation-protected-config:
+  reservation-db-secrets:
+  reservation-migrate-secrets:
+  reservation-rest-secrets:
+  reservation-api-secrets:
+  reservation-console-secrets:
+  reservation-worker-secrets:
+  reservation-db-data:
+  reservation-whatsapp-sessions:
+  reservation-caddy-data:
+  reservation-caddy-config:
+
+networks:
+  reservation-backend:
+    internal: true
+  reservation-edge:
+    internal: true
+  reservation-public:

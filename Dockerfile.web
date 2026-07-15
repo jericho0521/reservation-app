@@ -23,6 +23,7 @@ COPY packages/reservation-react packages/reservation-react
 COPY packages/reservation-ui packages/reservation-ui
 COPY packages/sdk packages/sdk
 COPY docker/local-stack/run-with-config.sh /usr/local/bin/run-with-config
+COPY docker/production/run-with-secrets.sh /app/docker/production/run-with-secrets.sh
 RUN chmod 755 /usr/local/bin/run-with-config && \
     pnpm --filter @reservation-platform/contract-types run build && \
     pnpm --filter @reservation-platform/sdk run build && \
@@ -40,10 +41,14 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV HOSTNAME=0.0.0.0
 ENV PORT=4300
-RUN addgroup -g 1001 -S reservation && adduser -S reservation -u 1001 -G reservation
+ENV RESERVATION_RUN_AS_UID=1001
+ENV RESERVATION_RUN_AS_GID=1001
+RUN apk add --no-cache su-exec=0.3-r0 && addgroup -g 1001 -S reservation && adduser -S reservation -u 1001 -G reservation
 COPY --from=console-build --chown=reservation:reservation /app/apps/console/.next/standalone ./
 COPY --from=console-build --chown=reservation:reservation /app/apps/console/.next/static ./apps/console/.next/static
 COPY --from=console-build /usr/local/bin/run-with-config /usr/local/bin/run-with-config
+COPY --from=console-build /app/docker/production/run-with-secrets.sh /usr/local/bin/run-with-secrets
+RUN chmod 755 /usr/local/bin/run-with-secrets
 USER reservation
 EXPOSE 4300
 CMD ["node", "apps/console/server.js"]

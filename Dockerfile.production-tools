@@ -10,8 +10,10 @@ RUN apk add --no-cache \
     su-exec=0.2-r3
 
 COPY --chmod=0755 docker/production/run-with-secrets.sh /usr/local/bin/run-with-secrets
+COPY --chmod=0755 docker/production/configure-entrypoint.sh /usr/local/bin/configure-production
 COPY scripts/production/configure.mjs ./configure.mjs
-COPY packages/database/migrations/supabase ./migrations/supabase
+COPY scripts/production/migrate.mjs ./scripts/production/migrate.mjs
+COPY packages/database/migrations/supabase ./packages/database/migrations/supabase
 
 VOLUME ["/run/reservation-config"]
 

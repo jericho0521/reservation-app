@@ -1,0 +1,22 @@
+{$RESERVATION_DOMAIN} {
+	encode zstd gzip
+
+	handle /v1/* {
+		reverse_proxy reservation-api:4100
+	}
+
+	handle /admin* {
+		reverse_proxy reservation-console:4300
+	}
+
+	handle {
+		reverse_proxy reservation-booking:4400
+	}
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		X-Frame-Options "DENY"
+	}
+}

@@ -8,6 +8,7 @@ RUN corepack enable
 FROM base AS deps
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.json ./
 COPY apps/api/package.json apps/api/package.json
+COPY apps/worker/package.json apps/worker/package.json
 COPY packages/ai-chat/package.json packages/ai-chat/package.json
 COPY packages/contract-types/package.json packages/contract-types/package.json
 COPY packages/database/package.json packages/database/package.json
@@ -29,8 +30,11 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=4100
 ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0
+ENV RESERVATION_RUN_AS_UID=1001
+ENV RESERVATION_RUN_AS_GID=1001
 
-RUN addgroup -g 1001 -S reservation && \
+RUN apk add --no-cache su-exec=0.3-r0 && \
+    addgroup -g 1001 -S reservation && \
     adduser -S reservation -u 1001 -G reservation
 
 COPY --from=build --chown=reservation:reservation /app/package.json ./package.json
@@ -42,7 +46,8 @@ COPY --from=build --chown=reservation:reservation /app/apps/api/dist ./apps/api/
 COPY --from=build --chown=reservation:reservation /app/apps/api/deployment.config.json ./apps/api/deployment.config.json
 COPY --from=build --chown=reservation:reservation /app/packages ./packages
 COPY --from=build /app/docker/local-stack/run-with-config.sh /usr/local/bin/run-with-config
-RUN chmod 755 /usr/local/bin/run-with-config
+COPY --from=build /app/docker/production/run-with-secrets.sh /usr/local/bin/run-with-secrets
+RUN chmod 755 /usr/local/bin/run-with-config /usr/local/bin/run-with-secrets
 
 USER reservation
 EXPOSE 4100
@@ -51,3 +56,25 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
   CMD node -e "fetch('http://127.0.0.1:' + (process.env.PORT || '4100') + '/v1/health').then((r) => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
 
 CMD ["node", "apps/api/dist/server.js"]
+
+FROM node:24-alpine AS worker-runtime
+WORKDIR /app
+ENV NODE_ENV=production
+ENV RESERVATION_RUN_AS_UID=1001
+ENV RESERVATION_RUN_AS_GID=1001
+
+RUN apk add --no-cache su-exec=0.3-r0 && \
+    addgroup -g 1001 -S reservation && \
+    adduser -S reservation -u 1001 -G reservation
+
+COPY --from=build --chown=reservation:reservation /app/apps/worker/package.json ./apps/worker/package.json
+COPY --from=build --chown=reservation:reservation /app/apps/worker/dist ./apps/worker/dist
+COPY --from=build /app/docker/production/run-with-secrets.sh /usr/local/bin/run-with-secrets
+RUN chmod 755 /usr/local/bin/run-with-secrets
+
+USER reservation
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD node -e "try { process.kill(1, 0); process.exit(0); } catch { process.exit(1); }"
+
+CMD ["node", "apps/worker/dist/server.js"]

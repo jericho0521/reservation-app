@@ -43,6 +43,8 @@ export interface ConversationRepository {
   getOrCreate(scope: ExperienceScope, input: ConversationCreateInput): Promise<{ data?: ConversationResponse; error?: unknown }>;
   listMessages(scope: ExperienceScope, conversationId: string, query: Required<Pick<ListConversationMessagesQuery, "limit">> & Omit<ListConversationMessagesQuery, "limit">): Promise<{ data?: ConversationMessageResponse[]; error?: unknown }>;
   append(scope: ExperienceScope, conversationId: string, input: ConversationAppendInput): Promise<{ data?: ConversationMessageResponse; error?: unknown }>;
+  appendAutomationReplyWithOutbox?(scope: ExperienceScope, conversationId: string, input: ConversationAppendInput): Promise<{ data?: ConversationMessageResponse; error?: unknown }>;
+  appendStaffReplyWithOutbox?(scope: ExperienceScope, conversationId: string, input: { content: string; changedBy: string }): Promise<{ data?: ConversationMessageResponse; error?: unknown }>;
   updateAutomation(scope: ExperienceScope, conversationId: string, input: ConversationAutomationInput & { changedBy?: string }): Promise<{ data?: ConversationResponse; error?: unknown }>;
   getDeliveryTarget?(scope: ExperienceScope, conversationId: string): Promise<{ data?: { channelIdentifier: string }; error?: unknown }>;
 }
@@ -165,6 +167,18 @@ export async function appendStaffReply(input: {
   });
   if (conversation.status !== 200 || !("channel" in conversation.body)) {
     return { status: conversation.status, body: conversation.body as ReturnType<typeof platformErrorBody> };
+  }
+  if (conversation.body.channel === "whatsapp" && input.repository.appendStaffReplyWithOutbox) {
+    try {
+      const result = await input.repository.appendStaffReplyWithOutbox(input.scope, input.conversationId, {
+        content: parsed.data.content,
+        changedBy: "staff",
+      });
+      if (result.error) throw result.error;
+      return result.data ? { status: 200, body: result.data } : storageFailure();
+    } catch {
+      return storageFailure();
+    }
   }
   try {
     const takeover = await input.repository.updateAutomation(input.scope, input.conversationId, { automation_state: "manual", changedBy: "staff" });

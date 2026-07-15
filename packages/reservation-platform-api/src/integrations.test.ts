@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  createIntegrationAgentRuntimeLoader,
+  readAiIntegrationSettings,
+  saveAiIntegrationSettings,
+  testAiIntegration,
   deleteIntegrationCredential,
   readEmailIntegrationSettings,
   readIntegrationSettings,
@@ -244,6 +248,103 @@ test("unconfigured email settings return a safe disabled response", async () => 
     configured: false,
     credential_present: false,
   });
+});
+
+test("AI settings preserve an existing key and never expose credential material", async () => {
+  const calls: unknown[] = [];
+  const repository: IntegrationSettingsRepository = {
+    async read(tenantId, kind) {
+      return { tenantId, kind, enabled: false, provider: "openai", publicConfig: { model: "gpt-4.1-mini" }, credentialPresent: true, updatedAt: "2026-07-15T00:00:00.000Z" };
+    },
+    async saveSettings(input) {
+      calls.push(input);
+      return { ...input, credentialPresent: input.envelope !== undefined || true, updatedAt: "2026-07-15T01:00:00.000Z" };
+    },
+    async rotateCredential() {},
+    async readCredential() { return envelope; },
+    async deleteCredential() {},
+  };
+  const response = await saveAiIntegrationSettings({
+    principal: owner,
+    settings: { enabled: true, provider: "openai", model: "gpt-4.1-mini" },
+    repository,
+    encryptCredential() { throw new Error("existing credential must be preserved"); },
+  });
+  assert.equal(response.credential_present, true);
+  assert.equal("api_key" in response, false);
+  assert.equal((calls[0] as { envelope?: unknown }).envelope, undefined);
+});
+
+test("AI settings require a key before first enable and encrypt new keys", async () => {
+  const { repository, calls } = fixture();
+  repository.read = async () => undefined;
+  await assert.rejects(() => saveAiIntegrationSettings({
+    principal: owner,
+    settings: { enabled: true, provider: "openai", model: "gpt-4.1-mini" },
+    repository,
+    encryptCredential: () => envelope,
+  }), (error: unknown) => error instanceof PlatformAuthError && error.code === "validation_failed");
+  await saveAiIntegrationSettings({
+    principal: owner,
+    settings: { enabled: true, provider: "openai", model: "gpt-4.1-mini", api_key: "sk-test-secret" },
+    repository,
+    encryptCredential(credential) {
+      assert.deepEqual(credential, { api_key: "sk-test-secret" });
+      return envelope;
+    },
+  });
+  assert.equal(JSON.stringify(calls).includes("sk-test-secret"), false);
+});
+
+test("AI connection tests are bounded and return sanitized outcomes", async () => {
+  const { repository } = fixture();
+  repository.read = async (tenantId, kind) => ({
+    tenantId, kind, enabled: true, provider: "openai", publicConfig: { model: "gpt-4.1-mini" }, credentialPresent: true,
+    updatedAt: "2026-07-15T00:00:00.000Z",
+  });
+  let seenTimeout = 0;
+  const result = await testAiIntegration({
+    principal: owner,
+    repository,
+    decryptCredential: () => ({ api_key: "sk-test-secret" }),
+    tester: { async test(input) { seenTimeout = input.timeoutMs; } },
+    timeoutMs: 50_000,
+  });
+  assert.deepEqual(result, { ok: true, provider: "openai", model: "gpt-4.1-mini" });
+  assert.equal(seenTimeout, 10_000);
+  assert.deepEqual(await readAiIntegrationSettings({ principal: owner, repository }), {
+    enabled: true,
+    provider: "openai",
+    configured: true,
+    model: "gpt-4.1-mini",
+    credential_present: true,
+    updated_at: "2026-07-15T00:00:00.000Z",
+  });
+});
+
+test("AI runtime loader decrypts on demand and caches only until settings change", async () => {
+  let updatedAt = "2026-07-15T00:00:00.000Z";
+  let decryptions = 0;
+  let creations = 0;
+  const { repository } = fixture();
+  repository.read = async (tenantId, kind) => ({
+    tenantId, kind, enabled: true, provider: "openai", publicConfig: { model: "gpt-4.1-mini" }, credentialPresent: true, updatedAt,
+  });
+  const loader = createIntegrationAgentRuntimeLoader({
+    repository,
+    decryptCredential() { decryptions += 1; return { api_key: "sk-test-secret" }; },
+    createRuntime() { creations += 1; return { async run() { return { message: { role: "assistant", content: "ok" } }; } }; },
+  });
+  const first = await loader.load("tenant-1");
+  assert.equal(await loader.load("tenant-1"), first);
+  assert.equal(decryptions, 1);
+  assert.equal(creations, 1);
+  updatedAt = "2026-07-15T01:00:00.000Z";
+  assert.notEqual(await loader.load("tenant-1"), first);
+  assert.equal(decryptions, 2);
+  loader.invalidate("tenant-1");
+  await loader.load("tenant-1");
+  assert.equal(creations, 3);
 });
 
 test("SMTP connection tests are bounded and sanitize provider failures", async () => {

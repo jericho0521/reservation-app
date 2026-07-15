@@ -13,7 +13,7 @@ import {
 
 const indexPath = new URL("../migrations/supabase/migration-index.json", import.meta.url);
 
-test("core plan includes exactly 000001 through 000033 in order", async () => {
+test("core plan includes exactly 000001 through 000034 in order", async () => {
   const index = await readActualIndex();
   const plan = buildSupabaseMigrationPlan(index);
 
@@ -53,10 +53,28 @@ test("core plan includes exactly 000001 through 000033 in order", async () => {
       "000031_appointment_correctness_followup.sql",
       "000032_appointment_staff_operations.sql",
       "000033_appointment_notification_jobs.sql",
+      "000034_channel_runtime.sql",
     ],
   );
-  assert.equal(plan.migrations.length, 33);
+  assert.equal(plan.migrations.length, 34);
   assert.equal(plan.seeds.length, 0);
+});
+
+test("channel runtime persists restart-safe proposals and service-role-only command state", async () => {
+  const sql = (await readFile(new URL("../migrations/supabase/000034_channel_runtime.sql", import.meta.url), "utf8")).toLowerCase();
+  assert.match(sql, /create table public\.platform_conversation_booking_proposals/);
+  assert.match(sql, /create table public\.platform_channel_commands/);
+  assert.match(sql, /create table public\.platform_channel_outbox/);
+  assert.match(sql, /create table public\.platform_whatsapp_pairing_state/);
+  assert.match(sql, /claim_platform_conversation_booking_proposal[\s\S]*for update/);
+  assert.match(sql, /expires_at <= now\(\)/);
+  assert.match(sql, /reservation_id <> p_reservation_id/);
+  assert.match(sql, /booking\.id = p_reservation_id[\s\S]*venue\.id = p_venue_id[\s\S]*venue\.tenant_id = p_tenant_id/);
+  assert.match(sql, /revoke all on table public\.platform_channel_outbox from public, anon, authenticated, service_role/);
+  assert.match(sql, /platform_append_whatsapp_outbound[\s\S]*append_platform_conversation_message[\s\S]*platform_channel_outbox[\s\S]*whatsapp\.deliver_outbound/);
+  assert.match(sql, /platform_claim_whatsapp_outbox[\s\S]*status = 'sending'/);
+  assert.match(sql, /platform_complete_whatsapp_outbox[\s\S]*delivery_state = 'sent'/);
+  assert.match(sql, /platform_release_whatsapp_outbox[\s\S]*delivery_state = 'failed'/);
 });
 
 test("durable jobs use tenant-idempotent enqueue and exclusive leases", async () => {
@@ -170,6 +188,24 @@ test("appointment staff migration creates tenant-safe profiles through atomic RP
   assert.match(sql, /grant execute on function public\.platform_create_staff_profile[^;]+to service_role/);
 });
 
+test("appointment staff operations are actor-scoped, atomic, and PII-minimized", async () => {
+  const sql = (await readFile(new URL("../migrations/supabase/000032_appointment_staff_operations.sql", import.meta.url), "utf8")).toLowerCase();
+
+  assert.match(sql, /create or replace function public\.platform_staff_create_appointment/);
+  assert.match(sql, /create or replace function public\.platform_transition_appointment/);
+  assert.match(sql, /create or replace function public\.platform_staff_reschedule_appointment/);
+  assert.match(sql, /actor\.tenant_id = p_tenant_id[\s\S]*actor\.role in \('owner', 'staff'\)/);
+  assert.match(sql, /p_target_status in \('completed', 'cancelled', 'no_show'\)/);
+  assert.match(sql, /p_target_status in \('cancelled', 'no_show'\)[\s\S]*reason_required/);
+  assert.match(sql, /public\.create_reservation_atomic/);
+  assert.match(sql, /'reservation\.staff_created'/);
+  assert.match(sql, /'reservation\.staff_rescheduled'/);
+  assert.match(sql, /'reservation\.status_changed'/);
+  assert.doesNotMatch(sql, /v_before := to_jsonb\(v_booking\)/);
+  assert.doesNotMatch(sql, /before_value[^;]*user_email/);
+  assert.match(sql, /grant execute on function public\.platform_staff_create_appointment[^;]+to service_role/);
+});
+
 test("availability snapshot exposes its venue for application-layer scope enforcement", async () => {
   const sql = (await readFile(new URL("../migrations/supabase/000025_availability_snapshot_venue_scope.sql", import.meta.url), "utf8")).toLowerCase();
 
@@ -211,7 +247,7 @@ test("bundled core migration loader follows an extended validated index", async 
   const rawIndex = await readActualRawIndex();
   rawIndex.coreMigrations.push({
     order: rawIndex.coreMigrations.length + 1,
-    path: "packages/database/migrations/supabase/000034_runtime_readiness_test.sql",
+    path: "packages/database/migrations/supabase/000035_runtime_readiness_test.sql",
     module: "core",
     scope: "reservation-platform",
     sha256: "a".repeat(64),
@@ -224,9 +260,9 @@ test("bundled core migration loader follows an extended validated index", async 
 
   const plan = await loadBundledCoreMigrationPlan(pathToFileURL(extendedIndexPath));
 
-  assert.equal(plan.length, 34);
+  assert.equal(plan.length, 35);
   assert.deepEqual(plan.at(-1), {
-    path: "packages/database/migrations/supabase/000034_runtime_readiness_test.sql",
+    path: "packages/database/migrations/supabase/000035_runtime_readiness_test.sql",
     sha256: "a".repeat(64),
   });
 });

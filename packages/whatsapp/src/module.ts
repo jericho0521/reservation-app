@@ -44,6 +44,7 @@ export interface WhatsAppBusinessModuleOptions {
   responder?: WhatsAppAgentResponder;
   unifiedConversations?: WhatsAppUnifiedConversationBridge;
   now?: () => Date;
+  persistSessionQrCode?: boolean;
 }
 
 export interface WhatsAppUnifiedConversationBridgeResult {
@@ -72,6 +73,7 @@ export class WhatsAppBusinessModule {
       store: this.store,
       adapter: options.sessionAdapter,
       now: options.now,
+      persistQrCode: options.persistSessionQrCode,
     });
     this.sender = isOutboundSender(options.sessionAdapter) ? options.sessionAdapter : undefined;
     this.responder = options.responder ?? defaultResponder;

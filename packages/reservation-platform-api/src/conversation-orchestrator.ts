@@ -18,6 +18,7 @@ import type {
 } from "@reservation-platform/contract-types";
 import type { ConversationCreateInput, ConversationRepository } from "./conversations.js";
 import type { ExperienceScope } from "./experience-studio.js";
+import type { PlatformJobRepository } from "./jobs.js";
 
 export interface NormalizedConversationInbound {
   channel: ConversationChannel;
@@ -70,6 +71,7 @@ type ConversationBoundBooking = BoundPreparedBooking & {
 export interface ConversationBookingStateStore {
   save(scope: ExperienceScope, proposal: ConversationBookingProposal): Promise<void>;
   load(scope: ExperienceScope, proposalId: string): Promise<ConversationBookingProposal | undefined>;
+  loadLatestActive(scope: ExperienceScope, conversationId: string): Promise<ConversationBookingProposal | undefined>;
   claim(scope: ExperienceScope, proposalId: string): Promise<"claimed" | "in_progress" | ReservationResponse | undefined>;
   release(scope: ExperienceScope, proposalId: string): Promise<void>;
   complete(scope: ExperienceScope, proposalId: string, reservation: ReservationResponse): Promise<void>;
@@ -135,8 +137,107 @@ export async function handleConversationInbound(input: {
     });
     if (inbound.error || !inbound.data) throw inbound.error ?? new Error("message unavailable");
     await safeAudit(input.dependencies.audit, { type: "conversation.message.received", scope, conversationId: conversation.conversation_id });
+    return processConversationMessage({ scope, conversation, content, inbound: inbound.data, dependencies: input.dependencies });
+  } catch {
+    await safeAudit(input.dependencies.audit, { type: "conversation.workflow.failed", scope });
+    return failure(503, "storage_unavailable", "Conversation workflow is temporarily unavailable.", true);
+  }
+}
+
+export async function acceptConversationInbound(input: {
+  scope: ExperienceScope;
+  message: NormalizedConversationInbound;
+  conversations: ConversationRepository;
+  jobs: Pick<PlatformJobRepository, "enqueue">;
+  audit?: ConversationOrchestratorAuditSink;
+}): Promise<ConversationOrchestratorResult> {
+  const scope = normalizeScope(input.scope);
+  const content = input.message.content.trim();
+  if (!scope || !input.message.channelThreadId.trim() || !content || content.length > 4000) {
+    return failure(400, "validation_failed", "Conversation message is invalid.");
+  }
+  try {
+    const conversationResult = await input.conversations.getOrCreate(scope, {
+      channel: input.message.channel,
+      channelThreadId: input.message.channelThreadId.trim(),
+      participant: input.message.participant,
+    });
+    if (conversationResult.error || !conversationResult.data) throw conversationResult.error ?? new Error("conversation unavailable");
+    const conversation = conversationResult.data;
+    const inbound = await input.conversations.append(scope, conversation.conversation_id, {
+      channel: input.message.channel,
+      direction: "inbound",
+      senderType: "customer",
+      deliveryState: "delivered",
+      externalMessageId: input.message.externalMessageId,
+      content,
+    });
+    if (inbound.error || !inbound.data) throw inbound.error ?? new Error("message unavailable");
+    await safeAudit(input.audit, { type: "conversation.message.received", scope, conversationId: conversation.conversation_id });
     if (conversation.automation_state === "manual") {
       return { status: 200, body: { conversation, message: inbound.data, automation_suppressed: true } };
+    }
+    await input.jobs.enqueue({
+      tenantId: scope.tenantId,
+      venueId: scope.venueId,
+      kind: "conversation.process_ai",
+      payload: { conversationId: conversation.conversation_id, messageId: inbound.data.message_id },
+      maxAttempts: 5,
+      idempotencyKey: `conversation:${conversation.conversation_id}:message:${inbound.data.message_id}`,
+    });
+    return { status: 202, body: { conversation, message: inbound.data } };
+  } catch {
+    await safeAudit(input.audit, { type: "conversation.workflow.failed", scope });
+    return failure(503, "storage_unavailable", "Conversation workflow is temporarily unavailable.", true);
+  }
+}
+
+export async function processPersistedConversationInbound(input: {
+  scope: ExperienceScope;
+  conversationId: string;
+  messageId: string;
+  dependencies: ConversationOrchestratorDependencies;
+}): Promise<ConversationOrchestratorResult> {
+  const scope = normalizeScope(input.scope);
+  if (!scope || !input.conversationId.trim() || !input.messageId.trim()) {
+    return failure(400, "validation_failed", "Persisted conversation message is invalid.");
+  }
+  try {
+    const [conversationResult, messagesResult] = await Promise.all([
+      input.dependencies.conversations.get(scope, input.conversationId.trim()),
+      input.dependencies.conversations.listMessages(scope, input.conversationId.trim(), { limit: 100 }),
+    ]);
+    if (conversationResult.error || messagesResult.error || !conversationResult.data) {
+      throw conversationResult.error ?? messagesResult.error ?? new Error("conversation unavailable");
+    }
+    const inbound = (messagesResult.data ?? []).find((message) => message.message_id === input.messageId);
+    if (!inbound || inbound.direction !== "inbound" || inbound.sender_type !== "customer") {
+      return failure(404, "not_found", "Persisted conversation message not found.");
+    }
+    return processConversationMessage({
+      scope,
+      conversation: conversationResult.data,
+      content: inbound.content,
+      inbound,
+      dependencies: input.dependencies,
+    });
+  } catch {
+    await safeAudit(input.dependencies.audit, { type: "conversation.workflow.failed", scope });
+    return failure(503, "storage_unavailable", "Conversation workflow is temporarily unavailable.", true);
+  }
+}
+
+async function processConversationMessage(input: {
+  scope: ExperienceScope;
+  conversation: ConversationResponse;
+  content: string;
+  inbound: ConversationMessageResponse;
+  dependencies: ConversationOrchestratorDependencies;
+}): Promise<ConversationOrchestratorResult> {
+  const { scope, conversation, content } = input;
+  try {
+    if (conversation.automation_state === "manual") {
+      return { status: 200, body: { conversation, message: input.inbound, automation_suppressed: true } };
     }
     const experience = await input.dependencies.loadExperience(scope);
     const response = await input.dependencies.responder.respond({ scope, conversation, message: content, experience });
@@ -147,19 +248,34 @@ export async function handleConversationInbound(input: {
     const replyContent = response.booking && !proposal
       ? "I could not verify that service and time against current availability. Please choose one of the available options."
       : response.content.trim() || (response.supported ? "Please confirm the proposed booking." : "Please wait while staff checks this for you.");
-    const outbound = await input.dependencies.conversations.append(scope, conversation.conversation_id, {
-      channel: input.message.channel,
+    const appendReply = conversation.channel === "whatsapp" && input.dependencies.conversations.appendAutomationReplyWithOutbox
+      ? input.dependencies.conversations.appendAutomationReplyWithOutbox.bind(input.dependencies.conversations)
+      : input.dependencies.conversations.append.bind(input.dependencies.conversations);
+    const outbound = await appendReply(scope, conversation.conversation_id, {
+      channel: conversation.channel,
       direction: "outbound",
       senderType: "automation",
-      deliveryState: "sent",
+      deliveryState: conversation.channel === "whatsapp" ? "pending" : "sent",
+      externalMessageId: `ai-reply:${input.inbound.message_id}`,
       content: replyContent,
       metadata: proposal ? { event: "booking.proposed", proposal_id: proposal.proposalId } : { event: response.supported ? "assistant.reply" : "assistant.unsupported" },
     });
     if (outbound.error || !outbound.data) throw outbound.error ?? new Error("reply unavailable");
     return { status: 200, body: { conversation, message: outbound.data, ...(proposal ? { proposal } : {}) } };
   } catch {
-    await safeAudit(input.dependencies.audit, { type: "conversation.workflow.failed", scope });
-    return failure(503, "storage_unavailable", "Conversation workflow is temporarily unavailable.", true);
+    const handoff = await input.dependencies.conversations.append(scope, conversation.conversation_id, {
+      channel: conversation.channel,
+      direction: "outbound",
+      senderType: "automation",
+      deliveryState: "sent",
+      externalMessageId: `ai-handoff:${input.inbound.message_id}`,
+      content: "The booking assistant is temporarily unavailable. Please wait while staff checks this for you.",
+      metadata: { event: "assistant.handoff" },
+    });
+    await safeAudit(input.dependencies.audit, { type: "conversation.workflow.failed", scope, conversationId: conversation.conversation_id });
+    return handoff.data
+      ? { status: 200, body: { conversation, message: handoff.data } }
+      : failure(503, "storage_unavailable", "Conversation workflow is temporarily unavailable.", true);
   }
 }
 
@@ -355,6 +471,15 @@ export class InMemoryConversationBookingStateStore implements ConversationBookin
   readonly proposals = new Map<string, ConversationBookingProposal>();
   async save(scope: ExperienceScope, proposal: ConversationBookingProposal) { this.proposals.set(key(scope, proposal.proposalId), structuredClone(proposal)); }
   async load(scope: ExperienceScope, proposalId: string) { const value = this.proposals.get(key(scope, proposalId)); return value ? structuredClone(value) : undefined; }
+  async loadLatestActive(scope: ExperienceScope, conversationId: string) {
+    const prefix = `${scope.tenantId}\u0000${scope.venueId}\u0000`;
+    const value = [...this.proposals.entries()].reverse().find(([proposalKey, proposal]) => (
+      proposalKey.startsWith(prefix)
+      && proposal.conversationId === conversationId
+      && proposal.status !== "confirmed"
+    ))?.[1];
+    return value ? structuredClone(value) : undefined;
+  }
   async claim(scope: ExperienceScope, proposalId: string) {
     const proposal = this.proposals.get(key(scope, proposalId));
     if (!proposal) return undefined;

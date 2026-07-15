@@ -20,6 +20,110 @@
       ],
       "type": "object"
     },
+    "AiIntegrationSettingsInput": {
+      "additionalProperties": false,
+      "properties": {
+        "api_key": {
+          "maxLength": 4096,
+          "minLength": 8,
+          "type": "string",
+          "writeOnly": true
+        },
+        "base_url": {
+          "format": "uri",
+          "maxLength": 2048,
+          "type": "string"
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "model": {
+          "maxLength": 200,
+          "minLength": 1,
+          "type": "string"
+        },
+        "provider": {
+          "const": "openai",
+          "type": "string"
+        }
+      },
+      "required": [
+        "enabled",
+        "provider",
+        "model"
+      ],
+      "type": "object"
+    },
+    "AiIntegrationSettingsResponse": {
+      "additionalProperties": false,
+      "properties": {
+        "base_url": {
+          "format": "uri",
+          "maxLength": 2048,
+          "type": "string"
+        },
+        "configured": {
+          "type": "boolean"
+        },
+        "credential_present": {
+          "type": "boolean"
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "model": {
+          "maxLength": 200,
+          "minLength": 1,
+          "type": "string"
+        },
+        "provider": {
+          "const": "openai",
+          "type": "string"
+        },
+        "updated_at": {
+          "format": "date-time",
+          "type": "string"
+        }
+      },
+      "required": [
+        "enabled",
+        "provider",
+        "configured",
+        "credential_present"
+      ],
+      "type": "object"
+    },
+    "AiIntegrationTestResponse": {
+      "additionalProperties": false,
+      "properties": {
+        "error_code": {
+          "enum": [
+            "not_configured",
+            "credential_missing",
+            "connection_failed"
+          ],
+          "type": "string"
+        },
+        "model": {
+          "maxLength": 200,
+          "minLength": 1,
+          "type": "string"
+        },
+        "ok": {
+          "type": "boolean"
+        },
+        "provider": {
+          "const": "openai",
+          "type": "string"
+        }
+      },
+      "required": [
+        "ok",
+        "provider",
+        "model"
+      ],
+      "type": "object"
+    },
     "AnalyticsQuery": {
       "additionalProperties": false,
       "properties": {
@@ -2728,6 +2832,27 @@
       "required": [
         "thread_id",
         "content"
+      ],
+      "type": "object"
+    },
+    "PublicChatMessagesResponse": {
+      "additionalProperties": false,
+      "properties": {
+        "messages": {
+          "items": {
+            "$ref": "#/$defs/ConversationMessageResponse"
+          },
+          "type": "array"
+        },
+        "next_cursor": {
+          "type": "string"
+        },
+        "proposal": {
+          "$ref": "#/$defs/ConversationBookingProposalResponse"
+        }
+      },
+      "required": [
+        "messages"
       ],
       "type": "object"
     },

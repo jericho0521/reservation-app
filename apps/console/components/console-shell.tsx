@@ -32,6 +32,8 @@ export function ConsoleShell({
           <a href="/admin/channels">Channels & AI</a>
           <a href="/admin/analytics">Analytics</a>
           {role === "owner" ? <a href="/admin/settings/email">Email delivery</a> : null}
+          {role === "owner" ? <a href="/admin/settings/ai">AI provider</a> : null}
+          {role === "owner" ? <a href="/admin/settings/whatsapp">WhatsApp setup</a> : null}
           {role ? staffNavigation({ role }).map((href) => <a href={href} key={href}>Staff access</a>) : null}
           {futureSections.map((section) => (
             <span aria-disabled="true" className="nav-disabled" key={section}>

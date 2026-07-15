@@ -50,6 +50,7 @@ const expectedCoreTargets = [
   "packages/database/migrations/supabase/000031_appointment_correctness_followup.sql",
   "packages/database/migrations/supabase/000032_appointment_staff_operations.sql",
   "packages/database/migrations/supabase/000033_appointment_notification_jobs.sql",
+  "packages/database/migrations/supabase/000034_channel_runtime.sql",
 ];
 
 const optionalAiPrefix = "packages/database/migrations/supabase/optional/ai-retrieval/";

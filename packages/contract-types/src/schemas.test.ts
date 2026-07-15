@@ -23,6 +23,9 @@ import {
   emailIntegrationSettingsInputSchema,
   emailIntegrationSettingsResponseSchema,
   emailIntegrationTestResponseSchema,
+  aiIntegrationSettingsInputSchema,
+  aiIntegrationSettingsResponseSchema,
+  aiIntegrationTestResponseSchema,
   installationBusinessInputSchema,
   installationBusinessResponseSchema,
   installationLocationInputSchema,
@@ -169,6 +172,30 @@ test("email integration contracts keep credentials write-only and bound response
   assert.equal(emailIntegrationSettingsResponseSchema.safeParse({ ...response, password: "must-not-leak" }).success, false);
   assert.equal(emailIntegrationTestResponseSchema.safeParse({ ok: false, message: "Connection failed.", error_code: "connection_failed" }).success, true);
   assert.equal(emailIntegrationTestResponseSchema.safeParse({ ok: false, message: "x".repeat(161) }).success, false);
+});
+
+test("AI integration contracts keep provider credentials write-only", () => {
+  const input = {
+    enabled: true,
+    provider: "openai" as const,
+    model: "gpt-4.1-mini",
+    base_url: "https://api.openai.com/v1",
+    api_key: "sk-test-key",
+  };
+  assert.equal(aiIntegrationSettingsInputSchema.safeParse(input).success, true);
+  assert.equal(aiIntegrationSettingsInputSchema.safeParse({ ...input, api_key: "short" }).success, false);
+  const response = {
+    enabled: true,
+    provider: "openai" as const,
+    configured: true,
+    model: input.model,
+    base_url: input.base_url,
+    credential_present: true,
+    updated_at: "2026-07-15T00:00:00.000Z",
+  };
+  assert.equal(aiIntegrationSettingsResponseSchema.safeParse(response).success, true);
+  assert.equal(aiIntegrationSettingsResponseSchema.safeParse({ ...response, api_key: input.api_key }).success, false);
+  assert.equal(aiIntegrationTestResponseSchema.safeParse({ ok: false, provider: "openai", model: input.model, error_code: "connection_failed" }).success, true);
 });
 
 test("platform error codes include payload_too_large", async () => {

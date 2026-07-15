@@ -68,6 +68,20 @@ test("production services use scoped secrets and never mount the backup recovery
   assert.doesNotMatch(distributor, /(?:publish|cp)[^\n]*reservation-whatsapp-sessions/u);
 });
 
+test("production assigns encrypted Baileys session ownership only to the worker", async () => {
+  const compose = await readFile("compose.production.yml", "utf8");
+  const api = compose.slice(compose.indexOf("  reservation-api:"), compose.indexOf("  reservation-worker:"));
+  const worker = compose.slice(compose.indexOf("  reservation-worker:"), compose.indexOf("  reservation-console:"));
+
+  assert.match(api, /RESERVATION_WHATSAPP_ENABLED: "false"/u);
+  assert.doesNotMatch(api, /reservation-whatsapp-sessions:\/app/u);
+  assert.match(worker, /RESERVATION_WHATSAPP_ENABLED: "true"/u);
+  assert.match(worker, /RESERVATION_WHATSAPP_PROVIDER: session_qr/u);
+  assert.match(worker, /RESERVATION_WHATSAPP_SESSION_AUTH_DIR: \/app\/\.reservation-whatsapp-sessions/u);
+  assert.match(worker, /reservation-whatsapp-sessions:\/app\/\.reservation-whatsapp-sessions/u);
+  assert.match(worker, /worker-secret-allowlist/u);
+});
+
 test("Caddy preserves the required route order and security headers", async () => {
   const caddy = await readFile("docker/production/Caddyfile", "utf8");
   const api = caddy.indexOf("handle /v1/*");

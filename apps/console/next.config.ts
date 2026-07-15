@@ -8,13 +8,18 @@ const nextConfig: NextConfig = {
   output: "standalone",
   basePath: "/admin",
   async headers() {
-    return ["/setup", "/invite/:path*", "/reset-password", "/reset-password/:path*"].map((source) => ({
+    const privateHeaders = [
+      { key: "Referrer-Policy", value: "no-referrer" },
+      { key: "Cache-Control", value: "private, no-store" },
+    ];
+    return [
+      ...["/setup", "/invite/:path*", "/reset-password", "/reset-password/:path*"].map((source) => ({
       source,
-      headers: [
-        { key: "Referrer-Policy", value: "no-referrer" },
-        { key: "Cache-Control", value: "private, no-store" },
-      ],
-    }));
+      headers: privateHeaders,
+      })),
+      { source: "/channels", headers: privateHeaders },
+      { source: "/api/whatsapp/qr", headers: [...privateHeaders, { key: "Vary", value: "Cookie" }] },
+    ];
   },
   outputFileTracingRoot: repoRoot,
   transpilePackages: ["@reservation-platform/sdk"],

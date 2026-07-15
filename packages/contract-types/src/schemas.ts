@@ -252,6 +252,31 @@ export const emailIntegrationTestResponseSchema = strictObject({
   error_code: z.enum(["not_configured", "connection_failed"]).optional(),
 });
 
+export const aiIntegrationSettingsInputSchema = strictObject({
+  enabled: z.boolean(),
+  provider: z.literal("openai"),
+  model: z.string().trim().min(1).max(200),
+  base_url: z.string().trim().url().max(2_048).optional(),
+  api_key: z.string().trim().min(8).max(4_096).optional(),
+});
+
+export const aiIntegrationSettingsResponseSchema = strictObject({
+  enabled: z.boolean(),
+  provider: z.literal("openai"),
+  configured: z.boolean(),
+  model: z.string().min(1).max(200).optional(),
+  base_url: z.string().url().max(2_048).optional(),
+  credential_present: z.boolean(),
+  updated_at: z.string().datetime().optional(),
+});
+
+export const aiIntegrationTestResponseSchema = strictObject({
+  ok: z.boolean(),
+  provider: z.literal("openai"),
+  model: z.string().min(1).max(200),
+  error_code: z.enum(["not_configured", "credential_missing", "connection_failed"]).optional(),
+});
+
 export const installationLocationInputSchema = strictObject({
   name: z.string().trim().min(1).max(120),
   address: z.string().trim().max(500).optional(),
@@ -592,6 +617,11 @@ export const conversationBookingProposalResponseSchema = strictObject({
   start_time: z.string().min(1),
   end_time: z.string().min(1),
   quantity: z.number().int().positive(),
+});
+export const publicChatMessagesResponseSchema = strictObject({
+  messages: z.array(conversationMessageResponseSchema),
+  next_cursor: z.string().optional(),
+  proposal: conversationBookingProposalResponseSchema.optional(),
 });
 export const publicChatConversationResponseSchema = strictObject({
   conversation_id: z.string().min(1),

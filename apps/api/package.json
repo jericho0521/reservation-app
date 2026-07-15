@@ -13,6 +13,7 @@
   "dependencies": {
     "@project-play/reservations-supabase": "workspace:*",
     "@reservation-platform/api": "workspace:*",
+    "@reservation-platform/ai-sdk-adapter": "workspace:*",
     "@reservation-platform/contract-types": "workspace:*",
     "@reservation-platform/database": "workspace:*",
     "@reservation-platform/platform-config": "workspace:*",

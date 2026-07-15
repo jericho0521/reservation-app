@@ -114,6 +114,31 @@ export interface EmailIntegrationTestResponse {
   error_code?: "not_configured" | "connection_failed";
 }
 
+export interface AiIntegrationSettingsInput {
+  enabled: boolean;
+  provider: "openai";
+  model: string;
+  base_url?: string;
+  api_key?: string;
+}
+
+export interface AiIntegrationSettingsResponse {
+  enabled: boolean;
+  provider: "openai";
+  configured: boolean;
+  model?: string;
+  base_url?: string;
+  credential_present: boolean;
+  updated_at?: string;
+}
+
+export interface AiIntegrationTestResponse {
+  ok: boolean;
+  provider: "openai";
+  model: string;
+  error_code?: "not_configured" | "credential_missing" | "connection_failed";
+}
+
 export interface InstallationLocationInput {
   name: string;
   address?: string;
@@ -576,6 +601,10 @@ export interface ConversationBookingProposalResponse {
   start_time: string;
   end_time: string;
   quantity: number;
+}
+
+export interface PublicChatMessagesResponse extends ListConversationMessagesResponse {
+  proposal?: ConversationBookingProposalResponse;
 }
 
 export interface PublicChatConversationResponse {

@@ -1123,6 +1123,7 @@ test("reservation read repository applies bounded working-day filters", async ()
     date: "2026-07-20",
     status: "confirmed",
     staffId: "33333333-3333-4333-8333-333333333333",
+    serviceId: "44444444-4444-4444-8444-444444444444",
   });
 
   assert.deepEqual(calls[0]?.filters, [
@@ -1130,6 +1131,7 @@ test("reservation read repository applies bounded working-day filters", async ()
     { column: "booking_date", value: "2026-07-20" },
     { column: "status", value: "confirmed" },
     { column: "staff_id", value: "33333333-3333-4333-8333-333333333333" },
+    { column: "service_id", value: "44444444-4444-4444-8444-444444444444" },
   ]);
 });
 

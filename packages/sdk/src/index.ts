@@ -1,4 +1,7 @@
 import type {
+  AiIntegrationSettingsInput,
+  AiIntegrationSettingsResponse,
+  AiIntegrationTestResponse,
   AcceptStaffInvitationInput,
   AuthenticatedSessionResponse,
   AvailabilityQuery,
@@ -66,6 +69,7 @@ import type {
   PublicExperienceResponse,
   PublicChatConfirmationInput,
   PublicChatConversationResponse,
+  PublicChatMessagesResponse,
   PublicChatMessageInput,
   ReservationResponse,
   RequestPasswordResetInput,
@@ -189,6 +193,10 @@ export interface ReservationPlatformClient {
   getEmailIntegrationSettings(options?: RequestOptions): Promise<EmailIntegrationSettingsResponse>;
   updateEmailIntegrationSettings(input: EmailIntegrationSettingsInput, options?: RequestOptions): Promise<EmailIntegrationSettingsResponse>;
   testEmailIntegration(options?: RequestOptions): Promise<EmailIntegrationTestResponse>;
+  getAiIntegrationSettings(options?: RequestOptions): Promise<AiIntegrationSettingsResponse>;
+  updateAiIntegrationSettings(input: AiIntegrationSettingsInput, options?: RequestOptions): Promise<AiIntegrationSettingsResponse>;
+  testAiIntegration(options?: RequestOptions): Promise<AiIntegrationTestResponse>;
+  revokeAiIntegrationCredential(options?: RequestOptions): Promise<void>;
   getInstallationBusiness(options?: RequestOptions): Promise<InstallationBusinessResponse>;
   configureInstallationBusiness(input: InstallationBusinessInput, options?: RequestOptions): Promise<InstallationBusinessResponse>;
   listInstallationLocations(options?: RequestOptions): Promise<ListInstallationLocationsResponse>;
@@ -225,7 +233,7 @@ export interface ReservationPlatformClient {
   cancelManagedReservation(slug: string, token: string, options?: RequestOptions): Promise<ReservationResponse>;
   rescheduleManagedReservation(slug: string, token: string, input: RescheduleManagedReservationInput, options?: RequestOptions): Promise<ReservationResponse>;
   sendPublicChatMessage(slug: string, input: PublicChatMessageInput, options?: RequestOptions): Promise<PublicChatConversationResponse>;
-  listPublicChatMessages(slug: string, conversationId: string, input?: ListConversationMessagesQuery, options?: RequestOptions): Promise<ListConversationMessagesResponse>;
+  listPublicChatMessages(slug: string, conversationId: string, input?: ListConversationMessagesQuery, options?: RequestOptions): Promise<PublicChatMessagesResponse>;
   confirmPublicChatBooking(slug: string, conversationId: string, input: PublicChatConfirmationInput, options?: RequestOptions): Promise<PublicChatConversationResponse>;
   getMetadata(options?: RequestOptions): Promise<MetadataResponse>;
   getCurrentTenant(options?: RequestOptions): Promise<TenantResponse>;
@@ -250,6 +258,7 @@ export interface ReservationPlatformClient {
   updateConversationAutomation(conversationId: string, input: ConversationAutomationInput, options?: RequestOptions): Promise<ConversationResponse>;
   getWhatsAppReadiness(options?: RequestOptions): Promise<WhatsAppChannelReadinessResponse>;
   startWhatsAppSession(options?: RequestOptions): Promise<WhatsAppOwnerSessionResponse>;
+  reconnectWhatsAppSession(options?: RequestOptions): Promise<WhatsAppOwnerSessionResponse>;
   getWhatsAppSessionStatus(options?: RequestOptions): Promise<WhatsAppOwnerSessionResponse>;
   getWhatsAppSessionQr(options?: RequestOptions): Promise<WhatsAppOwnerSessionResponse>;
   logoutWhatsAppSession(options?: RequestOptions): Promise<WhatsAppOwnerSessionResponse>;
@@ -270,7 +279,7 @@ export interface ReservationPlatformClient {
   };
 }
 
-type HttpMethod = "GET" | "POST" | "PUT" | "PATCH";
+type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 
 interface RequestConfig {
   method: HttpMethod;
@@ -330,6 +339,10 @@ export function createReservationPlatformClient(
     getEmailIntegrationSettings: (options) => request({ method: "GET", path: "/integrations/email", options, auth: true }),
     updateEmailIntegrationSettings: (input, options) => request({ method: "PUT", path: "/integrations/email", body: input, options, auth: true }),
     testEmailIntegration: (options) => request({ method: "POST", path: "/integrations/email/test", body: {}, options, auth: true }),
+    getAiIntegrationSettings: (options) => request({ method: "GET", path: "/integrations/ai", options, auth: true }),
+    updateAiIntegrationSettings: (input, options) => request({ method: "PUT", path: "/integrations/ai", body: input, options, auth: true }),
+    testAiIntegration: (options) => request({ method: "POST", path: "/integrations/ai/test", body: {}, options, auth: true }),
+    revokeAiIntegrationCredential: (options) => request({ method: "DELETE", path: "/integrations/ai", body: {}, options, auth: true, emptyResponse: true }),
     getInstallationBusiness: (options) => request({ method: "GET", path: "/installation/business", options, auth: true }),
     configureInstallationBusiness: (input, options) => request({ method: "PUT", path: "/installation/business", body: input, options, auth: true }),
     listInstallationLocations: (options) => request({ method: "GET", path: "/locations", options, auth: true }),
@@ -470,6 +483,7 @@ export function createReservationPlatformClient(
     updateConversationAutomation: (conversationId, input, options) => request({ method: "PUT", path: `/conversations/${encodeURIComponent(conversationId)}/automation`, body: input, options }),
     getWhatsAppReadiness: (options) => request({ method: "GET", path: "/channels/whatsapp/readiness", options }),
     startWhatsAppSession: (options) => request({ method: "POST", path: "/channels/whatsapp/session/start", body: {}, options }),
+    reconnectWhatsAppSession: (options) => request({ method: "POST", path: "/channels/whatsapp/session/reconnect", body: {}, options }),
     getWhatsAppSessionStatus: (options) => request({ method: "GET", path: "/channels/whatsapp/session/status", options }),
     getWhatsAppSessionQr: (options) => request({ method: "GET", path: "/channels/whatsapp/session/qr", options }),
     logoutWhatsAppSession: (options) => request({ method: "POST", path: "/channels/whatsapp/session/logout", body: {}, options }),

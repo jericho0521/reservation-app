@@ -1,4 +1,8 @@
 import {
+  aiIntegrationSettingsInputSchema,
+  type AiIntegrationSettingsInput,
+  type AiIntegrationSettingsResponse,
+  type AiIntegrationTestResponse,
   emailIntegrationSettingsInputSchema,
   type EmailIntegrationSettingsInput,
   type EmailIntegrationSettingsResponse,
@@ -10,6 +14,7 @@ import {
   requireOwner,
   type AuthenticatedPrincipal,
 } from "./sessions.js";
+import type { ConversationAgentRuntime as AgentRuntime } from "./conversation-responders.js";
 
 export type IntegrationKind = "email" | "ai" | "whatsapp";
 
@@ -65,6 +70,135 @@ export interface EmailConnectionTester {
     credential: { username?: string; password?: string };
     recipient: string;
   }): Promise<void>;
+}
+
+export interface AiConnectionTester {
+  test(input: {
+    provider: "openai";
+    model: string;
+    apiKey: string;
+    baseUrl?: string;
+    timeoutMs: number;
+  }): Promise<void>;
+}
+
+export interface AgentRuntimeLoader {
+  load(tenantId: string): Promise<AgentRuntime | undefined>;
+  invalidate(tenantId: string): void;
+}
+
+export type AiAgentRuntimeFactory = (input: {
+  provider: "openai";
+  model: string;
+  apiKey: string;
+  baseUrl?: string;
+}) => AgentRuntime;
+
+export function createIntegrationAgentRuntimeLoader(input: {
+  repository: Pick<IntegrationSettingsRepository, "read" | "readCredential">;
+  decryptCredential: IntegrationCredentialDecryptor;
+  createRuntime: AiAgentRuntimeFactory;
+  now?: () => number;
+  cacheTtlMs?: number;
+}): AgentRuntimeLoader {
+  const cache = new Map<string, { runtime: AgentRuntime; updatedAt: string; expiresAt: number }>();
+  const now = input.now ?? Date.now;
+  const cacheTtlMs = Math.max(1, Math.min(input.cacheTtlMs ?? 300_000, 300_000));
+  return {
+    async load(tenantId) {
+      const settings = await input.repository.read(tenantId, "ai");
+      if (!settings?.enabled || settings.provider !== "openai") {
+        cache.delete(tenantId);
+        return undefined;
+      }
+      const cached = cache.get(tenantId);
+      if (cached && cached.updatedAt === settings.updatedAt && cached.expiresAt > now()) return cached.runtime;
+      const envelope = await input.repository.readCredential(tenantId, "ai");
+      if (!envelope) {
+        cache.delete(tenantId);
+        return undefined;
+      }
+      const config = parseAiPublicConfig(settings.publicConfig);
+      const credential = parseAiCredential(input.decryptCredential(envelope));
+      const runtime = input.createRuntime({
+        provider: "openai",
+        model: config.model,
+        apiKey: credential.apiKey,
+        ...(config.baseUrl ? { baseUrl: config.baseUrl } : {}),
+      });
+      cache.set(tenantId, { runtime, updatedAt: settings.updatedAt, expiresAt: now() + cacheTtlMs });
+      return runtime;
+    },
+    invalidate(tenantId) { cache.delete(tenantId); },
+  };
+}
+
+export async function readAiIntegrationSettings(input: {
+  principal: AuthenticatedPrincipal;
+  repository: Pick<IntegrationSettingsRepository, "read">;
+}): Promise<AiIntegrationSettingsResponse> {
+  const settings = await readIntegrationSettings({ ...input, kind: "ai" });
+  return aiSettingsResponse(settings);
+}
+
+export async function saveAiIntegrationSettings(input: {
+  principal: AuthenticatedPrincipal;
+  settings: AiIntegrationSettingsInput;
+  repository: IntegrationSettingsRepository;
+  encryptCredential: IntegrationCredentialEncryptor;
+}): Promise<AiIntegrationSettingsResponse> {
+  const parsed = aiIntegrationSettingsInputSchema.safeParse(input.settings);
+  if (!parsed.success) throw validationError("AI integration settings are invalid.");
+  const value = parsed.data;
+  const existing = await input.repository.read(input.principal.tenantId, "ai");
+  if (value.enabled && !value.api_key && !existing?.credentialPresent) {
+    throw validationError("An API key is required before the AI integration can be enabled.");
+  }
+  const saved = await saveIntegrationSettings({
+    principal: input.principal,
+    kind: "ai",
+    settings: {
+      enabled: value.enabled,
+      provider: value.provider,
+      publicConfig: {
+        model: value.model,
+        ...(value.base_url ? { base_url: value.base_url } : {}),
+      },
+      ...(value.api_key ? { credential: { api_key: value.api_key } } : {}),
+    },
+    repository: input.repository,
+    encryptCredential: input.encryptCredential,
+  });
+  return aiSettingsResponse(saved);
+}
+
+export async function testAiIntegration(input: {
+  principal: AuthenticatedPrincipal;
+  repository: Pick<IntegrationSettingsRepository, "read" | "readCredential">;
+  decryptCredential: IntegrationCredentialDecryptor;
+  tester: AiConnectionTester;
+  timeoutMs?: number;
+}): Promise<AiIntegrationTestResponse> {
+  const settings = await readIntegrationSettings({ principal: input.principal, kind: "ai", repository: input.repository });
+  const model = settings ? parseAiPublicConfig(settings.publicConfig).model : "unconfigured";
+  if (!settings) return { ok: false, provider: "openai", model, error_code: "not_configured" };
+  const envelope = await input.repository.readCredential(input.principal.tenantId, "ai");
+  if (!envelope) return { ok: false, provider: "openai", model, error_code: "credential_missing" };
+  try {
+    const config = parseAiPublicConfig(settings.publicConfig);
+    const credential = parseAiCredential(input.decryptCredential(envelope));
+    const timeoutMs = boundedTimeout(input.timeoutMs, 5_000);
+    await withDeadline(input.tester.test({
+      provider: "openai",
+      model: config.model,
+      apiKey: credential.apiKey,
+      ...(config.baseUrl ? { baseUrl: config.baseUrl } : {}),
+      timeoutMs,
+    }), timeoutMs);
+    return { ok: true, provider: "openai", model: config.model };
+  } catch {
+    return { ok: false, provider: "openai", model, error_code: "connection_failed" };
+  }
 }
 
 export async function readEmailIntegrationSettings(input: {
@@ -258,6 +392,46 @@ function emailSettingsResponse(
   };
 }
 
+function aiSettingsResponse(
+  settings: IntegrationSettingsRecord | undefined,
+): AiIntegrationSettingsResponse {
+  if (!settings) {
+    return { enabled: false, provider: "openai", configured: false, credential_present: false };
+  }
+  const config = parseAiPublicConfig(settings.publicConfig);
+  return {
+    enabled: settings.enabled,
+    provider: "openai",
+    configured: true,
+    model: config.model,
+    ...(config.baseUrl ? { base_url: config.baseUrl } : {}),
+    credential_present: settings.credentialPresent,
+    updated_at: settings.updatedAt,
+  };
+}
+
+function parseAiPublicConfig(value: Record<string, unknown>) {
+  const parsed = aiIntegrationSettingsInputSchema.safeParse({
+    enabled: true,
+    provider: "openai",
+    model: value.model,
+    base_url: value.base_url,
+  });
+  if (!parsed.success) throw validationError("Stored AI integration settings are invalid.");
+  return { model: parsed.data.model, baseUrl: parsed.data.base_url };
+}
+
+function parseAiCredential(value: Record<string, unknown>) {
+  if (Object.keys(value).some((key) => key !== "api_key")) {
+    throw validationError("Stored AI integration credential is invalid.");
+  }
+  const apiKey = typeof value.api_key === "string" ? value.api_key.trim() : "";
+  if (apiKey.length < 8 || apiKey.length > 4_096) {
+    throw validationError("Stored AI integration credential is invalid.");
+  }
+  return { apiKey };
+}
+
 function parseEmailPublicConfig(value: Record<string, unknown>) {
   const input = {
     enabled: true,
@@ -291,9 +465,7 @@ function parseEmailCredential(value: Record<string, unknown>) {
 }
 
 async function withDeadline<T>(promise: Promise<T>, requestedTimeoutMs = 10_000): Promise<T> {
-  const timeoutMs = Number.isSafeInteger(requestedTimeoutMs) && requestedTimeoutMs > 0
-    ? Math.min(requestedTimeoutMs, 10_000)
-    : 10_000;
+  const timeoutMs = boundedTimeout(requestedTimeoutMs, 10_000);
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
     return await Promise.race([
@@ -305,6 +477,12 @@ async function withDeadline<T>(promise: Promise<T>, requestedTimeoutMs = 10_000)
   } finally {
     if (timer) clearTimeout(timer);
   }
+}
+
+function boundedTimeout(requestedTimeoutMs: number | undefined, fallback: number) {
+  return Number.isSafeInteger(requestedTimeoutMs) && Number(requestedTimeoutMs) > 0
+    ? Math.min(Number(requestedTimeoutMs), 10_000)
+    : fallback;
 }
 
 function validateKind(value: IntegrationKind): IntegrationKind {
@@ -383,7 +561,7 @@ function validateEmailPublicConfig(config: Record<string, unknown>) {
 
 function validateAiPublicConfig(config: Record<string, unknown>) {
   if ("model" in config) {
-    const model = requirePublicString(config.model, "AI model", 128);
+    const model = requirePublicString(config.model, "AI model", 200);
     if (!/^[a-z0-9][a-z0-9._:/-]*$/iu.test(model)) throw validationError("AI model is invalid.");
   }
   if ("base_url" in config) validatePublicEndpoint(requirePublicString(config.base_url, "AI base URL", 2_048));

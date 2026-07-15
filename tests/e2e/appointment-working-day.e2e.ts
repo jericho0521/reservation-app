@@ -1,117 +1,98 @@
 import assert from "node:assert/strict";
-import { createHash } from "node:crypto";
+import { spawnSync } from "node:child_process";
 import test from "node:test";
-import { canTransition } from "../../apps/console/lib/appointment-view.ts";
 
-type AppointmentState = "pending" | "confirmed" | "completed" | "cancelled" | "no_show";
-type JobState = "queued" | "leased" | "sent";
-
-interface WorkingDaySnapshot {
-  appointment: {
-    id: string;
-    managementTokenHash: string;
-    status: AppointmentState;
-    date: string;
-    startTime: string;
-    endTime: string;
-  };
-  audit: Array<{ event: string; detail: string }>;
-  jobs: Array<{ id: string; kind: "confirmation" | "reminder"; state: JobState }>;
-}
-
-class WorkingDayStore {
-  constructor(readonly snapshot: WorkingDaySnapshot) {}
-
-  static publicBooking(managementToken: string) {
-    return new WorkingDayStore({
-      appointment: {
-        id: "appointment-001",
-        managementTokenHash: digest(managementToken),
-        status: "pending",
-        date: "2026-07-20",
-        startTime: "09:00",
-        endTime: "09:30",
-      },
-      audit: [{ event: "appointment.created", detail: "web_booking" }],
-      jobs: [{ id: "job-confirmation-001", kind: "confirmation", state: "queued" }],
-    });
+test("appointment staff operations execute atomically against PostgreSQL and write audit events", (context) => {
+  const fixture = appointmentDatabaseFixture();
+  if (!fixture) {
+    context.skip("Set RESERVATION_APPOINTMENT_E2E_DATABASE_URL, TENANT_ID, VENUE_ID, ACTOR_USER_ID, BOOKING_ID, STAFF_ID, SERVICE_ID, DATE, START_TIME, and END_TIME to run the dedicated PostgreSQL proof.");
+    return;
   }
 
-  static restart(serialized: string) {
-    return new WorkingDayStore(JSON.parse(serialized) as WorkingDaySnapshot);
-  }
+  const variables = [
+    "--set", `tenant_id=${fixture.tenantId}`,
+    "--set", `venue_id=${fixture.venueId}`,
+    "--set", `actor_user_id=${fixture.actorUserId}`,
+    "--set", `booking_id=${fixture.bookingId}`,
+    "--set", `staff_id=${fixture.staffId}`,
+    "--set", `service_id=${fixture.serviceId}`,
+    "--set", `appointment_date=${fixture.date}`,
+    "--set", `start_time=${fixture.startTime}`,
+    "--set", `end_time=${fixture.endTime}`,
+  ];
 
-  serialize() { return JSON.stringify(this.snapshot); }
+  runProof(fixture.databaseUrl, variables, `
+    begin;
+    with operated as (
+      select public.platform_staff_create_appointment(
+        :'tenant_id', :'venue_id'::uuid, :'actor_user_id'::uuid,
+        jsonb_build_object(
+          'service_id', :'service_id', 'staff_id', :'staff_id',
+          'booking_date', :'appointment_date', 'start_time', :'start_time', 'end_time', :'end_time',
+          'user_name', 'Database E2E Customer', 'user_email', 'database-e2e@example.invalid',
+          'user_phone', 'unknown', 'seats_booked', 1, 'interface_type', 'form'
+        )
+      ) as result
+    )
+    select jsonb_build_object(
+      'result', result,
+      'audit_count', (select count(*) from public.platform_audit_events
+        where action = 'reservation.staff_created' and entity_id = result -> 'booking' ->> 'id')
+    ) from operated;
+    rollback;
+  `);
 
-  verifiesManagementToken(token: string) {
-    return this.snapshot.appointment.managementTokenHash === digest(token);
-  }
+  runProof(fixture.databaseUrl, variables, `
+    begin;
+    with operated as (
+      select public.platform_staff_reschedule_appointment(
+        :'tenant_id', :'venue_id'::uuid, :'actor_user_id'::uuid, :'booking_id'::uuid,
+        'confirmed', :'appointment_date'::date, :'start_time'::time, :'staff_id'::uuid,
+        'Dedicated database E2E reschedule'
+      ) as result
+    )
+    select jsonb_build_object(
+      'result', result,
+      'audit_count', (select count(*) from public.platform_audit_events
+        where action = 'reservation.staff_rescheduled' and entity_id = :'booking_id')
+    ) from operated;
+    rollback;
+  `);
 
-  claimJob(kind: "confirmation" | "reminder") {
-    const job = this.snapshot.jobs.find((candidate) => candidate.kind === kind && candidate.state === "queued");
-    assert.ok(job, `${kind} job should be queued`);
-    job.state = "leased";
-    return job.id;
-  }
-
-  completeJob(jobId: string) {
-    const job = this.snapshot.jobs.find((candidate) => candidate.id === jobId);
-    assert.ok(job, "leased job should still exist");
-    assert.equal(job.state, "leased");
-    job.state = "sent";
-    if (job.kind === "confirmation") this.transition("confirmed", "confirmation worker");
-  }
-
-  staffReschedule(date: string, startTime: string, endTime: string, reason: string) {
-    assert.equal(this.snapshot.appointment.status, "confirmed");
-    assert.ok(reason.trim());
-    Object.assign(this.snapshot.appointment, { date, startTime, endTime });
-    this.snapshot.audit.push({ event: "appointment.rescheduled", detail: reason });
-    this.snapshot.jobs.push({ id: "job-reminder-001", kind: "reminder", state: "queued" });
-  }
-
-  transition(next: AppointmentState, detail: string) {
-    const current = this.snapshot.appointment.status;
-    assert.equal(canTransition(current, next), true, `${current} must explicitly allow ${next}`);
-    this.snapshot.appointment.status = next;
-    this.snapshot.audit.push({ event: `appointment.${next}`, detail });
-  }
-}
-
-test("appointment working day survives API and worker restarts", () => {
-  const managementToken = "customer-management-token-001";
-  const initial = WorkingDayStore.publicBooking(managementToken);
-  const confirmationJob = initial.claimJob("confirmation");
-  initial.completeJob(confirmationJob);
-  initial.staffReschedule("2026-07-20", "10:00", "10:30", "Customer requested a later slot");
-
-  const afterApiRestart = WorkingDayStore.restart(initial.serialize());
-  assert.equal(afterApiRestart.verifiesManagementToken(managementToken), true);
-  assert.deepEqual(afterApiRestart.snapshot.appointment, {
-    id: "appointment-001",
-    managementTokenHash: digest(managementToken),
-    status: "confirmed",
-    date: "2026-07-20",
-    startTime: "10:00",
-    endTime: "10:30",
-  });
-
-  const afterWorkerRestart = WorkingDayStore.restart(afterApiRestart.serialize());
-  const reminderJob = afterWorkerRestart.claimJob("reminder");
-  afterWorkerRestart.completeJob(reminderJob);
-  afterWorkerRestart.transition("completed", "staff command center");
-
-  assert.equal(afterWorkerRestart.snapshot.appointment.status, "completed");
-  assert.deepEqual(afterWorkerRestart.snapshot.audit.map((entry) => entry.event), [
-    "appointment.created",
-    "appointment.confirmed",
-    "appointment.rescheduled",
-    "appointment.completed",
-  ]);
-  assert.deepEqual(afterWorkerRestart.snapshot.jobs, [
-    { id: "job-confirmation-001", kind: "confirmation", state: "sent" },
-    { id: "job-reminder-001", kind: "reminder", state: "sent" },
-  ]);
+  runProof(fixture.databaseUrl, variables, `
+    begin;
+    with operated as (
+      select public.platform_transition_appointment(
+        :'tenant_id', :'venue_id'::uuid, :'actor_user_id'::uuid, :'booking_id'::uuid,
+        'confirmed', 'no_show', 'Dedicated database E2E no-show'
+      ) as result
+    )
+    select jsonb_build_object(
+      'result', result,
+      'audit_count', (select count(*) from public.platform_audit_events
+        where action = 'reservation.status_changed' and entity_id = :'booking_id')
+    ) from operated;
+    rollback;
+  `);
 });
 
-function digest(value: string) { return createHash("sha256").update(value).digest("hex"); }
+function runProof(databaseUrl: string, variables: string[], sql: string) {
+  const result = spawnSync(
+    process.env.PSQL_BIN?.trim() || "psql",
+    [databaseUrl, "--no-psqlrc", "--tuples-only", "--no-align", "--set", "ON_ERROR_STOP=1", ...variables, "--command", sql],
+    { encoding: "utf8" },
+  );
+  assert.equal(result.status, 0, result.stderr || "PostgreSQL appointment proof failed.");
+  assert.match(result.stdout, /"ok": true/u);
+  assert.match(result.stdout, /"audit_count": 1/u);
+}
+
+function appointmentDatabaseFixture() {
+  const read = (name: string) => process.env[`RESERVATION_APPOINTMENT_E2E_${name}`]?.trim();
+  const values = {
+    databaseUrl: read("DATABASE_URL"), tenantId: read("TENANT_ID"), venueId: read("VENUE_ID"),
+    actorUserId: read("ACTOR_USER_ID"), bookingId: read("BOOKING_ID"), staffId: read("STAFF_ID"),
+    serviceId: read("SERVICE_ID"), date: read("DATE"), startTime: read("START_TIME"), endTime: read("END_TIME"),
+  };
+  return Object.values(values).every(Boolean) ? values as Record<keyof typeof values, string> : null;
+}

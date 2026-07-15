@@ -16,6 +16,11 @@ export async function startWhatsAppSessionAction() {
   revalidatePath("/channels");
 }
 
+export async function reconnectWhatsAppSessionAction() {
+  await createConsolePlatformClient().reconnectWhatsAppSession();
+  revalidatePath("/channels");
+}
+
 export async function logoutWhatsAppSessionAction() {
   await createConsolePlatformClient().logoutWhatsAppSession();
   revalidatePath("/channels");

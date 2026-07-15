@@ -1,14 +1,30 @@
 import { fileURLToPath } from "node:url";
 import { hostname } from "node:os";
 import { createClient } from "@supabase/supabase-js";
+import { createAiSdkAgentRuntime } from "@reservation-platform/ai-sdk-adapter";
 import {
+  createSupabaseAvailabilityRepository,
+  createSupabaseConversationBookingStateStore,
+  createSupabaseConversationRepository,
+  createSupabaseExperienceKnowledgeRepository,
+  createSupabaseExperienceStudioRepository,
   createSupabaseIntegrationSettingsRepository,
+  createSupabasePlatformCatalogRepository,
   createSupabasePlatformJobRepository,
+  createSupabaseReservationRepository,
   createSupabaseReservationReadRepository,
+  type ConversationStateSupabaseClient,
+  type ConversationSupabaseClient,
+  type ExperienceKnowledgeSupabaseClient,
+  type ExperienceSupabaseLikeClient,
   type IntegrationSupabaseClient,
   type PlatformJobsSupabaseClient,
 } from "@project-play/reservations-supabase";
-import { toPlatformReservation } from "@reservation-platform/api";
+import {
+  createConversationProcessingDependencies,
+  createIntegrationAgentRuntimeLoader,
+  toPlatformReservation,
+} from "@reservation-platform/api";
 import { decryptSecretEnvelope } from "@reservation-platform/platform-config";
 
 import { createWorkerRuntime, type PlatformJobHandler, type WorkerPlatformJob } from "./runtime.js";
@@ -18,6 +34,8 @@ import {
   type LoadedEmailDelivery,
   type SmtpPublicConfig,
 } from "./email.js";
+import { createAiConversationJobHandler } from "./ai-conversation.js";
+import { createProductionWhatsAppRuntime } from "./whatsapp.js";
 
 const pollIntervalMs = 1_000;
 
@@ -40,14 +58,26 @@ async function runDirectWorker(): Promise<void> {
       { auth: { persistSession: false, autoRefreshToken: false } },
     );
     const repository = createSupabasePlatformJobRepository(client as unknown as PlatformJobsSupabaseClient);
+    const whatsapp = isEnabledEnvironment("RESERVATION_WHATSAPP_ENABLED")
+      ? createProductionWhatsAppRuntime({
+          client,
+          jobs: repository,
+          sessionEncryptionKey: requiredEnvironment("RESERVATION_WHATSAPP_SESSION_ENCRYPTION_KEY"),
+          authDirectory: requiredEnvironment("RESERVATION_WHATSAPP_SESSION_AUTH_DIR"),
+        })
+      : undefined;
     const runtime = createWorkerRuntime({
       signal: controller.signal,
       pollIntervalMs,
       workerId: process.env.RESERVATION_WORKER_ID?.trim() || `${hostname()}:${process.pid}`,
       repository,
-      handlers: productionJobHandlers(client, requiredEnvironment("RESERVATION_INSTALLATION_MASTER_KEY")),
+      handlers: {
+        ...productionJobHandlers(client, requiredEnvironment("RESERVATION_INSTALLATION_MASTER_KEY")),
+        ...(whatsapp?.handlers ?? {}),
+      },
       outcomeReporter: createNotificationOutcomeReporter(client),
     });
+    await whatsapp?.enqueueRestore();
     await runtime.start();
     logLifecycleEvent("worker_stopped");
   } catch {
@@ -89,8 +119,33 @@ export function productionJobHandlers(
     },
     decrypt: (envelope) => decryptSecretEnvelope(envelope, installationKey),
   });
+  const conversations = createSupabaseConversationRepository(client as ConversationSupabaseClient);
+  const catalogRepository = createSupabasePlatformCatalogRepository(client as Parameters<typeof createSupabasePlatformCatalogRepository>[0]);
+  const availabilityRepository = createSupabaseAvailabilityRepository(client as Parameters<typeof createSupabaseAvailabilityRepository>[0]);
+  const reservationCreateRepository = createSupabaseReservationRepository(client as Parameters<typeof createSupabaseReservationRepository>[0]);
+  const experienceStudioRepository = createSupabaseExperienceStudioRepository(client as ExperienceSupabaseLikeClient);
+  const experienceKnowledgeRepository = createSupabaseExperienceKnowledgeRepository(client as ExperienceKnowledgeSupabaseClient);
+  const conversationDependencies = createConversationProcessingDependencies({
+    conversations,
+    state: createSupabaseConversationBookingStateStore(client as ConversationStateSupabaseClient),
+    catalogRepository,
+    availabilityRepository,
+    reservationCreateRepository,
+    experienceStudioRepository,
+    experienceKnowledgeRepository,
+  });
+  const aiRuntimeLoader = createIntegrationAgentRuntimeLoader({
+    repository: integrations,
+    decryptCredential: (envelope) => decryptSecretEnvelope<Record<string, unknown>>(envelope, installationKey),
+    createRuntime: createAiSdkAgentRuntime,
+  });
+  const aiHandler = createAiConversationJobHandler({
+    runtimeLoader: aiRuntimeLoader,
+    loadDependencies: () => conversationDependencies,
+  });
   return {
     "notification.email": (job) => handler(job as unknown as EmailJob),
+    "conversation.process_ai": aiHandler,
   };
 }
 
@@ -194,10 +249,14 @@ export function buildAccountActionLink(kind: string, token: string, baseUrl: str
   return `${normalizedBase}${path}${encodeURIComponent(token)}`;
 }
 
-function requiredEnvironment(name: "RESERVATION_SUPABASE_URL" | "RESERVATION_SUPABASE_SERVICE_ROLE_KEY" | "RESERVATION_INSTALLATION_MASTER_KEY") {
+function requiredEnvironment(name: "RESERVATION_SUPABASE_URL" | "RESERVATION_SUPABASE_SERVICE_ROLE_KEY" | "RESERVATION_INSTALLATION_MASTER_KEY" | "RESERVATION_WHATSAPP_SESSION_ENCRYPTION_KEY" | "RESERVATION_WHATSAPP_SESSION_AUTH_DIR") {
   const value = process.env[name]?.trim();
   if (!value) throw new Error(`${name} is required.`);
   return value;
+}
+
+function isEnabledEnvironment(name: string) {
+  return process.env[name]?.trim().toLowerCase() === "true";
 }
 
 function logLifecycleEvent(event: "worker_started" | "worker_stopped" | "worker_failed"): void {

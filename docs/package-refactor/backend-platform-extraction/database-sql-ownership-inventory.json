@@ -347,6 +347,16 @@
       "notes": [
         "Backend-owned transactional appointment email intents and stale reminder supersession."
       ]
+    },
+    {
+      "path": "packages/database/migrations/supabase/000034_channel_runtime.sql",
+      "classification": "core-platform",
+      "intendedBackendDestination": [
+        "packages/database/migrations/supabase/000034_channel_runtime.sql"
+      ],
+      "notes": [
+        "Backend-owned durable conversation proposals, channel commands, delivery outbox, and encrypted WhatsApp pairing state."
+      ]
     }
   ]
 }

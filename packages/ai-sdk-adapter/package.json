@@ -1,0 +1,50 @@
+{
+  "name": "@reservation-platform/ai-sdk-adapter",
+  "version": "0.0.0",
+  "description": "Backend-only Vercel AI SDK adapter for reservation platform agent runtimes.",
+  "private": true,
+  "type": "module",
+  "license": "UNLICENSED",
+  "author": "Reservation Platform maintainers",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jericho0521/reservation-app.git",
+    "directory": "packages/ai-sdk-adapter"
+  },
+  "keywords": [
+    "reservations",
+    "booking",
+    "ai",
+    "backend",
+    "typescript"
+  ],
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "prepack": "pnpm run build",
+    "test": "tsc -p tsconfig.build.json && node --import tsx --test \"src/**/*.test.ts\"",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@ai-sdk/openai": "^4.0.14",
+    "@reservation-platform/ai-chat": "workspace:*",
+    "@reservation-platform/contract-types": "workspace:*",
+    "ai": "^7.0.28"
+  },
+  "devDependencies": {
+    "tsx": "^4.21.0",
+    "typescript": "^5"
+  }
+}

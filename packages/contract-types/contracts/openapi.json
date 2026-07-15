@@ -55,6 +55,110 @@
         ],
         "type": "object"
       },
+      "AiIntegrationSettingsInput": {
+        "additionalProperties": false,
+        "properties": {
+          "api_key": {
+            "maxLength": 4096,
+            "minLength": 8,
+            "type": "string",
+            "writeOnly": true
+          },
+          "base_url": {
+            "format": "uri",
+            "maxLength": 2048,
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "model": {
+            "maxLength": 200,
+            "minLength": 1,
+            "type": "string"
+          },
+          "provider": {
+            "const": "openai",
+            "type": "string"
+          }
+        },
+        "required": [
+          "enabled",
+          "provider",
+          "model"
+        ],
+        "type": "object"
+      },
+      "AiIntegrationSettingsResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "base_url": {
+            "format": "uri",
+            "maxLength": 2048,
+            "type": "string"
+          },
+          "configured": {
+            "type": "boolean"
+          },
+          "credential_present": {
+            "type": "boolean"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "model": {
+            "maxLength": 200,
+            "minLength": 1,
+            "type": "string"
+          },
+          "provider": {
+            "const": "openai",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "enabled",
+          "provider",
+          "configured",
+          "credential_present"
+        ],
+        "type": "object"
+      },
+      "AiIntegrationTestResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "error_code": {
+            "enum": [
+              "not_configured",
+              "credential_missing",
+              "connection_failed"
+            ],
+            "type": "string"
+          },
+          "model": {
+            "maxLength": 200,
+            "minLength": 1,
+            "type": "string"
+          },
+          "ok": {
+            "type": "boolean"
+          },
+          "provider": {
+            "const": "openai",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ok",
+          "provider",
+          "model"
+        ],
+        "type": "object"
+      },
       "AnalyticsQuery": {
         "additionalProperties": false,
         "properties": {
@@ -2763,6 +2867,27 @@
         "required": [
           "thread_id",
           "content"
+        ],
+        "type": "object"
+      },
+      "PublicChatMessagesResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "messages": {
+            "items": {
+              "$ref": "#/components/schemas/ConversationMessageResponse"
+            },
+            "type": "array"
+          },
+          "next_cursor": {
+            "type": "string"
+          },
+          "proposal": {
+            "$ref": "#/components/schemas/ConversationBookingProposalResponse"
+          }
+        },
+        "required": [
+          "messages"
         ],
         "type": "object"
       },
@@ -6080,6 +6205,193 @@
         ]
       }
     },
+    "/v1/integrations/ai": {
+      "delete": {
+        "operationId": "revokeAiIntegrationCredential",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/TenantIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/VenueIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/CorrelationIdHeader"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful response."
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformErrorResponse"
+                }
+              }
+            },
+            "description": "Platform error response."
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "summary": "Revoke the stored AI provider credential.",
+        "tags": [
+          "Integrations"
+        ]
+      },
+      "get": {
+        "operationId": "getAiIntegrationSettings",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/TenantIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/VenueIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/CorrelationIdHeader"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiIntegrationSettingsResponse"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformErrorResponse"
+                }
+              }
+            },
+            "description": "Platform error response."
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "summary": "Read the owner-managed AI provider settings.",
+        "tags": [
+          "Integrations"
+        ]
+      },
+      "put": {
+        "operationId": "updateAiIntegrationSettings",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/TenantIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/VenueIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/CorrelationIdHeader"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AiIntegrationSettingsInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiIntegrationSettingsResponse"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformErrorResponse"
+                }
+              }
+            },
+            "description": "Platform error response."
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "summary": "Save or rotate the owner-managed AI provider settings.",
+        "tags": [
+          "Integrations"
+        ]
+      }
+    },
+    "/v1/integrations/ai/test": {
+      "post": {
+        "operationId": "testAiIntegration",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/TenantIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/VenueIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/CorrelationIdHeader"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiIntegrationTestResponse"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformErrorResponse"
+                }
+              }
+            },
+            "description": "Platform error response."
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "summary": "Run a bounded AI provider connection test.",
+        "tags": [
+          "Integrations"
+        ]
+      }
+    },
     "/v1/integrations/email": {
       "get": {
         "operationId": "getEmailIntegrationSettings",
@@ -6780,7 +7092,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ListConversationMessagesResponse"
+                  "$ref": "#/components/schemas/PublicChatMessagesResponse"
                 }
               }
             },

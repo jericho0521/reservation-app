@@ -1,6 +1,7 @@
 import { createHash, timingSafeEqual } from "node:crypto";
 import {
   appendStaffReply,
+  acceptConversationInbound,
   readAnalytics,
   confirmConversationBooking,
   authorizePlatformContext,
@@ -70,6 +71,10 @@ import {
   readEmailIntegrationSettings,
   saveEmailIntegrationSettings,
   testEmailIntegration,
+  readAiIntegrationSettings,
+  saveAiIntegrationSettings,
+  testAiIntegration,
+  deleteIntegrationCredential,
   enqueueAppointmentNotificationsSafely,
   enqueueAccountLinkNotification,
   type AvailabilityRepositoryPort,
@@ -81,6 +86,7 @@ import {
   type ExperienceChannelRuntimeReadiness,
   type ExperienceValidationDependencies,
   type ConversationRepository,
+  type ConversationBookingProposal,
   type ConversationOrchestratorDependencies,
   type OperatingHoursRepository,
   type OperationsOverviewRepository,
@@ -93,10 +99,13 @@ import {
   type ReservationReadRepositoryPort,
   type ResourceMaintenanceRepositoryPort,
   type EmailConnectionTester,
+  type AiConnectionTester,
+  type AgentRuntimeLoader,
   type IntegrationCredentialDecryptor,
   type IntegrationCredentialEncryptor,
   type IntegrationSettingsRepository,
   type NotificationJobQueue,
+  type PlatformJobRepository,
   validatePlatformTenantVenueContext,
   acceptStaffInvitation,
   authenticateSession,
@@ -144,6 +153,7 @@ import {
   experienceResourceInputSchema,
   experienceServiceInputSchema,
   emailIntegrationSettingsInputSchema,
+  aiIntegrationSettingsInputSchema,
   archiveCatalogItemInputSchema,
   publishExperienceInputSchema,
   publicChatConfirmationInputSchema,
@@ -157,6 +167,7 @@ import {
   type ListServicesResponse,
   type MetadataRecord,
   type PlatformErrorResponse,
+  type ConversationBookingProposalResponse,
   type PublicChatConversationResponse,
   type ReservationResponse,
 } from "@reservation-platform/contract-types";
@@ -193,8 +204,11 @@ export interface StandaloneApiDependencies {
   integrationCredentialEncryptor?: IntegrationCredentialEncryptor;
   integrationCredentialDecryptor?: IntegrationCredentialDecryptor;
   emailConnectionTester?: EmailConnectionTester;
+  aiConnectionTester?: AiConnectionTester;
+  aiRuntimeLoader?: AgentRuntimeLoader;
   emailTestRecipientResolver?: (principal: import("@reservation-platform/api").AuthenticatedPrincipal) => Promise<string | undefined>;
   notificationJobQueue?: NotificationJobQueue;
+  platformJobQueue?: Pick<PlatformJobRepository, "enqueue">;
   appointmentReminderMinutes?: number;
   operatingHoursRepository?: OperatingHoursRepository;
   operationsOverviewRepository?: OperationsOverviewRepository;
@@ -269,10 +283,11 @@ export interface StandaloneApiChatModule {
 }
 
 export interface StandaloneApiWhatsAppModule {
-  startSession(input: WhatsAppSessionStartInput): WhatsAppSessionSnapshot | Promise<WhatsAppSessionSnapshot>;
-  sessionStatus(): WhatsAppSessionSnapshot | Promise<WhatsAppSessionSnapshot>;
-  sessionQr(): WhatsAppSessionSnapshot | Promise<WhatsAppSessionSnapshot>;
-  logoutSession(): WhatsAppSessionSnapshot | Promise<WhatsAppSessionSnapshot>;
+  startSession(input: WhatsAppSessionStartInput): WhatsAppSessionSnapshot | StandaloneApiResponse | Promise<WhatsAppSessionSnapshot | StandaloneApiResponse>;
+  reconnectSession?(input?: { tenantId?: string; venueId?: string }): WhatsAppSessionSnapshot | StandaloneApiResponse | Promise<WhatsAppSessionSnapshot | StandaloneApiResponse>;
+  sessionStatus(input?: { tenantId?: string }): WhatsAppSessionSnapshot | Promise<WhatsAppSessionSnapshot>;
+  sessionQr(input?: { tenantId?: string }): WhatsAppSessionSnapshot | StandaloneApiResponse | Promise<WhatsAppSessionSnapshot | StandaloneApiResponse>;
+  logoutSession(input?: { tenantId?: string; venueId?: string }): WhatsAppSessionSnapshot | StandaloneApiResponse | Promise<WhatsAppSessionSnapshot | StandaloneApiResponse>;
   getConfig(): WhatsAppBusinessConfig | Promise<WhatsAppBusinessConfig>;
   updateConfig(input: WhatsAppBusinessConfigPatch): WhatsAppBusinessConfig | Promise<WhatsAppBusinessConfig>;
   listKnowledge(): WhatsAppKnowledgeEntry[] | Promise<WhatsAppKnowledgeEntry[]>;
@@ -346,7 +361,7 @@ const installationLocationPattern = /^\/v1\/locations\/([^/]+)$/;
 const servicePattern = /^\/v1\/services\/([^/]+)$/;
 const resourcePattern = /^\/v1\/resources\/([^/]+)$/;
 const resourceLayoutPattern = /^\/v1\/resource-layouts\/([^/]+)$/;
-const whatsappSessionRoutePattern = /^\/v1\/channels\/whatsapp\/session\/(?:start|status|qr|logout)$/;
+const whatsappSessionRoutePattern = /^\/v1\/channels\/whatsapp\/session\/(?:start|reconnect|status|qr|logout)$/;
 const whatsappConfigPath = "/v1/channels/whatsapp/config";
 const whatsappKnowledgePath = "/v1/channels/whatsapp/knowledge";
 const whatsappReadinessPath = "/v1/channels/whatsapp/readiness";
@@ -490,6 +505,58 @@ export async function handleStandaloneApiRequest(
         repository: dependencies.integrationSettingsRepository,
         decryptCredential: dependencies.integrationCredentialDecryptor,
         tester: dependencies.emailConnectionTester,
+      }));
+    } catch (error) {
+      return integrationErrorResponse(error);
+    }
+  }
+
+  if (path === "/v1/integrations/ai" && (method === "GET" || method === "PUT" || method === "DELETE")) {
+    const principal = request.authenticatedPrincipal;
+    if (!principal) return platformError(401, "unauthorized", "Authentication is required.");
+    const tenantId = (principal as import("@reservation-platform/api").AuthenticatedPrincipal).tenantId;
+    if (!dependencies.integrationSettingsRepository) {
+      return platformError(503, "internal_error", "AI integration storage is not configured.");
+    }
+    try {
+      if (method === "GET") {
+        return jsonResponse(200, await readAiIntegrationSettings({ principal, repository: dependencies.integrationSettingsRepository }));
+      }
+      if (method === "DELETE") {
+        await deleteIntegrationCredential({ principal, kind: "ai", repository: dependencies.integrationSettingsRepository });
+        dependencies.aiRuntimeLoader?.invalidate(tenantId);
+        return { status: 204, headers: { "cache-control": "no-store" }, body: undefined };
+      }
+      if (!dependencies.integrationCredentialEncryptor) {
+        return platformError(503, "internal_error", "AI credential encryption is not configured.");
+      }
+      const parsed = aiIntegrationSettingsInputSchema.safeParse(request.body);
+      if (!parsed.success) return platformError(400, "validation_failed", "AI integration settings are invalid.");
+      const saved = await saveAiIntegrationSettings({
+        principal,
+        settings: parsed.data,
+        repository: dependencies.integrationSettingsRepository,
+        encryptCredential: dependencies.integrationCredentialEncryptor,
+      });
+      dependencies.aiRuntimeLoader?.invalidate(tenantId);
+      return jsonResponse(200, saved);
+    } catch (error) {
+      return integrationErrorResponse(error);
+    }
+  }
+
+  if (path === "/v1/integrations/ai/test" && method === "POST") {
+    const principal = request.authenticatedPrincipal;
+    if (!principal) return platformError(401, "unauthorized", "Authentication is required.");
+    if (!dependencies.integrationSettingsRepository || !dependencies.integrationCredentialDecryptor || !dependencies.aiConnectionTester) {
+      return platformError(503, "internal_error", "AI connection testing is not configured.");
+    }
+    try {
+      return jsonResponse(200, await testAiIntegration({
+        principal,
+        repository: dependencies.integrationSettingsRepository,
+        decryptCredential: dependencies.integrationCredentialDecryptor,
+        tester: dependencies.aiConnectionTester,
       }));
     } catch (error) {
       return integrationErrorResponse(error);
@@ -907,16 +974,20 @@ export async function handleStandaloneApiRequest(
     return handleWhatsAppSessionStartRequest(request, dependencies.whatsappModule);
   }
 
+  if (method === "POST" && path === "/v1/channels/whatsapp/session/reconnect") {
+    return handleWhatsAppSessionReconnectRequest(request, dependencies.whatsappModule);
+  }
+
   if (method === "GET" && path === "/v1/channels/whatsapp/session/status") {
-    return handleWhatsAppSessionStatusRequest(dependencies.whatsappModule);
+    return handleWhatsAppSessionStatusRequest(request, dependencies.whatsappModule);
   }
 
   if (method === "GET" && path === "/v1/channels/whatsapp/session/qr") {
-    return handleWhatsAppSessionQrRequest(dependencies.whatsappModule);
+    return handleWhatsAppSessionQrRequest(request, dependencies.whatsappModule);
   }
 
   if (method === "POST" && path === "/v1/channels/whatsapp/session/logout") {
-    return handleWhatsAppSessionLogoutRequest(dependencies.whatsappModule);
+    return handleWhatsAppSessionLogoutRequest(request, dependencies.whatsappModule);
   }
 
   if (method === "GET" && path === whatsappReadinessPath) {
@@ -1134,13 +1205,17 @@ async function handleSessionAuthRoute(
         tokenFactory: sessionAuth.tokenFactory,
         now: sessionAuth.now?.(),
       });
-      const emailed = await enqueueAccountEmail(dependencies, {
+      const emailDelivery = await enqueueAccountEmail(dependencies, {
         tenantId: session.tenantId,
         kind: "staff_invitation",
         recipient: result.user.email,
         referenceId: result.user.userId,
         token: result.invitationToken,
       });
+      if (emailDelivery === "failed") {
+        return platformError(503, "internal_error", "Invitation email could not be queued. No invitation link was exposed.");
+      }
+      const emailed = emailDelivery === "queued";
       return jsonResponse(201, {
         user_id: result.user.userId,
         ...(!emailed ? { invitation_token: result.invitationToken } : {}),
@@ -1251,10 +1326,10 @@ async function enqueueAccountEmail(
   },
 ) {
   if (!dependencies.integrationSettingsRepository || !dependencies.notificationJobQueue
-    || !dependencies.integrationCredentialEncryptor) return false;
+    || !dependencies.integrationCredentialEncryptor) return "disabled" as const;
   try {
     const settings = await dependencies.integrationSettingsRepository.read(input.tenantId, "email");
-    if (!settings?.enabled) return false;
+    if (!settings?.enabled) return "disabled" as const;
     await enqueueAccountLinkNotification({
       tenantId: input.tenantId,
       jobs: dependencies.notificationJobQueue,
@@ -1263,9 +1338,9 @@ async function enqueueAccountEmail(
       referenceId: input.referenceId,
       encryptedAction: dependencies.integrationCredentialEncryptor({ token: input.token }),
     });
-    return true;
+    return "queued" as const;
   } catch {
-    return false;
+    return "failed" as const;
   }
 }
 
@@ -1628,7 +1703,7 @@ type RouteMatcher = string | RegExp | ((path: string) => boolean);
 const protectedRouteMetadata: Readonly<Record<string, readonly RouteMatcher[]>> = {
   GET: [
     "/v1/installation/business", "/v1/locations",
-    "/v1/integrations/email",
+    "/v1/integrations/email", "/v1/integrations/ai",
     "/v1/experience/presets", "/v1/experience/workspace", "/v1/experience/validation",
     "/v1/experience/services", "/v1/experience/resources", "/v1/experience/operating-hours",
     "/v1/experience/knowledge", "/v1/experience/channels",
@@ -1642,7 +1717,7 @@ const protectedRouteMetadata: Readonly<Record<string, readonly RouteMatcher[]>> 
   ],
   POST: [
     "/v1/locations",
-    "/v1/integrations/email/test",
+    "/v1/integrations/email/test", "/v1/integrations/ai/test",
     "/v1/experience/publish",
     "/v1/experience/services", "/v1/experience/resources", "/v1/experience/knowledge",
     experienceServiceArchivePattern, experienceResourceArchivePattern,
@@ -1654,24 +1729,24 @@ const protectedRouteMetadata: Readonly<Record<string, readonly RouteMatcher[]>> 
     isChatReservationSessionRoute, isWhatsAppOwnerRoute,
   ],
   PATCH: ["/v1/experience/identity", installationLocationPattern, reservationPattern, isWhatsAppOwnerRoute],
-  PUT: ["/v1/installation/business", "/v1/integrations/email", "/v1/experience/draft", "/v1/experience/operating-hours", "/v1/experience/channels", experienceServicePattern, experienceResourcePattern, experienceKnowledgePattern, conversationAutomationPattern],
-  DELETE: [isWhatsAppOwnerRoute],
+  PUT: ["/v1/installation/business", "/v1/integrations/email", "/v1/integrations/ai", "/v1/experience/draft", "/v1/experience/operating-hours", "/v1/experience/channels", experienceServicePattern, experienceResourcePattern, experienceKnowledgePattern, conversationAutomationPattern],
+  DELETE: ["/v1/integrations/ai", isWhatsAppOwnerRoute],
 };
 
 const ownerOnlyRouteMetadata: Readonly<Record<string, readonly RouteMatcher[]>> = {
   GET: [
     "/v1/installation/business",
-    "/v1/integrations/email",
+    "/v1/integrations/email", "/v1/integrations/ai",
     "/v1/venues", venuePattern,
     servicePattern,
     resourcePattern, resourceLayoutPattern,
     isExperienceOwnerRoute,
     isWhatsAppConfigurationRoute,
   ],
-  POST: ["/v1/locations", "/v1/integrations/email/test", isExperienceOwnerRoute, isWhatsAppConfigurationRoute],
+  POST: ["/v1/locations", "/v1/integrations/email/test", "/v1/integrations/ai/test", isExperienceOwnerRoute, isWhatsAppConfigurationRoute],
   PATCH: [installationLocationPattern, isExperienceOwnerRoute, isWhatsAppConfigurationRoute],
-  PUT: ["/v1/installation/business", "/v1/integrations/email", isExperienceOwnerRoute, isWhatsAppConfigurationRoute],
-  DELETE: [isExperienceOwnerRoute, isWhatsAppConfigurationRoute],
+  PUT: ["/v1/installation/business", "/v1/integrations/email", "/v1/integrations/ai", isExperienceOwnerRoute, isWhatsAppConfigurationRoute],
+  DELETE: ["/v1/integrations/ai", isExperienceOwnerRoute, isWhatsAppConfigurationRoute],
 };
 
 const venueScopedRouteMetadata: Readonly<Record<string, readonly RouteMatcher[]>> = {
@@ -2035,17 +2110,23 @@ async function handlePublicChatMessageRequest(
   const parsed = publicChatMessageInputSchema.safeParse(request.body);
   if (!parsed.success) return platformError(400, "validation_failed", "Invalid public chat message.");
   if (!dependencies.conversationOrchestrator) return platformError(503, "bad_request", "Public chat is not configured.");
-  const result = await handleConversationInbound({
-    scope: { tenantId: experience.tenantId, venueId: experience.venueId },
-    message: {
+  const message = {
       channel: "web_chat",
       channelThreadId: parsed.data.thread_id,
       externalMessageId: parsed.data.external_message_id,
       content: parsed.data.content,
       participant: { displayName: parsed.data.display_name },
-    },
-    dependencies: dependencies.conversationOrchestrator,
-  });
+    } as const;
+  const scope = { tenantId: experience.tenantId, venueId: experience.venueId };
+  const result = dependencies.platformJobQueue && dependencies.conversationRepository
+    ? await acceptConversationInbound({
+        scope,
+        message,
+        conversations: dependencies.conversationRepository,
+        jobs: dependencies.platformJobQueue,
+        audit: dependencies.conversationOrchestrator.audit,
+      })
+    : await handleConversationInbound({ scope, message, dependencies: dependencies.conversationOrchestrator });
   return publicChatOrchestratorResponse(result);
 }
 
@@ -2074,7 +2155,12 @@ async function handlePublicChatMessagesRequest(
     },
     repository: dependencies.conversationRepository,
   });
-  return jsonResponse(result.status, result.body);
+  if (result.status !== 200 || !("messages" in result.body)) return jsonResponse(result.status, result.body);
+  const proposal = await dependencies.conversationOrchestrator?.state.loadLatestActive(scope, conversationId);
+  return jsonResponse(200, {
+    ...result.body,
+    ...(proposal ? { proposal: toPublicChatProposal(proposal) } : {}),
+  });
 }
 
 async function handlePublicChatConfirmationRequest(
@@ -2105,19 +2191,25 @@ function publicChatOrchestratorResponse(result: Awaited<ReturnType<typeof handle
     conversation_id: result.body.conversation.conversation_id,
     automation_state: result.body.conversation.automation_state,
     ...(result.body.message ? { message: result.body.message } : {}),
-    ...(proposal ? { proposal: {
-      proposal_id: proposal.proposalId,
-      service_id: proposal.booking.service_id,
-      service_name: proposal.booking.service_name,
-      date: proposal.booking.date,
-      start_time: proposal.booking.start_time,
-      end_time: proposal.booking.end_time,
-      quantity: proposal.booking.seats,
-    } } : {}),
+    ...(proposal ? { proposal: toPublicChatProposal(proposal) } : {}),
     ...(result.body.reservation ? { reservation: result.body.reservation } : {}),
     ...(result.body.automation_suppressed ? { automation_suppressed: true } : {}),
   };
   return jsonResponse(result.status, body);
+}
+
+function toPublicChatProposal(
+  proposal: ConversationBookingProposal,
+): ConversationBookingProposalResponse {
+  return {
+    proposal_id: proposal.proposalId,
+    service_id: proposal.booking.service_id,
+    service_name: proposal.booking.service_name,
+    date: proposal.booking.date,
+    start_time: proposal.booking.start_time,
+    end_time: proposal.booking.end_time,
+    quantity: proposal.booking.seats,
+  };
 }
 
 async function readPublicExperienceServices(
@@ -2356,15 +2448,6 @@ async function handleConversationStaffReply(
     conversationId,
     value: request.body,
     repository: dependencies.conversationRepository,
-    deliver: async ({ conversation, content }) => {
-      if (conversation.channel !== "whatsapp") return;
-      if (!dependencies.whatsappModule?.sendDirectMessage || !dependencies.conversationRepository?.getDeliveryTarget) {
-        throw new Error("WhatsApp delivery is not configured.");
-      }
-      const target = await dependencies.conversationRepository.getDeliveryTarget(scoped.scope, conversationId);
-      if (target.error || !target.data) throw target.error ?? new Error("WhatsApp delivery target is unavailable.");
-      await dependencies.whatsappModule.sendDirectMessage({ to: target.data.channelIdentifier, text: content, metadata: { staff_reply: true } });
-    },
   });
   return jsonResponse(result.status, result.body);
 }
@@ -2600,40 +2683,59 @@ async function handleWhatsAppSessionStartRequest(
 
   return invokeWhatsAppModule(() => whatsappModule.startSession({
     provider: body.value.provider === "meta_cloud" ? "meta_cloud" : "session_qr",
-    tenant_id: getStringField(body.value, "tenant_id") ?? createChatContext(request).tenantId,
-    venue_id: getStringField(body.value, "venue_id") ?? createChatContext(request).venueId,
+    tenant_id: createChatContext(request).tenantId,
+    venue_id: createChatContext(request).venueId,
     metadata: readMetadataField(body.value),
   }));
 }
 
+async function handleWhatsAppSessionReconnectRequest(
+  request: StandaloneApiRequest,
+  whatsappModule: StandaloneApiWhatsAppModule | undefined,
+): Promise<StandaloneApiResponse> {
+  if (!whatsappModule?.reconnectSession) {
+    return whatsappModuleDisabled();
+  }
+
+  const context = createChatContext(request);
+  return invokeWhatsAppModule(() => whatsappModule.reconnectSession?.({
+    tenantId: context.tenantId,
+    venueId: context.venueId,
+  }));
+}
+
 async function handleWhatsAppSessionStatusRequest(
+  request: StandaloneApiRequest,
   whatsappModule: StandaloneApiWhatsAppModule | undefined,
 ): Promise<StandaloneApiResponse> {
   if (!whatsappModule) {
     return whatsappModuleDisabled();
   }
 
-  return invokeWhatsAppModule(() => whatsappModule.sessionStatus());
+  return invokeWhatsAppModule(() => whatsappModule.sessionStatus({ tenantId: createChatContext(request).tenantId }));
 }
 
 async function handleWhatsAppSessionQrRequest(
+  request: StandaloneApiRequest,
   whatsappModule: StandaloneApiWhatsAppModule | undefined,
 ): Promise<StandaloneApiResponse> {
   if (!whatsappModule) {
     return whatsappModuleDisabled();
   }
 
-  return invokeWhatsAppModule(() => whatsappModule.sessionQr());
+  return invokeWhatsAppModule(() => whatsappModule.sessionQr({ tenantId: createChatContext(request).tenantId }));
 }
 
 async function handleWhatsAppSessionLogoutRequest(
+  request: StandaloneApiRequest,
   whatsappModule: StandaloneApiWhatsAppModule | undefined,
 ): Promise<StandaloneApiResponse> {
   if (!whatsappModule) {
     return whatsappModuleDisabled();
   }
 
-  return invokeWhatsAppModule(() => whatsappModule.logoutSession());
+  const context = createChatContext(request);
+  return invokeWhatsAppModule(() => whatsappModule.logoutSession({ tenantId: context.tenantId, venueId: context.venueId }));
 }
 
 async function handleWhatsAppConfigReadRequest(
@@ -3362,6 +3464,7 @@ async function handleReservationListRequest(
     ...(url.searchParams.get("start_at")?.slice(0, 10) ? { date: url.searchParams.get("start_at")!.slice(0, 10) } : {}),
     ...(url.searchParams.get("status") ? { status: url.searchParams.get("status")! } : {}),
     ...(url.searchParams.get("staff_id") ? { staffId: url.searchParams.get("staff_id")! } : {}),
+    ...(url.searchParams.get("service_id") ? { serviceId: url.searchParams.get("service_id")! } : {}),
     ...(getHeader(request.headers, "X-Reservation-Venue-Id")
       ? { venueId: getHeader(request.headers, "X-Reservation-Venue-Id") }
       : {}),

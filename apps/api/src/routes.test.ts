@@ -376,6 +376,51 @@ test("email integration routes are owner-only and require CSRF for writes", asyn
   assert.equal(csrfDenied.status, 403);
 });
 
+test("owner AI integration routes save, test, disable, and revoke a write-only key", async () => {
+  const repository = integrationRepositoryFixture();
+  const cookie = `reservation_session=${"s".repeat(43)}; reservation_csrf=${"c".repeat(43)}`;
+  const writeHeaders = { cookie, origin: authOrigin, "x-csrf-token": "c".repeat(43) };
+  let credential: Record<string, unknown> | undefined;
+  const dependencies = {
+    sessionAuth: { repositories: authRepository(), allowedOrigins: [authOrigin] },
+    tenantVenueRepository: tenantVenueRepository({
+      async getVenue(id) { return { data: { id, tenant_id: "tenant-1" } }; },
+    }),
+    integrationSettingsRepository: repository,
+    integrationCredentialEncryptor(value: Record<string, unknown>) {
+      credential = value;
+      return { v: 1 as const, alg: "aes-256-gcm" as const, iv: "iv", tag: "tag", ciphertext: "ciphertext" };
+    },
+    integrationCredentialDecryptor() { return credential ?? { api_key: "sk-existing-key" }; },
+    aiConnectionTester: { async test(input: { apiKey: string; model: string }) {
+      assert.equal(input.apiKey, "sk-private-key");
+      assert.equal(input.model, "gpt-4.1-mini");
+    } },
+  };
+  const saved = await handleStandaloneApiRequest({
+    method: "PUT", path: "/v1/integrations/ai", headers: writeHeaders,
+    body: { enabled: true, provider: "openai", model: "gpt-4.1-mini", api_key: "sk-private-key" },
+  }, dependencies);
+  assert.equal(saved.status, 200, JSON.stringify(saved.body));
+  assert.equal(JSON.stringify(saved.body).includes("sk-private-key"), false);
+  assert.deepEqual(credential, { api_key: "sk-private-key" });
+
+  const tested = await handleStandaloneApiRequest({
+    method: "POST", path: "/v1/integrations/ai/test", headers: writeHeaders, body: {},
+  }, dependencies);
+  assert.deepEqual(tested.body, { ok: true, provider: "openai", model: "gpt-4.1-mini" });
+
+  const disabled = await handleStandaloneApiRequest({
+    method: "PUT", path: "/v1/integrations/ai", headers: writeHeaders,
+    body: { enabled: false, provider: "openai", model: "gpt-4.1-mini" },
+  }, dependencies);
+  assert.equal((disabled.body as { enabled: boolean }).enabled, false);
+  const revoked = await handleStandaloneApiRequest({
+    method: "DELETE", path: "/v1/integrations/ai", headers: writeHeaders, body: {},
+  }, dependencies);
+  assert.equal(revoked.status, 204);
+});
+
 test("cookie owners also require a concrete venue for venue-scoped operations", async () => {
   const cookie = `reservation_session=${"s".repeat(43)}`;
   let storageCalls = 0;
@@ -877,6 +922,52 @@ test("staff invitation is owner-only and invitation acceptance creates a session
   assert.equal(Array.isArray(accepted.headers["set-cookie"]), true);
 });
 
+test("enabled email queues an encrypted invitation and never returns the raw capability", async () => {
+  const queued: any[] = [];
+  const token = "i".repeat(43);
+  const response = await handleStandaloneApiRequest({
+    method: "POST",
+    path: "/v1/auth/staff/invitations",
+    headers: {
+      origin: authOrigin,
+      cookie: `reservation_session=${"s".repeat(43)}; reservation_csrf=${"c".repeat(43)}`,
+      "x-csrf-token": "c".repeat(43),
+    },
+    body: { email: "new@example.com", display_name: "New Staff", venue_ids: ["123e4567-e89b-42d3-a456-426614174000"] },
+  }, {
+    sessionAuth: { repositories: authRepository(), allowedOrigins: [authOrigin], tokenFactory: () => token },
+    integrationSettingsRepository: integrationRepositoryFixture(),
+    integrationCredentialEncryptor(value) {
+      assert.deepEqual(value, { token });
+      return { v: 1, alg: "aes-256-gcm", iv: "iv", tag: "tag", ciphertext: "encrypted-capability" };
+    },
+    notificationJobQueue: { async enqueue(input) { queued.push(input); return { jobId: "job-1" }; } },
+  });
+  assert.equal(response.status, 201);
+  assert.equal((response.body as { delivery: string }).delivery, "email");
+  assert.equal("invitation_token" in (response.body as object), false);
+  assert.equal(JSON.stringify(queued).includes(token), false);
+  assert.equal(queued[0].payload.encryptedAction.ciphertext, "encrypted-capability");
+
+  const failed = await handleStandaloneApiRequest({
+    method: "POST",
+    path: "/v1/auth/staff/invitations",
+    headers: {
+      origin: authOrigin,
+      cookie: `reservation_session=${"s".repeat(43)}; reservation_csrf=${"c".repeat(43)}`,
+      "x-csrf-token": "c".repeat(43),
+    },
+    body: { email: "new@example.com", display_name: "New Staff", venue_ids: ["123e4567-e89b-42d3-a456-426614174000"] },
+  }, {
+    sessionAuth: { repositories: authRepository(), allowedOrigins: [authOrigin], tokenFactory: () => token },
+    integrationSettingsRepository: integrationRepositoryFixture(),
+    integrationCredentialEncryptor: () => ({ v: 1, alg: "aes-256-gcm", iv: "iv", tag: "tag", ciphertext: "encrypted-capability" }),
+    notificationJobQueue: { async enqueue() { throw new Error("queue unavailable"); } },
+  });
+  assert.equal(failed.status, 503);
+  assert.equal(JSON.stringify(failed.body).includes(token), false);
+});
+
 test("owner lists staff, disables accounts, and replaces venue assignments while staff is denied", async () => {
   const calls: unknown[] = [];
   const userId = "323e4567-e89b-42d3-a456-426614174000";
@@ -1101,7 +1192,7 @@ test("public management routes read, reschedule, and replay cancellation without
     method: "POST",
     path: `/v1/public/experiences/apex-racing/manage/${token}/cancel`,
     headers: {},
-    body: {},
+    body: { tenant_id: "tenant_attacker", venue_id: "venue_attacker" },
   }, { serviceApiKey: "secret", reservationManagementRepository: repository });
   const rescheduled = await handleStandaloneApiRequest({
     method: "POST",
@@ -1504,7 +1595,6 @@ test("new owner operations reject cross-tenant object and aggregate access", asy
 
 test("conversation owner routes preserve scope, filters, chronology, replies, and takeover", async () => {
   const observed: unknown[] = [];
-  const delivered: unknown[] = [];
   const repository = conversationRepository({
     async list(scope, query) {
       observed.push({ operation: "list", scope, query });
@@ -1538,7 +1628,7 @@ test("conversation owner routes preserve scope, filters, chronology, replies, an
   const replied = await handleStandaloneApiRequest({ method: "POST", path: "/v1/conversations/conversation%2F1/messages", headers, body: { content: "A staff reply" } }, {
     serviceApiKey: "secret",
     conversationRepository: repository,
-    whatsappModule: { async sendDirectMessage(input) { delivered.push(input); } } as StandaloneApiWhatsAppModule,
+    whatsappModule: {} as StandaloneApiWhatsAppModule,
   });
   const takeover = await handleStandaloneApiRequest({ method: "PUT", path: "/v1/conversations/conversation%2F1/automation", headers, body: { automation_state: "manual" } }, { serviceApiKey: "secret", conversationRepository: repository });
 
@@ -1550,11 +1640,9 @@ test("conversation owner routes preserve scope, filters, chronology, replies, an
     { operation: "list", scope: { tenantId: "tenant_1", venueId: "venue_1" }, query: { channel: "whatsapp", status: "active", limit: 25 } },
     { operation: "messages", scope: { tenantId: "tenant_1", venueId: "venue_1" }, conversationId: "conversation/1", query: { limit: 10 } },
     { operation: "automation", scope: { tenantId: "tenant_1", venueId: "venue_1" }, conversationId: "conversation/1", input: { automation_state: "manual", changedBy: "staff" } },
-    { operation: "target", scope: { tenantId: "tenant_1", venueId: "venue_1" }, conversationId: "conversation/1" },
     { operation: "append", scope: { tenantId: "tenant_1", venueId: "venue_1" }, conversationId: "conversation/1", input: { channel: "whatsapp", direction: "outbound", senderType: "staff", content: "A staff reply" } },
     { operation: "automation", scope: { tenantId: "tenant_1", venueId: "venue_1" }, conversationId: "conversation/1", input: { automation_state: "manual", changedBy: "staff" } },
   ]);
-  assert.deepEqual(delivered, [{ to: "60123@s.whatsapp.net", text: "A staff reply", metadata: { staff_reply: true } }]);
 });
 
 test("conversation owner routes reject missing authentication before repository access", async () => {
@@ -1782,6 +1870,7 @@ function fakeWhatsAppModule(
 test("disabled WhatsApp session routes return the shared platform error body", async () => {
   const routes = [
     { method: "POST", path: "/v1/channels/whatsapp/session/start" },
+    { method: "POST", path: "/v1/channels/whatsapp/session/reconnect" },
     { method: "GET", path: "/v1/channels/whatsapp/session/status" },
     { method: "GET", path: "/v1/channels/whatsapp/session/qr" },
     { method: "POST", path: "/v1/channels/whatsapp/session/logout" },
@@ -1806,6 +1895,15 @@ test("enabled WhatsApp session module receives owner lifecycle calls", async () 
         session_id: "session_123",
         qr_code: "qr_payload",
         updated_at: "2026-06-30T00:00:00.000Z",
+      };
+    },
+    reconnectSession() {
+      calls.push("reconnect");
+      return {
+        provider: "session_qr",
+        status: "disconnected",
+        updated_at: "2026-06-30T00:00:00.000Z",
+        metadata: { connection_state: "reconnecting" },
       };
     },
     sessionStatus() {
@@ -1847,16 +1945,18 @@ test("enabled WhatsApp session module receives owner lifecycle calls", async () 
     },
     body: {},
   });
+  const reconnect = await handler({ method: "POST", path: "/v1/channels/whatsapp/session/reconnect" });
   const status = await handler({ method: "GET", path: "/v1/channels/whatsapp/session/status" });
   const qr = await handler({ method: "GET", path: "/v1/channels/whatsapp/session/qr" });
   const logout = await handler({ method: "POST", path: "/v1/channels/whatsapp/session/logout" });
 
   assert.equal(start.status, 200);
   assert.equal((start.body as { qr_code?: string }).qr_code, "qr_payload");
+  assert.equal(reconnect.status, 200);
   assert.equal(status.status, 200);
   assert.equal(qr.status, 200);
   assert.equal(logout.status, 200);
-  assert.deepEqual(calls, ["start:tenant_1:venue_1", "status", "qr", "logout"]);
+  assert.deepEqual(calls, ["start:tenant_1:venue_1", "reconnect", "status", "qr", "logout"]);
 });
 
 test("service-token auth protects WhatsApp owner session routes", async () => {
@@ -1864,6 +1964,9 @@ test("service-token auth protects WhatsApp owner session routes", async () => {
     auth: { serviceApiKey: "platform-service-secret" },
     whatsappModule: fakeWhatsAppModule({
       startSession() {
+        throw new Error("unauthorized request should not invoke WhatsApp module");
+      },
+      reconnectSession() {
         throw new Error("unauthorized request should not invoke WhatsApp module");
       },
       sessionStatus() {
@@ -1880,6 +1983,7 @@ test("service-token auth protects WhatsApp owner session routes", async () => {
 
   for (const route of [
     { method: "POST", path: "/v1/channels/whatsapp/session/start" },
+    { method: "POST", path: "/v1/channels/whatsapp/session/reconnect" },
     { method: "GET", path: "/v1/channels/whatsapp/session/status" },
     { method: "GET", path: "/v1/channels/whatsapp/session/qr" },
     { method: "POST", path: "/v1/channels/whatsapp/session/logout" },
@@ -5297,6 +5401,54 @@ test("reservation cancel route validates input but uses the existing cancel serv
       cancelled_by: "standalone-api-test",
     },
   });
+});
+
+test("authenticated staff appointment routes pass the session actor to atomic operations", async () => {
+  const calls: unknown[] = [];
+  const actorUserId = "223e4567-e89b-42d3-a456-426614174000";
+  const venueId = "123e4567-e89b-42d3-a456-426614174000";
+  const bookingId = validReservationId();
+  const booking = reservationRow({ id: bookingId, staff_id: "33333333-3333-4333-8333-333333333333" });
+  const dependencies = {
+    sessionAuth: { repositories: authRepository({
+      async readSession() { return { userId: actorUserId, tenantId: "tenant-1", role: "staff", venueIds: [venueId], expiresAt: "2026-07-15T12:00:00.000Z" }; },
+    }), allowedOrigins: [authOrigin] },
+    idempotencyRepository: new InMemoryIdempotencyRepository(),
+    reservationMutationRepository: reservationMutationRepository({
+      async staffCreateAppointment(input) { calls.push(["create", input]); return { data: { ok: true, booking } }; },
+      async transitionAppointment(input) { calls.push(["transition", input]); return { data: { ok: true, booking: { ...booking, status: input.targetStatus } } }; },
+      async staffRescheduleAppointment(input) { calls.push(["reschedule", input]); return { data: { ok: true, booking: { ...booking, booking_date: input.date, start_time: input.startTime } } }; },
+    }),
+  };
+  const headers = {
+    cookie: `reservation_session=${"s".repeat(43)}; reservation_csrf=${"c".repeat(43)}`,
+    origin: authOrigin,
+    "x-csrf-token": "c".repeat(43),
+    "x-reservation-venue-id": venueId,
+  };
+
+  const responses = [
+    await handleStandaloneApiRequest({ method: "POST", path: "/v1/reservations/staff", headers: { ...headers, "idempotency-key": "staff-create-route-123" }, body: {
+      service_id: "44444444-4444-4444-8444-444444444444", staff_id: "33333333-3333-4333-8333-333333333333",
+      date: "2026-07-20", start_time: "09:00", end_time: "10:00", quantity: 1,
+      customer: { name: "Alex", email: "alex@example.com" },
+    } }, dependencies),
+    await handleStandaloneApiRequest({ method: "POST", path: `/v1/reservations/${bookingId}/transition`, headers: { ...headers, "idempotency-key": "staff-transition-route-123" }, body: {
+      expected_status: "confirmed", target_status: "no_show", reason: "Customer did not arrive",
+    } }, dependencies),
+    await handleStandaloneApiRequest({ method: "POST", path: `/v1/reservations/${bookingId}/staff-reschedule`, headers: { ...headers, "idempotency-key": "staff-reschedule-route-123" }, body: {
+      expected_status: "confirmed", date: "2026-07-20", start_time: "10:00",
+      staff_id: "33333333-3333-4333-8333-333333333333", reason: "Customer requested later",
+    } }, dependencies),
+  ];
+
+  assert.deepEqual(responses.map((response) => response.status), [200, 200, 200]);
+  for (const [, input] of calls as Array<[string, { tenantId: string; venueId: string; actorUserId: string }]>) {
+    assert.deepEqual({ tenantId: input.tenantId, venueId: input.venueId, actorUserId: input.actorUserId }, {
+      tenantId: "tenant-1", venueId, actorUserId,
+    });
+  }
+  assert.equal((calls[0] as [string, { reservation: { channel?: string } }])[1].reservation.channel, "staff");
 });
 
 test("reservation lifecycle routes require idempotency before id, body, or repository work", async () => {

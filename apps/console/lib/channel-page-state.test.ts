@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { PlatformError, type WhatsAppChannelReadinessResponse, type WhatsAppOwnerSessionResponse } from "@reservation-platform/sdk";
-import { canStartWhatsAppSession, resolveChannelPageState } from "./channel-page-state";
+import { canStartWhatsAppSession, describeWhatsAppSession, resolveChannelPageState } from "./channel-page-state";
 
 const readiness: WhatsAppChannelReadinessResponse = {
   enabled: true,
@@ -50,4 +50,28 @@ test("QR pairing is offered only for sessions that can start", () => {
   assert.equal(canStartWhatsAppSession("disabled"), false);
   assert.equal(canStartWhatsAppSession("pending_qr"), false);
   assert.equal(canStartWhatsAppSession("connected"), false);
+});
+
+test("WhatsApp session presentation covers every operational state", () => {
+  const unhealthy = { ...readiness, production_ready: false, whatsapp: { ...readiness.whatsapp, connected: false, healthy: false, message: "Connection health check failed." } };
+  const cases = [
+    ["disabled", resolveChannelPageState(
+      { status: "rejected", reason: new PlatformError({ code: "whatsapp_module_disabled", message: "disabled", status: 404 }) },
+      { status: "rejected", reason: new PlatformError({ code: "whatsapp_module_disabled", message: "disabled", status: 404 }) },
+    ).session, { ...readiness, enabled: false }, false],
+    ["disconnected", { ...session, status: "disconnected" }, readiness, false],
+    ["pairing", { ...session, status: "pending_qr" }, readiness, false],
+    ["qr", { ...session, status: "pending_qr" }, readiness, true],
+    ["connected", session, readiness, false],
+    ["reconnecting", { ...session, metadata: { connection_state: "reconnecting" } }, unhealthy, false],
+    ["degraded", session, unhealthy, false],
+    ["expired", { ...session, status: "expired" }, unhealthy, false],
+  ] as const;
+
+  for (const [expected, currentSession, currentReadiness, qrAvailable] of cases) {
+    const view = describeWhatsAppSession(currentReadiness, currentSession, qrAvailable);
+    assert.equal(view.state, expected);
+    assert.ok(view.title.length > 0);
+    assert.ok(view.description.length > 0);
+  }
 });

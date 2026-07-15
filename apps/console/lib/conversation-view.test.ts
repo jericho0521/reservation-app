@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
-import { conversationChannelLabel, conversationPreview, groupConversationTimeline } from "./conversation-view";
+import { conversationChannelLabel, conversationPreview, deliveryStatePresentation, groupConversationTimeline } from "./conversation-view";
 
 test("conversation view labels channels, hides identifiers, and groups chronological messages", () => {
   assert.equal(conversationChannelLabel("whatsapp"), "WhatsApp");
@@ -12,8 +12,29 @@ test("conversation view labels channels, hides identifiers, and groups chronolog
   ]).length, 1);
 });
 
+test("durable outbox states have explicit operator labels", () => {
+  assert.deepEqual([
+    deliveryStatePresentation("pending"),
+    deliveryStatePresentation("sent"),
+    deliveryStatePresentation("delivered"),
+    deliveryStatePresentation("failed"),
+  ].map(({ label, tone }) => [label, tone]), [
+    ["Queued", "pending"],
+    ["Sent", "sent"],
+    ["Delivered", "delivered"],
+    ["Delivery failed", "failed"],
+  ]);
+});
+
 test("staff reply action calls the direct conversation SDK operation without AI generation", async () => {
   const source = await readFile(new URL("../app/conversations/actions.ts", import.meta.url), "utf8");
   assert.match(source, /sendConversationStaffReply/u);
   assert.doesNotMatch(source, /ai-chat|model_provider|generate\(/u);
+});
+
+test("unified inbox requires explicit takeover before a staff reply and offers resume", async () => {
+  const source = await readFile(new URL("../components/inbox/takeover-controls.tsx", import.meta.url), "utf8");
+  assert.match(source, /Take over conversation/u);
+  assert.match(source, /Resume AI automation/u);
+  assert.match(source, /disabled=\{!manual\}/u);
 });

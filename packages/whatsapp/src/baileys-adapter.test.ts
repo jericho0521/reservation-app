@@ -4,6 +4,8 @@ import test from "node:test";
 
 import {
   deserializeBaileysSessionCredentials,
+  BaileysWhatsAppSessionAdapter,
+  baileysProviderMessageId,
   normalizeBaileysMessage,
   nextBaileysReconnectAttempt,
   serializeBaileysSessionCredentials,
@@ -52,4 +54,24 @@ test("Baileys session credentials encrypt and decrypt when a key is set", () => 
   assert.deepEqual(deserializeBaileysSessionCredentials(payload, key), {
     auth_directory: "/tmp/whatsapp/session-1",
   });
+});
+
+test("Baileys production mode requires a credential encryption key", () => {
+  assert.throws(
+    () => new BaileysWhatsAppSessionAdapter({
+      authDirectory: "/tmp/whatsapp",
+      requireEncryptedCredentials: true,
+    }),
+    /encryption key is required/u,
+  );
+  assert.doesNotThrow(() => new BaileysWhatsAppSessionAdapter({
+    authDirectory: "/tmp/whatsapp",
+    sessionEncryptionKey: "test-session-encryption-key",
+    requireEncryptedCredentials: true,
+  }));
+});
+
+test("Baileys delivery exposes only the provider message id for outbox persistence", () => {
+  assert.equal(baileysProviderMessageId({ key: { id: "provider-message-1" }, message: { conversation: "private" } }), "provider-message-1");
+  assert.equal(baileysProviderMessageId({ message: { conversation: "private" } }), undefined);
 });

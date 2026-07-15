@@ -73,6 +73,23 @@ test("staff replies pause automation before direct delivery and persistence", as
   assert.deepEqual(order, ["takeover", "deliver", "persist"]);
 });
 
+test("WhatsApp staff replies use the atomic durable outbox repository operation", async () => {
+  const order: string[] = [];
+  const repo = repository({
+    get: async () => ({ data: conversationFixture({ channel: "whatsapp" }) }),
+    appendStaffReplyWithOutbox: async (_scope, _conversationId, input) => {
+      order.push(`outbox:${input.content}`);
+      return { data: messageFixture({ direction: "outbound", sender_type: "staff", delivery_state: "pending" }) };
+    },
+    updateAutomation: async () => { order.push("non-atomic-takeover"); return { data: conversationFixture() }; },
+    append: async () => { order.push("non-atomic-append"); return { data: messageFixture() }; },
+  });
+  const result = await appendStaffReply({ scope, conversationId: "conversation_1", value: { content: "Queued reply" }, repository: repo });
+  assert.equal(result.status, 200);
+  assert.deepEqual(order, ["outbox:Queued reply"]);
+  assert.equal("delivery_state" in result.body && result.body.delivery_state, "pending");
+});
+
 function repository(overrides: Partial<ConversationRepository>): ConversationRepository {
   return {
     list: async () => ({ data: [] }),

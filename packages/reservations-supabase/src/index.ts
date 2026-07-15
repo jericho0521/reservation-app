@@ -42,6 +42,8 @@ export * from "./experience-knowledge.js";
 export * from "./operating-hours.js";
 export * from "./reservation-management.js";
 export * from "./conversations.js";
+export * from "./conversation-state.js";
+export * from "./channel-runtime.js";
 export * from "./operations-overview.js";
 export * from "./analytics.js";
 export * from "./installation.js";
@@ -871,7 +873,7 @@ export function createSupabaseReservationReadRepository(
   }
 
   return {
-    async listReservations({ searchFilterExpression, limit, venueId, date, status, staffId }) {
+    async listReservations({ searchFilterExpression, limit, venueId, date, status, staffId, serviceId }) {
       let query = applyVenueFilter(applyReservationListFilters(
         fromTable(client, RESERVATION_SUPABASE_TABLES.bookings)
         .select(venueId
@@ -884,6 +886,7 @@ export function createSupabaseReservationReadRepository(
       if (date) query = query.eq("booking_date", date);
       if (status) query = query.eq("status", status);
       if (staffId) query = query.eq("staff_id", staffId);
+      if (serviceId) query = query.eq("service_id", serviceId);
 
       if (limit) {
         query = query.limit(limit);

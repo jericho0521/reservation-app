@@ -182,6 +182,31 @@ test("email integration SDK keeps SMTP credentials in write requests only", asyn
   assert.equal(JSON.stringify(response).includes("write-only-secret"), false);
 });
 
+test("AI integration SDK keeps provider keys in write requests only", async () => {
+  const calls: Array<{ url: string; init?: RequestInit }> = [];
+  const client = createReservationPlatformClient({
+    baseUrl: "https://api.example.com",
+    fetch: async (url, init) => {
+      calls.push({ url: String(url), init });
+      if (init?.method === "DELETE") return new Response(null, { status: 204 });
+      return Response.json(init?.method === "POST"
+        ? { ok: true, provider: "openai", model: "gpt-4.1-mini" }
+        : { enabled: true, provider: "openai", configured: true, model: "gpt-4.1-mini", credential_present: true });
+    },
+  });
+  await client.getAiIntegrationSettings();
+  await client.updateAiIntegrationSettings({ enabled: true, provider: "openai", model: "gpt-4.1-mini", api_key: "sk-test-secret" });
+  await client.testAiIntegration();
+  await client.revokeAiIntegrationCredential();
+  assert.deepEqual(calls.map((call) => [call.init?.method, new URL(call.url).pathname]), [
+    ["GET", "/v1/integrations/ai"],
+    ["PUT", "/v1/integrations/ai"],
+    ["POST", "/v1/integrations/ai/test"],
+    ["DELETE", "/v1/integrations/ai"],
+  ]);
+  assert.equal(String(calls[1].init?.body).includes("sk-test-secret"), true);
+});
+
 test("SDK forwards an explicitly configured credentials mode", async () => {
   let credentials: RequestCredentials | undefined;
   const client = createReservationPlatformClient({
@@ -513,6 +538,7 @@ test("WhatsApp owner SDK methods keep readiness, QR, and simulation behind scope
   });
   await client.getWhatsAppReadiness();
   await client.startWhatsAppSession();
+  await client.reconnectWhatsAppSession();
   await client.getWhatsAppSessionStatus();
   await client.getWhatsAppSessionQr();
   await client.logoutWhatsAppSession();
@@ -520,13 +546,14 @@ test("WhatsApp owner SDK methods keep readiness, QR, and simulation behind scope
   assert.deepEqual(requests.map(({ url, init }) => [new URL(url).pathname, init?.method]), [
     ["/v1/channels/whatsapp/readiness", "GET"],
     ["/v1/channels/whatsapp/session/start", "POST"],
+    ["/v1/channels/whatsapp/session/reconnect", "POST"],
     ["/v1/channels/whatsapp/session/status", "GET"],
     ["/v1/channels/whatsapp/session/qr", "GET"],
     ["/v1/channels/whatsapp/session/logout", "POST"],
     ["/v1/channels/whatsapp/messages:simulate", "POST"],
   ]);
   requests.forEach(({ init }) => assert.equal(new Headers(init?.headers).get("authorization"), "Bearer owner-secret"));
-  assert.deepEqual(JSON.parse(String(requests[5]!.init?.body)), { text: "Book a room", message_id: "demo-step-1" });
+  assert.deepEqual(JSON.parse(String(requests[6]!.init?.body)), { text: "Book a room", message_id: "demo-step-1" });
 });
 
 test("public chat SDK methods stay slug scoped and omit owner credentials", async () => {

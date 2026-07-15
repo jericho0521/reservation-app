@@ -1,4 +1,4 @@
-import type { ConversationChannel, ConversationMessageResponse, ConversationResponse } from "@reservation-platform/sdk";
+import type { ConversationChannel, ConversationDeliveryState, ConversationMessageResponse, ConversationResponse } from "@reservation-platform/sdk";
 
 export function conversationChannelLabel(channel: ConversationChannel) {
   return channel === "web_chat" ? "Web chat" : channel === "whatsapp" ? "WhatsApp" : "Simulation";
@@ -18,4 +18,11 @@ export function groupConversationTimeline(messages: ConversationMessageResponse[
     else groups.push({ date, messages: [message] });
     return groups;
   }, []);
+}
+
+export function deliveryStatePresentation(state: ConversationDeliveryState) {
+  if (state === "pending") return { label: "Queued", detail: "Waiting for durable outbox delivery.", tone: "pending" as const };
+  if (state === "sent") return { label: "Sent", detail: "Accepted by the channel provider.", tone: "sent" as const };
+  if (state === "delivered") return { label: "Delivered", detail: "Delivered to the customer device.", tone: "delivered" as const };
+  return { label: "Delivery failed", detail: "The durable outbox recorded a failed delivery.", tone: "failed" as const };
 }

@@ -1,5 +1,6 @@
 import type { JsonValue, MetadataRecord } from "@reservation-platform/contract-types";
 
+import { isEncryptedPayload } from "./crypto.js";
 import type { WhatsAppContact } from "./messages.js";
 import type { WhatsAppEncryptedSessionRecord } from "./session.js";
 import type {
@@ -54,7 +55,10 @@ export class SupabaseWhatsAppModuleStore implements WhatsAppModuleStore {
       .limit(1)
       .maybeSingle();
     assertNoError(result);
-    return result.data ? sessionFromRow(asRecord(result.data)) : undefined;
+    if (!result.data) return undefined;
+    const record = sessionFromRow(asRecord(result.data));
+    assertSessionCredentialStorage(record.encrypted_credentials, this.options.requireEncryptedCredentials === true);
+    return record;
   }
 
   async save(record: WhatsAppEncryptedSessionRecord) {
@@ -235,12 +239,11 @@ export function assertSessionCredentialStorage(payload: string | undefined, encr
   if (!encryptionRequired || !payload) return;
   try {
     const parsed = JSON.parse(payload) as unknown;
-    if (parsed && typeof parsed === "object" && !Array.isArray(parsed) && "auth_directory" in parsed) {
-      throw new Error("WhatsApp session credentials must be encrypted before persistence.");
-    }
-  } catch (error) {
-    if (error instanceof Error && error.message === "WhatsApp session credentials must be encrypted before persistence.") throw error;
+    if (isEncryptedPayload(parsed)) return;
+  } catch {
+    // Invalid JSON is not a valid encrypted credential envelope.
   }
+  throw new Error("WhatsApp session credentials must be encrypted before persistence.");
 }
 
 function sessionToRow(record: WhatsAppEncryptedSessionRecord) {

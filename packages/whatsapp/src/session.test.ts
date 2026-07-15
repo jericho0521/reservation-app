@@ -85,6 +85,29 @@ test("restore passes persisted credentials to the session adapter", async () => 
   assert.equal(restoredCredentials, "persisted-credentials");
 });
 
+test("worker ownership can return a pairing QR without persisting its raw payload", async () => {
+  const store = new InMemoryWhatsAppSessionStore();
+  const service = new WhatsAppSessionService({
+    enabled: true,
+    store,
+    persistQrCode: false,
+    adapter: {
+      async start() {
+        return { qr_code: "raw-private-qr", encrypted_credentials: "encrypted" };
+      },
+      async logout() {
+        return undefined;
+      },
+    },
+  });
+
+  const started = await service.start();
+
+  assert.equal(started.qr_code, "raw-private-qr");
+  assert.equal((await store.load())?.qr_code, undefined);
+  await assert.rejects(() => service.qr(), WhatsAppSessionNotReadyError);
+});
+
 test("normalizes inbound WhatsApp text and ignores unsupported messages", () => {
   assert.deepEqual(
     normalizeWhatsAppInboundTextMessage({

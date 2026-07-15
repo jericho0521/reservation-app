@@ -15,7 +15,24 @@ const checkedPackages = [
     allowedRuntimeDependencies: new Set(["@reservation-platform/contract-types"]),
     allowedDevDependencies: new Set(["tsx", "typescript"]),
   },
+  {
+    name: "@reservation-platform/ai-sdk-adapter",
+    relativeRoot: "packages/ai-sdk-adapter",
+    providerAdapter: true,
+    allowedRuntimeDependencies: new Set([
+      "@ai-sdk/openai",
+      "@reservation-platform/ai-chat",
+      "@reservation-platform/contract-types",
+      "ai",
+    ]),
+    allowedDevDependencies: new Set(["tsx", "typescript"]),
+  },
 ];
+
+const allowedProviderCompositionFiles = new Set([
+  "apps/api/src/runtime.ts",
+  "apps/worker/src/server.ts",
+]);
 
 const sourceExtensions = new Set([".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx"]);
 const ignoredDirectoryNames = new Set([
@@ -117,13 +134,18 @@ export async function verifyAiChatBoundary(options = {}) {
       const relativePath = toPosix(path.relative(repoRoot, filePath));
 
       for (const specifier of extractImportSpecifiers(content)) {
-        const failureReason = getForbiddenImportReason(specifier, filePath, repoRoot);
+        const failureReason = packageConfig.providerAdapter
+          ? getAdapterImportReason(specifier)
+          : getForbiddenImportReason(specifier, filePath, repoRoot);
         if (failureReason) {
           failures.push(`${relativePath}: imports forbidden ${failureReason}: ${specifier}`);
         }
       }
 
       for (const [marker, pattern] of forbiddenReferencePatterns) {
+        if (packageConfig.providerAdapter && (marker === "@ai-sdk/*" || marker === "process.env runtime config access")) {
+          continue;
+        }
         pattern.lastIndex = 0;
         if (pattern.test(content)) {
           failures.push(`${relativePath}: references forbidden marker ${marker}`);
@@ -134,12 +156,38 @@ export async function verifyAiChatBoundary(options = {}) {
     await verifyPackageManifest(packageConfig, repoRoot, failures);
   }
 
+  const repoSourceFiles = await collectRepoSourceFiles(repoRoot);
+  for (const filePath of repoSourceFiles) {
+    const relativePath = toPosix(path.relative(repoRoot, filePath));
+    if (
+      relativePath.startsWith("packages/ai-sdk-adapter/") ||
+      allowedProviderCompositionFiles.has(relativePath)
+    ) {
+      continue;
+    }
+    const content = await readFile(filePath, "utf8");
+    for (const specifier of extractImportSpecifiers(content)) {
+      if (isAiSdkImport(specifier)) {
+        failures.push(`${relativePath}: AI SDK provider/runtime imports are backend adapter-only: ${specifier}`);
+      }
+    }
+  }
+
   return {
     ok: failures.length === 0,
     failures,
     checkedSourceFileCount: checkedSourceFiles.length,
     checkedPackageCount: checkedPackages.length,
   };
+}
+
+async function collectRepoSourceFiles(repoRoot) {
+  const roots = ["apps", "packages", "scripts"].map((entry) => path.join(repoRoot, entry));
+  const collected = [];
+  for (const root of roots) {
+    await collectPath(root, collected);
+  }
+  return sortFiles(collected, repoRoot);
 }
 
 async function collectSourceFiles(rootPath, repoRoot) {
@@ -210,6 +258,25 @@ function getForbiddenImportReason(specifier, importerPath, repoRoot) {
   return repoRule?.[1] ?? null;
 }
 
+function getAdapterImportReason(specifier) {
+  if (specifier.startsWith(".")) {
+    return null;
+  }
+  const allowedImports = new Set([
+    "@ai-sdk/openai",
+    "@reservation-platform/ai-chat",
+    "@reservation-platform/contract-types",
+    "ai",
+  ]);
+  return allowedImports.has(specifier)
+    ? null
+    : "dependency outside the backend AI adapter allowlist";
+}
+
+function isAiSdkImport(specifier) {
+  return specifier === "ai" || specifier.startsWith("ai/") || specifier.startsWith("@ai-sdk/");
+}
+
 function getRepoRelativeImportPath(specifier, importerPath, repoRoot) {
   if (specifier.startsWith("@/")) {
     return normalizeRepoImportPath(specifier.slice(2));
@@ -250,10 +317,12 @@ async function verifyPackageManifest(packageConfig, repoRoot, failures) {
   const packageJson = JSON.parse(packageJsonText);
   const relativePath = `${packageConfig.relativeRoot}/package.json`;
 
-  for (const [marker, pattern] of forbiddenReferencePatterns) {
-    pattern.lastIndex = 0;
-    if (pattern.test(packageJsonText)) {
-      failures.push(`${relativePath}: references forbidden marker ${marker}`);
+  if (!packageConfig.providerAdapter) {
+    for (const [marker, pattern] of forbiddenReferencePatterns) {
+      pattern.lastIndex = 0;
+      if (pattern.test(packageJsonText)) {
+        failures.push(`${relativePath}: references forbidden marker ${marker}`);
+      }
     }
   }
 

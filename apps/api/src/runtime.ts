@@ -1,5 +1,6 @@
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
+import { createAiSdkAgentRuntime } from "@reservation-platform/ai-sdk-adapter";
 import {
   loadBundledCoreMigrationPlan,
   type CoreMigrationLedgerEntry,
@@ -17,6 +18,7 @@ import {
   createReservation,
   confirmConversationBooking,
   createAgentConversationResponder,
+  createIntegrationAgentRuntimeLoader,
   createDeterministicConversationResponder,
   getPlatformService,
   handleConversationInbound,
@@ -27,6 +29,10 @@ import {
   prepareLegacyReservationCreate,
   type AvailabilityRepositoryPort,
   type ConversationOrchestratorDependencies,
+  type ConversationResponder,
+  type ConversationBookingStateStore,
+  type AgentRuntimeLoader,
+  type AiConnectionTester,
   type EmailConnectionTester,
   type ExperienceScope,
   type PlatformCatalogRepository,
@@ -36,6 +42,7 @@ import {
   createSupabaseAvailabilityRepository,
   createSupabaseAnalyticsRepository,
   createSupabaseConversationRepository,
+  createSupabaseConversationBookingStateStore,
   createSupabaseExperienceStudioRepository,
   createSupabaseExperienceKnowledgeRepository,
   createSupabaseIdempotencyRepository,
@@ -53,10 +60,12 @@ import {
   createSupabasePlatformSessionRepository,
   createSupabasePlatformJobRepository,
   createSupabaseTenantVenueRepository,
+  createSupabaseWhatsAppChannelRuntime,
   type ExperienceSupabaseLikeClient,
   type ExperienceKnowledgeSupabaseClient,
   type ReservationManagementSupabaseClient,
   type ConversationSupabaseClient,
+  type ConversationStateSupabaseClient,
   type OperationsOverviewSupabaseClient,
   type AnalyticsSupabaseClient,
   type PlatformSessionSupabaseClient,
@@ -64,6 +73,7 @@ import {
   type IntegrationSupabaseClient,
   type PlatformJobsSupabaseClient,
   type LocationsSupabaseClient,
+  type ChannelRuntimeSupabaseClient,
 } from "@project-play/reservations-supabase";
 import {
   BaileysWhatsAppSessionAdapter,
@@ -76,6 +86,7 @@ import {
   type SupabaseWhatsAppClient,
   type WhatsAppReservationTools,
   type WhatsAppModuleStore,
+  type WhatsAppSessionSnapshot,
 } from "@reservation-platform/whatsapp";
 
 import { createStandaloneJwtJwksBearerTokenVerifier } from "./jwt-verifier.js";
@@ -187,6 +198,7 @@ export interface StandaloneSupabaseRepositoryFactories {
   createAvailabilityRepository(input: StandaloneSupabasePublicAdminClients): NonNullable<StandaloneApiDependencies["availabilityRepository"]>;
   createAnalyticsRepository(client: StandaloneSupabaseClient): NonNullable<StandaloneApiDependencies["analyticsRepository"]>;
   createConversationRepository(client: StandaloneSupabaseClient): NonNullable<StandaloneApiDependencies["conversationRepository"]>;
+  createConversationBookingStateStore(client: StandaloneSupabaseClient): ConversationBookingStateStore;
   createReservationReadRepository(client: StandaloneSupabaseClient): NonNullable<StandaloneApiDependencies["reservationReadRepository"]>;
   createReservationCreateRepository(client: StandaloneSupabaseClient): NonNullable<StandaloneApiDependencies["reservationCreateRepository"]>;
   createReservationMutationRepository(client: StandaloneSupabaseClient): NonNullable<StandaloneApiDependencies["reservationMutationRepository"]>;
@@ -212,7 +224,9 @@ export interface StandaloneSupabaseRuntimeOptions {
   platformConfig?: PlatformRuntimeConfig;
   sessionAllowedOrigins?: readonly string[];
   integrationEncryptionKey?: string;
+  whatsappSessionEncryptionKey?: string;
   emailConnectionTester?: EmailConnectionTester;
+  aiConnectionTester?: AiConnectionTester;
   repositoryFactories?: Partial<StandaloneSupabaseRepositoryFactories>;
 }
 
@@ -243,6 +257,9 @@ const defaultRepositoryFactories: StandaloneSupabaseRepositoryFactories = {
   createAvailabilityRepository: createSupabaseAvailabilityRepository,
   createAnalyticsRepository: (client) => createSupabaseAnalyticsRepository(client as unknown as AnalyticsSupabaseClient),
   createConversationRepository: (client) => createSupabaseConversationRepository(client as unknown as ConversationSupabaseClient),
+  createConversationBookingStateStore: (client) => createSupabaseConversationBookingStateStore(
+    client as unknown as ConversationStateSupabaseClient,
+  ),
   createReservationReadRepository: createSupabaseReservationReadRepository,
   createReservationCreateRepository: createSupabaseReservationRepository,
   createReservationMutationRepository: createSupabaseReservationMutationRepository,
@@ -327,11 +344,45 @@ export function createStandaloneSupabaseDependencies(
         operationsOverviewRepository: repositoryFactories.createOperationsOverviewRepository(adminClient),
         integrationSettingsRepository: repositoryFactories.createIntegrationSettingsRepository(adminClient),
         notificationJobQueue: repositoryFactories.createJobRepository!(adminClient),
+        platformJobQueue: repositoryFactories.createJobRepository!(adminClient),
         tenantVenueRepository: repositoryFactories.createTenantVenueRepository(adminClient),
       }
     : {};
-  const conversationOrchestrator = createWebChatOrchestrator(platformDependencies);
+  const integrationSettingsRepository = "integrationSettingsRepository" in platformDependencies
+    ? platformDependencies.integrationSettingsRepository
+    : undefined;
+  const conversationBookingState = reservationsEnabled
+    ? repositoryFactories.createConversationBookingStateStore(adminClient)
+    : undefined;
+  const conversationOrchestrator = createWebChatOrchestrator(
+    platformDependencies,
+    undefined,
+    conversationBookingState,
+  );
   const integrationEncryptionKey = options.integrationEncryptionKey?.trim();
+  const integrationCredentialEncryptor = integrationEncryptionKey
+    ? (credential: Record<string, unknown>) => encryptSecretEnvelope(credential, integrationEncryptionKey)
+    : undefined;
+  const integrationCredentialDecryptor = integrationEncryptionKey
+    ? (envelope: Parameters<typeof decryptSecretEnvelope>[0]) => decryptSecretEnvelope<Record<string, unknown>>(envelope, integrationEncryptionKey)
+    : undefined;
+  const aiRuntimeLoader = integrationSettingsRepository && integrationCredentialDecryptor
+    ? createIntegrationAgentRuntimeLoader({
+        repository: integrationSettingsRepository,
+        decryptCredential: integrationCredentialDecryptor,
+        createRuntime: createAiSdkAgentRuntime,
+      })
+    : undefined;
+  const workerOwnedWhatsAppModule = createWorkerOwnedWhatsAppModule({
+    client: adminClient,
+    sessionEncryptionKey: options.whatsappSessionEncryptionKey,
+  });
+  const managedConversationOrchestrator = createWebChatOrchestrator(
+    platformDependencies,
+    undefined,
+    conversationBookingState,
+    aiRuntimeLoader,
+  );
 
   return {
     ...authDependencies,
@@ -341,17 +392,12 @@ export function createStandaloneSupabaseDependencies(
       adminClient,
       options.loadCoreMigrationPlan ?? loadBundledCoreMigrationPlan,
     ),
-    ...(conversationOrchestrator ? { conversationOrchestrator } : {}),
-    ...(integrationEncryptionKey
-      ? {
-          integrationCredentialEncryptor: (credential: Record<string, unknown>) => (
-            encryptSecretEnvelope(credential, integrationEncryptionKey)
-          ),
-          integrationCredentialDecryptor: (envelope: Parameters<typeof decryptSecretEnvelope>[0]) => (
-            decryptSecretEnvelope<Record<string, unknown>>(envelope, integrationEncryptionKey)
-          ),
-        }
-      : {}),
+    ...(managedConversationOrchestrator ? { conversationOrchestrator: managedConversationOrchestrator } : conversationOrchestrator ? { conversationOrchestrator } : {}),
+    ...(integrationCredentialEncryptor ? { integrationCredentialEncryptor } : {}),
+    ...(integrationCredentialDecryptor ? { integrationCredentialDecryptor } : {}),
+    ...(aiRuntimeLoader ? { aiRuntimeLoader } : {}),
+    whatsappModule: workerOwnedWhatsAppModule,
+    aiConnectionTester: options.aiConnectionTester ?? createAiSdkConnectionTester(),
     ...(options.emailConnectionTester ? { emailConnectionTester: options.emailConnectionTester } : {}),
     emailTestRecipientResolver: async (principal) => (
       (await sessionRepository.findUserById?.(principal.tenantId, principal.userId))?.email
@@ -451,6 +497,7 @@ export function createStandaloneSupabaseDependenciesFromEnv(
     platformConfig,
     sessionAllowedOrigins: options.sessionAllowedOrigins ?? createStandaloneCorsOptionsFromEnv(env).allowedOrigins,
     integrationEncryptionKey: options.integrationEncryptionKey ?? env.RESERVATION_INSTALLATION_MASTER_KEY,
+    whatsappSessionEncryptionKey: options.whatsappSessionEncryptionKey ?? env.RESERVATION_WHATSAPP_SESSION_ENCRYPTION_KEY,
   };
   const config = standaloneSupabaseConfigFromEnv(env);
   const normalizedConfig = normalizeStandaloneSupabaseConfig(config);
@@ -465,10 +512,15 @@ export function createStandaloneSupabaseDependenciesFromEnv(
 
   const supabaseDependencies = createStandaloneSupabaseDependencies(config, runtimeOptions);
   const agentRuntime = createWebChatAgentRuntime(env, platformConfig, options.fetch);
-  if (platformConfig?.modules.ai.enabled && !agentRuntime) {
+  if (platformConfig?.modules.ai.enabled && !agentRuntime && !supabaseDependencies.aiRuntimeLoader) {
     throw new PlatformRuntimeConfigError(["modules.ai.enabled requires AI_AGENT_API_KEY plus provider baseUrl and model"]);
   }
-  const conversationOrchestrator = createWebChatOrchestrator(supabaseDependencies, agentRuntime);
+  const conversationOrchestrator = createWebChatOrchestrator(
+    supabaseDependencies,
+    agentRuntime,
+    supabaseDependencies.conversationOrchestrator?.state,
+    supabaseDependencies.aiRuntimeLoader,
+  );
   return {
     ...supabaseDependencies,
     ...authDependencies,
@@ -487,6 +539,8 @@ function createWebChatAgentRuntime(env: StandaloneSupabaseEnv, platformConfig: P
 function createWebChatOrchestrator(
   dependencies: StandaloneApiDependencies,
   agentRuntime?: ReturnType<typeof createWhatsAppAgentRuntimeFromEnv>,
+  state: ConversationBookingStateStore = new InMemoryConversationBookingStateStore(),
+  agentRuntimeLoader?: AgentRuntimeLoader,
 ): ConversationOrchestratorDependencies | undefined {
   const {
     conversationRepository: conversations,
@@ -497,12 +551,22 @@ function createWebChatOrchestrator(
     experienceKnowledgeRepository,
   } = dependencies;
   if (!conversations || !catalogRepository || !availabilityRepository || !reservationCreateRepository || !experienceStudioRepository || !experienceKnowledgeRepository) return undefined;
-  const responder = agentRuntime
-    ? createAgentConversationResponder(agentRuntime)
-    : createDeterministicConversationResponder();
+  const fallback = createDeterministicConversationResponder();
+  const responder: ConversationResponder = agentRuntime
+    ? createAgentConversationResponder(agentRuntime, fallback)
+    : agentRuntimeLoader
+      ? {
+          async respond(input: Parameters<ConversationResponder["respond"]>[0]) {
+            const runtime = await agentRuntimeLoader.load(input.scope.tenantId);
+            return runtime
+              ? createAgentConversationResponder(runtime, fallback).respond(input)
+              : fallback.respond(input);
+          },
+        }
+      : fallback;
   return {
     conversations,
-    state: new InMemoryConversationBookingStateStore(),
+    state,
     responder,
     async loadExperience(scope) {
       const [workspace, knowledgeResult, servicesResult] = await Promise.all([
@@ -518,6 +582,25 @@ function createWebChatOrchestrator(
       };
     },
     tools: createConversationBookingTools({ catalogRepository, availabilityRepository, reservationCreateRepository }),
+  };
+}
+
+function createAiSdkConnectionTester(): AiConnectionTester {
+  return {
+    async test(input) {
+      const runtime = createAiSdkAgentRuntime({
+        provider: input.provider,
+        model: input.model,
+        apiKey: input.apiKey,
+        ...(input.baseUrl ? { baseUrl: input.baseUrl } : {}),
+        timeoutMs: input.timeoutMs,
+      });
+      await runtime.run({
+        scope: { tenant_id: "connection-test", venue_id: "connection-test" },
+        messages: [{ role: "user", content: "Reply with OK." }],
+        system_prompt: "This is a connection test. Reply briefly and do not call tools.",
+      });
+    },
   };
 }
 
@@ -572,6 +655,149 @@ export function createStandaloneCorsOptionsFromEnv(env: StandaloneSupabaseEnv = 
   return {
     allowedOrigins: splitEnvList(env.RESERVATION_PLATFORM_CORS_ALLOWED_ORIGINS),
   };
+}
+
+function createWorkerOwnedWhatsAppModule(input: {
+  client: StandaloneSupabaseClient;
+  sessionEncryptionKey?: string;
+}): StandaloneApiDependencies["whatsappModule"] {
+  const channel = createSupabaseWhatsAppChannelRuntime(input.client as unknown as ChannelRuntimeSupabaseClient);
+  const store = new SupabaseWhatsAppModuleStore(
+    input.client as unknown as SupabaseWhatsAppClient,
+    { requireEncryptedCredentials: Boolean(input.sessionEncryptionKey?.trim()) },
+  );
+  const requireTenant = (tenantId?: string) => {
+    const value = tenantId?.trim();
+    if (!value) throw new Error("WhatsApp tenant scope is required.");
+    return value;
+  };
+  const snapshot = (value: Record<string, unknown>): WhatsAppSessionSnapshot => {
+    const status = value.status;
+    const normalizedStatus: WhatsAppSessionSnapshot["status"] = status === "pending_qr" || status === "connected" || status === "expired" || status === "disabled"
+      ? status
+      : "disconnected";
+    return {
+      provider: "session_qr" as const,
+      status: normalizedStatus,
+      ...(typeof value.session_id === "string" ? { session_id: value.session_id } : {}),
+      ...(typeof value.connected_at === "string" ? { connected_at: value.connected_at } : {}),
+      updated_at: typeof value.updated_at === "string" ? value.updated_at : new Date().toISOString(),
+      ...(isMetadataRecord(value.metadata) ? { metadata: value.metadata } : {}),
+    };
+  };
+  return {
+    async startSession(value) {
+      const tenantId = requireTenant(value.tenant_id);
+      const venueId = value.venue_id?.trim();
+      if (!venueId) throw new Error("WhatsApp venue scope is required.");
+      const command = await channel.enqueue({
+        tenantId,
+        venueId,
+        kind: "whatsapp.start_session",
+        idempotencyKey: `whatsapp:start:${randomUUID()}`,
+      });
+      return {
+        status: 202,
+        headers: { "cache-control": "no-store" },
+        body: {
+          provider: "session_qr",
+          status: "pending_qr",
+          updated_at: new Date().toISOString(),
+          metadata: { command_id: command.command_id, command_status: "pending" },
+        },
+      };
+    },
+    async sessionStatus(value) {
+      return snapshot(await channel.readState(requireTenant(value?.tenantId)));
+    },
+    async reconnectSession(value) {
+      const tenantId = requireTenant(value?.tenantId);
+      const command = await channel.enqueue({
+        tenantId,
+        ...(value?.venueId?.trim() ? { venueId: value.venueId.trim() } : {}),
+        kind: "whatsapp.restore_session",
+        idempotencyKey: `whatsapp:reconnect:${randomUUID()}`,
+      });
+      return {
+        status: 202,
+        headers: { "cache-control": "no-store" },
+        body: {
+          provider: "session_qr",
+          status: "disconnected",
+          updated_at: new Date().toISOString(),
+          metadata: { command_id: command.command_id, command_status: "pending", connection_state: "reconnecting" },
+        },
+      };
+    },
+    async sessionQr(value) {
+      const tenantId = requireTenant(value?.tenantId);
+      const pairing = await channel.readPairing(tenantId);
+      if (!pairing || !input.sessionEncryptionKey?.trim()) {
+        const error = new Error("WhatsApp QR session is not ready.");
+        error.name = "WhatsAppSessionNotReadyError";
+        throw error;
+      }
+      const decrypted = decryptSecretEnvelope<{ qr?: unknown }>(
+        pairing.encryptedQr as Parameters<typeof decryptSecretEnvelope>[0],
+        input.sessionEncryptionKey,
+      );
+      if (typeof decrypted.qr !== "string" || !decrypted.qr) throw new Error("WhatsApp pairing state is invalid.");
+      return {
+        status: 200,
+        headers: { "cache-control": "no-store", pragma: "no-cache" },
+        body: { ...snapshot(await channel.readState(tenantId)), qr_code: decrypted.qr },
+      };
+    },
+    async logoutSession(value) {
+      const tenantId = requireTenant(value?.tenantId);
+      const command = await channel.enqueue({
+        tenantId,
+        ...(value?.venueId?.trim() ? { venueId: value.venueId.trim() } : {}),
+        kind: "whatsapp.logout_session",
+        idempotencyKey: `whatsapp:logout:${randomUUID()}`,
+      });
+      return {
+        status: 202,
+        headers: { "cache-control": "no-store" },
+        body: {
+          provider: "session_qr",
+          status: "disconnected",
+          updated_at: new Date().toISOString(),
+          metadata: { command_id: command.command_id, command_status: "pending" },
+        },
+      };
+    },
+    getConfig: () => store.getConfig(),
+    updateConfig: (value) => store.updateConfig(value),
+    listKnowledge: () => store.listKnowledge(),
+    createKnowledge: (value) => store.createKnowledge(value),
+    updateKnowledge: (knowledgeId, value) => store.updateKnowledge(knowledgeId, value),
+    deleteKnowledge: (knowledgeId) => store.deleteKnowledge(knowledgeId),
+    listConversations: () => store.listConversations(),
+    listConversationMessages: (conversationId) => store.listConversationMessages(conversationId),
+    handleInboundMessage() {
+      const error = new Error("WhatsApp inbound simulation is disabled.");
+      error.name = "WhatsAppSimulationDisabledError";
+      throw error;
+    },
+    async readiness() {
+      const current = await store.load();
+      const connected = current?.status === "connected";
+      return {
+        enabled: true,
+        provider: "session_qr",
+        simulation_enabled: false,
+        production_ready: connected,
+        missing_requirements: connected ? [] : ["whatsapp_session_connected"],
+        ai: { configured: true, connected: true, healthy: true, message: "AI settings are managed separately." },
+        whatsapp: { configured: true, connected, healthy: connected, message: connected ? "WhatsApp is connected." : "Connect a WhatsApp session." },
+      };
+    },
+  };
+}
+
+function isMetadataRecord(value: unknown): value is MetadataRecord {
+  return Boolean(value && typeof value === "object" && !Array.isArray(value));
 }
 
 export function standaloneWhatsAppDependenciesFromEnv(
@@ -664,6 +890,7 @@ export function standaloneWhatsAppDependenciesFromEnv(
   return {
     whatsappModule: {
       startSession: (input) => service.startSession(input),
+      reconnectSession: () => service.restoreSessionConnection(),
       sessionStatus: () => service.sessionStatus(),
       sessionQr: () => service.sessionQr(),
       logoutSession: () => service.logoutSession(),

@@ -9,6 +9,15 @@ export interface EncryptedPayload {
   ciphertext: string;
 }
 
+export function isEncryptedPayload(value: unknown): value is EncryptedPayload {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const payload = value as Partial<EncryptedPayload>;
+  return payload.algorithm === algorithm
+    && typeof payload.iv === "string" && payload.iv.length > 0
+    && typeof payload.tag === "string" && payload.tag.length > 0
+    && typeof payload.ciphertext === "string" && payload.ciphertext.length > 0;
+}
+
 export function encryptJson(value: unknown, secret: string): string {
   const key = keyFromSecret(secret);
   const iv = randomBytes(12);
@@ -25,8 +34,8 @@ export function encryptJson(value: unknown, secret: string): string {
 }
 
 export function decryptJson<T = unknown>(payloadText: string, secret: string): T {
-  const payload = JSON.parse(payloadText) as EncryptedPayload;
-  if (payload.algorithm !== algorithm) {
+  const payload = JSON.parse(payloadText) as unknown;
+  if (!isEncryptedPayload(payload)) {
     throw new Error("Unsupported encrypted payload algorithm.");
   }
   const decipher = createDecipheriv(algorithm, keyFromSecret(secret), Buffer.from(payload.iv, "base64url"));

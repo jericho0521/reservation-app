@@ -135,6 +135,7 @@ export interface ReservationReadRepositoryPort {
     date?: string;
     status?: string;
     staffId?: string;
+    serviceId?: string;
   }): Promise<ReservationReadRepositoryResult<unknown[]>>;
   getReservationsSummary?(input: ReservationListSummaryInput & { venueId?: string }): Promise<ReservationListSummaryResult>;
   readReservationById(reservationId: string, venueId?: string): Promise<ReservationReadRepositoryResult<unknown>>;
@@ -761,6 +762,7 @@ export async function listReservations(input: {
   date?: string;
   status?: string;
   staffId?: string;
+  serviceId?: string;
 }): Promise<ReservationApplicationResult<ListReservationsResponse>> {
   try {
     const search = normalizeReservationSearchTerm(input.search);
@@ -773,6 +775,7 @@ export async function listReservations(input: {
       ...(input.date ? { date: input.date } : {}),
       ...(input.status ? { status: input.status } : {}),
       ...(input.staffId ? { staffId: input.staffId } : {}),
+      ...(input.serviceId ? { serviceId: input.serviceId } : {}),
     });
 
     if (error) {

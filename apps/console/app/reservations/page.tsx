@@ -25,6 +25,7 @@ export default async function ReservationsPage({ searchParams }: { searchParams:
         end_at: `${date}T23:59:59`,
         ...(filters.practitioner ? { staff_id: filters.practitioner } : {}),
         ...(filters.status && isAppointmentStatus(filters.status) ? { status: filters.status } : {}),
+        ...(filters.service ? { service_id: filters.service } : {}),
       }),
       client.listServices(),
       client.listResources(),

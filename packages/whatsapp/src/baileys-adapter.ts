@@ -13,6 +13,7 @@ export interface BaileysWhatsAppSessionAdapterOptions {
   qrTimeoutMs?: number;
   maxReconnectAttempts?: number;
   sessionEncryptionKey?: string;
+  requireEncryptedCredentials?: boolean;
   onInboundMessage?: (message: WhatsAppInboundMessage) => void | Promise<void>;
   onStatusChange?: (status: "pending_qr" | "connected" | "disconnected" | "expired", metadata?: MetadataRecord) => void | Promise<void>;
 }
@@ -56,6 +57,9 @@ export class BaileysWhatsAppSessionAdapter implements WhatsAppSessionAdapter {
     this.qrTimeoutMs = options.qrTimeoutMs ?? 60_000;
     this.maxReconnectAttempts = options.maxReconnectAttempts ?? 5;
     this.sessionEncryptionKey = options.sessionEncryptionKey?.trim() || undefined;
+    if (options.requireEncryptedCredentials === true && !this.sessionEncryptionKey) {
+      throw new Error("WhatsApp session encryption key is required.");
+    }
     this.onInboundMessage = options.onInboundMessage;
     this.onStatusChange = options.onStatusChange;
   }
@@ -102,7 +106,7 @@ export class BaileysWhatsAppSessionAdapter implements WhatsAppSessionAdapter {
               encrypted_credentials: serializeBaileysSessionCredentials(sessionDirectory, this.sessionEncryptionKey),
               metadata: {
                 adapter: "baileys",
-                auth_directory: sessionDirectory,
+                session_storage: "multi-file",
                 ...input.metadata,
               },
             });
@@ -189,7 +193,7 @@ export class BaileysWhatsAppSessionAdapter implements WhatsAppSessionAdapter {
           settled = true;
           resolve({
             status: "disconnected",
-            metadata: { adapter: "baileys", auth_directory: sessionDirectory, restore_timeout: true },
+            metadata: { adapter: "baileys", session_storage: "multi-file", restore_timeout: true },
           });
         }
       }, this.qrTimeoutMs);
@@ -211,7 +215,7 @@ export class BaileysWhatsAppSessionAdapter implements WhatsAppSessionAdapter {
               status: "pending_qr",
               qr_code: update.qr,
               encrypted_credentials: serializeBaileysSessionCredentials(sessionDirectory, this.sessionEncryptionKey),
-              metadata: { adapter: "baileys", auth_directory: sessionDirectory, ...input.metadata },
+              metadata: { adapter: "baileys", session_storage: "multi-file", ...input.metadata },
             });
             return;
           }
@@ -224,7 +228,7 @@ export class BaileysWhatsAppSessionAdapter implements WhatsAppSessionAdapter {
               resolve({
                 status: "connected",
                 encrypted_credentials: serializeBaileysSessionCredentials(sessionDirectory, this.sessionEncryptionKey),
-                metadata: { adapter: "baileys", auth_directory: sessionDirectory, restored: true, ...input.metadata },
+                metadata: { adapter: "baileys", session_storage: "multi-file", restored: true, ...input.metadata },
               });
             }
             return;
@@ -239,7 +243,7 @@ export class BaileysWhatsAppSessionAdapter implements WhatsAppSessionAdapter {
                 settled = true;
                 resolve({
                   status: "expired",
-                  metadata: { adapter: "baileys", auth_directory: sessionDirectory, disconnect_status: disconnectStatus },
+                  metadata: { adapter: "baileys", session_storage: "multi-file", disconnect_status: disconnectStatus },
                 });
               }
               return;
@@ -263,7 +267,7 @@ export class BaileysWhatsAppSessionAdapter implements WhatsAppSessionAdapter {
                 status: "disconnected",
                 metadata: {
                   adapter: "baileys",
-                  auth_directory: sessionDirectory,
+                  session_storage: "multi-file",
                   ...(disconnectStatus === undefined ? {} : { disconnect_status: disconnectStatus }),
                   reconnect_attempts: attempt,
                 },
@@ -287,12 +291,17 @@ export class BaileysWhatsAppSessionAdapter implements WhatsAppSessionAdapter {
   }
 
   async sendMessage(input: WhatsAppOutboundMessage) {
+    await this.deliverMessage(input);
+  }
+
+  async deliverMessage(input: WhatsAppOutboundMessage) {
     const socket = this.socket as BaileysSocket | undefined;
     if (!socket) {
       throw new Error("WhatsApp session is not connected.");
     }
 
-    await socket.sendMessage(input.to, { text: input.text });
+    const result = await socket.sendMessage(input.to, { text: input.text });
+    return { providerMessageId: baileysProviderMessageId(result) };
   }
 
   async logout() {
@@ -311,6 +320,14 @@ export class BaileysWhatsAppSessionAdapter implements WhatsAppSessionAdapter {
       console.error("WhatsApp status change handler failed.", error);
     }
   }
+}
+
+export function baileysProviderMessageId(value: unknown): string | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  const key = (value as { key?: unknown }).key;
+  if (!key || typeof key !== "object" || Array.isArray(key)) return undefined;
+  const id = (key as { id?: unknown }).id;
+  return typeof id === "string" && id.length > 0 ? id : undefined;
 }
 
 interface BaileysSocket {

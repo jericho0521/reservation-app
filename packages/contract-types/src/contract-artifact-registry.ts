@@ -1,7 +1,7 @@
 export type JsonSchema = Record<string, unknown>;
 
 export interface ContractOperation {
-  method: "get" | "post" | "put" | "patch";
+  method: "get" | "post" | "put" | "patch" | "delete";
   path: string;
   operationId: string;
   summary: string;
@@ -150,6 +150,28 @@ export const publicJsonSchemaDefinitions: Record<string, JsonSchema> = {
     message: { type: "string", minLength: 1, maxLength: 160 },
     error_code: { type: "string", enum: ["not_configured", "connection_failed"] },
   }, ["ok", "message"]),
+  AiIntegrationSettingsInput: objectSchema({
+    enabled: booleanSchema,
+    provider: { type: "string", const: "openai" },
+    model: { type: "string", minLength: 1, maxLength: 200 },
+    base_url: { type: "string", format: "uri", maxLength: 2_048 },
+    api_key: { type: "string", minLength: 8, maxLength: 4_096, writeOnly: true },
+  }, ["enabled", "provider", "model"]),
+  AiIntegrationSettingsResponse: objectSchema({
+    enabled: booleanSchema,
+    provider: { type: "string", const: "openai" },
+    configured: booleanSchema,
+    model: { type: "string", minLength: 1, maxLength: 200 },
+    base_url: { type: "string", format: "uri", maxLength: 2_048 },
+    credential_present: booleanSchema,
+    updated_at: { type: "string", format: "date-time" },
+  }, ["enabled", "provider", "configured", "credential_present"]),
+  AiIntegrationTestResponse: objectSchema({
+    ok: booleanSchema,
+    provider: { type: "string", const: "openai" },
+    model: { type: "string", minLength: 1, maxLength: 200 },
+    error_code: { type: "string", enum: ["not_configured", "credential_missing", "connection_failed"] },
+  }, ["ok", "provider", "model"]),
   InstallationLocationInput: objectSchema({
     name: { type: "string", minLength: 1, maxLength: 120 },
     address: { type: "string", maxLength: 500 },
@@ -442,6 +464,11 @@ export const publicJsonSchemaDefinitions: Record<string, JsonSchema> = {
     end_time: stringSchema,
     quantity: positiveIntegerSchema,
   }, ["proposal_id", "service_id", "service_name", "date", "start_time", "end_time", "quantity"]),
+  PublicChatMessagesResponse: objectSchema({
+    messages: { type: "array", items: ref("ConversationMessageResponse") },
+    next_cursor: stringSchema,
+    proposal: ref("ConversationBookingProposalResponse"),
+  }, ["messages"]),
   PublicChatConversationResponse: objectSchema({
     conversation_id: stringSchema,
     automation_state: ref("ConversationAutomationState"),
@@ -948,6 +975,43 @@ export const publicContractOperations: ContractOperation[] = [
   },
   {
     method: "get",
+    path: "/v1/integrations/ai",
+    operationId: "getAiIntegrationSettings",
+    summary: "Read the owner-managed AI provider settings.",
+    tags: ["Integrations"],
+    responseSchema: "AiIntegrationSettingsResponse",
+    authentication: "cookie",
+  },
+  {
+    method: "put",
+    path: "/v1/integrations/ai",
+    operationId: "updateAiIntegrationSettings",
+    summary: "Save or rotate the owner-managed AI provider settings.",
+    tags: ["Integrations"],
+    requestBodySchema: "AiIntegrationSettingsInput",
+    responseSchema: "AiIntegrationSettingsResponse",
+    authentication: "cookie",
+  },
+  {
+    method: "post",
+    path: "/v1/integrations/ai/test",
+    operationId: "testAiIntegration",
+    summary: "Run a bounded AI provider connection test.",
+    tags: ["Integrations"],
+    responseSchema: "AiIntegrationTestResponse",
+    authentication: "cookie",
+  },
+  {
+    method: "delete",
+    path: "/v1/integrations/ai",
+    operationId: "revokeAiIntegrationCredential",
+    summary: "Revoke the stored AI provider credential.",
+    tags: ["Integrations"],
+    successStatus: "204",
+    authentication: "cookie",
+  },
+  {
+    method: "get",
     path: "/v1/installation/business",
     operationId: "getInstallationBusiness",
     summary: "Read the installation business and locations.",
@@ -1315,7 +1379,7 @@ export const publicContractOperations: ContractOperation[] = [
     tags: ["Public chat"],
     pathParameters: ["slug", "conversation_id"],
     querySchema: "ListConversationMessagesQuery",
-    responseSchema: "ListConversationMessagesResponse",
+    responseSchema: "PublicChatMessagesResponse",
     authentication: "public",
   },
   {

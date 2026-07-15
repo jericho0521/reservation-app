@@ -487,6 +487,7 @@ test("standalone Supabase runtime wires public and admin clients to repository f
     { name: "createOperationsOverviewRepository", adminClient: clients[1] },
     { name: "createIntegrationSettingsRepository", adminClient: clients[1] },
     { name: "createTenantVenueRepository", adminClient: clients[1] },
+    { name: "createConversationBookingStateStore", adminClient: clients[1] },
   ]);
 
   assert.equal(Boolean(dependencies.catalogRepository), true);
@@ -829,6 +830,10 @@ function recordingRepositoryFactories(
     createConversationRepository(client) {
       recordAdminFactoryCall(calls, "createConversationRepository", client);
       return repository as NonNullable<StandaloneApiDependencies["conversationRepository"]>;
+    },
+    createConversationBookingStateStore(client) {
+      recordAdminFactoryCall(calls, "createConversationBookingStateStore", client);
+      return new InMemoryConversationBookingStateStore();
     },
     createReservationReadRepository(client) {
       recordAdminFactoryCall(calls, "createReservationReadRepository", client);

@@ -71,6 +71,7 @@ export interface WhatsAppSessionServiceOptions {
   store?: WhatsAppSessionStore;
   adapter?: WhatsAppSessionAdapter & Partial<WhatsAppSessionRestoreAdapter>;
   now?: () => Date;
+  persistQrCode?: boolean;
 }
 
 export class WhatsAppModuleDisabledError extends Error {
@@ -126,6 +127,7 @@ export class WhatsAppSessionService {
   private readonly store: WhatsAppSessionStore;
   private readonly adapter: WhatsAppSessionAdapter;
   private readonly now: () => Date;
+  private readonly persistQrCode: boolean;
 
   constructor(options: WhatsAppSessionServiceOptions = {}) {
     this.enabled = options.enabled ?? false;
@@ -133,6 +135,7 @@ export class WhatsAppSessionService {
     this.store = options.store ?? new InMemoryWhatsAppSessionStore();
     this.adapter = options.adapter ?? new PlaceholderWhatsAppQrSessionAdapter();
     this.now = options.now ?? (() => new Date());
+    this.persistQrCode = options.persistQrCode ?? true;
   }
 
   async start(input: WhatsAppSessionStartInput = {}): Promise<WhatsAppSessionSnapshot> {
@@ -152,14 +155,14 @@ export class WhatsAppSessionService {
       session_id: sessionId,
       provider,
       status: "pending_qr",
-      qr_code: started.qr_code,
+      qr_code: this.persistQrCode ? started.qr_code : undefined,
       encrypted_credentials: started.encrypted_credentials,
       updated_at: updatedAt,
       metadata: buildSessionMetadata(input, started.metadata),
     };
 
     await this.store.save(record);
-    return sessionSnapshot(record);
+    return sessionSnapshot({ ...record, qr_code: started.qr_code });
   }
 
   async status(): Promise<WhatsAppSessionSnapshot> {
@@ -258,7 +261,7 @@ export class WhatsAppSessionService {
     const updated: WhatsAppEncryptedSessionRecord = {
       ...record,
       status: restored.status,
-      qr_code: restored.qr_code,
+      qr_code: this.persistQrCode ? restored.qr_code : undefined,
       encrypted_credentials: restored.encrypted_credentials ?? record.encrypted_credentials,
       connected_at: restored.status === "connected" ? record.connected_at ?? this.nowIso() : record.connected_at,
       updated_at: this.nowIso(),
@@ -268,7 +271,7 @@ export class WhatsAppSessionService {
       },
     };
     await this.store.save(updated);
-    return sessionSnapshot(updated);
+    return sessionSnapshot({ ...updated, qr_code: restored.qr_code ?? updated.qr_code });
   }
 
   private assertEnabled() {

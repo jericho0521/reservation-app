@@ -32,7 +32,9 @@ test("setup responses prevent token caching and referrer forwarding through Next
     readFile(new URL("../../../docker/production/Caddyfile", import.meta.url), "utf8"),
   ]);
 
-  assert.match(nextConfig, /source: "\/setup"/u);
+  for (const source of ["/setup", "/invite/:path*", "/reset-password", "/reset-password/:path*"]) {
+    assert.match(nextConfig, new RegExp(source.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "u"));
+  }
   assert.match(nextConfig, /key: "Referrer-Policy", value: "no-referrer"/u);
   assert.match(nextConfig, /key: "Cache-Control", value: "private, no-store"/u);
   assert.match(caddy, /\?Referrer-Policy "strict-origin-when-cross-origin"/u);

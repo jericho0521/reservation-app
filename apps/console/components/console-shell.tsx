@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { staffNavigation } from "../lib/staff-access";
 
 const futureSections: string[] = [];
 
@@ -30,6 +31,7 @@ export function ConsoleShell({
           <a href="/admin/resources">Resources & maintenance</a>
           <a href="/admin/channels">Channels & AI</a>
           <a href="/admin/analytics">Analytics</a>
+          {role ? staffNavigation({ role }).map((href) => <a href={href} key={href}>Staff access</a>) : null}
           {futureSections.map((section) => (
             <span aria-disabled="true" className="nav-disabled" key={section}>
               {section}

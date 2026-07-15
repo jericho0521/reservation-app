@@ -8,13 +8,13 @@ const nextConfig: NextConfig = {
   output: "standalone",
   basePath: "/admin",
   async headers() {
-    return [{
-      source: "/setup",
+    return ["/setup", "/invite/:path*", "/reset-password", "/reset-password/:path*"].map((source) => ({
+      source,
       headers: [
         { key: "Referrer-Policy", value: "no-referrer" },
         { key: "Cache-Control", value: "private, no-store" },
       ],
-    }];
+    }));
   },
   outputFileTracingRoot: repoRoot,
   transpilePackages: ["@reservation-platform/sdk"],

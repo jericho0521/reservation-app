@@ -25,6 +25,9 @@ test("protected route redirects an anonymous request to login", () => {
 test("login and setup remain public without a session", () => {
   assert.equal(authRedirect({ pathname: "/login", hasSessionCookie: false }), undefined);
   assert.equal(authRedirect({ pathname: "/setup", hasSessionCookie: false }), undefined);
+  assert.equal(authRedirect({ pathname: `/invite/${"i".repeat(43)}`, hasSessionCookie: false }), undefined);
+  assert.equal(authRedirect({ pathname: "/reset-password", hasSessionCookie: false }), undefined);
+  assert.equal(authRedirect({ pathname: `/reset-password/${"r".repeat(43)}`, hasSessionCookie: false }), undefined);
 });
 
 test("server API headers forward only session cookies and add CSRF for writes", () => {

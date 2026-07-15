@@ -84,6 +84,18 @@ button, input, select, textarea { font: inherit; }
 .setup-record-list span, .setup-record-list small, .setup-details summary { color: var(--muted); }
 .setup-details summary { cursor: pointer; font-weight: 700; }
 .setup-details[open] summary { margin-bottom: 1rem; }
+.auth-secondary-link { display: inline-block; margin-top: 1rem; color: var(--accent); }
+.assignment-options { display: flex; flex-wrap: wrap; gap: .65rem; padding: 1rem; border: 1px solid var(--border); border-radius: .75rem; }
+.assignment-options legend { padding: 0 .35rem; color: var(--muted); font-size: .78rem; font-weight: 700; }
+.assignment-options label { display: flex; align-items: center; gap: .45rem; padding: .5rem .65rem; border: 1px solid var(--border); border-radius: 999px; }
+.one-time-secret { display: grid; gap: .5rem; padding: 1rem; border: 1px solid #854d0e; border-radius: .75rem; background: rgba(133,77,14,.12); }
+.one-time-secret code { padding: .7rem; overflow-wrap: anywhere; border-radius: .5rem; background: #0b111a; }
+.one-time-secret small { color: var(--muted); }
+.staff-access-list { display: grid; gap: 1rem; }
+.staff-access-card { padding: 1.25rem; }
+.staff-access-card > header { display: flex; justify-content: space-between; gap: 1rem; }
+.staff-access-card h2 { margin: .25rem 0; }
+.staff-access-card header p { margin: 0; color: var(--muted); }
 .muted { color: var(--muted); }
 .studio-workspace { width: min(82rem, 100%); margin: 0 auto; display: grid; grid-template-columns: 14rem minmax(0, 1fr); gap: 2.5rem; }
 .studio-rail { min-width: 0; }

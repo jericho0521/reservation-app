@@ -5,6 +5,7 @@ export const publicRouteHeader = "x-reservation-console-public-route";
 export const locationRouteHeader = "x-reservation-console-location-route";
 export const onboardingRouteHeader = "x-reservation-console-onboarding-route";
 const publicAdminPaths = new Set(["/login", "/setup"]);
+const publicAdminPrefixes = ["/invite/", "/reset-password/"] as const;
 const locationAdminPath = "/location";
 const onboardingAdminPath = "/onboarding";
 const setupWizardPrefix = "/setup/";
@@ -17,12 +18,14 @@ export interface AuthRedirectInput {
 }
 
 export function authRedirect(input: AuthRedirectInput): string | undefined {
-  if (publicAdminPaths.has(input.pathname) || input.hasSessionCookie) return undefined;
+  if (isPublicAdminPath(input.pathname) || input.hasSessionCookie) return undefined;
   return "/admin/login";
 }
 
 export function isPublicAdminPath(pathname: string): boolean {
-  return publicAdminPaths.has(pathname);
+  return publicAdminPaths.has(pathname)
+    || pathname === "/reset-password"
+    || publicAdminPrefixes.some((prefix) => pathname.startsWith(prefix));
 }
 
 export function buildMiddlewareRequestHeaders(pathname: string, incoming: Headers): Headers {

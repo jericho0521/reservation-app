@@ -6,7 +6,7 @@ Status: **Blocked pending external release evidence.**
 
 - [x] Complete CI gate passes on the exact candidate commit.
 - [x] Browser discovery and available local-stack journeys pass.
-- [x] Migration bundle is current through `000036`.
+- [x] Migration bundle is current through `000037`.
 - [x] Release manifest, signature harness, security, recovery, documentation, and evidence validators pass.
 
 ## Required observed evidence

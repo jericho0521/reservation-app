@@ -47,7 +47,7 @@
     },
     {
       "path": "scripts/production/release-manifest.mjs",
-      "sha256": "2604f7abb191ff1a5df98dda6bf4669933dc93c83853825d0528fc3141b89862"
+      "sha256": "e82ce15df0897f555dd86369e7454a28a5873946eb95be21e9af161f9caba81a"
     },
     {
       "path": "scripts/production/smoke.mjs",

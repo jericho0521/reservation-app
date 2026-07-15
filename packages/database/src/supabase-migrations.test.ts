@@ -13,7 +13,7 @@ import {
 
 const indexPath = new URL("../migrations/supabase/migration-index.json", import.meta.url);
 
-test("core plan includes exactly 000001 through 000036 in order", async () => {
+test("core plan includes exactly 000001 through 000037 in order", async () => {
   const index = await readActualIndex();
   const plan = buildSupabaseMigrationPlan(index);
 
@@ -56,9 +56,10 @@ test("core plan includes exactly 000001 through 000036 in order", async () => {
       "000034_channel_runtime.sql",
       "000035_system_operations.sql",
       "000036_appointment_analytics.sql",
+      "000037_operations_overview_channel_compatibility.sql",
     ],
   );
-  assert.equal(plan.migrations.length, 36);
+  assert.equal(plan.migrations.length, 37);
   assert.equal(plan.seeds.length, 0);
 });
 
@@ -112,6 +113,13 @@ test("appointment analytics are bounded, scoped, and based on operating records"
   assert.match(sql, /'no_show_rate'/);
   assert.match(sql, /limit 50/);
   assert.doesNotMatch(sql, /predict|forecast/);
+});
+
+test("operations overview remains compatible with the booking channel column", async () => {
+  const sql = (await readFile(new URL("../migrations/supabase/000037_operations_overview_channel_compatibility.sql", import.meta.url), "utf8")).toLowerCase();
+  assert.match(sql, /as resolved_channel/);
+  assert.match(sql, /'channel', bounded\.resolved_channel/);
+  assert.doesNotMatch(sql, /'channel', channel/);
 });
 
 test("durable jobs use tenant-idempotent enqueue and exclusive leases", async () => {
@@ -288,7 +296,7 @@ test("bundled core migration loader follows an extended validated index", async 
   const rawIndex = await readActualRawIndex();
   rawIndex.coreMigrations.push({
     order: rawIndex.coreMigrations.length + 1,
-    path: "packages/database/migrations/supabase/000037_runtime_readiness_test.sql",
+    path: "packages/database/migrations/supabase/000038_runtime_readiness_test.sql",
     module: "core",
     scope: "reservation-platform",
     sha256: "a".repeat(64),
@@ -301,9 +309,9 @@ test("bundled core migration loader follows an extended validated index", async 
 
   const plan = await loadBundledCoreMigrationPlan(pathToFileURL(extendedIndexPath));
 
-  assert.equal(plan.length, 37);
+  assert.equal(plan.length, 38);
   assert.deepEqual(plan.at(-1), {
-    path: "packages/database/migrations/supabase/000037_runtime_readiness_test.sql",
+    path: "packages/database/migrations/supabase/000038_runtime_readiness_test.sql",
     sha256: "a".repeat(64),
   });
 });

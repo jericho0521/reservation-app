@@ -47,7 +47,7 @@ test("the checked-in 0.2.0 pending record cannot be mistaken for release evidenc
 });
 
 function validEvidence() { return {
-  schema_version: 1, evidence_status: "completed", release_version: "0.2.0", commit_sha: "a".repeat(40), migration_version: "000036",
+  schema_version: 1, evidence_status: "completed", release_version: "0.2.0", commit_sha: "a".repeat(40), migration_version: "000037",
   image_digests: Object.fromEntries(["api", "worker", "console", "booking", "tools"].map((name, index) => [name, `sha256:${String(index + 1).repeat(64)}`])),
   operator: { role: "business operator", background: "appointment operations", independent: true, signature: "Synthetic Test Operator", signed_at: "2026-07-15T18:01:00.000Z" },
   started_at: "2026-07-15T09:00:00.000Z", ended_at: "2026-07-15T18:00:00.000Z", tasks_completed: [...requiredAcceptanceTasks],

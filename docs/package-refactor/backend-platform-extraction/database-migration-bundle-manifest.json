@@ -408,6 +408,17 @@
       ]
     },
     {
+      "kind": "core-migration",
+      "order": 37,
+      "targetPath": "packages/database/migrations/supabase/000037_operations_overview_channel_compatibility.sql",
+      "sourceAssets": [
+        {
+          "path": "packages/database/migrations/supabase/000037_operations_overview_channel_compatibility.sql",
+          "section": "Operations overview compatibility after the bookings channel column was introduced"
+        }
+      ]
+    },
+    {
       "kind": "optional-ai-retrieval",
       "targetPath": "packages/database/migrations/supabase/optional/ai-retrieval/000001_knowledge_chunks.sql",
       "sourceAssets": [

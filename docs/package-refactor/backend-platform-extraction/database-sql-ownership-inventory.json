@@ -377,6 +377,16 @@
       "notes": [
         "Backend-owned bounded appointment analytics for practitioner utilization, location volume, and no-show rates."
       ]
+    },
+    {
+      "path": "packages/database/migrations/supabase/000037_operations_overview_channel_compatibility.sql",
+      "classification": "core-platform",
+      "intendedBackendDestination": [
+        "packages/database/migrations/supabase/000037_operations_overview_channel_compatibility.sql"
+      ],
+      "notes": [
+        "Append-only compatibility replacement for the operations overview RPC after bookings gained a channel column."
+      ]
     }
   ]
 }

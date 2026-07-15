@@ -10,8 +10,8 @@ const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), ".."
 const indexPath = path.join(repoRoot, "packages/database/migrations/supabase/migration-index.json");
 
 export function planCoreMigrations(index, ledgerRows) {
-  if (!index || !Array.isArray(index.coreMigrations) || index.coreMigrations.length !== 36) {
-    throw new Error("Local stack requires exactly 36 core migrations.");
+  if (!index || !Array.isArray(index.coreMigrations) || index.coreMigrations.length !== 37) {
+    throw new Error("Local stack requires exactly 37 core migrations.");
   }
   const indexedByPath = new Map();
   for (const [position, entry] of index.coreMigrations.entries()) {

@@ -293,6 +293,14 @@
       "scope": "reservation-platform",
       "sha256": "7f16962d52e468f14fcc5a9d99222f7f7f5e6232d0ea96eb69ebd13dbf007ea6",
       "bytes": 10101
+    },
+    {
+      "order": 37,
+      "path": "packages/database/migrations/supabase/000037_operations_overview_channel_compatibility.sql",
+      "module": "core",
+      "scope": "reservation-platform",
+      "sha256": "661985e96e9dce5b8b5acfb705446a2375df44db782a8d9ed6711135b85d745c",
+      "bytes": 4541
     }
   ],
   "optionalMigrations": [

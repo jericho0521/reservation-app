@@ -171,8 +171,8 @@
       "path": "packages/database/migrations/supabase/000021_installation_auth.sql",
       "module": "core",
       "scope": "reservation-platform",
-      "sha256": "41c92f8a97db87eb70f9d2d97027c456d4986237816edbd8d848781ded4fae46",
-      "bytes": 8463
+      "sha256": "2a5fc975898a2dfa5bee0d751ca9e794913951b1956e24effbf0da6aab3fcf73",
+      "bytes": 13696
     }
   ],
   "optionalMigrations": [

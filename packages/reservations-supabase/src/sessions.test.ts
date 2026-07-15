@@ -13,6 +13,7 @@ function fakeClient(calls: unknown[], results: Result[]): PlatformSessionSupabas
       calls.push(["rpc", name, input]);
       const result = Promise.resolve(results.shift() ?? { data: null, error: null });
       return {
+        single() { calls.push(["single"]); return result; },
         maybeSingle() { calls.push(["maybeSingle"]); return result; },
       };
     },
@@ -47,8 +48,8 @@ function userRow(overrides: Record<string, unknown> = {}) {
     role: "owner",
     status: "active",
     assignments: [
-      { venue_id: "venue-1", venue: { tenant_id: "tenant-1" } },
-      { venue_id: "venue-2", venue: { tenant_id: "tenant-1" } },
+      { tenant_id: "tenant-1", venue_id: "venue-1" },
+      { tenant_id: "tenant-1", venue_id: "venue-2" },
     ],
     ...overrides,
   };
@@ -152,8 +153,8 @@ test("session venue mapping rejects assignments belonging to another tenant", as
       user: userRow({
         role: "staff",
         assignments: [
-          { venue_id: "venue-1", venue: { tenant_id: "tenant-1" } },
-          { venue_id: "venue-other", venue: { tenant_id: "tenant-other" } },
+          { tenant_id: "tenant-1", venue_id: "venue-1" },
+          { tenant_id: "tenant-other", venue_id: "venue-other" },
         ],
       }),
     },
@@ -185,8 +186,19 @@ test("malformed session hashes fail closed without querying storage", async () =
 test("user and session writes persist normalized values without plaintext tokens", async () => {
   const calls: unknown[] = [];
   const repository = createSupabasePlatformSessionRepository(fakeClient(calls, [
-    { data: userRow(), error: null },
-    { data: null, error: null },
+    {
+      data: {
+        id: "user-1",
+        tenant_id: "tenant-1",
+        email: "owner@example.com",
+        display_name: "Owner",
+        password_hash: "argon2-hash",
+        role: "owner",
+        status: "active",
+        venue_ids: ["venue-1"],
+      },
+      error: null,
+    },
     { data: null, error: null },
     { data: null, error: null },
   ]));
@@ -210,20 +222,25 @@ test("user and session writes persist normalized values without plaintext tokens
   const inserts = calls.filter((call) => Array.isArray(call) && call[0] === "insert");
   assert.deepEqual(inserts, [
     ["insert", [{
-      tenant_id: "tenant-1",
-      email: "owner@example.com",
-      display_name: "Owner",
-      password_hash: "argon2-hash",
-      role: "owner",
-      status: "active",
-    }]],
-    ["insert", [{ user_id: "user-1", venue_id: "venue-1" }]],
-    ["insert", [{
       user_id: "user-1",
       token_hash: "b".repeat(64),
       expires_at: "2026-07-15T12:00:00.000Z",
     }]],
   ]);
+  assert.deepEqual(calls.slice(0, 2), [
+    ["rpc", "platform_create_user", {
+      p_tenant_id: "tenant-1",
+      p_email: "owner@example.com",
+      p_display_name: "Owner",
+      p_password_hash: "argon2-hash",
+      p_role: "owner",
+      p_status: "active",
+      p_venue_ids: ["venue-1"],
+    }],
+    ["single"],
+  ]);
+  assert.equal(calls.some((call) => Array.isArray(call) && call[0] === "from"
+    && ["platform_users", "platform_user_venue_assignments"].includes(String(call[1]))), false);
   assert.equal(JSON.stringify(inserts).includes("opaque-token"), false);
   assert.ok(calls.some((call) => Array.isArray(call) && call[0] === "update"
     && JSON.stringify(call[1]) === JSON.stringify({ revoked_at: "2026-07-15T01:00:00.000Z" })));
@@ -268,4 +285,67 @@ test("first owner creation uses one atomic setup-consumption RPC", async () => {
     }],
     ["maybeSingle"],
   ]);
+});
+
+test("staff invitation creation and acceptance use atomic hashed-token RPCs", async () => {
+  const calls: unknown[] = [];
+  const invited = {
+    id: "user-2",
+    tenant_id: "tenant-1",
+    email: "staff@example.com",
+    display_name: "staff@example.com",
+    password_hash: "argon2-placeholder",
+    role: "staff",
+    status: "invited",
+    venue_ids: ["venue-1"],
+  };
+  const active = {
+    ...invited,
+    display_name: "Staff Member",
+    password_hash: "argon2-password",
+    status: "active",
+  };
+  const repository = createSupabasePlatformSessionRepository(fakeClient(calls, [
+    { data: invited, error: null },
+    { data: active, error: null },
+  ]));
+
+  const created = await repository.createStaffInvitation({
+    tenantId: "tenant-1",
+    email: " STAFF@Example.com ",
+    displayName: "Staff",
+    placeholderPasswordHash: "argon2-placeholder",
+    tokenHash: "c".repeat(64),
+    expiresAt: "2026-07-16T00:00:00.000Z",
+    venueIds: ["venue-1", "venue-1"],
+  });
+  const accepted = await repository.acceptStaffInvitation({
+    tokenHash: "c".repeat(64),
+    now: "2026-07-15T01:00:00.000Z",
+    displayName: "Staff Member",
+    passwordHash: "argon2-password",
+  });
+
+  assert.equal(created.status, "invited");
+  assert.equal(accepted?.status, "active");
+  assert.deepEqual(calls, [
+    ["rpc", "platform_create_staff_invitation", {
+      p_tenant_id: "tenant-1",
+      p_email: "staff@example.com",
+      p_display_name: "Staff",
+      p_placeholder_password_hash: "argon2-placeholder",
+      p_token_hash: "c".repeat(64),
+      p_expires_at: "2026-07-16T00:00:00.000Z",
+      p_venue_ids: ["venue-1"],
+    }],
+    ["single"],
+    ["rpc", "platform_accept_staff_invitation", {
+      p_token_hash: "c".repeat(64),
+      p_now: "2026-07-15T01:00:00.000Z",
+      p_display_name: "Staff Member",
+      p_password_hash: "argon2-password",
+    }],
+    ["maybeSingle"],
+  ]);
+  assert.doesNotMatch(JSON.stringify(calls), /opaque-invitation-token/u);
 });

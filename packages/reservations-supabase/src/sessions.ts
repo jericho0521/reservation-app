@@ -19,6 +19,7 @@ interface PlatformSessionQueryBuilder extends PromiseLike<QueryResult> {
 }
 
 interface PlatformSessionRpcBuilder {
+  single(): Promise<QueryResult>;
   maybeSingle(): Promise<QueryResult>;
 }
 
@@ -81,6 +82,24 @@ export interface PlatformSessionRepository extends InstallationRepository {
   revokeSession(tokenHash: string, now: string): Promise<void>;
 }
 
+export interface PlatformStaffRepository {
+  createStaffInvitation(input: {
+    tenantId: string;
+    email: string;
+    displayName: string;
+    placeholderPasswordHash: string;
+    tokenHash: string;
+    expiresAt: string;
+    venueIds: readonly string[];
+  }): Promise<PlatformUserRecord>;
+  acceptStaffInvitation(input: {
+    tokenHash: string;
+    now: string;
+    displayName: string;
+    passwordHash: string;
+  }): Promise<PlatformUserRecord | undefined>;
+}
+
 const userSelect = [
   "id",
   "tenant_id",
@@ -89,14 +108,14 @@ const userSelect = [
   "password_hash",
   "role",
   "status",
-  "assignments:platform_user_venue_assignments(venue_id, venue:venues(tenant_id))",
+  "assignments:platform_user_venue_assignments(tenant_id, venue_id)",
 ].join(", ");
 const sha256Pattern = /^[a-f0-9]{64}$/u;
 const emailPattern = /^[^@\s]+@[^@\s]+\.[^@\s]+$/u;
 
 export function createSupabasePlatformSessionRepository(
   client: PlatformSessionSupabaseClient,
-): PlatformSessionRepository {
+): PlatformSessionRepository & PlatformStaffRepository {
   const installationRepository = createSupabaseInstallationRepository(client);
   return {
     ...installationRepository,
@@ -116,32 +135,18 @@ export function createSupabasePlatformSessionRepository(
     async createUser(input) {
       const email = normalizeEmail(input.email);
       if (!email) throw new Error("Platform user email is invalid.");
-      const result = await client
-        .from("platform_users")
-        .insert([{
-          tenant_id: input.tenantId,
-          email,
-          display_name: input.displayName,
-          password_hash: input.passwordHash,
-          role: input.role,
-          status: input.status,
-        }])
-        .select(userSelect)
-        .single();
+      const result = await client.rpc("platform_create_user", {
+        p_tenant_id: input.tenantId,
+        p_email: email,
+        p_display_name: input.displayName,
+        p_password_hash: input.passwordHash,
+        p_role: input.role,
+        p_status: input.status,
+        p_venue_ids: [...(input.venueIds ?? [])],
+      }).single();
       assertQuerySucceeded(result, "Failed to create platform user.");
       if (!result.data) throw new Error("Failed to create platform user.");
-      const user = adaptUser(result.data);
-
-      if (input.venueIds?.length) {
-        const assignments = await client
-          .from("platform_user_venue_assignments")
-          .insert(input.venueIds.map((venueId) => ({
-            user_id: user.userId,
-            venue_id: venueId,
-          })));
-        assertQuerySucceeded(assignments, "Failed to assign platform user venues.");
-      }
-      return { ...user, venueIds: [...(input.venueIds ?? [])] };
+      return adaptCreatedUser(result.data);
     },
     async findUserByEmail(tenantId, email) {
       const normalizedEmail = normalizeEmail(email);
@@ -170,7 +175,7 @@ export function createSupabasePlatformSessionRepository(
       assertQuerySucceeded(result, "Failed to create platform session.");
     },
     async readSession(tokenHash, now) {
-      if (!sha256Pattern.test(tokenHash)) return undefined;
+      if (!sha256Pattern.test(tokenHash) || !Number.isFinite(Date.parse(now))) return undefined;
       const result = await client
         .from("platform_sessions")
         .select([
@@ -189,7 +194,8 @@ export function createSupabasePlatformSessionRepository(
       if (
         row.revoked_at !== null
         || typeof row.expires_at !== "string"
-        || row.expires_at <= now
+        || !Number.isFinite(Date.parse(row.expires_at))
+        || Date.parse(row.expires_at) <= Date.parse(now)
       ) return undefined;
       const user = adaptUser(row.user);
       if (user.status !== "active") return undefined;
@@ -207,6 +213,36 @@ export function createSupabasePlatformSessionRepository(
         .update({ revoked_at: now })
         .eq("token_hash", tokenHash);
       assertQuerySucceeded(result, "Failed to revoke platform session.");
+    },
+    async createStaffInvitation(input) {
+      const email = normalizeEmail(input.email);
+      if (!email) throw new Error("Staff invitation email is invalid.");
+      if (!sha256Pattern.test(input.tokenHash)) {
+        throw new Error("Staff invitation hash is invalid.");
+      }
+      const result = await client.rpc("platform_create_staff_invitation", {
+        p_tenant_id: input.tenantId,
+        p_email: email,
+        p_display_name: input.displayName,
+        p_placeholder_password_hash: input.placeholderPasswordHash,
+        p_token_hash: input.tokenHash,
+        p_expires_at: input.expiresAt,
+        p_venue_ids: [...new Set(input.venueIds)],
+      }).single();
+      assertQuerySucceeded(result, "Failed to create staff invitation.");
+      if (!result.data) throw new Error("Failed to create staff invitation.");
+      return adaptCreatedUser(result.data);
+    },
+    async acceptStaffInvitation(input) {
+      if (!sha256Pattern.test(input.tokenHash)) return undefined;
+      const result = await client.rpc("platform_accept_staff_invitation", {
+        p_token_hash: input.tokenHash,
+        p_now: input.now,
+        p_display_name: input.displayName,
+        p_password_hash: input.passwordHash,
+      }).maybeSingle();
+      assertQuerySucceeded(result, "Failed to accept staff invitation.");
+      return result.data ? adaptCreatedUser(result.data) : undefined;
     },
   };
 }
@@ -240,6 +276,32 @@ function adaptFirstOwner(value: unknown): CreateFirstOwnerStorageResult {
   };
 }
 
+function adaptCreatedUser(value: unknown): PlatformUserRecord {
+  const row = asRecord(value, "created platform user");
+  const role = row.role;
+  const status = row.status;
+  if (role !== "owner" && role !== "staff") {
+    throw new Error("Supabase returned an invalid platform user role.");
+  }
+  if (status !== "invited" && status !== "active" && status !== "disabled") {
+    throw new Error("Supabase returned an invalid platform user status.");
+  }
+  return {
+    userId: requireString(row.id, "platform user id"),
+    tenantId: requireString(row.tenant_id, "platform user tenant id"),
+    email: normalizeEmail(requireString(row.email, "platform user email")) ?? (() => {
+      throw new Error("Supabase returned an invalid platform user email.");
+    })(),
+    displayName: requireString(row.display_name, "platform user display name"),
+    passwordHash: requireString(row.password_hash, "platform user password hash"),
+    role,
+    status,
+    venueIds: Array.isArray(row.venue_ids)
+      ? row.venue_ids.map((venueId) => requireString(venueId, "venue assignment id"))
+      : [],
+  };
+}
+
 function adaptUser(value: unknown): PlatformUserRecord {
   const row = asRecord(value, "platform user");
   const role = row.role;
@@ -264,8 +326,7 @@ function adaptUser(value: unknown): PlatformUserRecord {
     venueIds: Array.isArray(row.assignments)
       ? row.assignments.flatMap((assignment) => {
         const assignmentRow = asRecord(assignment, "venue assignment");
-        const venue = asRecord(assignmentRow.venue, "venue assignment tenant");
-        return venue.tenant_id === tenantId
+        return assignmentRow.tenant_id === tenantId
           ? [requireString(assignmentRow.venue_id, "venue assignment id")]
           : [];
       })

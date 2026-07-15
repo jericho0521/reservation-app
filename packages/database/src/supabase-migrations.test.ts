@@ -114,17 +114,33 @@ test("installation auth migration stores only hashed capabilities and restricts 
   assert.doesNotMatch(sql, /setup_token\s+text|plaintext_token|raw_token/);
   assert.match(sql, /role text not null check \(role in \('owner', 'staff'\)\)/);
   assert.match(sql, /status text not null default 'active' check \(status in \('invited', 'active', 'disabled'\)\)/);
-  assert.match(sql, /create or replace function public\.platform_enforce_user_venue_assignment_tenant/);
-  assert.match(sql, /create trigger enforce_platform_user_venue_assignment_tenant/);
-  assert.match(sql, /foreign key \(tenant_id, venue_id\) references public\.venues \(tenant_id, id\)/);
+  assert.doesNotMatch(sql, /platform_enforce_user_venue_assignment_tenant/);
+  assert.match(sql, /create table public\.platform_user_venue_assignments \([\s\S]*tenant_id text not null/);
+  assert.match(sql, /foreign key \(tenant_id, user_id\)\s+references public\.platform_users \(tenant_id, id\) on delete cascade/);
+  assert.equal(
+    (sql.match(/foreign key \(tenant_id, venue_id\)\s+references public\.venues \(tenant_id, id\)/g) ?? []).length,
+    2,
+  );
   assert.match(sql, /foreign key \(tenant_id, actor_user_id\) references public\.platform_users \(tenant_id, id\)/);
+  assert.match(sql, /create or replace function public\.platform_create_user/);
+  assert.match(sql, /insert into public\.platform_users[\s\S]*insert into public\.platform_user_venue_assignments/);
+  assert.match(sql, /revoke all on function public\.platform_create_user/);
+  assert.match(sql, /grant execute on function public\.platform_create_user\(text, text, text, text, text, text, uuid\[\]\) to service_role/);
+  assert.doesNotMatch(sql, /grant execute on function public\.platform_create_user[^;]+to (?:public|anon|authenticated)/);
   assert.match(sql, /create or replace function public\.platform_create_first_owner/);
   assert.match(sql, /select candidate\.\* into installation[\s\S]*for update/);
   assert.match(sql, /insert into public\.platform_users[\s\S]*update public\.platform_installation/);
   assert.match(sql, /revoke all on function public\.platform_create_first_owner/);
   assert.match(sql, /grant execute on function public\.platform_create_first_owner\(text, timestamptz, text, text, text\) to service_role/);
   assert.doesNotMatch(sql, /grant execute on function public\.platform_create_first_owner[^;]+to (?:public|anon|authenticated)/);
-  assert.doesNotMatch(sql, /grant execute on function public\.platform_enforce_user_venue_assignment_tenant/);
+  assert.match(sql, /create or replace function public\.platform_create_staff_invitation/);
+  assert.match(sql, /insert into public\.platform_auth_tokens[\s\S]*'invitation'/);
+  assert.match(sql, /create or replace function public\.platform_accept_staff_invitation/);
+  assert.match(sql, /for update of candidate, invited_user/);
+  assert.match(sql, /set consumed_at = p_now/);
+  assert.match(sql, /status = 'active'/);
+  assert.match(sql, /grant execute on function public\.platform_create_staff_invitation\(text, text, text, text, text, timestamptz, uuid\[\]\) to service_role/);
+  assert.match(sql, /grant execute on function public\.platform_accept_staff_invitation\(text, timestamptz, text, text\) to service_role/);
 });
 
 test("experience availability migration owns normalized rules and shared snapshot integration", async () => {

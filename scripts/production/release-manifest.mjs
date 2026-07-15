@@ -20,7 +20,6 @@ export const PRODUCTION_RELEASE_ASSETS = Object.freeze([
   "docker/production/Caddyfile",
   "docker/production/postgrest.conf",
   "docker/production/allowlists/api.env",
-  "docker/production/allowlists/console.env",
   "docker/production/allowlists/migrate.env",
   "docker/production/allowlists/worker.env",
   "scripts/production/install.sh",

@@ -13,7 +13,6 @@ services:
       - reservation-bootstrap-config:/run/reservation-bootstrap-config
       - reservation-rest-secrets:/run/reservation-rest-secrets
       - reservation-api-secrets:/run/reservation-api-secrets
-      - reservation-console-secrets:/run/reservation-console-secrets
       - reservation-worker-secrets:/run/reservation-worker-secrets
       - reservation-whatsapp-sessions:/run/reservation-whatsapp-sessions
     network_mode: none
@@ -185,21 +184,11 @@ services:
     depends_on:
       reservation-api:
         condition: service_healthy
-    user: "0:0"
-    entrypoint: ["/usr/local/bin/run-with-secrets", "/etc/reservation-secrets/console.env", "--"]
     command: ["node", "apps/console/server.js"]
     environment:
       HOSTNAME: 0.0.0.0
       PORT: "4300"
-      RESERVATION_RUN_AS_UID: "1001"
-      RESERVATION_RUN_AS_GID: "1001"
       RESERVATION_PLATFORM_BASE_URL: http://reservation-api:4100
-    volumes:
-      - reservation-console-secrets:/run/reservation-secrets:ro
-    configs:
-      - source: console-secret-allowlist
-        target: /etc/reservation-secrets/console.env
-        mode: 0400
     networks:
       - reservation-edge
     healthcheck:
@@ -266,8 +255,6 @@ services:
 configs:
   api-secret-allowlist:
     file: ./docker/production/allowlists/api.env
-  console-secret-allowlist:
-    file: ./docker/production/allowlists/console.env
   migrate-secret-allowlist:
     file: ./docker/production/allowlists/migrate.env
   worker-secret-allowlist:
@@ -284,7 +271,6 @@ volumes:
   reservation-bootstrap-config:
   reservation-rest-secrets:
   reservation-api-secrets:
-  reservation-console-secrets:
   reservation-worker-secrets:
   reservation-db-data:
   reservation-whatsapp-sessions:

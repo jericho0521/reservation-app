@@ -50,13 +50,14 @@ test("production services use scoped secrets and never mount the backup recovery
   assert.deepEqual(result.secretAllowlistServices, [
     "reservation-api",
     "reservation-bootstrap",
-    "reservation-console",
     "reservation-migrate",
     "reservation-worker",
   ]);
   assert.match(compose, /reservation-protected-config:\/run\/reservation-config/u);
   assert.match(compose, /reservation-whatsapp-sessions:\/app\/\.reservation-whatsapp-sessions/u);
   assert.doesNotMatch(distributor, /publish[^\n]*backup-recovery-key/u);
+  assert.doesNotMatch(compose, /reservation-console-secrets|console-secret-allowlist|allowlists\/console\.env/u);
+  assert.doesNotMatch(distributor, /reservation-console-secrets/u);
   assert.match(distributor, /if \[ -z "\$\(\/bin\/ls -A "\$protected"\)" \]; then\n  chmod 0700 "\$protected"/u);
   assert.match(distributor, /\[ ! -L "\$session_directory" \] \|\| fail/u);
   assert.match(distributor, /chown 1001:1001 "\$session_directory"/u);

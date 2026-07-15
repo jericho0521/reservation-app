@@ -57,7 +57,6 @@ unset database_password
 for name in postgrest-anon-token postgrest-service-token internal-service-key whatsapp-session-key; do
   publish "$protected/$name" /run/reservation-api-secrets "$name" 0 0
 done
-publish "$protected/internal-service-key" /run/reservation-console-secrets internal-service-key 0 0
 for name in internal-service-key installation-master-key whatsapp-session-key; do
   publish "$protected/$name" /run/reservation-worker-secrets "$name" 0 0
 done

@@ -115,7 +115,6 @@ export async function verifyProductionDeployment(options = {}) {
     JSON.stringify(secretAllowlistServices) === JSON.stringify([
       "reservation-api",
       "reservation-bootstrap",
-      "reservation-console",
       "reservation-migrate",
       "reservation-worker",
     ]),
@@ -142,6 +141,11 @@ export async function verifyProductionDeployment(options = {}) {
     expect(/RESERVATION_RUN_AS_UID: "1001"/u.test(block), `${service} must drop to UID 1001.`, errors);
     expect(/RESERVATION_RUN_AS_GID: "1001"/u.test(block), `${service} must drop to GID 1001.`, errors);
   }
+  expect(
+    !/reservation-console-secrets|console-secret-allowlist|allowlists\/console\.env/u.test(compose),
+    "The console must not mount or publish a service API key.",
+    errors,
+  );
 
   expectOrdered(caddy, ["handle /v1/*", "handle /admin*", "handle {"], "Caddy route order", errors);
   for (const expected of [

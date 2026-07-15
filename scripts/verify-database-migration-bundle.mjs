@@ -49,6 +49,8 @@ const expectedCoreTargets = [
   "packages/database/migrations/supabase/000023_venue_scoped_operations.sql",
   "packages/database/migrations/supabase/000024_installation_business_onboarding.sql",
   "packages/database/migrations/supabase/000025_availability_snapshot_venue_scope.sql",
+  "packages/database/migrations/supabase/000026_appointment_staff_timing.sql",
+  "packages/database/migrations/supabase/000027_staff_access_administration.sql",
 ];
 
 const optionalAiPrefix = "packages/database/migrations/supabase/optional/ai-retrieval/";

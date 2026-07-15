@@ -287,6 +287,28 @@
       ]
     },
     {
+      "kind": "core-migration",
+      "order": 26,
+      "targetPath": "packages/database/migrations/supabase/000026_appointment_staff_timing.sql",
+      "sourceAssets": [
+        {
+          "path": "packages/database/migrations/supabase/000026_appointment_staff_timing.sql",
+          "section": "Appointment service timing, practitioner profiles, tenant-safe assignments, and atomic staff resource RPCs"
+        }
+      ]
+    },
+    {
+      "kind": "core-migration",
+      "order": 27,
+      "targetPath": "packages/database/migrations/supabase/000027_staff_access_administration.sql",
+      "sourceAssets": [
+        {
+          "path": "packages/database/migrations/supabase/000027_staff_access_administration.sql",
+          "section": "Tenant-safe staff access administration, session revocation, and audit events"
+        }
+      ]
+    },
+    {
       "kind": "optional-ai-retrieval",
       "targetPath": "packages/database/migrations/supabase/optional/ai-retrieval/000001_knowledge_chunks.sql",
       "sourceAssets": [

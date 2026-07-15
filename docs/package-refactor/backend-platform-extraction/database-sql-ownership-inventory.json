@@ -267,6 +267,26 @@
       "notes": [
         "Backend-owned availability snapshot venue identity for application-layer scope enforcement."
       ]
+    },
+    {
+      "path": "packages/database/migrations/supabase/000026_appointment_staff_timing.sql",
+      "classification": "core-platform",
+      "intendedBackendDestination": [
+        "packages/database/migrations/supabase/000026_appointment_staff_timing.sql"
+      ],
+      "notes": [
+        "Backend-owned appointment timing, practitioner profiles, and tenant-safe staff resource RPCs."
+      ]
+    },
+    {
+      "path": "packages/database/migrations/supabase/000027_staff_access_administration.sql",
+      "classification": "core-platform",
+      "intendedBackendDestination": [
+        "packages/database/migrations/supabase/000027_staff_access_administration.sql"
+      ],
+      "notes": [
+        "Backend-owned tenant-safe staff listing, atomic status and venue assignment updates, session revocation, and staff access audit events."
+      ]
     }
   ]
 }

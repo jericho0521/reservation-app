@@ -13,7 +13,7 @@ import {
 
 const indexPath = new URL("../migrations/supabase/migration-index.json", import.meta.url);
 
-test("core plan includes exactly 000001 through 000025 in order", async () => {
+test("core plan includes exactly 000001 through 000027 in order", async () => {
   const index = await readActualIndex();
   const plan = buildSupabaseMigrationPlan(index);
 
@@ -45,10 +45,54 @@ test("core plan includes exactly 000001 through 000025 in order", async () => {
       "000023_venue_scoped_operations.sql",
       "000024_installation_business_onboarding.sql",
       "000025_availability_snapshot_venue_scope.sql",
+      "000026_appointment_staff_timing.sql",
+      "000027_staff_access_administration.sql",
     ],
   );
-  assert.equal(plan.migrations.length, 25);
+  assert.equal(plan.migrations.length, 27);
   assert.equal(plan.seeds.length, 0);
+});
+
+test("staff access administration is tenant-safe, audited, and blocks placeholder activation", async () => {
+  const sql = (await readFile(new URL("../migrations/supabase/000027_staff_access_administration.sql", import.meta.url), "utf8")).toLowerCase();
+
+  assert.match(sql, /create or replace function public\.platform_list_staff\(p_tenant_id text\)/);
+  assert.match(sql, /where staff\.tenant_id = p_tenant_id\s+and staff\.role = 'staff'/);
+  assert.match(sql, /create or replace function public\.platform_update_staff_access/);
+  assert.match(sql, /actor\.tenant_id = p_tenant_id[\s\S]*actor\.role = 'owner'[\s\S]*actor\.status = 'active'/);
+  assert.match(sql, /candidate\.id = p_user_id\s+and candidate\.tenant_id = p_tenant_id\s+and candidate\.role = 'staff'/);
+  assert.match(sql, /venue\.tenant_id = p_tenant_id/);
+  assert.match(sql, /p_status = 'active' and target_user\.activated_at is null/);
+  assert.match(sql, /target_user\.status = 'invited'[\s\S]*purpose = 'invitation'[\s\S]*consumed_at is null/);
+  assert.match(sql, /updated_user\.status = 'disabled'[\s\S]*update public\.platform_sessions[\s\S]*set revoked_at = p_now/);
+  assert.match(sql, /'staff\.invited'/);
+  assert.match(sql, /'staff\.access\.updated'/);
+  assert.match(sql, /revoke all on function public\.platform_update_staff_access[^;]+from public, anon, authenticated/);
+  assert.match(sql, /grant execute on function public\.platform_update_staff_access[^;]+to service_role/);
+});
+
+test("appointment staff migration creates tenant-safe profiles through atomic RPCs", async () => {
+  const sql = (await readFile(new URL("../migrations/supabase/000026_appointment_staff_timing.sql", import.meta.url), "utf8")).toLowerCase();
+
+  for (const column of [
+    "duration_minutes integer not null default 60",
+    "buffer_before_minutes integer not null default 0",
+    "buffer_after_minutes integer not null default 0",
+    "display_price numeric(12,2)",
+    "currency text",
+  ]) assert.match(sql, new RegExp(column.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  assert.match(sql, /create table public\.platform_staff_profiles/);
+  assert.match(sql, /create table public\.platform_staff_locations/);
+  assert.match(sql, /create table public\.platform_staff_services/);
+  assert.match(sql, /create or replace function public\.platform_create_staff_profile/);
+  assert.match(sql, /insert into public\.reservable_resources[\s\S]*insert into public\.platform_staff_profiles/);
+  assert.match(sql, /jsonb_build_object\([\s\S]*'platform_staff_id'/);
+  assert.match(sql, /create trigger platform_validate_staff_location_scope/);
+  assert.match(sql, /create trigger platform_validate_staff_service_scope/);
+  assert.match(sql, /staff requires a location assignment/);
+  assert.match(sql, /staff requires a service assignment/);
+  assert.match(sql, /revoke all on function public\.platform_create_staff_profile[^;]+from public, anon, authenticated/);
+  assert.match(sql, /grant execute on function public\.platform_create_staff_profile[^;]+to service_role/);
 });
 
 test("availability snapshot exposes its venue for application-layer scope enforcement", async () => {
@@ -92,7 +136,7 @@ test("bundled core migration loader follows an extended validated index", async 
   const rawIndex = await readActualRawIndex();
   rawIndex.coreMigrations.push({
     order: rawIndex.coreMigrations.length + 1,
-    path: "packages/database/migrations/supabase/000026_runtime_readiness_test.sql",
+    path: "packages/database/migrations/supabase/000028_runtime_readiness_test.sql",
     module: "core",
     scope: "reservation-platform",
     sha256: "a".repeat(64),
@@ -105,9 +149,9 @@ test("bundled core migration loader follows an extended validated index", async 
 
   const plan = await loadBundledCoreMigrationPlan(pathToFileURL(extendedIndexPath));
 
-  assert.equal(plan.length, 26);
+  assert.equal(plan.length, 28);
   assert.deepEqual(plan.at(-1), {
-    path: "packages/database/migrations/supabase/000026_runtime_readiness_test.sql",
+    path: "packages/database/migrations/supabase/000028_runtime_readiness_test.sql",
     sha256: "a".repeat(64),
   });
 });

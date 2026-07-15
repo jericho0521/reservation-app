@@ -2138,6 +2138,21 @@
         ],
         "type": "object"
       },
+      "ListStaffResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "staff": {
+            "items": {
+              "$ref": "#/components/schemas/StaffMemberResponse"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "staff"
+        ],
+        "type": "object"
+      },
       "ListVenuesQuery": {
         "additionalProperties": false,
         "properties": {
@@ -3045,6 +3060,30 @@
         ],
         "type": "object"
       },
+      "StaffAccessPatch": {
+        "additionalProperties": false,
+        "properties": {
+          "status": {
+            "enum": [
+              "active",
+              "disabled"
+            ],
+            "type": "string"
+          },
+          "venue_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "minItems": 1,
+            "type": "array"
+          }
+        },
+        "required": [
+          "venue_ids"
+        ],
+        "type": "object"
+      },
       "StaffInvitationInput": {
         "additionalProperties": false,
         "properties": {
@@ -3095,6 +3134,48 @@
           "user_id",
           "invitation_token",
           "expires_at"
+        ],
+        "type": "object"
+      },
+      "StaffMemberResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "display_name": {
+            "maxLength": 120,
+            "minLength": 1,
+            "type": "string"
+          },
+          "email": {
+            "format": "email",
+            "maxLength": 320,
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "invited",
+              "active",
+              "disabled"
+            ],
+            "type": "string"
+          },
+          "user_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "venue_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "user_id",
+          "email",
+          "display_name",
+          "status",
+          "venue_ids"
         ],
         "type": "object"
       },
@@ -3491,6 +3572,118 @@
           }
         ],
         "summary": "Read the current authenticated session.",
+        "tags": [
+          "Authentication"
+        ]
+      }
+    },
+    "/v1/auth/staff": {
+      "get": {
+        "operationId": "listStaff",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/TenantIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/VenueIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/CorrelationIdHeader"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListStaffResponse"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformErrorResponse"
+                }
+              }
+            },
+            "description": "Platform error response."
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "summary": "List staff users and location assignments.",
+        "tags": [
+          "Authentication"
+        ]
+      }
+    },
+    "/v1/auth/staff/{userId}": {
+      "patch": {
+        "operationId": "updateStaffAccess",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "userId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/TenantIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/VenueIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/CorrelationIdHeader"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StaffAccessPatch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StaffMemberResponse"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformErrorResponse"
+                }
+              }
+            },
+            "description": "Platform error response."
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "summary": "Update a staff user's status and assigned locations.",
         "tags": [
           "Authentication"
         ]

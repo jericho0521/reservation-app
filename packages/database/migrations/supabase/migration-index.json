@@ -205,6 +205,22 @@
       "scope": "reservation-platform",
       "sha256": "4b4bc54921960ff4c6fc47087054f6ae7412b97b5b61019e1f71b12365cca60b",
       "bytes": 2653
+    },
+    {
+      "order": 26,
+      "path": "packages/database/migrations/supabase/000026_appointment_staff_timing.sql",
+      "module": "core",
+      "scope": "reservation-platform",
+      "sha256": "05a90c7f77e741985478c0eac731b71670e603911007058e6867e06cb2073163",
+      "bytes": 16101
+    },
+    {
+      "order": 27,
+      "path": "packages/database/migrations/supabase/000027_staff_access_administration.sql",
+      "module": "core",
+      "scope": "reservation-platform",
+      "sha256": "5e17bc373bc1282e6d2d4dce2f0b0c49435aa1c921bd42995051861ad458105a",
+      "bytes": 9428
     }
   ],
   "optionalMigrations": [

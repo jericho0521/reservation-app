@@ -150,6 +150,8 @@ function authRepository(overrides: Partial<PlatformSessionRepository & StaffRepo
     async completePasswordReset() { return true; },
     async createStaffInvitation() { return { ...activeUser, role: "staff", status: "invited" }; },
     async acceptStaffInvitation() { return { ...activeUser, role: "staff", status: "active" }; },
+    async listStaff() { return [{ ...activeUser, role: "staff", status: "active" }]; },
+    async updateStaffAccess(input) { return { userId: activeUser.userId, email: activeUser.email, displayName: activeUser.displayName, status: input.status ?? "active", venueIds: [...input.venueIds] }; },
     ...overrides,
   };
 }
@@ -765,6 +767,56 @@ test("staff invitation is owner-only and invitation acceptance creates a session
   assert.equal(accepted.status, 200);
   assert.equal(accepted.headers["cache-control"], "no-store");
   assert.equal(Array.isArray(accepted.headers["set-cookie"]), true);
+});
+
+test("owner lists staff, disables accounts, and replaces venue assignments while staff is denied", async () => {
+  const calls: unknown[] = [];
+  const userId = "323e4567-e89b-42d3-a456-426614174000";
+  const venueId = "423e4567-e89b-42d3-a456-426614174000";
+  const repositories = authRepository({
+    async listStaff(tenantId) {
+      calls.push(["list", tenantId]);
+      return [{
+        userId,
+        tenantId,
+        email: "staff@example.com",
+        displayName: "Staff",
+        passwordHash: "$argon2id$hash",
+        role: "staff",
+        status: "active",
+        venueIds: [venueId],
+      }];
+    },
+    async updateStaffAccess(input) {
+      calls.push(["access", input]);
+      return {
+        userId, email: "staff@example.com", displayName: "Staff",
+        status: input.status ?? "active", venueIds: [...input.venueIds],
+      };
+    },
+  });
+  const cookie = `reservation_session=${"s".repeat(43)}; reservation_csrf=${"c".repeat(43)}`;
+  const mutationHeaders = { origin: authOrigin, cookie, "x-csrf-token": "c".repeat(43) };
+
+  const listed = await handleStandaloneApiRequest({ method: "GET", path: "/v1/auth/staff", headers: { cookie } }, {
+    sessionAuth: { repositories, allowedOrigins: [authOrigin] },
+  });
+  const disabled = await handleStandaloneApiRequest({
+    method: "PATCH", path: `/v1/auth/staff/${userId}`, headers: mutationHeaders, body: { status: "disabled", venue_ids: [venueId] },
+  }, { sessionAuth: { repositories, allowedOrigins: [authOrigin] } });
+  const denied = await handleStandaloneApiRequest({ method: "GET", path: "/v1/auth/staff", headers: { cookie } }, {
+    sessionAuth: {
+      repositories: authRepository({ readSession: async () => ({ userId, tenantId: "tenant-1", role: "staff", venueIds: [venueId], expiresAt: "2026-07-15T12:00:00.000Z" }) }),
+      allowedOrigins: [authOrigin],
+    },
+  });
+
+  assert.equal(listed.status, 200);
+  assert.deepEqual((listed.body as { staff: unknown[] }).staff.length, 1);
+  assert.equal((disabled.body as { status: string }).status, "disabled");
+  assert.deepEqual((disabled.body as { venue_ids: string[] }).venue_ids, [venueId]);
+  assert.equal(denied.status, 403);
+  assert.deepEqual(calls.map((call) => (call as unknown[])[0]), ["list", "access"]);
 });
 
 test("password reset request is account-enumeration safe and completion is single-use", async () => {

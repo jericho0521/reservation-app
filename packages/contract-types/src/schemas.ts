@@ -181,6 +181,23 @@ export const staffInvitationResponseSchema = strictObject({
   expires_at: z.string().datetime(),
 });
 
+export const staffMemberResponseSchema = strictObject({
+  user_id: z.string().uuid(),
+  email: z.string().email().max(320),
+  display_name: z.string().trim().min(1).max(120),
+  status: z.enum(["invited", "active", "disabled"]),
+  venue_ids: z.array(z.string().uuid()),
+});
+
+export const listStaffResponseSchema = strictObject({
+  staff: z.array(staffMemberResponseSchema),
+});
+
+export const staffAccessPatchSchema = strictObject({
+  status: z.enum(["active", "disabled"]).optional(),
+  venue_ids: z.array(z.string().uuid()).min(1),
+});
+
 export const acceptStaffInvitationInputSchema = strictObject({
   display_name: z.string().trim().min(1).max(120),
   password: z.string().min(12).max(128),

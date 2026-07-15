@@ -3215,8 +3215,8 @@
       "type": "object"
     }
   },
-  "$id": "https://reservation-platform.local/contracts/json-schema/platform-error-response.schema.json",
-  "$ref": "#/$defs/PlatformErrorResponse",
+  "$id": "https://reservation-platform.local/contracts/json-schema/staff-member-response.schema.json",
+  "$ref": "#/$defs/StaffMemberResponse",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "PlatformErrorResponse"
+  "title": "StaffMemberResponse"
 }

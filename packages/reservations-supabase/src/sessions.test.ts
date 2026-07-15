@@ -15,6 +15,9 @@ function fakeClient(calls: unknown[], results: Result[]): PlatformSessionSupabas
       return {
         single() { calls.push(["single"]); return result; },
         maybeSingle() { calls.push(["maybeSingle"]); return result; },
+        then(resolve: (value: Result) => unknown, reject?: (reason: unknown) => unknown) {
+          return result.then(resolve, reject);
+        },
       };
     },
     from(table: string) {
@@ -340,6 +343,7 @@ test("staff invitation creation and acceptance use atomic hashed-token RPCs", as
 
   const created = await repository.createStaffInvitation({
     tenantId: "tenant-1",
+    actorUserId: "owner-1",
     email: " STAFF@Example.com ",
     displayName: "Staff",
     placeholderPasswordHash: "argon2-placeholder",
@@ -359,6 +363,7 @@ test("staff invitation creation and acceptance use atomic hashed-token RPCs", as
   assert.deepEqual(calls, [
     ["rpc", "platform_create_staff_invitation", {
       p_tenant_id: "tenant-1",
+      p_actor_user_id: "owner-1",
       p_email: "staff@example.com",
       p_display_name: "Staff",
       p_placeholder_password_hash: "argon2-placeholder",
@@ -413,4 +418,47 @@ test("password reset creation and completion use hashed atomic RPCs", async () =
     ["maybeSingle"],
   ]);
   assert.doesNotMatch(JSON.stringify(calls), /opaque-reset-token/u);
+});
+
+test("staff administration lists by tenant and uses scoped atomic mutation RPCs", async () => {
+  const calls: unknown[] = [];
+  const staff = userRow({
+    id: "staff-1",
+    email: "staff@example.com",
+    display_name: "Staff",
+    role: "staff",
+    venue_ids: ["venue-1"],
+  });
+  const repository = createSupabasePlatformSessionRepository(fakeClient(calls, [
+    { data: [staff], error: null },
+    { data: { ...staff, status: "disabled", venue_ids: ["venue-2"] }, error: null },
+  ]));
+
+  const listed = await repository.listStaff("tenant-1");
+  const disabled = await repository.updateStaffAccess({
+    tenantId: "tenant-1",
+    actorUserId: "owner-1",
+    userId: "staff-1",
+    status: "disabled",
+    venueIds: ["venue-2", "venue-2"],
+    now: "2026-07-15T00:00:00.000Z",
+  });
+
+  assert.deepEqual(listed[0]?.venueIds, ["venue-1"]);
+  assert.equal(disabled?.status, "disabled");
+  assert.deepEqual(disabled?.venueIds, ["venue-2"]);
+  assert.deepEqual(calls, [
+    ["rpc", "platform_list_staff", {
+      p_tenant_id: "tenant-1",
+    }],
+    ["rpc", "platform_update_staff_access", {
+      p_tenant_id: "tenant-1",
+      p_actor_user_id: "owner-1",
+      p_user_id: "staff-1",
+      p_status: "disabled",
+      p_venue_ids: ["venue-2"],
+      p_now: "2026-07-15T00:00:00.000Z",
+    }],
+    ["maybeSingle"],
+  ]);
 });

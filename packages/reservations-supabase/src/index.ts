@@ -47,6 +47,7 @@ export * from "./analytics.js";
 export * from "./installation.js";
 export * from "./locations.js";
 export * from "./sessions.js";
+export * from "./staff.js";
 
 export const RESERVATION_SUPABASE_TABLES = {
   platformTenants: "tenants",

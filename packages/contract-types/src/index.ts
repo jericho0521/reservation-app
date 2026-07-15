@@ -51,6 +51,23 @@ export interface StaffInvitationResponse {
   expires_at: string;
 }
 
+export interface StaffMemberResponse {
+  user_id: string;
+  email: string;
+  display_name: string;
+  status: "invited" | "active" | "disabled";
+  venue_ids: string[];
+}
+
+export interface ListStaffResponse {
+  staff: StaffMemberResponse[];
+}
+
+export interface StaffAccessPatch {
+  status?: "active" | "disabled";
+  venue_ids: string[];
+}
+
 export interface AcceptStaffInvitationInput {
   display_name: string;
   password: string;

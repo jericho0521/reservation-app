@@ -30,6 +30,16 @@ test("authentication SDK methods use cookie credentials and omit tokens from ses
           expires_at: "2026-07-16T00:00:00.000Z",
         });
       }
+      if (path === "/v1/auth/staff") return jsonResponse({ staff: [] });
+      if (path.includes("/v1/auth/staff/") && init?.method === "PATCH") {
+        return jsonResponse({
+          user_id: "22222222-2222-4222-8222-222222222222",
+          email: "staff@example.com",
+          display_name: "Staff",
+          status: "disabled",
+          venue_ids: ["33333333-3333-4333-8333-333333333333"],
+        });
+      }
       if (path.endsWith("/password-reset") || path.endsWith("/complete") || path.endsWith("/logout")) {
         return new Response(null, { status: path.endsWith("/password-reset") ? 202 : 204 });
       }
@@ -51,6 +61,11 @@ test("authentication SDK methods use cookie credentials and omit tokens from ses
     display_name: "Staff",
     venue_ids: ["33333333-3333-4333-8333-333333333333"],
   });
+  await client.listStaff();
+  await client.updateStaffAccess("staff/id", {
+    status: "disabled",
+    venue_ids: ["33333333-3333-4333-8333-333333333333"],
+  });
   await client.acceptStaffInvitation("opaque/token", {
     display_name: "Staff",
     password: "correct horse battery staple",
@@ -65,6 +80,8 @@ test("authentication SDK methods use cookie credentials and omit tokens from ses
     ["/v1/auth/login", "POST"],
     ["/v1/auth/session", "GET"],
     ["/v1/auth/staff/invitations", "POST"],
+    ["/v1/auth/staff", "GET"],
+    ["/v1/auth/staff/staff%2Fid", "PATCH"],
     ["/v1/auth/staff/invitations/opaque%2Ftoken/accept", "POST"],
     ["/v1/auth/password-reset", "POST"],
     ["/v1/auth/password-reset/reset%2Ftoken/complete", "POST"],

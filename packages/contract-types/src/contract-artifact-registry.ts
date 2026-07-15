@@ -94,6 +94,20 @@ export const publicJsonSchemaDefinitions: Record<string, JsonSchema> = {
     invitation_token: { type: "string", minLength: 43, maxLength: 128 },
     expires_at: { type: "string", format: "date-time" },
   }, ["user_id", "invitation_token", "expires_at"]),
+  StaffMemberResponse: objectSchema({
+    user_id: { type: "string", format: "uuid" },
+    email: { type: "string", format: "email", maxLength: 320 },
+    display_name: { type: "string", minLength: 1, maxLength: 120 },
+    status: { type: "string", enum: ["invited", "active", "disabled"] },
+    venue_ids: { type: "array", items: { type: "string", format: "uuid" } },
+  }, ["user_id", "email", "display_name", "status", "venue_ids"]),
+  ListStaffResponse: objectSchema({
+    staff: { type: "array", items: ref("StaffMemberResponse") },
+  }, ["staff"]),
+  StaffAccessPatch: objectSchema({
+    status: { type: "string", enum: ["active", "disabled"] },
+    venue_ids: { type: "array", minItems: 1, items: { type: "string", format: "uuid" } },
+  }, ["venue_ids"]),
   AcceptStaffInvitationInput: objectSchema({
     display_name: { type: "string", minLength: 1, maxLength: 120 },
     password: { type: "string", minLength: 12, maxLength: 128 },
@@ -809,6 +823,26 @@ export const publicContractOperations: ContractOperation[] = [
     requestBodySchema: "StaffInvitationInput",
     responseSchema: "StaffInvitationResponse",
     successStatus: "201",
+    authentication: "cookie",
+  },
+  {
+    method: "get",
+    path: "/v1/auth/staff",
+    operationId: "listStaff",
+    summary: "List staff users and location assignments.",
+    tags: ["Authentication"],
+    responseSchema: "ListStaffResponse",
+    authentication: "cookie",
+  },
+  {
+    method: "patch",
+    path: "/v1/auth/staff/{userId}",
+    operationId: "updateStaffAccess",
+    summary: "Update a staff user's status and assigned locations.",
+    tags: ["Authentication"],
+    pathParameters: ["userId"],
+    requestBodySchema: "StaffAccessPatch",
+    responseSchema: "StaffMemberResponse",
     authentication: "cookie",
   },
   {

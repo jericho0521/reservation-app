@@ -47,6 +47,7 @@ import type {
   ExperienceValidationResponse,
   ListReservationsQuery,
   ListReservationsResponse,
+  ListStaffResponse,
   ListResourceMaintenanceQuery,
   ListResourceMaintenanceResponse,
   ListResourcesQuery,
@@ -71,8 +72,10 @@ import type {
   ResourceResponse,
   ServiceResponse,
   SetupStatusResponse,
+  StaffAccessPatch,
   StaffInvitationInput,
   StaffInvitationResponse,
+  StaffMemberResponse,
   TenantResponse,
   UpdateReservationPatch,
   VenueResponse,
@@ -172,6 +175,8 @@ export interface ReservationPlatformClient {
   logout(options?: RequestOptions): Promise<void>;
   getSession(options?: RequestOptions): Promise<AuthenticatedSessionResponse>;
   inviteStaff(input: StaffInvitationInput, options?: RequestOptions): Promise<StaffInvitationResponse>;
+  listStaff(options?: RequestOptions): Promise<ListStaffResponse>;
+  updateStaffAccess(userId: string, input: StaffAccessPatch, options?: RequestOptions): Promise<StaffMemberResponse>;
   acceptStaffInvitation(token: string, input: AcceptStaffInvitationInput, options?: RequestOptions): Promise<AuthenticatedSessionResponse>;
   requestPasswordReset(input: RequestPasswordResetInput, options?: RequestOptions): Promise<void>;
   completePasswordReset(token: string, input: CompletePasswordResetInput, options?: RequestOptions): Promise<void>;
@@ -277,6 +282,14 @@ export function createReservationPlatformClient(
     logout: (options) => request({ method: "POST", path: "/auth/logout", options, auth: true, emptyResponse: true }),
     getSession: (options) => request({ method: "GET", path: "/auth/session", options, auth: true }),
     inviteStaff: (input, options) => request({ method: "POST", path: "/auth/staff/invitations", body: input, options, auth: true }),
+    listStaff: (options) => request({ method: "GET", path: "/auth/staff", options, auth: true }),
+    updateStaffAccess: (userId, input, options) => request({
+      method: "PATCH",
+      path: `/auth/staff/${encodeURIComponent(userId)}`,
+      body: input,
+      options,
+      auth: true,
+    }),
     acceptStaffInvitation: (token, input, options) => request({
       method: "POST",
       path: `/auth/staff/invitations/${encodeURIComponent(token)}/accept`,

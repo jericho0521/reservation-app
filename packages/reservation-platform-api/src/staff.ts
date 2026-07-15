@@ -19,6 +19,7 @@ import {
 export interface StaffRepository {
   createStaffInvitation(input: {
     tenantId: string;
+    actorUserId: string;
     email: string;
     displayName: string;
     placeholderPasswordHash: string;
@@ -32,6 +33,23 @@ export interface StaffRepository {
     displayName: string;
     passwordHash: string;
   }): Promise<PlatformUserRecord | undefined>;
+  listStaff(tenantId: string): Promise<StaffMemberRecord[]>;
+  updateStaffAccess(input: {
+    tenantId: string;
+    actorUserId: string;
+    userId: string;
+    status?: "active" | "disabled";
+    venueIds: readonly string[];
+    now: string;
+  }): Promise<StaffMemberRecord | undefined>;
+}
+
+export interface StaffMemberRecord {
+  userId: string;
+  email: string;
+  displayName: string;
+  status: "invited" | "active" | "disabled";
+  venueIds: readonly string[];
 }
 
 export async function inviteStaff(input: {
@@ -59,6 +77,7 @@ export async function inviteStaff(input: {
   const placeholderPasswordHash = await (input.passwordHasher ?? argon2idPasswordHasher).hash(invitationToken);
   const user = await input.repositories.createStaffInvitation({
     tenantId: input.principal.tenantId,
+    actorUserId: input.principal.userId,
     email,
     displayName,
     placeholderPasswordHash,
@@ -98,4 +117,37 @@ export async function acceptStaffInvitation(input: {
     tokenFactory: input.tokenFactory,
     now,
   });
+}
+
+export async function listStaffMembers(input: {
+  principal: AuthenticatedPrincipal;
+  repositories: Pick<StaffRepository, "listStaff">;
+}): Promise<StaffMemberRecord[]> {
+  requireOwner(input.principal);
+  return input.repositories.listStaff(input.principal.tenantId);
+}
+
+export async function updateStaffAccess(input: {
+  principal: AuthenticatedPrincipal;
+  userId: string;
+  input: { status?: "active" | "disabled"; venueIds: readonly string[] };
+  repositories: Pick<StaffRepository, "updateStaffAccess">;
+  now?: Date;
+}): Promise<StaffMemberRecord> {
+  requireOwner(input.principal);
+  const userId = input.userId.trim();
+  const venueIds = [...new Set(input.input.venueIds.map((venueId) => venueId.trim()).filter(Boolean))];
+  if (!userId || venueIds.length === 0) {
+    throw new PlatformAuthError("validation_failed", 400, "Staff location assignments are invalid.");
+  }
+  const user = await input.repositories.updateStaffAccess({
+    tenantId: input.principal.tenantId,
+    actorUserId: input.principal.userId,
+    userId,
+    ...(input.input.status ? { status: input.input.status } : {}),
+    venueIds,
+    now: (input.now ?? new Date()).toISOString(),
+  });
+  if (!user) throw new PlatformAuthError("validation_failed", 404, "Staff account was not found.");
+  return user;
 }

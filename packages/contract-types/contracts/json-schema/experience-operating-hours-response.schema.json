@@ -2103,6 +2103,21 @@
       ],
       "type": "object"
     },
+    "ListStaffResponse": {
+      "additionalProperties": false,
+      "properties": {
+        "staff": {
+          "items": {
+            "$ref": "#/$defs/StaffMemberResponse"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "staff"
+      ],
+      "type": "object"
+    },
     "ListVenuesQuery": {
       "additionalProperties": false,
       "properties": {
@@ -3010,6 +3025,30 @@
       ],
       "type": "object"
     },
+    "StaffAccessPatch": {
+      "additionalProperties": false,
+      "properties": {
+        "status": {
+          "enum": [
+            "active",
+            "disabled"
+          ],
+          "type": "string"
+        },
+        "venue_ids": {
+          "items": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "minItems": 1,
+          "type": "array"
+        }
+      },
+      "required": [
+        "venue_ids"
+      ],
+      "type": "object"
+    },
     "StaffInvitationInput": {
       "additionalProperties": false,
       "properties": {
@@ -3060,6 +3099,48 @@
         "user_id",
         "invitation_token",
         "expires_at"
+      ],
+      "type": "object"
+    },
+    "StaffMemberResponse": {
+      "additionalProperties": false,
+      "properties": {
+        "display_name": {
+          "maxLength": 120,
+          "minLength": 1,
+          "type": "string"
+        },
+        "email": {
+          "format": "email",
+          "maxLength": 320,
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "invited",
+            "active",
+            "disabled"
+          ],
+          "type": "string"
+        },
+        "user_id": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "venue_ids": {
+          "items": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "user_id",
+        "email",
+        "display_name",
+        "status",
+        "venue_ids"
       ],
       "type": "object"
     },

@@ -18,7 +18,7 @@ interface PlatformSessionQueryBuilder extends PromiseLike<QueryResult> {
   maybeSingle(): Promise<QueryResult>;
 }
 
-interface PlatformSessionRpcBuilder {
+interface PlatformSessionRpcBuilder extends PromiseLike<QueryResult> {
   single(): Promise<QueryResult>;
   maybeSingle(): Promise<QueryResult>;
 }
@@ -101,6 +101,7 @@ export interface PlatformSessionRepository extends InstallationRepository {
 export interface PlatformStaffRepository {
   createStaffInvitation(input: {
     tenantId: string;
+    actorUserId: string;
     email: string;
     displayName: string;
     placeholderPasswordHash: string;
@@ -114,6 +115,23 @@ export interface PlatformStaffRepository {
     displayName: string;
     passwordHash: string;
   }): Promise<PlatformUserRecord | undefined>;
+  listStaff(tenantId: string): Promise<PlatformStaffMemberRecord[]>;
+  updateStaffAccess(input: {
+    tenantId: string;
+    actorUserId: string;
+    userId: string;
+    status?: "active" | "disabled";
+    venueIds: readonly string[];
+    now: string;
+  }): Promise<PlatformStaffMemberRecord | undefined>;
+}
+
+export interface PlatformStaffMemberRecord {
+  userId: string;
+  email: string;
+  displayName: string;
+  status: "invited" | "active" | "disabled";
+  venueIds: readonly string[];
 }
 
 const userSelect = [
@@ -265,6 +283,7 @@ export function createSupabasePlatformSessionRepository(
       }
       const result = await client.rpc("platform_create_staff_invitation", {
         p_tenant_id: input.tenantId,
+        p_actor_user_id: input.actorUserId,
         p_email: email,
         p_display_name: input.displayName,
         p_placeholder_password_hash: input.placeholderPasswordHash,
@@ -286,6 +305,25 @@ export function createSupabasePlatformSessionRepository(
       }).maybeSingle();
       assertQuerySucceeded(result, "Failed to accept staff invitation.");
       return result.data ? adaptCreatedUser(result.data) : undefined;
+    },
+    async listStaff(tenantId) {
+      const result = await client.rpc("platform_list_staff", {
+        p_tenant_id: tenantId,
+      });
+      assertQuerySucceeded(result, "Failed to list staff accounts.");
+      return Array.isArray(result.data) ? result.data.map(adaptStaffMember) : [];
+    },
+    async updateStaffAccess(input) {
+      const result = await client.rpc("platform_update_staff_access", {
+        p_tenant_id: input.tenantId,
+        p_actor_user_id: input.actorUserId,
+        p_user_id: input.userId,
+        p_status: input.status ?? null,
+        p_venue_ids: [...new Set(input.venueIds)],
+        p_now: input.now,
+      }).maybeSingle();
+      assertQuerySucceeded(result, "Failed to update staff access.");
+      return result.data ? adaptStaffMember(result.data) : undefined;
     },
   };
 }
@@ -373,6 +411,25 @@ function adaptUser(value: unknown): PlatformUserRecord {
           ? [requireString(assignmentRow.venue_id, "venue assignment id")]
           : [];
       })
+      : [],
+  };
+}
+
+function adaptStaffMember(value: unknown): PlatformStaffMemberRecord {
+  const row = asRecord(value, "staff member");
+  const status = row.status;
+  if (status !== "invited" && status !== "active" && status !== "disabled") {
+    throw new Error("Supabase returned an invalid staff account status.");
+  }
+  return {
+    userId: requireString(row.id, "staff account id"),
+    email: normalizeEmail(requireString(row.email, "staff account email")) ?? (() => {
+      throw new Error("Supabase returned an invalid staff account email.");
+    })(),
+    displayName: requireString(row.display_name, "staff account display name"),
+    status,
+    venueIds: Array.isArray(row.venue_ids)
+      ? row.venue_ids.map((venueId) => requireString(venueId, "venue assignment id"))
       : [],
   };
 }

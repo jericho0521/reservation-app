@@ -43,6 +43,8 @@ import {
   setupStatusResponseSchema,
   staffInvitationInputSchema,
   staffInvitationResponseSchema,
+  listStaffResponseSchema,
+  staffAccessPatchSchema,
 } from "./index.js";
 
 test("authentication contracts validate setup, sessions, staff, and password resets", () => {
@@ -83,6 +85,17 @@ test("authentication contracts validate setup, sessions, staff, and password res
     display_name: "Staff Member",
     password: "correct horse battery staple",
   }).success, true);
+  assert.equal(listStaffResponseSchema.safeParse({ staff: [{
+    user_id: "33333333-3333-4333-8333-333333333333",
+    email: "staff@example.com",
+    display_name: "Staff Member",
+    status: "active",
+    venue_ids: invitation.venue_ids,
+  }] }).success, true);
+  assert.equal(staffAccessPatchSchema.safeParse({ status: "disabled", venue_ids: invitation.venue_ids }).success, true);
+  assert.equal(staffAccessPatchSchema.safeParse({ status: "invited", venue_ids: invitation.venue_ids }).success, false);
+  assert.equal(staffAccessPatchSchema.safeParse({ venue_ids: invitation.venue_ids }).success, true);
+  assert.equal(staffAccessPatchSchema.safeParse({ venue_ids: [] }).success, false);
 
   assert.equal(requestPasswordResetInputSchema.safeParse({ email: owner.email }).success, true);
   assert.equal(completePasswordResetInputSchema.safeParse({ password: "correct horse battery staple" }).success, true);
@@ -522,6 +535,8 @@ test("contract artifact registry covers current public /v1 API and SDK paths", (
     "POST /v1/auth/logout",
     "GET /v1/auth/session",
     "POST /v1/auth/staff/invitations",
+    "GET /v1/auth/staff",
+    "PATCH /v1/auth/staff/{userId}",
     "POST /v1/auth/staff/invitations/{token}/accept",
     "POST /v1/auth/password-reset",
     "POST /v1/auth/password-reset/{token}/complete",

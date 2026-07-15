@@ -1,7 +1,13 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { PlatformAuthError, type AuthenticatedPrincipal, type PlatformSessionRepository } from "./sessions.js";
-import { acceptStaffInvitation, inviteStaff, type StaffRepository } from "./staff.js";
+import {
+  acceptStaffInvitation,
+  inviteStaff,
+  listStaffMembers,
+  updateStaffAccess,
+  type StaffRepository,
+} from "./staff.js";
 
 const owner: AuthenticatedPrincipal = { userId: "owner", tenantId: "tenant", role: "owner", venueIds: [] };
 
@@ -17,6 +23,11 @@ function repository(): PlatformSessionRepository & StaffRepository & { calls: un
     async createPasswordResetToken() {}, async completePasswordReset() { return false; },
     async createStaffInvitation(input) { calls.push(["createStaffInvitation", input]); return invited; },
     async acceptStaffInvitation(input) { calls.push(["acceptStaffInvitation", input]); return { ...invited, displayName: input.displayName, passwordHash: input.passwordHash, status: "active" }; },
+    async listStaff(tenantId) { calls.push(["listStaff", tenantId]); return [invited]; },
+    async updateStaffAccess(input) {
+      calls.push(["updateStaffAccess", input]);
+      return { ...invited, ...(input.status ? { status: input.status } : {}), venueIds: [...input.venueIds] };
+    },
   };
 }
 
@@ -34,6 +45,7 @@ test("owner invitation stores only a token hash and assigned venues", async () =
   assert.equal(result.expiresAt, "2026-07-15T00:00:00.000Z");
   assert.equal(JSON.stringify(repositories.calls).includes("i".repeat(43)), false);
   assert.equal((repositories.calls[0] as [string, { email: string }])[1].email, "staff@example.com");
+  assert.equal((repositories.calls[0] as [string, { actorUserId: string }])[1].actorUserId, "owner");
   assert.equal((repositories.calls[0] as [string, { placeholderPasswordHash: string }])[1].placeholderPasswordHash, "$argon2id$placeholder");
 });
 
@@ -60,4 +72,46 @@ test("acceptance atomically consumes the invitation and creates a session", asyn
   assert.equal(result.principal.role, "staff");
   assert.equal(JSON.stringify(repositories.calls).includes("i".repeat(43)), false);
   assert.equal(JSON.stringify(repositories.calls).includes("s".repeat(43)), false);
+});
+
+test("owner lists staff and controls status and assigned venues inside the tenant", async () => {
+  const repositories = repository();
+
+  const listed = await listStaffMembers({ principal: owner, repositories });
+  const disabled = await updateStaffAccess({
+    principal: owner,
+    userId: "staff",
+    input: { status: "disabled", venueIds: ["venue-b", "venue-b", "venue-a"] },
+    repositories,
+    now: new Date("2026-07-15T00:00:00Z"),
+  });
+
+  assert.equal(listed[0]?.email, "staff@example.com");
+  assert.equal(disabled.status, "disabled");
+  assert.deepEqual(disabled.venueIds, ["venue-b", "venue-a"]);
+  assert.deepEqual(repositories.calls.slice(-2), [
+    ["listStaff", "tenant"],
+    ["updateStaffAccess", {
+      tenantId: "tenant",
+      actorUserId: "owner",
+      userId: "staff",
+      status: "disabled",
+      venueIds: ["venue-b", "venue-a"],
+      now: "2026-07-15T00:00:00.000Z",
+    }],
+  ]);
+});
+
+test("staff administration is owner-only and venue assignment requires a location", async () => {
+  const repositories = repository();
+  const staffPrincipal = { ...owner, role: "staff" as const };
+
+  await assert.rejects(
+    () => listStaffMembers({ principal: staffPrincipal, repositories }),
+    (error: unknown) => error instanceof PlatformAuthError && error.code === "owner_required",
+  );
+  await assert.rejects(
+    () => updateStaffAccess({ principal: owner, userId: "staff", input: { venueIds: [] }, repositories }),
+    (error: unknown) => error instanceof PlatformAuthError && error.code === "validation_failed",
+  );
 });

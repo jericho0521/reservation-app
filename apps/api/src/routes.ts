@@ -90,9 +90,11 @@ import {
   createFirstOwner,
   createOpaqueToken,
   inviteStaff,
+  listStaffMembers,
   loginWithPassword,
   logoutSession,
   requestPasswordReset,
+  updateStaffAccess,
   type PasswordHasher,
   PlatformAuthError,
   type PlatformSessionRepository,
@@ -113,6 +115,7 @@ import {
   loginInputSchema,
   requestPasswordResetInputSchema,
   staffInvitationInputSchema,
+  staffAccessPatchSchema,
   chatConfirmReservationInputSchema,
   chatCreateReservationSessionInputSchema,
   chatMessageInputSchema,
@@ -939,6 +942,8 @@ async function handleSessionAuthRoute(
     || path === "/v1/auth/logout"
     || path === "/v1/auth/session"
     || path === "/v1/auth/staff/invitations"
+    || path === "/v1/auth/staff"
+    || /^\/v1\/auth\/staff\/[^/]+$/u.test(path)
     || /^\/v1\/auth\/staff\/invitations\/[^/]+\/accept$/u.test(path)
     || path === "/v1/auth/password-reset"
     || /^\/v1\/auth\/password-reset\/[^/]+\/complete$/u.test(path);
@@ -1032,6 +1037,36 @@ async function handleSessionAuthRoute(
       });
     }
 
+    if (method === "GET" && path === "/v1/auth/staff") {
+      const session = await authenticateRequestSession(request, sessionAuth);
+      if (!session) return platformError(401, "unauthorized", "Authentication is required.");
+      const staff = await listStaffMembers({ principal: session, repositories: sessionAuth.repositories });
+      return jsonResponse(200, { staff: staff.map(staffUserBody) });
+    }
+
+    const staffAccessMatch = /^\/v1\/auth\/staff\/([^/]+)$/u.exec(path);
+    if (method === "PATCH" && staffAccessMatch) {
+      const csrfError = validateSessionCsrf(request, sessionAuth.allowedOrigins);
+      if (csrfError) return csrfError;
+      const session = await authenticateRequestSession(request, sessionAuth);
+      if (!session) return platformError(401, "unauthorized", "Authentication is required.");
+      const userId = decodeURIComponent(staffAccessMatch[1]!);
+      if (!reservationIdPattern.test(userId)) return platformError(400, "validation_failed", "Staff account id is invalid.");
+      const parsed = staffAccessPatchSchema.safeParse(request.body);
+      if (!parsed.success) return platformError(400, "validation_failed", "Staff access details are invalid.");
+      const staff = await updateStaffAccess({
+        principal: session,
+        userId,
+        input: {
+          ...(parsed.data.status ? { status: parsed.data.status } : {}),
+          venueIds: parsed.data.venue_ids,
+        },
+        repositories: sessionAuth.repositories,
+        now: sessionAuth.now?.(),
+      });
+      return jsonResponse(200, staffUserBody(staff));
+    }
+
     const invitationMatch = /^\/v1\/auth\/staff\/invitations\/([^/]+)\/accept$/u.exec(path);
     if (method === "POST" && invitationMatch) {
       const originError = validateSessionOrigin(request, sessionAuth.allowedOrigins);
@@ -1117,6 +1152,16 @@ function authenticatedSessionBody(session: {
     role: session.role,
     venue_ids: [...session.venueIds],
     expires_at: session.expiresAt,
+  };
+}
+
+function staffUserBody(user: Awaited<ReturnType<typeof updateStaffAccess>>) {
+  return {
+    user_id: user.userId,
+    email: user.email,
+    display_name: user.displayName,
+    status: user.status,
+    venue_ids: [...user.venueIds],
   };
 }
 

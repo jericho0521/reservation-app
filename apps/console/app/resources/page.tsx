@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 export default async function ResourcesPage() {
   try {
     const client = createConsolePlatformClient();
-    const [resourcesResult, servicesResult, reservationsResult] = await Promise.all([client.listExperienceResources(), client.listExperienceServices(), client.listReservations()]);
+    const [resourcesResult, servicesResult, reservationsResult] = await Promise.all([client.listResources(), client.listServices(), client.listReservations()]);
     const maintenanceResults = await Promise.all(servicesResult.services.map((service) => client.listResourceMaintenance({ service_id: service.service_id, active_only: true }).catch(() => ({ maintenance: [] }))));
     const maintenance = maintenanceResults.flatMap((result) => result.maintenance);
     const serviceNames = new Map(servicesResult.services.map((service) => [service.service_id, service.name]));

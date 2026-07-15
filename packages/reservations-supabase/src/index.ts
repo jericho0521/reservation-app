@@ -545,6 +545,7 @@ export function createSupabasePlatformCatalogRepository(
           ? services.data.flatMap((row) => isRecord(row) && typeof row.id === "string" ? [row.id] : [])
           : [];
         if (serviceIds.length === 0) return { data: [] };
+        if (serviceId && !serviceIds.includes(serviceId)) return { data: [] };
       }
       let query = fromTable(client, RESERVATION_SUPABASE_TABLES.reservableResources)
         .select(RESERVATION_SUPABASE_SELECTS.catalogResource)

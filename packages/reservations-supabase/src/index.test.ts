@@ -549,6 +549,40 @@ test("catalog repository applies resource service filter with admin client", asy
   ]);
 });
 
+test("catalog repository does not query resources for a service outside the requested venue", async () => {
+  const calls: RecordedCatalogRead[] = [];
+  const publicClient = createCatalogReadClient("public", {}, calls);
+  const adminClient = createCatalogReadClient(
+    "admin",
+    {
+      [RESERVATION_SUPABASE_TABLES.services]: [
+        { data: [{ id: "service-in-venue" }], error: null },
+      ],
+      [RESERVATION_SUPABASE_TABLES.reservableResources]: [
+        { data: [{ id: "resource-outside-venue", service_id: "service-outside-venue" }], error: null },
+      ],
+    },
+    calls,
+  );
+  const repository = createSupabasePlatformCatalogRepository({ publicClient, adminClient });
+
+  const result = await repository.listResources({
+    venueId: "venue-1",
+    serviceId: "service-outside-venue",
+  });
+
+  assert.deepEqual(result, { data: [] });
+  assert.deepEqual(calls, [
+    {
+      client: "admin",
+      table: RESERVATION_SUPABASE_TABLES.services,
+      select: "id",
+      filters: [{ column: "venue_id", value: "venue-1" }],
+      orders: [],
+    },
+  ]);
+});
+
 test("availability repository reads and adapts one database snapshot", async () => {
   const rpcCalls: Array<{ fn: string; params?: Record<string, unknown> }> = [];
   const publicClient = {

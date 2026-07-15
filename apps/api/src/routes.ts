@@ -97,6 +97,14 @@ import {
   PlatformAuthError,
   type PlatformSessionRepository,
   type StaffRepository,
+  configureInstallationBusiness,
+  createInstallationLocation,
+  listInstallationLocations,
+  readInstallationBusiness,
+  updateInstallationLocation,
+  OnboardingError,
+  type InstallationBusinessRepository,
+  type InstallationLocationsRepository,
 } from "@reservation-platform/api";
 import {
   acceptStaffInvitationInputSchema,
@@ -155,6 +163,8 @@ export interface StandaloneApiDependencies {
   conversationOrchestrator?: ConversationOrchestratorDependencies;
   chatModule?: StandaloneApiChatModule;
   idempotencyRepository?: IdempotencyRepository;
+  installationBusinessRepository?: InstallationBusinessRepository;
+  installationLocationsRepository?: InstallationLocationsRepository;
   experienceStudioRepository?: ExperienceStudioRepository;
   experienceKnowledgeRepository?: ExperienceKnowledgeRepository;
   operatingHoursRepository?: OperatingHoursRepository;
@@ -303,6 +313,7 @@ const safeChatModuleErrorCodes = new Set([
 ]);
 
 const venuePattern = /^\/v1\/venues\/([^/]+)$/;
+const installationLocationPattern = /^\/v1\/locations\/([^/]+)$/;
 const servicePattern = /^\/v1\/services\/([^/]+)$/;
 const resourcePattern = /^\/v1\/resources\/([^/]+)$/;
 const resourceLayoutPattern = /^\/v1\/resource-layouts\/([^/]+)$/;
@@ -361,6 +372,7 @@ export async function handleStandaloneApiRequest(
   const method = request.method.toUpperCase();
   const url = parseRequestUrl(request.path);
   const path = normalizePath(url.pathname);
+  request.authenticatedPrincipal = undefined;
 
   if (method === "GET" && path === "/v1/metadata") {
     return jsonResponse(200, getPlatformMetadata());
@@ -400,6 +412,59 @@ export async function handleStandaloneApiRequest(
 
     if (request.internalPreflight === "auth-only") {
       return { status: 204, headers: {}, body: undefined };
+    }
+  }
+
+  if (path === "/v1/installation/business" && (method === "GET" || method === "PUT")) {
+    const principal = request.authenticatedPrincipal;
+    if (!principal) return platformError(401, "unauthorized", "Authentication is required.");
+    if (!dependencies.installationBusinessRepository) {
+      return platformError(503, "internal_error", "Business onboarding is not configured.");
+    }
+    try {
+      const body = method === "GET"
+        ? await readInstallationBusiness({ principal, repository: dependencies.installationBusinessRepository })
+        : await configureInstallationBusiness({ principal, input: request.body, repository: dependencies.installationBusinessRepository });
+      return jsonResponse(200, body);
+    } catch (error) {
+      return onboardingErrorResponse(error);
+    }
+  }
+
+  if (path === "/v1/locations" && (method === "GET" || method === "POST")) {
+    const principal = request.authenticatedPrincipal;
+    if (!principal) return platformError(401, "unauthorized", "Authentication is required.");
+    if (!dependencies.installationLocationsRepository) {
+      return platformError(503, "internal_error", "Location onboarding is not configured.");
+    }
+    try {
+      const body = method === "GET"
+        ? await listInstallationLocations({ principal, repository: dependencies.installationLocationsRepository })
+        : await createInstallationLocation({ principal, input: request.body, repository: dependencies.installationLocationsRepository });
+      return jsonResponse(method === "POST" ? 201 : 200, body);
+    } catch (error) {
+      return onboardingErrorResponse(error);
+    }
+  }
+
+  if (method === "PATCH") {
+    const encodedLocationId = installationLocationPattern.exec(path)?.[1];
+    if (encodedLocationId) {
+      const principal = request.authenticatedPrincipal;
+      if (!principal) return platformError(401, "unauthorized", "Authentication is required.");
+      if (!dependencies.installationLocationsRepository) {
+        return platformError(503, "internal_error", "Location onboarding is not configured.");
+      }
+      try {
+        return jsonResponse(200, await updateInstallationLocation({
+          principal,
+          locationId: decodeURIComponent(encodedLocationId),
+          input: request.body,
+          repository: dependencies.installationLocationsRepository,
+        }));
+      } catch (error) {
+        return onboardingErrorResponse(error);
+      }
     }
   }
 
@@ -1134,6 +1199,16 @@ function sessionAuthErrorResponse(error: unknown): StandaloneApiResponse {
   return platformError(error.status, code, error.message);
 }
 
+function onboardingErrorResponse(error: unknown): StandaloneApiResponse {
+  if (error instanceof OnboardingError) {
+    return platformError(error.status, error.code, error.message);
+  }
+  if (error instanceof PlatformAuthError && error.code === "owner_required") {
+    return platformError(403, "forbidden", "Owner access is required.");
+  }
+  return platformError(500, "internal_error", "Business onboarding request failed.");
+}
+
 async function readStandaloneApiReadiness(
   readinessCheck: StandaloneApiReadinessCheck | undefined,
   timeoutMs: number | undefined,
@@ -1220,8 +1295,7 @@ async function authorizeStandalonePlatformDataRequest(
     if (session.role === "staff" && isOwnerOnlyPlatformDataRoute(request.method.toUpperCase(), normalizePath(parseRequestUrl(request.path).pathname))) {
       return platformError(403, "forbidden", "Owner access is required.");
     }
-    if (session.role === "staff"
-      && isVenueScopedPlatformDataRoute(request.method.toUpperCase(), normalizePath(parseRequestUrl(request.path).pathname))
+    if (isVenueScopedPlatformDataRoute(request.method.toUpperCase(), normalizePath(parseRequestUrl(request.path).pathname))
       && !venueId) {
       return platformError(403, "forbidden", "A concrete assigned venue is required.");
     }
@@ -1247,6 +1321,7 @@ async function authorizeStandalonePlatformDataRequest(
       );
       if (!validation.ok) return jsonResponse(validation.status, validation.body);
     }
+    request.authenticatedPrincipal = session;
     return undefined;
   }
 
@@ -1347,6 +1422,7 @@ type RouteMatcher = string | RegExp | ((path: string) => boolean);
 
 const protectedRouteMetadata: Readonly<Record<string, readonly RouteMatcher[]>> = {
   GET: [
+    "/v1/installation/business", "/v1/locations",
     "/v1/experience/presets", "/v1/experience/workspace", "/v1/experience/validation",
     "/v1/experience/services", "/v1/experience/resources", "/v1/experience/operating-hours",
     "/v1/experience/knowledge", "/v1/experience/channels",
@@ -1359,6 +1435,7 @@ const protectedRouteMetadata: Readonly<Record<string, readonly RouteMatcher[]>> 
     resourceLayoutPattern, isWhatsAppOwnerRoute,
   ],
   POST: [
+    "/v1/locations",
     "/v1/experience/publish",
     "/v1/experience/services", "/v1/experience/resources", "/v1/experience/knowledge",
     experienceServiceArchivePattern, experienceResourceArchivePattern,
@@ -1368,16 +1445,24 @@ const protectedRouteMetadata: Readonly<Record<string, readonly RouteMatcher[]>> 
     conversationMessagesPattern,
     isChatReservationSessionRoute, isWhatsAppOwnerRoute,
   ],
-  PATCH: ["/v1/experience/identity", reservationPattern, isWhatsAppOwnerRoute],
-  PUT: ["/v1/experience/draft", "/v1/experience/operating-hours", "/v1/experience/channels", experienceServicePattern, experienceResourcePattern, experienceKnowledgePattern, conversationAutomationPattern],
+  PATCH: ["/v1/experience/identity", installationLocationPattern, reservationPattern, isWhatsAppOwnerRoute],
+  PUT: ["/v1/installation/business", "/v1/experience/draft", "/v1/experience/operating-hours", "/v1/experience/channels", experienceServicePattern, experienceResourcePattern, experienceKnowledgePattern, conversationAutomationPattern],
   DELETE: [isWhatsAppOwnerRoute],
 };
 
 const ownerOnlyRouteMetadata: Readonly<Record<string, readonly RouteMatcher[]>> = {
-  GET: [isExperienceOwnerRoute, isWhatsAppConfigurationRoute],
-  POST: [isExperienceOwnerRoute, isWhatsAppConfigurationRoute],
-  PATCH: [isExperienceOwnerRoute, isWhatsAppConfigurationRoute],
-  PUT: [isExperienceOwnerRoute, isWhatsAppConfigurationRoute],
+  GET: [
+    "/v1/installation/business",
+    "/v1/availability",
+    "/v1/venues", venuePattern,
+    "/v1/services", servicePattern,
+    "/v1/resources", resourcePattern, resourceLayoutPattern,
+    isExperienceOwnerRoute,
+    isWhatsAppConfigurationRoute,
+  ],
+  POST: ["/v1/locations", isExperienceOwnerRoute, isWhatsAppConfigurationRoute],
+  PATCH: [installationLocationPattern, isExperienceOwnerRoute, isWhatsAppConfigurationRoute],
+  PUT: ["/v1/installation/business", isExperienceOwnerRoute, isWhatsAppConfigurationRoute],
   DELETE: [isExperienceOwnerRoute, isWhatsAppConfigurationRoute],
 };
 
@@ -2103,7 +2188,10 @@ function isWhatsAppConfigurationRoute(path: string) {
     || path === whatsappReadinessPath
     || path === whatsappSimulationPath
     || path === whatsappKnowledgePath
-    || whatsappKnowledgePattern.test(path);
+    || whatsappKnowledgePattern.test(path)
+    || path === whatsappConversationsPath
+    || whatsappConversationPattern.test(path)
+    || whatsappConversationMessagesPattern.test(path);
 }
 
 function isWhatsAppOwnerRoute(path: string) {

@@ -265,6 +265,17 @@
       ]
     },
     {
+      "kind": "core-migration",
+      "order": 24,
+      "targetPath": "packages/database/migrations/supabase/000024_installation_business_onboarding.sql",
+      "sourceAssets": [
+        {
+          "path": "packages/database/migrations/supabase/000024_installation_business_onboarding.sql",
+          "section": "Atomic appointment-business onboarding and tenant-scoped location management"
+        }
+      ]
+    },
+    {
       "kind": "optional-ai-retrieval",
       "targetPath": "packages/database/migrations/supabase/optional/ai-retrieval/000001_knowledge_chunks.sql",
       "sourceAssets": [

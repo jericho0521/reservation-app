@@ -194,6 +194,46 @@ export const completePasswordResetInputSchema = strictObject({
   password: z.string().min(12).max(128),
 });
 
+export const installationLocationInputSchema = strictObject({
+  name: z.string().trim().min(1).max(120),
+  address: z.string().trim().max(500).optional(),
+  timezone: z.string().trim().min(1).max(100),
+});
+
+export const installationBusinessInputSchema = strictObject({
+  name: z.string().trim().min(1).max(120),
+  public_slug: z.string().trim().min(1).max(120),
+  timezone: z.string().trim().min(1).max(100),
+  location: strictObject({
+    name: z.string().trim().min(1).max(120),
+    address: z.string().trim().max(500).optional(),
+  }),
+});
+
+export const installationLocationPatchSchema = strictObject({
+  name: z.string().trim().min(1).max(120).optional(),
+  address: z.string().trim().max(500).nullable().optional(),
+  timezone: z.string().trim().min(1).max(100).optional(),
+}).refine((value) => Object.keys(value).length > 0, {
+  message: "At least one location field is required.",
+});
+
+export const installationLocationResponseSchema = strictObject({
+  location_id: z.string().uuid(),
+  name: z.string().min(1),
+  address: z.string().optional(),
+  timezone: z.string().min(1),
+});
+
+export const listInstallationLocationsResponseSchema = strictObject({
+  locations: z.array(installationLocationResponseSchema),
+});
+
+export const installationBusinessResponseSchema = strictObject({
+  profile: businessProfileResponseSchema,
+  locations: z.array(installationLocationResponseSchema).min(1),
+});
+
 export const tenantResponseSchema = strictObject({
   tenant_id: z.string(),
   name: z.string().optional(),

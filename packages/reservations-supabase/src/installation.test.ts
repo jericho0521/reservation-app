@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   createSupabaseAuditRepository,
+  createSupabaseInstallationBusinessRepository,
   createSupabaseInstallationRepository,
   type InstallationSupabaseClient,
 } from "./installation.js";
@@ -130,4 +131,48 @@ test("audit records remain tenant-scoped and preserve nullable context", async (
       correlation_id: "request-1",
     }]],
   ]);
+});
+
+test("business onboarding uses one atomic RPC and maps the appointment workspace", async () => {
+  const calls: unknown[] = [];
+  const data = {
+    profile: {
+      business_id: "business-1",
+      tenant_id: "tenant-1",
+      venue_id: "11111111-1111-4111-8111-111111111111",
+      name: "Northstar Therapy",
+      public_slug: "northstar-therapy",
+      preset_id: "appointments_salon",
+      status: "draft",
+    },
+    locations: [{
+      location_id: "11111111-1111-4111-8111-111111111111",
+      name: "City Centre",
+      address: "1 Example Road",
+      timezone: "Asia/Kuala_Lumpur",
+    }],
+  };
+  const repository = createSupabaseInstallationBusinessRepository({
+    async rpc(name, params) { calls.push([name, params]); return { data, error: null }; },
+  });
+  const result = await repository.configureBusiness({
+    tenantId: "tenant-1",
+    ownerUserId: "22222222-2222-4222-8222-222222222222",
+    business: {
+      name: "Northstar Therapy",
+      public_slug: "northstar-therapy",
+      timezone: "Asia/Kuala_Lumpur",
+      location: { name: "City Centre", address: "1 Example Road" },
+    },
+  });
+  assert.equal(result.profile.preset_id, "appointments_salon");
+  assert.deepEqual(calls[0], ["platform_configure_installation_business", {
+    p_tenant_id: "tenant-1",
+    p_owner_user_id: "22222222-2222-4222-8222-222222222222",
+    p_name: "Northstar Therapy",
+    p_public_slug: "northstar-therapy",
+    p_timezone: "Asia/Kuala_Lumpur",
+    p_location_name: "City Centre",
+    p_location_address: "1 Example Road",
+  }]);
 });

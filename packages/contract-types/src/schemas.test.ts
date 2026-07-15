@@ -20,6 +20,10 @@ import {
   experienceResourceInputSchema,
   experienceServiceInputSchema,
   experienceWorkspaceResponseSchema,
+  installationBusinessInputSchema,
+  installationBusinessResponseSchema,
+  installationLocationInputSchema,
+  installationLocationPatchSchema,
   listReservationsResponseSchema,
   loginInputSchema,
   completePasswordResetInputSchema,
@@ -83,6 +87,40 @@ test("authentication contracts validate setup, sessions, staff, and password res
   assert.equal(requestPasswordResetInputSchema.safeParse({ email: owner.email }).success, true);
   assert.equal(completePasswordResetInputSchema.safeParse({ password: "correct horse battery staple" }).success, true);
   assert.equal(completePasswordResetInputSchema.safeParse({ password: "too-short" }).success, false);
+});
+
+test("installation onboarding contracts require a business, timezone, and first location", () => {
+  const input = {
+    name: "Northstar Therapy",
+    public_slug: "northstar-therapy",
+    timezone: "Asia/Kuala_Lumpur",
+    location: { name: "City Centre", address: "1 Example Road" },
+  };
+  assert.equal(installationBusinessInputSchema.safeParse(input).success, true);
+  assert.equal(installationBusinessInputSchema.safeParse({ ...input, extra: true }).success, false);
+  assert.equal(installationLocationInputSchema.safeParse({
+    name: "East Branch",
+    timezone: "Asia/Kuala_Lumpur",
+  }).success, true);
+  assert.equal(installationLocationPatchSchema.safeParse({}).success, false);
+  assert.equal(installationLocationPatchSchema.safeParse({ address: null }).success, true);
+  assert.equal(installationBusinessResponseSchema.safeParse({
+    profile: {
+      business_id: "business-1",
+      tenant_id: "tenant-1",
+      venue_id: "11111111-1111-4111-8111-111111111111",
+      name: input.name,
+      public_slug: input.public_slug,
+      preset_id: "appointments_salon",
+      status: "draft",
+    },
+    locations: [{
+      location_id: "11111111-1111-4111-8111-111111111111",
+      name: input.location.name,
+      address: input.location.address,
+      timezone: input.timezone,
+    }],
+  }).success, true);
 });
 
 test("platform error codes include payload_too_large", async () => {

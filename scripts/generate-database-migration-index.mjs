@@ -40,6 +40,7 @@ const expectedCoreTargets = [
   "packages/database/migrations/supabase/000021_installation_auth.sql",
   "packages/database/migrations/supabase/000022_password_reset.sql",
   "packages/database/migrations/supabase/000023_venue_scoped_operations.sql",
+  "packages/database/migrations/supabase/000024_installation_business_onboarding.sql",
 ];
 
 const optionalAiPrefix = "packages/database/migrations/supabase/optional/ai-retrieval/";

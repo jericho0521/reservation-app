@@ -1674,6 +1674,149 @@
       },
       "type": "object"
     },
+    "InstallationBusinessInput": {
+      "additionalProperties": false,
+      "properties": {
+        "location": {
+          "additionalProperties": false,
+          "properties": {
+            "address": {
+              "maxLength": 500,
+              "type": "string"
+            },
+            "name": {
+              "maxLength": 120,
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "name"
+          ],
+          "type": "object"
+        },
+        "name": {
+          "maxLength": 120,
+          "minLength": 1,
+          "type": "string"
+        },
+        "public_slug": {
+          "maxLength": 120,
+          "minLength": 1,
+          "type": "string"
+        },
+        "timezone": {
+          "maxLength": 100,
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "public_slug",
+        "timezone",
+        "location"
+      ],
+      "type": "object"
+    },
+    "InstallationBusinessResponse": {
+      "additionalProperties": false,
+      "properties": {
+        "locations": {
+          "items": {
+            "$ref": "#/$defs/InstallationLocationResponse"
+          },
+          "minItems": 1,
+          "type": "array"
+        },
+        "profile": {
+          "$ref": "#/$defs/BusinessProfileResponse"
+        }
+      },
+      "required": [
+        "profile",
+        "locations"
+      ],
+      "type": "object"
+    },
+    "InstallationLocationInput": {
+      "additionalProperties": false,
+      "properties": {
+        "address": {
+          "maxLength": 500,
+          "type": "string"
+        },
+        "name": {
+          "maxLength": 120,
+          "minLength": 1,
+          "type": "string"
+        },
+        "timezone": {
+          "maxLength": 100,
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "timezone"
+      ],
+      "type": "object"
+    },
+    "InstallationLocationPatch": {
+      "additionalProperties": false,
+      "minProperties": 1,
+      "properties": {
+        "address": {
+          "oneOf": [
+            {
+              "maxLength": 500,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "name": {
+          "maxLength": 120,
+          "minLength": 1,
+          "type": "string"
+        },
+        "timezone": {
+          "maxLength": 100,
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "InstallationLocationResponse": {
+      "additionalProperties": false,
+      "properties": {
+        "address": {
+          "type": "string"
+        },
+        "location_id": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "name": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "timezone": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "location_id",
+        "name",
+        "timezone"
+      ],
+      "type": "object"
+    },
     "JsonPrimitive": {
       "oneOf": [
         {
@@ -1804,6 +1947,21 @@
       },
       "required": [
         "presets"
+      ],
+      "type": "object"
+    },
+    "ListInstallationLocationsResponse": {
+      "additionalProperties": false,
+      "properties": {
+        "locations": {
+          "items": {
+            "$ref": "#/$defs/InstallationLocationResponse"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "locations"
       ],
       "type": "object"
     },

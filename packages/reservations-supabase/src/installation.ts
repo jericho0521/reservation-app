@@ -1,3 +1,9 @@
+import { installationBusinessResponseSchema } from "@reservation-platform/contract-types";
+import {
+  OnboardingRepositoryConflictError,
+  type InstallationBusinessRepository,
+} from "@reservation-platform/api";
+
 type QueryResult = { data: unknown; error: unknown | null };
 
 interface InstallationQueryBuilder extends PromiseLike<QueryResult> {
@@ -12,6 +18,10 @@ interface InstallationQueryBuilder extends PromiseLike<QueryResult> {
 
 export interface InstallationSupabaseClient {
   from(table: string): InstallationQueryBuilder;
+}
+
+export interface InstallationBusinessSupabaseClient {
+  rpc(name: string, params?: Record<string, unknown>): Promise<QueryResult>;
 }
 
 export interface InstallationRecord {
@@ -86,6 +96,34 @@ export function createSupabaseInstallationRepository(
   };
 }
 
+export function createSupabaseInstallationBusinessRepository(
+  client: InstallationBusinessSupabaseClient,
+): InstallationBusinessRepository {
+  return {
+    async readBusiness(tenantId) {
+      const result = await client.rpc("platform_read_installation_business", {
+        p_tenant_id: tenantId,
+      });
+      assertOnboardingQuerySucceeded(result, "Failed to read installation business.");
+      if (result.data === null) return undefined;
+      return installationBusinessResponseSchema.parse(unwrapRpcValue(result.data));
+    },
+    async configureBusiness({ tenantId, ownerUserId, business }) {
+      const result = await client.rpc("platform_configure_installation_business", {
+        p_tenant_id: tenantId,
+        p_owner_user_id: ownerUserId,
+        p_name: business.name,
+        p_public_slug: business.public_slug,
+        p_timezone: business.timezone,
+        p_location_name: business.location.name,
+        p_location_address: business.location.address ?? null,
+      });
+      assertOnboardingQuerySucceeded(result, "Failed to configure installation business.");
+      return installationBusinessResponseSchema.parse(unwrapRpcValue(result.data));
+    },
+  };
+}
+
 export function createSupabaseAuditRepository(
   client: InstallationSupabaseClient,
 ): AuditRepository {
@@ -126,6 +164,25 @@ function adaptInstallation(value: unknown): InstallationRecord {
 
 function assertQuerySucceeded(result: QueryResult, message: string) {
   if (result.error) throw new Error(message, { cause: result.error });
+}
+
+function assertOnboardingQuerySucceeded(result: QueryResult, message: string) {
+  if (!result.error) return;
+  const error = asQueryError(result.error);
+  if (error.code === "23505") {
+    throw new OnboardingRepositoryConflictError(
+      error.message?.includes("slug") ? "public_slug" : "location_name",
+    );
+  }
+  throw new Error(message, { cause: result.error });
+}
+
+function unwrapRpcValue(value: unknown): unknown {
+  return Array.isArray(value) && value.length === 1 ? value[0] : value;
+}
+
+function asQueryError(value: unknown): { code?: string; message?: string } {
+  return value && typeof value === "object" ? value as { code?: string; message?: string } : {};
 }
 
 function asRecord(value: unknown): Record<string, unknown> {

@@ -237,7 +237,7 @@ test("cookie staff cannot access owner configuration routes but can list assigne
         ownerRepositoryCalls += 1;
         return {};
       },
-    } as StandaloneApiWhatsAppModule,
+    } as unknown as StandaloneApiWhatsAppModule,
   };
   const cookie = `reservation_session=${"s".repeat(43)}`;
 
@@ -264,6 +264,255 @@ test("cookie staff cannot access owner configuration routes but can list assigne
   });
   assert.equal(operational.status, 200);
   assert.equal(observedVenue, assignedVenue);
+});
+
+test("cookie owners also require a concrete venue for venue-scoped operations", async () => {
+  const cookie = `reservation_session=${"s".repeat(43)}`;
+  let storageCalls = 0;
+  const reservationReadRepository: ReservationReadRepositoryPort = {
+    async listReservations() { storageCalls += 1; return { data: [] }; },
+    async readReservationById() { storageCalls += 1; return { data: null }; },
+  };
+  for (const venueIds of [[], [
+    "123e4567-e89b-42d3-a456-426614174000",
+    "223e4567-e89b-42d3-a456-426614174000",
+  ]]) {
+    const response = await handleStandaloneApiRequest({
+      method: "GET",
+      path: "/v1/reservations",
+      headers: { cookie },
+    }, {
+      sessionAuth: {
+        repositories: authRepository({
+          readSession: async () => ({
+            userId: "223e4567-e89b-42d3-a456-426614174000",
+            tenantId: "tenant-1",
+            role: "owner",
+            venueIds,
+            expiresAt: "2026-07-15T12:00:00.000Z",
+          }),
+        }),
+        allowedOrigins: [authOrigin],
+      },
+      reservationReadRepository,
+    });
+    assert.equal(response.status, 403);
+  }
+  assert.equal(storageCalls, 0);
+});
+
+test("cookie staff cannot escape through legacy catalog, availability, or WhatsApp stores", async () => {
+  const assignedVenue = "123e4567-e89b-42d3-a456-426614174000";
+  const cookie = `reservation_session=${"s".repeat(43)}`;
+  let storageCalls = 0;
+  const dependencies = {
+    sessionAuth: {
+      repositories: authRepository({
+        readSession: async () => ({
+          userId: "223e4567-e89b-42d3-a456-426614174000",
+          tenantId: "tenant-1",
+          role: "staff",
+          venueIds: [assignedVenue],
+          expiresAt: "2026-07-15T12:00:00.000Z",
+        }),
+      }),
+      allowedOrigins: [authOrigin],
+    },
+    catalogRepository: {
+      async listVenues() { storageCalls += 1; return { data: [] }; },
+      async getVenue() { storageCalls += 1; return { data: null }; },
+      async listServices() { storageCalls += 1; return { data: [] }; },
+      async getService() { storageCalls += 1; return { data: null }; },
+      async listResources() { storageCalls += 1; return { data: [] }; },
+      async getResource() { storageCalls += 1; return { data: null }; },
+      async getResourceLayout() { storageCalls += 1; return { data: null }; },
+    } satisfies PlatformCatalogRepository,
+    availabilityRepository: {
+      async readAvailability() { storageCalls += 1; throw new Error("must be blocked"); },
+    } satisfies AvailabilityRepositoryPort,
+    whatsappModule: {
+      async listConversations() { storageCalls += 1; return []; },
+      async listConversationMessages() { storageCalls += 1; return []; },
+      async updateConversationAutomationStatus() { storageCalls += 1; return undefined; },
+      async sendConversationMessage() { storageCalls += 1; return undefined; },
+    } as unknown as StandaloneApiWhatsAppModule,
+  };
+  const paths = [
+    "/v1/venues",
+    `/v1/venues/${assignedVenue}`,
+    "/v1/services",
+    "/v1/services/service-other-venue",
+    "/v1/resources",
+    "/v1/resources/resource-other-venue",
+    "/v1/resource-layouts/layout-other-venue",
+    "/v1/availability?service_id=service-other-venue&date=2026-07-15",
+    "/v1/channels/whatsapp/conversations",
+    "/v1/channels/whatsapp/conversations/conversation-other-venue/messages",
+  ];
+  for (const path of paths) {
+    const response = await handleStandaloneApiRequest({ method: "GET", path, headers: { cookie } }, dependencies);
+    assert.equal(response.status, 403, path);
+  }
+  const mutationHeaders = {
+    cookie: `${cookie}; reservation_csrf=${"c".repeat(43)}`,
+    origin: authOrigin,
+    "x-csrf-token": "c".repeat(43),
+  };
+  for (const request of [
+    {
+      method: "PATCH",
+      path: "/v1/channels/whatsapp/conversations/conversation-other-venue",
+      body: { automation_status: "manual" },
+    },
+    {
+      method: "POST",
+      path: "/v1/channels/whatsapp/conversations/conversation-other-venue/messages",
+      body: { text: "staff reply" },
+    },
+  ]) {
+    const response = await handleStandaloneApiRequest({ ...request, headers: mutationHeaders }, dependencies);
+    assert.equal(response.status, 403, `${request.method} ${request.path}`);
+  }
+  assert.equal(storageCalls, 0);
+
+  let unifiedScope: unknown;
+  const unified = await handleStandaloneApiRequest({
+    method: "GET",
+    path: "/v1/conversations",
+    headers: { cookie },
+  }, {
+    sessionAuth: dependencies.sessionAuth,
+    conversationRepository: conversationRepository({
+      async list(scope) { unifiedScope = scope; return { data: [] }; },
+    }),
+  });
+  assert.equal(unified.status, 200);
+  assert.deepEqual(unifiedScope, { tenantId: "tenant-1", venueId: assignedVenue });
+});
+
+test("owner configures the appointment business while staff only list assigned locations", async () => {
+  const ownerCookie = `reservation_session=${"s".repeat(43)}; reservation_csrf=${"c".repeat(43)}`;
+  const mutationHeaders = { cookie: ownerCookie, origin: authOrigin, "x-csrf-token": "c".repeat(43) };
+  const location = {
+    location_id: "123e4567-e89b-42d3-a456-426614174000",
+    name: "City Centre",
+    address: "1 Example Road",
+    timezone: "Asia/Kuala_Lumpur",
+  };
+  const business = {
+    profile: {
+      business_id: "business-1",
+      tenant_id: "tenant-1",
+      venue_id: location.location_id,
+      name: "Northstar Therapy",
+      public_slug: "northstar-therapy",
+      preset_id: "appointments_salon" as const,
+      status: "draft" as const,
+    },
+    locations: [location],
+  };
+  let configureInput: unknown;
+  const dependencies = {
+    sessionAuth: { repositories: authRepository({
+      readSession: async () => ({
+        userId: "223e4567-e89b-42d3-a456-426614174000",
+        tenantId: "tenant-1",
+        role: "owner",
+        venueIds: [],
+        expiresAt: "2026-07-15T12:00:00.000Z",
+      }),
+    }), allowedOrigins: [authOrigin] },
+    installationBusinessRepository: {
+      async readBusiness() { return business; },
+      async configureBusiness(input: unknown) { configureInput = input; return business; },
+    },
+    installationLocationsRepository: {
+      async listLocations() { return [location]; },
+      async createLocation() { return location; },
+      async updateLocation() { return location; },
+    },
+  };
+  const configured = await handleStandaloneApiRequest({
+    method: "PUT",
+    path: "/v1/installation/business",
+    headers: mutationHeaders,
+    body: {
+      name: "Northstar Therapy",
+      public_slug: "Northstar-Therapy",
+      timezone: "Asia/Kuala_Lumpur",
+      location: { name: "City Centre", address: "1 Example Road" },
+    },
+  }, dependencies);
+  assert.equal(configured.status, 200);
+  assert.equal((configureInput as { business: { public_slug: string } }).business.public_slug, "northstar-therapy");
+
+  let visibleVenueIds: readonly string[] | undefined;
+  const staffList = await handleStandaloneApiRequest({
+    method: "GET",
+    path: "/v1/locations",
+    headers: { cookie: `reservation_session=${"s".repeat(43)}` },
+  }, {
+    sessionAuth: {
+      repositories: authRepository({
+        readSession: async () => ({
+          userId: "223e4567-e89b-42d3-a456-426614174000",
+          tenantId: "tenant-1",
+          role: "staff",
+          venueIds: [location.location_id],
+          expiresAt: "2026-07-15T12:00:00.000Z",
+        }),
+      }),
+      allowedOrigins: [authOrigin],
+    },
+    installationLocationsRepository: {
+      async listLocations(input) { visibleVenueIds = input.venueIds; return [location]; },
+      async createLocation() { throw new Error("unused"); },
+      async updateLocation() { throw new Error("unused"); },
+    },
+    tenantVenueRepository: {
+      async getTenant() { return { data: { id: "tenant-1" } }; },
+      async getVenue() { return { data: { id: location.location_id, tenant_id: "tenant-1" } }; },
+    },
+  });
+  assert.equal(staffList.status, 200);
+  assert.deepEqual(visibleVenueIds, [location.location_id]);
+});
+
+test("location routes validate UUIDs and sanitize storage failures", async () => {
+  let storageCalls = 0;
+  const dependencies = {
+    sessionAuth: { repositories: authRepository({
+      readSession: async () => ({
+        userId: "223e4567-e89b-42d3-a456-426614174000",
+        tenantId: "tenant-1",
+        role: "owner",
+        venueIds: [],
+        expiresAt: "2026-07-15T12:00:00.000Z",
+      }),
+    }), allowedOrigins: [authOrigin] },
+    installationLocationsRepository: {
+      async listLocations() { return []; },
+      async createLocation() { throw new Error("database password leaked"); },
+      async updateLocation() { storageCalls += 1; return undefined; },
+    },
+  };
+  const headers = {
+    cookie: `reservation_session=${"s".repeat(43)}; reservation_csrf=${"c".repeat(43)}`,
+    origin: authOrigin,
+    "x-csrf-token": "c".repeat(43),
+  };
+  const invalidId = await handleStandaloneApiRequest({
+    method: "PATCH", path: "/v1/locations/not-a-uuid", headers, body: { timezone: "UTC" },
+  }, dependencies);
+  assert.equal(invalidId.status, 400);
+  assert.equal(storageCalls, 0);
+
+  const failed = await handleStandaloneApiRequest({
+    method: "POST", path: "/v1/locations", headers,
+    body: { name: "Branch", timezone: "UTC" },
+  }, dependencies);
+  assert.equal(failed.status, 500);
+  assert.equal(JSON.stringify(failed.body).includes("database password"), false);
 });
 
 test("cookie staff venue scope fails closed before cross-venue reservation and maintenance storage", async () => {

@@ -1709,6 +1709,149 @@
         },
         "type": "object"
       },
+      "InstallationBusinessInput": {
+        "additionalProperties": false,
+        "properties": {
+          "location": {
+            "additionalProperties": false,
+            "properties": {
+              "address": {
+                "maxLength": 500,
+                "type": "string"
+              },
+              "name": {
+                "maxLength": 120,
+                "minLength": 1,
+                "type": "string"
+              }
+            },
+            "required": [
+              "name"
+            ],
+            "type": "object"
+          },
+          "name": {
+            "maxLength": 120,
+            "minLength": 1,
+            "type": "string"
+          },
+          "public_slug": {
+            "maxLength": 120,
+            "minLength": 1,
+            "type": "string"
+          },
+          "timezone": {
+            "maxLength": 100,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "public_slug",
+          "timezone",
+          "location"
+        ],
+        "type": "object"
+      },
+      "InstallationBusinessResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "locations": {
+            "items": {
+              "$ref": "#/components/schemas/InstallationLocationResponse"
+            },
+            "minItems": 1,
+            "type": "array"
+          },
+          "profile": {
+            "$ref": "#/components/schemas/BusinessProfileResponse"
+          }
+        },
+        "required": [
+          "profile",
+          "locations"
+        ],
+        "type": "object"
+      },
+      "InstallationLocationInput": {
+        "additionalProperties": false,
+        "properties": {
+          "address": {
+            "maxLength": 500,
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 120,
+            "minLength": 1,
+            "type": "string"
+          },
+          "timezone": {
+            "maxLength": 100,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "timezone"
+        ],
+        "type": "object"
+      },
+      "InstallationLocationPatch": {
+        "additionalProperties": false,
+        "minProperties": 1,
+        "properties": {
+          "address": {
+            "oneOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "name": {
+            "maxLength": 120,
+            "minLength": 1,
+            "type": "string"
+          },
+          "timezone": {
+            "maxLength": 100,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "InstallationLocationResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "address": {
+            "type": "string"
+          },
+          "location_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "name": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "timezone": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "location_id",
+          "name",
+          "timezone"
+        ],
+        "type": "object"
+      },
       "JsonPrimitive": {
         "oneOf": [
           {
@@ -1839,6 +1982,21 @@
         },
         "required": [
           "presets"
+        ],
+        "type": "object"
+      },
+      "ListInstallationLocationsResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "locations": {
+            "items": {
+              "$ref": "#/components/schemas/InstallationLocationResponse"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "locations"
         ],
         "type": "object"
       },
@@ -5434,6 +5592,275 @@
         "summary": "Read the current venue experience workspace.",
         "tags": [
           "Experience Studio"
+        ]
+      }
+    },
+    "/v1/installation/business": {
+      "get": {
+        "operationId": "getInstallationBusiness",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/TenantIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/VenueIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/CorrelationIdHeader"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InstallationBusinessResponse"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformErrorResponse"
+                }
+              }
+            },
+            "description": "Platform error response."
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "summary": "Read the installation business and locations.",
+        "tags": [
+          "Onboarding"
+        ]
+      },
+      "put": {
+        "operationId": "configureInstallationBusiness",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/TenantIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/VenueIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/CorrelationIdHeader"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InstallationBusinessInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InstallationBusinessResponse"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformErrorResponse"
+                }
+              }
+            },
+            "description": "Platform error response."
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "summary": "Configure the appointment business and first location.",
+        "tags": [
+          "Onboarding"
+        ]
+      }
+    },
+    "/v1/locations": {
+      "get": {
+        "operationId": "listInstallationLocations",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/TenantIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/VenueIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/CorrelationIdHeader"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListInstallationLocationsResponse"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformErrorResponse"
+                }
+              }
+            },
+            "description": "Platform error response."
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "summary": "List locations visible to the current user.",
+        "tags": [
+          "Onboarding"
+        ]
+      },
+      "post": {
+        "operationId": "createInstallationLocation",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/TenantIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/VenueIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/CorrelationIdHeader"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InstallationLocationInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InstallationLocationResponse"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformErrorResponse"
+                }
+              }
+            },
+            "description": "Platform error response."
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "summary": "Create an appointment business location.",
+        "tags": [
+          "Onboarding"
+        ]
+      }
+    },
+    "/v1/locations/{location_id}": {
+      "patch": {
+        "operationId": "updateInstallationLocation",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "location_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/TenantIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/VenueIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/CorrelationIdHeader"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InstallationLocationPatch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InstallationLocationResponse"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformErrorResponse"
+                }
+              }
+            },
+            "description": "Platform error response."
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "summary": "Update an appointment business location.",
+        "tags": [
+          "Onboarding"
         ]
       }
     },

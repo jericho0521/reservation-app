@@ -20,5 +20,6 @@ export * from "./conversations.js";
 export * from "./conversation-orchestrator.js";
 export * from "./conversation-responders.js";
 export * from "./installation.js";
+export * from "./locations.js";
 export * from "./sessions.js";
 export * from "./staff.js";

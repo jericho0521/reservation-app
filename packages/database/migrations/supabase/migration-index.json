@@ -189,6 +189,14 @@
       "scope": "reservation-platform",
       "sha256": "725c90038d01e328cf00ea1dc8a589fc8b510a8abba20912376d8760096794aa",
       "bytes": 6422
+    },
+    {
+      "order": 24,
+      "path": "packages/database/migrations/supabase/000024_installation_business_onboarding.sql",
+      "module": "core",
+      "scope": "reservation-platform",
+      "sha256": "3bb2fa8ef875cb1c8fbf1dce61371f45848f0c8141acb180a10930565c793d65",
+      "bytes": 11175
     }
   ],
   "optionalMigrations": [

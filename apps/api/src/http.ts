@@ -1,4 +1,5 @@
 import type { PlatformErrorResponse } from "@reservation-platform/contract-types";
+import type { AuthenticatedPrincipal } from "@reservation-platform/api";
 
 export interface StandaloneApiRequest {
   method: string;
@@ -6,6 +7,7 @@ export interface StandaloneApiRequest {
   headers?: Record<string, string | string[] | undefined>;
   body?: unknown;
   internalPreflight?: "auth-only";
+  authenticatedPrincipal?: AuthenticatedPrincipal;
 }
 
 export interface StandaloneApiResponse {

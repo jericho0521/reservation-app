@@ -365,6 +365,8 @@ test("standalone Supabase runtime wires public and admin clients to repository f
     { name: "createReservationManagementRepository", adminClient: clients[1] },
     { name: "createResourceMaintenanceRepository", adminClient: clients[1] },
     { name: "createIdempotencyRepository", adminClient: clients[1] },
+    { name: "createInstallationBusinessRepository", adminClient: clients[1] },
+    { name: "createInstallationLocationsRepository", adminClient: clients[1] },
     { name: "createExperienceStudioRepository", adminClient: clients[1] },
     { name: "createExperienceKnowledgeRepository", adminClient: clients[1] },
     { name: "createOperatingHoursRepository", adminClient: clients[1] },
@@ -373,6 +375,8 @@ test("standalone Supabase runtime wires public and admin clients to repository f
   ]);
 
   assert.equal(Boolean(dependencies.catalogRepository), true);
+  assert.equal(Boolean(dependencies.installationBusinessRepository), true);
+  assert.equal(Boolean(dependencies.installationLocationsRepository), true);
   assert.equal(Boolean(dependencies.availabilityRepository), true);
   assert.equal(Boolean(dependencies.analyticsRepository), true);
   assert.equal(Boolean(dependencies.conversationRepository), true);
@@ -702,6 +706,14 @@ function recordingRepositoryFactories(
     createIdempotencyRepository(client) {
       recordAdminFactoryCall(calls, "createIdempotencyRepository", client);
       return repository as NonNullable<StandaloneApiDependencies["idempotencyRepository"]>;
+    },
+    createInstallationBusinessRepository(client) {
+      recordAdminFactoryCall(calls, "createInstallationBusinessRepository", client);
+      return repository as NonNullable<StandaloneApiDependencies["installationBusinessRepository"]>;
+    },
+    createInstallationLocationsRepository(client) {
+      recordAdminFactoryCall(calls, "createInstallationLocationsRepository", client);
+      return repository as NonNullable<StandaloneApiDependencies["installationLocationsRepository"]>;
     },
     createExperienceStudioRepository(client) {
       recordAdminFactoryCall(calls, "createExperienceStudioRepository", client);

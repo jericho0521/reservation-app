@@ -64,6 +64,39 @@ export interface CompletePasswordResetInput {
   password: string;
 }
 
+export interface InstallationLocationInput {
+  name: string;
+  address?: string;
+  timezone: string;
+}
+
+export interface InstallationBusinessInput {
+  name: string;
+  public_slug: string;
+  timezone: string;
+  location: {
+    name: string;
+    address?: string;
+  };
+}
+
+export interface InstallationLocationPatch {
+  name?: string;
+  address?: string | null;
+  timezone?: string;
+}
+
+export interface InstallationLocationResponse {
+  location_id: string;
+  name: string;
+  address?: string;
+  timezone: string;
+}
+
+export interface ListInstallationLocationsResponse {
+  locations: InstallationLocationResponse[];
+}
+
 export type ExperiencePresetId =
   | "racing_gaming"
   | "rooms_facilities"
@@ -116,6 +149,11 @@ export interface BusinessProfileResponse {
   public_slug: string;
   preset_id: ExperiencePresetId;
   status: "draft" | "published" | "archived";
+}
+
+export interface InstallationBusinessResponse {
+  profile: BusinessProfileResponse;
+  locations: InstallationLocationResponse[];
 }
 
 export interface ExperienceConfigurationResponse {

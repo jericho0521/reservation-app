@@ -13,7 +13,7 @@ import {
 
 const indexPath = new URL("../migrations/supabase/migration-index.json", import.meta.url);
 
-test("core plan includes exactly 000001 through 000023 in order", async () => {
+test("core plan includes exactly 000001 through 000024 in order", async () => {
   const index = await readActualIndex();
   const plan = buildSupabaseMigrationPlan(index);
 
@@ -43,10 +43,31 @@ test("core plan includes exactly 000001 through 000023 in order", async () => {
       "000021_installation_auth.sql",
       "000022_password_reset.sql",
       "000023_venue_scoped_operations.sql",
+      "000024_installation_business_onboarding.sql",
     ],
   );
-  assert.equal(plan.migrations.length, 23);
+  assert.equal(plan.migrations.length, 24);
   assert.equal(plan.seeds.length, 0);
+});
+
+test("installation business onboarding is atomic, appointment-specific, and service-role only", async () => {
+  const sql = (await readFile(new URL("../migrations/supabase/000024_installation_business_onboarding.sql", import.meta.url), "utf8")).toLowerCase();
+  assert.match(sql, /create or replace function public\.platform_configure_installation_business/);
+  assert.match(sql, /from public\.tenants tenant\s+where tenant\.id = p_tenant_id\s+for update/);
+  assert.match(sql, /insert into public\.venues[\s\S]*insert into public\.platform_business_profiles/);
+  assert.match(sql, /insert into public\.platform_experience_configurations/);
+  assert.match(sql, /'appointments_salon'/);
+  assert.match(sql, /'customer', 'client'/);
+  assert.match(sql, /insert into public\.platform_availability_settings/);
+  assert.match(sql, /insert into public\.platform_user_venue_assignments/);
+  assert.match(sql, /pg_timezone_names/);
+  assert.match(sql, /create unique index if not exists venues_tenant_name_key[\s\S]*tenant_id, lower\(name\)/);
+  const existingDraftUpdate = sql.match(/if found then\s+update public\.platform_experience_configurations[\s\S]*?\n  else/)?.[0] ?? "";
+  assert.match(existingDraftUpdate, /branding = coalesce\(v_draft\.branding/);
+  assert.doesNotMatch(existingDraftUpdate, /terminology\s*=|channels\s*=/);
+  assert.match(sql, /platform_list_installation_locations\(text, uuid\[\]\)/);
+  assert.match(sql, /revoke all on function public\.platform_configure_installation_business[^;]+from public, anon, authenticated/);
+  assert.match(sql, /grant execute on function public\.platform_configure_installation_business[^;]+to service_role/);
 });
 
 test("bundled core migration loader returns every indexed path and checksum", async () => {
@@ -61,7 +82,7 @@ test("bundled core migration loader follows an extended validated index", async 
   const rawIndex = await readActualRawIndex();
   rawIndex.coreMigrations.push({
     order: rawIndex.coreMigrations.length + 1,
-    path: "packages/database/migrations/supabase/000024_runtime_readiness_test.sql",
+    path: "packages/database/migrations/supabase/000025_runtime_readiness_test.sql",
     module: "core",
     scope: "reservation-platform",
     sha256: "a".repeat(64),
@@ -74,9 +95,9 @@ test("bundled core migration loader follows an extended validated index", async 
 
   const plan = await loadBundledCoreMigrationPlan(pathToFileURL(extendedIndexPath));
 
-  assert.equal(plan.length, 24);
+  assert.equal(plan.length, 25);
   assert.deepEqual(plan.at(-1), {
-    path: "packages/database/migrations/supabase/000024_runtime_readiness_test.sql",
+    path: "packages/database/migrations/supabase/000025_runtime_readiness_test.sql",
     sha256: "a".repeat(64),
   });
 });
@@ -258,7 +279,7 @@ test("AI retrieval option appends optional AI retrieval migrations after core mi
   const plan = buildSupabaseMigrationPlan(index, { includeAiRetrieval: true });
 
   assert.deepEqual(
-    plan.migrations.slice(23).map((entry) => entry.path),
+    plan.migrations.slice(24).map((entry) => entry.path),
     [
       "packages/database/migrations/supabase/optional/ai-retrieval/000001_knowledge_chunks.sql",
       "packages/database/migrations/supabase/optional/ai-retrieval/000002_langchain_checkpoints.sql",

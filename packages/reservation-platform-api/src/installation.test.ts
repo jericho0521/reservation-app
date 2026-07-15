@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createFirstOwner } from "./installation.js";
+import { configureInstallationBusiness, createFirstOwner } from "./installation.js";
 import { PlatformAuthError, type PlatformSessionRepository } from "./sessions.js";
 
 function repository(): PlatformSessionRepository & { ownerCalls: unknown[]; sessionCalls: unknown[] } {
@@ -68,4 +68,44 @@ test("first owner validates email, display name, password, and setup token befor
     now: new Date(),
   }), (error: unknown) => error instanceof PlatformAuthError && error.code === "validation_failed");
   assert.equal(hashes, 0);
+});
+
+test("first business setup creates an appointment draft and first location", async () => {
+  const calls: unknown[] = [];
+  const result = await configureInstallationBusiness({
+    principal: { userId: "owner", tenantId: "tenant", role: "owner", venueIds: [] },
+    input: {
+      name: "Northstar Therapy",
+      public_slug: " Northstar-Therapy ",
+      timezone: "Asia/Kuala_Lumpur",
+      location: { name: "City Centre", address: "1 Example Road" },
+    },
+    repository: {
+      async readBusiness() { return undefined; },
+      async configureBusiness(input) {
+        calls.push(input);
+        return {
+          profile: {
+            business_id: "business",
+            tenant_id: input.tenantId,
+            venue_id: "11111111-1111-4111-8111-111111111111",
+            name: input.business.name,
+            public_slug: input.business.public_slug,
+            preset_id: "appointments_salon",
+            status: "draft",
+          },
+          locations: [{
+            location_id: "11111111-1111-4111-8111-111111111111",
+            name: input.business.location.name,
+            address: input.business.location.address,
+            timezone: input.business.timezone,
+          }],
+        };
+      },
+    },
+  });
+
+  assert.equal(result.profile.preset_id, "appointments_salon");
+  assert.equal(result.locations.length, 1);
+  assert.equal((calls[0] as { business: { public_slug: string } }).business.public_slug, "northstar-therapy");
 });

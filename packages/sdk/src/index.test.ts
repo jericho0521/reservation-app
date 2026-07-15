@@ -74,6 +74,55 @@ test("authentication SDK methods use cookie credentials and omit tokens from ses
   assert.equal(String(requests[1]?.init?.body).includes("session_token"), false);
 });
 
+test("onboarding SDK methods use installation and location routes", async () => {
+  const requests: Array<{ path: string; method: string; body?: unknown }> = [];
+  const location = {
+    location_id: "11111111-1111-4111-8111-111111111111",
+    name: "City Centre",
+    timezone: "Asia/Kuala_Lumpur",
+  };
+  const client = createReservationPlatformClient({
+    baseUrl: "https://platform.example",
+    fetch: async (input, init) => {
+      const path = new URL(String(input)).pathname;
+      requests.push({ path, method: init?.method ?? "GET", body: init?.body ? JSON.parse(String(init.body)) : undefined });
+      if (path === "/v1/locations") return jsonResponse(init?.method === "POST" ? location : { locations: [location] });
+      if (path.startsWith("/v1/locations/")) return jsonResponse({ ...location, timezone: "UTC" });
+      return jsonResponse({
+        profile: {
+          business_id: "business-1",
+          tenant_id: "tenant-1",
+          venue_id: location.location_id,
+          name: "Northstar Therapy",
+          public_slug: "northstar-therapy",
+          preset_id: "appointments_salon",
+          status: "draft",
+        },
+        locations: [location],
+      });
+    },
+  });
+  const businessInput = {
+    name: "Northstar Therapy",
+    public_slug: "northstar-therapy",
+    timezone: "Asia/Kuala_Lumpur",
+    location: { name: "City Centre" },
+  };
+  await client.getInstallationBusiness();
+  await client.configureInstallationBusiness(businessInput);
+  await client.listInstallationLocations();
+  await client.createInstallationLocation({ name: "City Centre", timezone: "Asia/Kuala_Lumpur" });
+  await client.updateInstallationLocation("location/1", { timezone: "UTC" });
+  assert.deepEqual(requests.map(({ path, method }) => [path, method]), [
+    ["/v1/installation/business", "GET"],
+    ["/v1/installation/business", "PUT"],
+    ["/v1/locations", "GET"],
+    ["/v1/locations", "POST"],
+    ["/v1/locations/location%2F1", "PATCH"],
+  ]);
+  assert.deepEqual(requests[1]?.body, businessInput);
+});
+
 test("SDK forwards an explicitly configured credentials mode", async () => {
   let credentials: RequestCredentials | undefined;
   const client = createReservationPlatformClient({

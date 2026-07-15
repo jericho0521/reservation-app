@@ -36,6 +36,8 @@ import {
   createSupabaseExperienceStudioRepository,
   createSupabaseExperienceKnowledgeRepository,
   createSupabaseIdempotencyRepository,
+  createSupabaseInstallationBusinessRepository,
+  createSupabaseInstallationLocationsRepository,
   createSupabaseOperatingHoursRepository,
   createSupabaseOperationsOverviewRepository,
   createSupabasePlatformCatalogRepository,
@@ -53,6 +55,8 @@ import {
   type OperationsOverviewSupabaseClient,
   type AnalyticsSupabaseClient,
   type PlatformSessionSupabaseClient,
+  type InstallationBusinessSupabaseClient,
+  type LocationsSupabaseClient,
 } from "@project-play/reservations-supabase";
 import {
   BaileysWhatsAppSessionAdapter,
@@ -180,6 +184,8 @@ export interface StandaloneSupabaseRepositoryFactories {
   createReservationManagementRepository(client: StandaloneSupabaseClient): NonNullable<StandaloneApiDependencies["reservationManagementRepository"]>;
   createResourceMaintenanceRepository(client: StandaloneSupabaseClient): NonNullable<StandaloneApiDependencies["resourceMaintenanceRepository"]>;
   createIdempotencyRepository(client: StandaloneSupabaseClient): NonNullable<StandaloneApiDependencies["idempotencyRepository"]>;
+  createInstallationBusinessRepository(client: StandaloneSupabaseClient): NonNullable<StandaloneApiDependencies["installationBusinessRepository"]>;
+  createInstallationLocationsRepository(client: StandaloneSupabaseClient): NonNullable<StandaloneApiDependencies["installationLocationsRepository"]>;
   createExperienceStudioRepository(client: StandaloneSupabaseClient): NonNullable<StandaloneApiDependencies["experienceStudioRepository"]>;
   createExperienceKnowledgeRepository(client: StandaloneSupabaseClient): NonNullable<StandaloneApiDependencies["experienceKnowledgeRepository"]>;
   createOperatingHoursRepository(client: StandaloneSupabaseClient): NonNullable<StandaloneApiDependencies["operatingHoursRepository"]>;
@@ -232,6 +238,12 @@ const defaultRepositoryFactories: StandaloneSupabaseRepositoryFactories = {
   ),
   createResourceMaintenanceRepository: createSupabaseResourceMaintenanceRepository,
   createIdempotencyRepository: createSupabaseIdempotencyRepository,
+  createInstallationBusinessRepository: (client) => createSupabaseInstallationBusinessRepository(
+    client as unknown as InstallationBusinessSupabaseClient,
+  ),
+  createInstallationLocationsRepository: (client) => createSupabaseInstallationLocationsRepository(
+    client as unknown as LocationsSupabaseClient,
+  ),
   createExperienceStudioRepository: (client) => createSupabaseExperienceStudioRepository(
     client as unknown as ExperienceSupabaseLikeClient,
   ),
@@ -291,6 +303,8 @@ export function createStandaloneSupabaseDependencies(
         reservationManagementRepository: repositoryFactories.createReservationManagementRepository(adminClient),
         resourceMaintenanceRepository: repositoryFactories.createResourceMaintenanceRepository(adminClient),
         idempotencyRepository: repositoryFactories.createIdempotencyRepository(adminClient),
+        installationBusinessRepository: repositoryFactories.createInstallationBusinessRepository(adminClient),
+        installationLocationsRepository: repositoryFactories.createInstallationLocationsRepository(adminClient),
         experienceStudioRepository: repositoryFactories.createExperienceStudioRepository(adminClient),
         experienceKnowledgeRepository: repositoryFactories.createExperienceKnowledgeRepository(adminClient),
         operatingHoursRepository: repositoryFactories.createOperatingHoursRepository(adminClient),
@@ -473,24 +487,34 @@ function createWebChatOrchestrator(
   };
 }
 
-function createConversationBookingTools(input: {
+export function createConversationBookingTools(input: {
   catalogRepository: PlatformCatalogRepository;
   availabilityRepository: AvailabilityRepositoryPort;
   reservationCreateRepository: ReservationCreateRepositoryPort;
 }): ConversationOrchestratorDependencies["tools"] {
   return {
-    async getService(_scope: ExperienceScope, serviceId: string) {
-      const result = await getPlatformService(input.catalogRepository, serviceId);
-      return "service_id" in result.body ? result.body : undefined;
+    async getService(scope: ExperienceScope, serviceId: string) {
+      const result = await listPlatformServices(input.catalogRepository, { venueId: scope.venueId });
+      return "services" in result.body
+        ? result.body.services.find((service) => service.service_id === serviceId)
+        : undefined;
     },
-    async checkAvailability(_scope: ExperienceScope, { serviceId, date }) {
+    async checkAvailability(scope: ExperienceScope, { serviceId, date }) {
+      const services = await listPlatformServices(input.catalogRepository, { venueId: scope.venueId });
+      if (!("services" in services.body) || !services.body.services.some((service) => service.service_id === serviceId)) {
+        throw new Error("Service is outside the published experience.");
+      }
       const result = await listAvailability({ repository: input.availabilityRepository, query: new URLSearchParams({ service_id: serviceId, date }) });
       if (!("slots" in result.body)) throw new Error(result.body.error.message);
       return result.body;
     },
-    async createReservation(_scope: ExperienceScope, reservation) {
+    async createReservation(scope: ExperienceScope, reservation) {
       const legacy = prepareLegacyReservationCreate(reservation);
-      const result = await createReservation({ repository: input.reservationCreateRepository, legacyInput: legacy.legacyInput });
+      const result = await createReservation({
+        repository: input.reservationCreateRepository,
+        legacyInput: legacy.legacyInput,
+        venueId: scope.venueId,
+      });
       if (!("reservation_id" in result.body)) throw new Error(result.body.error.message);
       return result.body;
     },

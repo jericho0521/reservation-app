@@ -17,6 +17,12 @@ import type {
   ChatMessageResponse,
   ChatSessionResponse,
   CompletePasswordResetInput,
+  InstallationBusinessInput,
+  InstallationBusinessResponse,
+  InstallationLocationInput,
+  InstallationLocationPatch,
+  InstallationLocationResponse,
+  ListInstallationLocationsResponse,
   CreateFirstOwnerInput,
   CreateReservationInput,
   CreateResourceMaintenanceInput,
@@ -169,6 +175,11 @@ export interface ReservationPlatformClient {
   acceptStaffInvitation(token: string, input: AcceptStaffInvitationInput, options?: RequestOptions): Promise<AuthenticatedSessionResponse>;
   requestPasswordReset(input: RequestPasswordResetInput, options?: RequestOptions): Promise<void>;
   completePasswordReset(token: string, input: CompletePasswordResetInput, options?: RequestOptions): Promise<void>;
+  getInstallationBusiness(options?: RequestOptions): Promise<InstallationBusinessResponse>;
+  configureInstallationBusiness(input: InstallationBusinessInput, options?: RequestOptions): Promise<InstallationBusinessResponse>;
+  listInstallationLocations(options?: RequestOptions): Promise<ListInstallationLocationsResponse>;
+  createInstallationLocation(input: InstallationLocationInput, options?: RequestOptions): Promise<InstallationLocationResponse>;
+  updateInstallationLocation(locationId: string, input: InstallationLocationPatch, options?: RequestOptions): Promise<InstallationLocationResponse>;
   listExperiencePresets(options?: RequestOptions): Promise<{ presets: ExperiencePresetSummary[] }>;
   getExperienceWorkspace(options?: RequestOptions): Promise<ExperienceWorkspaceResponse>;
   validateExperienceWorkspace(options?: RequestOptions): Promise<ExperienceValidationResponse>;
@@ -288,6 +299,17 @@ export function createReservationPlatformClient(
       options,
       auth: true,
       emptyResponse: true,
+    }),
+    getInstallationBusiness: (options) => request({ method: "GET", path: "/installation/business", options, auth: true }),
+    configureInstallationBusiness: (input, options) => request({ method: "PUT", path: "/installation/business", body: input, options, auth: true }),
+    listInstallationLocations: (options) => request({ method: "GET", path: "/locations", options, auth: true }),
+    createInstallationLocation: (input, options) => request({ method: "POST", path: "/locations", body: input, options, auth: true }),
+    updateInstallationLocation: (locationId, input, options) => request({
+      method: "PATCH",
+      path: `/locations/${encodeURIComponent(locationId)}`,
+      body: input,
+      options,
+      auth: true,
     }),
     listExperiencePresets: (options) => request({ method: "GET", path: "/experience/presets", options }),
     getExperienceWorkspace: (options) => request({ method: "GET", path: "/experience/workspace", options }),

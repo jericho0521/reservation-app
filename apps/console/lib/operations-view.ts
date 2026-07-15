@@ -10,6 +10,7 @@ export interface OperationsAttentionItem {
 export function buildOperationsAttentionItems(overview: OperationsOverviewResponse): OperationsAttentionItem[] {
   const items: OperationsAttentionItem[] = [];
   if (overview.conversations.staff_takeover > 0) items.push({ label: "Staff replies needed", detail: `${overview.conversations.staff_takeover} conversation${overview.conversations.staff_takeover === 1 ? " is" : "s are"} under manual control.`, href: "/admin/conversations", severity: "urgent" });
+  if (overview.reservations.pending > 0) items.push({ label: "Appointments awaiting confirmation", detail: `${overview.reservations.pending} appointment${overview.reservations.pending === 1 ? " is" : "s are"} still pending today.`, href: "/admin/reservations?status=pending", severity: "urgent" });
   if (overview.resources.maintenance > 0) items.push({ label: "Resources under maintenance", detail: `${overview.resources.maintenance} resource${overview.resources.maintenance === 1 ? " is" : "s are"} unavailable.`, href: "/admin/resources", severity: "warning" });
   for (const [channel, status] of Object.entries(overview.channel_readiness)) {
     if (!status.ready && status.desired_enabled) items.push({ label: `${channelLabel(channel)} needs setup`, detail: status.message ?? "Complete channel setup.", href: "/admin/channels", severity: "warning" });

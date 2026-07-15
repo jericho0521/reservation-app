@@ -22,6 +22,14 @@ test("operations attention prioritizes takeover before maintenance and enabled-c
   ]);
 });
 
+test("operations attention links pending appointments to the daily queue", () => {
+  const items = buildOperationsAttentionItems({ ...overview, reservations: { ...overview.reservations, pending: 2 } });
+  assert.deepEqual(items.slice(0, 2).map((item) => [item.label, item.href]), [
+    ["Staff replies needed", "/admin/conversations"],
+    ["Appointments awaiting confirmation", "/admin/reservations?status=pending"],
+  ]);
+});
+
 test("healthy empty operations render a positive no-issues state", () => {
   const items = buildOperationsAttentionItems({ ...overview, resources: { total: 0, available: 0, maintenance: 0 }, conversations: { open: 0, staff_takeover: 0 }, channel_readiness: { ...overview.channel_readiness, web_chat: { desired_enabled: false, configured: false, ready: false, state: "not_configured" } } });
   assert.equal(items[0]?.label, "No urgent issues");

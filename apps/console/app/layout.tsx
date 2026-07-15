@@ -30,15 +30,15 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
     try {
       session = await createConsolePlatformClient(process.env, fetch, { includeActiveVenue: false }).getSession();
     } catch {
-      redirect("/admin/login");
+      redirect("/login");
     }
     if (!isLocationRoute && !isOnboardingRoute) {
       const location = resolveActiveLocation(
         session.venue_ids,
         (await cookies()).get(activeVenueCookieName)?.value,
       );
-      if (location.kind === "onboarding") redirect("/admin/onboarding");
-      if (location.kind === "selection_required") redirect("/admin/location");
+      if (location.kind === "onboarding") redirect("/onboarding");
+      if (location.kind === "selection_required") redirect("/location");
       activeLocation = location;
     }
   }

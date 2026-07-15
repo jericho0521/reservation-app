@@ -8,7 +8,7 @@ export default async function LocationPage() {
     fetch,
     { includeActiveVenue: false },
   ).getSession();
-  if (session.venue_ids.length === 0) redirect("/admin/onboarding");
+  if (session.venue_ids.length === 0) redirect("/onboarding");
 
   return (
     <div className="auth-page">

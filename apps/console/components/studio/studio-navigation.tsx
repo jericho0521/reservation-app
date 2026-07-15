@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   getStudioSectionHref,
@@ -21,10 +22,10 @@ export function StudioNavigation({
         const active = pathname === href || (section.id === "preset" && pathname === "/studio");
         const status = statuses[section.id] ?? "incomplete";
         return (
-          <a aria-current={active ? "step" : undefined} className={active ? "active" : ""} href={href} key={section.id}>
+          <Link aria-current={active ? "step" : undefined} className={active ? "active" : ""} href={href} key={section.id}>
             <span className={`step-index ${status}`}>{status === "complete" ? "✓" : index + 1}</span>
             <span><strong>{section.shortLabel}</strong><small>{status}</small></span>
-          </a>
+          </Link>
         );
       })}
     </nav>

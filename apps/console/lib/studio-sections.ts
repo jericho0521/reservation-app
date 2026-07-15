@@ -31,7 +31,7 @@ export const studioSections: readonly StudioSection[] = Object.freeze([
 export type StudioSectionStatus = "complete" | "incomplete" | "invalid";
 
 export function getStudioSectionHref(id: StudioSectionId) {
-  return `/admin/studio/${id}`;
+  return `/studio/${id}`;
 }
 
 export function getStudioSection(id: string): StudioSection | undefined {

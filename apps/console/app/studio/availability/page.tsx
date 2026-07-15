@@ -16,7 +16,7 @@ export default async function AvailabilityPage() {
           <h1>Set bookable hours</h1>
           <p className="muted">These venue-local rules constrain web, AI chat, and WhatsApp availability through the same engine.</p>
         </div>
-        <Link href="/admin/studio/resources" className="secondary-action">Back to resources</Link>
+        <Link href="/studio/resources" className="secondary-action">Back to resources</Link>
       </header>
       <AvailabilityEditor value={operatingHours} />
     </main>;

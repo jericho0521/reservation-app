@@ -7,7 +7,7 @@ export default async function OnboardingPage() {
     fetch,
     { includeActiveVenue: false },
   ).getSession();
-  if (session.venue_ids.length > 0) redirect("/admin");
+  if (session.venue_ids.length > 0) redirect("/");
 
   return (
     <div className="auth-page">

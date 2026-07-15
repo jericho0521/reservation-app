@@ -16,15 +16,15 @@ import {
 
 test("protected route redirects an anonymous request to login", () => {
   assert.equal(
-    authRedirect({ pathname: "/admin/reservations", hasSessionCookie: false }),
+    authRedirect({ pathname: "/reservations", hasSessionCookie: false }),
     "/admin/login",
   );
-  assert.equal(authRedirect({ pathname: "/admin/reservations", hasSessionCookie: true }), undefined);
+  assert.equal(authRedirect({ pathname: "/reservations", hasSessionCookie: true }), undefined);
 });
 
 test("login and setup remain public without a session", () => {
-  assert.equal(authRedirect({ pathname: "/admin/login", hasSessionCookie: false }), undefined);
-  assert.equal(authRedirect({ pathname: "/admin/setup", hasSessionCookie: false }), undefined);
+  assert.equal(authRedirect({ pathname: "/login", hasSessionCookie: false }), undefined);
+  assert.equal(authRedirect({ pathname: "/setup", hasSessionCookie: false }), undefined);
 });
 
 test("server API headers forward only session cookies and add CSRF for writes", () => {
@@ -102,11 +102,14 @@ test("middleware derives trusted route headers and compiles relative to the admi
     "x-reservation-console-public-route": "1",
     "x-reservation-console-location-route": "1",
   });
-  const protectedHeaders = buildMiddlewareRequestHeaders("/admin/reservations", spoofed);
+  const protectedHeaders = buildMiddlewareRequestHeaders("/reservations", spoofed);
   assert.equal(protectedHeaders.has("x-reservation-console-public-route"), false);
   assert.equal(protectedHeaders.has("x-reservation-console-location-route"), false);
-  assert.equal(buildMiddlewareRequestHeaders("/admin/login", spoofed).get("x-reservation-console-public-route"), "1");
-  assert.equal(buildMiddlewareRequestHeaders("/admin/setup", spoofed).get("x-reservation-console-public-route"), "1");
+  assert.equal(buildMiddlewareRequestHeaders("/login", spoofed).get("x-reservation-console-public-route"), "1");
+  assert.equal(buildMiddlewareRequestHeaders("/setup", spoofed).get("x-reservation-console-public-route"), "1");
+  assert.equal(buildMiddlewareRequestHeaders("/location", spoofed).get("x-reservation-console-location-route"), "1");
+  assert.equal(buildMiddlewareRequestHeaders("/onboarding", spoofed).get("x-reservation-console-onboarding-route"), "1");
+  assert.equal(buildMiddlewareRequestHeaders("/setup/business", spoofed).get("x-reservation-console-onboarding-route"), "1");
 
   const probe = spawnSync(process.execPath, ["--eval", [
     "const { getMiddlewareMatchers } = require('next/dist/build/analysis/get-page-static-info.js');",
@@ -122,11 +125,14 @@ test("middleware derives trusted route headers and compiles relative to the admi
 });
 
 test("browser auth forms use same-origin cookie requests and replace token-bearing history", async () => {
-  const [login, setup, middleware, layout] = await Promise.all([
+  const [login, setup, middleware, layout, locationAction, locationPage, onboardingPage] = await Promise.all([
     readFile(new URL("../components/auth/login-form.tsx", import.meta.url), "utf8"),
     readFile(new URL("../components/auth/setup-owner-form.tsx", import.meta.url), "utf8"),
     readFile(new URL("../middleware.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/location/actions.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/location/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/onboarding/page.tsx", import.meta.url), "utf8"),
   ]);
 
   assert.match(login, /fetch\("\/v1\/auth\/login"/u);
@@ -139,5 +145,13 @@ test("browser auth forms use same-origin cookie requests and replace token-beari
   assert.match(setup, /history\.replaceState\(null, "", "\/admin\/setup"\)/u);
   assert.match(middleware, /matcher: \["\/:path\*"\]/u);
   assert.match(layout, /getSession\(\)/u);
-  assert.match(layout, /redirect\("\/admin\/login"\)/u);
+  assert.match(layout, /redirect\("\/login"\)/u);
+  assert.match(layout, /redirect\("\/onboarding"\)/u);
+  assert.match(layout, /redirect\("\/location"\)/u);
+  assert.match(locationAction, /redirect\("\/"\)/u);
+  assert.match(locationPage, /redirect\("\/onboarding"\)/u);
+  assert.match(onboardingPage, /redirect\("\/"\)/u);
+  for (const source of [layout, locationAction, locationPage, onboardingPage]) {
+    assert.doesNotMatch(source, /redirect\("\/admin/u);
+  }
 });

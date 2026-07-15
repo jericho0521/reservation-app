@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import test from "node:test";
 import {
   calculateStudioProgress,
@@ -19,7 +20,7 @@ test("Studio sections preserve the approved guided order", () => {
     "branding",
     "publish",
   ]);
-  assert.equal(getStudioSectionHref("availability"), "/admin/studio/availability");
+  assert.equal(getStudioSectionHref("availability"), "/studio/availability");
 });
 
 test("Studio progress combines saved sections with server validation issues", () => {
@@ -64,4 +65,19 @@ test("validation paths deep-link to the owning Studio section", () => {
   assert.equal(sectionForValidationPath("availability.intervals"), "availability");
   assert.equal(sectionForValidationPath("channels.whatsapp"), "knowledge");
   assert.equal(sectionForValidationPath("resources.service_1"), "resources");
+});
+
+test("Next links use base-path-relative Studio destinations", async () => {
+  const [availabilityPage, validationSummary, studioNavigation] = await Promise.all([
+    readFile(new URL("../app/studio/availability/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../components/studio/validation-summary.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../components/studio/studio-navigation.tsx", import.meta.url), "utf8"),
+  ]);
+  assert.match(availabilityPage, /<Link href="\/studio\/resources"/u);
+  assert.doesNotMatch(availabilityPage, /<Link href="\/admin/u);
+  assert.match(validationSummary, /<Link href=\{getStudioSectionHref\(section\)\}/u);
+  assert.match(studioNavigation, /import Link from "next\/link"/u);
+  assert.match(studioNavigation, /<Link[^>]*href=\{href\}/u);
+  assert.doesNotMatch(studioNavigation, /<a[^>]*href=\{href\}/u);
+  assert.equal(getStudioSectionHref("publish"), "/studio/publish");
 });

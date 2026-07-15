@@ -8,7 +8,9 @@
     "build": "next build",
     "start": "next start -p 4300",
     "test": "node --import tsx --test \"lib/**/*.test.ts\"",
-    "typecheck": "tsc -p tsconfig.json --noEmit --incremental false"
+    "test:standalone": "node --test lib/standalone-base-path.test.mjs",
+    "typecheck": "tsc -p tsconfig.json --noEmit --incremental false",
+    "verify": "pnpm run test && pnpm run typecheck && pnpm run build && pnpm run test:standalone"
   },
   "dependencies": {
     "@reservation-platform/sdk": "workspace:*",

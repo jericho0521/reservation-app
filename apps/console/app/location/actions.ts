@@ -26,5 +26,5 @@ export async function selectActiveVenue(formData: FormData) {
     secure: process.env.NODE_ENV === "production",
     path: "/admin",
   });
-  redirect("/admin");
+  redirect("/");
 }

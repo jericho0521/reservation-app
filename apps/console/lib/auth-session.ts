@@ -4,9 +4,10 @@ export const activeVenueCookieName = "reservation_active_venue";
 export const publicRouteHeader = "x-reservation-console-public-route";
 export const locationRouteHeader = "x-reservation-console-location-route";
 export const onboardingRouteHeader = "x-reservation-console-onboarding-route";
-const publicAdminPaths = new Set(["/admin/login", "/admin/setup"]);
-const locationAdminPath = "/admin/location";
-const onboardingAdminPath = "/admin/onboarding";
+const publicAdminPaths = new Set(["/login", "/setup"]);
+const locationAdminPath = "/location";
+const onboardingAdminPath = "/onboarding";
+const setupWizardPrefix = "/setup/";
 const safeCookieValuePattern = /^[A-Za-z0-9_-]+$/u;
 const writeMethods = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 
@@ -31,7 +32,9 @@ export function buildMiddlewareRequestHeaders(pathname: string, incoming: Header
   headers.delete(onboardingRouteHeader);
   if (isPublicAdminPath(pathname)) headers.set(publicRouteHeader, "1");
   if (pathname === locationAdminPath) headers.set(locationRouteHeader, "1");
-  if (pathname === onboardingAdminPath) headers.set(onboardingRouteHeader, "1");
+  if (pathname === onboardingAdminPath || pathname.startsWith(setupWizardPrefix)) {
+    headers.set(onboardingRouteHeader, "1");
+  }
   return headers;
 }
 

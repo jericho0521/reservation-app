@@ -25,17 +25,24 @@ test("wizard actions save through platform APIs and redirect in the approved seq
 
   for (const method of [
     "configureInstallationBusiness",
-    "createInstallationLocation",
     "createExperienceService",
     "createExperienceResource",
     "updateExperienceOperatingHours",
     "updateExperienceChannelSettings",
     "publishExperienceDraft",
   ]) assert.match(actions, new RegExp(`\\.${method}\\(`, "u"));
-  for (const step of ["location", "services", "staff", "hours", "channels", "review"]) {
+  for (const step of ["location", "staff", "hours", "channels", "review"]) {
     assert.match(actions, new RegExp(`redirect\\(\"/setup/${step}\"\\)`, "u"));
   }
   assert.match(actions, /redirect\("\/"\)/u);
+  assert.doesNotMatch(actions, /createInstallationLocation/u);
+});
+
+test("first-run setup does not offer an unusable second location", async () => {
+  const locationPage = await readFile(new URL("../app/setup/location/page.tsx", import.meta.url), "utf8");
+
+  assert.doesNotMatch(locationPage, /Add another location|createLocationSetupAction/u);
+  assert.match(locationPage, /one fully usable location/u);
 });
 
 test("production navigation exposes Business Setup and gates the preset catalogue", async () => {

@@ -32,18 +32,6 @@ export async function configureBusinessSetupAction(formData: FormData) {
   redirect("/setup/location");
 }
 
-export async function createLocationSetupAction(formData: FormData) {
-  await createConsolePlatformClient(process.env, fetch, {
-    includeActiveVenue: false,
-  }).createInstallationLocation({
-    name: requiredField(formData, "name"),
-    timezone: requiredField(formData, "timezone"),
-    ...optionalField(formData, "address", "address"),
-  });
-  revalidatePath("/setup/location");
-  redirect("/setup/services");
-}
-
 export async function saveSetupServiceAction(
   _previous: StudioActionState,
   formData: FormData,

@@ -14,7 +14,7 @@ test("production startup has no automatic final_demo identity or seed", async ()
   assert.doesNotMatch(productionInputs.join("\n"), /final_demo|final-demo\.sql/iu);
 });
 
-test("browser onboarding persists API records and resumes in production order", async () => {
+test("onboarding implementation uses platform APIs and derives the production order from records", async () => {
   const [actions, loader, pages] = await Promise.all([
     readFile("apps/console/app/setup/actions.ts", "utf8"),
     readFile("apps/console/lib/onboarding-loader.ts", "utf8"),
@@ -25,7 +25,6 @@ test("browser onboarding persists API records and resumes in production order", 
   const implementation = `${actions}\n${loader}\n${pages}`;
   for (const apiCall of [
     "configureInstallationBusiness",
-    "createInstallationLocation",
     "createExperienceService",
     "createExperienceResource",
     "updateExperienceOperatingHours",

@@ -41,8 +41,10 @@ export const PRODUCTION_IMAGE_NAMES = Object.freeze({
 export const POSTGREST_TOKEN_TTL_SECONDS = 10 * 365 * 24 * 60 * 60;
 
 const RELEASE_ENV_FILE = "release.env";
+const INSTALLATION_ID_FILE = "installation-id";
 const SECRET_BYTES = 32;
 const BASE64URL_SECRET = /^[A-Za-z0-9_-]{43}$/u;
+const UUID_V4 = /^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/u;
 const SEMVER_TAG = /^(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)(?:-(?:[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$/u;
 const DNS_LABEL = /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)$/u;
 
@@ -232,8 +234,14 @@ function assertEncodedSecret(value, name) {
   }
 }
 
+function assertInstallationId(value) {
+  if (!UUID_V4.test(value)) {
+    throw configurationError(`existing file ${INSTALLATION_ID_FILE} is invalid`);
+  }
+}
+
 async function inspectExistingConfiguration({ directory, domain, release, currentSeconds }) {
-  const expectedPaths = [...SECRET_FILE_NAMES, RELEASE_ENV_FILE].map((name) => path.join(directory, name));
+  const expectedPaths = [...SECRET_FILE_NAMES, INSTALLATION_ID_FILE, RELEASE_ENV_FILE].map((name) => path.join(directory, name));
   const states = await Promise.all(expectedPaths.map(pathState));
   const presentCount = states.filter(Boolean).length;
   const directoryEntries = await readdir(directory);
@@ -241,7 +249,7 @@ async function inspectExistingConfiguration({ directory, domain, release, curren
   if (presentCount !== expectedPaths.length) {
     throw configurationError("partial production configuration exists; restore it or choose an empty directory");
   }
-  const expectedNames = new Set([...SECRET_FILE_NAMES, RELEASE_ENV_FILE]);
+  const expectedNames = new Set([...SECRET_FILE_NAMES, INSTALLATION_ID_FILE, RELEASE_ENV_FILE]);
   if (directoryEntries.some((name) => !expectedNames.has(name))) {
     throw configurationError("production configuration directory contains an unexpected file");
   }
@@ -251,6 +259,8 @@ async function inspectExistingConfiguration({ directory, domain, release, curren
       SECRET_FILE_NAMES.map(async (name) => [name, await readProtectedRegularFile(path.join(directory, name), 0o600)]),
     ),
   );
+  const installationId = await readProtectedRegularFile(path.join(directory, INSTALLATION_ID_FILE), 0o600);
+  assertInstallationId(installationId);
   const releaseEnvironment = await readProtectedRegularFile(path.join(directory, RELEASE_ENV_FILE), 0o644);
   if (releaseEnvironment !== buildReleaseEnvironment(domain, release)) {
     throw configurationError("existing release metadata does not match the requested domain and release");
@@ -264,7 +274,7 @@ async function inspectExistingConfiguration({ directory, domain, release, curren
   const signingKey = values["postgrest-jwt-secret"];
   decodeAndVerifyJwt(values["postgrest-anon-token"], signingKey, "anon", currentSeconds);
   decodeAndVerifyJwt(values["postgrest-service-token"], signingKey, "service_role", currentSeconds);
-  return { values, releaseEnvironment };
+  return { values, installationId, releaseEnvironment };
 }
 
 function safeResult({ created, domain, release, values, releaseEnvironment }) {
@@ -303,6 +313,7 @@ export async function configureProduction(options) {
   const domain = validateProductionDomain(options.domain);
   const release = validateReleaseTag(options.release);
   const randomBytes = options.randomBytes ?? nodeRandomBytes;
+  const uuidFactory = options.randomUUID ?? randomUUID;
   const now = options.now ?? Date.now;
   const currentSeconds = Math.floor(now() / 1000);
   await prepareConfigurationDirectory(directory);
@@ -326,6 +337,8 @@ export async function configureProduction(options) {
   const values = Object.fromEntries(
     SECRET_FILE_NAMES.map((name) => [name, entropy[name].toString("base64url")]),
   );
+  const installationId = uuidFactory();
+  assertInstallationId(installationId);
   const signingKey = values["postgrest-jwt-secret"];
   values["postgrest-anon-token"] = encodeJwt({
     role: "anon",
@@ -347,6 +360,7 @@ export async function configureProduction(options) {
   for (const name of SECRET_FILE_NAMES) {
     await writeFileAtomically(path.join(directory, name), values[name], { mode: 0o600 });
   }
+  await writeFileAtomically(path.join(directory, INSTALLATION_ID_FILE), installationId, { mode: 0o600 });
   const releaseEnvironment = buildReleaseEnvironment(domain, release);
   await writeFileAtomically(path.join(directory, RELEASE_ENV_FILE), releaseEnvironment, { mode: 0o644 });
   return safeResult({ created: true, domain, release, values, releaseEnvironment });

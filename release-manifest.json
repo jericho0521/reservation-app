@@ -15,7 +15,7 @@
     },
     {
       "path": "compose.production.yml",
-      "sha256": "b718f63727038b9534e49c4d50098b164ceb3628177a02e090a6a471b7c2c59a"
+      "sha256": "0a786910cea45b61dac1b7feaeaf4331c2c78f35f38a7d9f7a8e48eac709c2f5"
     },
     {
       "path": "docker/production/Caddyfile",

@@ -232,6 +232,17 @@
       ]
     },
     {
+      "kind": "core-migration",
+      "order": 21,
+      "targetPath": "packages/database/migrations/supabase/000021_installation_auth.sql",
+      "sourceAssets": [
+        {
+          "path": "packages/database/migrations/supabase/000021_installation_auth.sql",
+          "section": "Single-installation identity, built-in users, hashed sessions and auth tokens, venue assignments, and privileged audit history"
+        }
+      ]
+    },
+    {
       "kind": "optional-ai-retrieval",
       "targetPath": "packages/database/migrations/supabase/optional/ai-retrieval/000001_knowledge_chunks.sql",
       "sourceAssets": [

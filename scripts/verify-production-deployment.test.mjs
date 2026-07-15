@@ -21,6 +21,17 @@ test("production topology exposes only Caddy and contains no development behavio
   assert.match(compose, /test: \["CMD", "pg_isready", "-h", "127\.0\.0\.1"/u);
   assert.match(compose, /postgrest\/postgrest:v14\.12@sha256:[a-f0-9]{64}/u);
   assert.match(compose, /test: \["CMD", "postgrest", "--ready"\]/u);
+  assert.ok(
+    compose.indexOf("  reservation-migrate:") < compose.indexOf("  reservation-bootstrap:")
+      && compose.indexOf("  reservation-bootstrap:") < compose.indexOf("  reservation-rest:"),
+  );
+  const bootstrapBlock = compose.slice(
+    compose.indexOf("  reservation-bootstrap:"),
+    compose.indexOf("  reservation-rest:"),
+  );
+  assert.match(bootstrapBlock, /reservation-migrate:[\s\S]*condition: service_completed_successfully/u);
+  assert.match(bootstrapBlock, /reservation-bootstrap-config:\/run\/reservation-config:ro/u);
+  assert.doesNotMatch(bootstrapBlock, /reservation-protected-config/u);
   const restBlock = compose.slice(
     compose.indexOf("  reservation-rest:"),
     compose.indexOf("  reservation-api:"),
@@ -38,6 +49,7 @@ test("production services use scoped secrets and never mount the backup recovery
   assert.equal(result.backupRecoveryKeyMountedToOrdinaryService, false);
   assert.deepEqual(result.secretAllowlistServices, [
     "reservation-api",
+    "reservation-bootstrap",
     "reservation-console",
     "reservation-migrate",
     "reservation-worker",
@@ -49,6 +61,9 @@ test("production services use scoped secrets and never mount the backup recovery
   assert.match(distributor, /\[ ! -L "\$session_directory" \] \|\| fail/u);
   assert.match(distributor, /chown 1001:1001 "\$session_directory"/u);
   assert.match(distributor, /chmod 0700 "\$session_directory"/u);
+  assert.match(distributor, /publish "\$protected\/setup-token" \/run\/reservation-bootstrap-config setup-token 1001 1001/u);
+  assert.match(distributor, /publish "\$protected\/installation-id" \/run\/reservation-bootstrap-config installation-id 1001 1001/u);
+  assert.match(distributor, /publish "\$protected\/release\.env" \/run\/reservation-bootstrap-config release\.env 1001 1001/u);
   assert.doesNotMatch(distributor, /(?:publish|cp)[^\n]*reservation-whatsapp-sessions/u);
 });
 

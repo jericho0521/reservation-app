@@ -10,6 +10,7 @@ export const expectedProductionServices = Object.freeze([
   "reservation-config",
   "reservation-db",
   "reservation-migrate",
+  "reservation-bootstrap",
   "reservation-rest",
   "reservation-api",
   "reservation-worker",
@@ -77,7 +78,7 @@ export async function verifyProductionDeployment(options = {}) {
   for (const service of ["reservation-db", "reservation-rest", "reservation-api", "reservation-worker", "reservation-console", "reservation-booking", "reservation-edge"]) {
     expect(/restart: unless-stopped/u.test(serviceBlocks.get(service) ?? ""), `${service} must restart unless stopped.`, errors);
   }
-  for (const service of ["reservation-config", "reservation-migrate"]) {
+  for (const service of ["reservation-config", "reservation-migrate", "reservation-bootstrap"]) {
     expect(/restart: "no"/u.test(serviceBlocks.get(service) ?? ""), `${service} must be one-shot.`, errors);
   }
   expect(
@@ -113,11 +114,27 @@ export async function verifyProductionDeployment(options = {}) {
   expect(
     JSON.stringify(secretAllowlistServices) === JSON.stringify([
       "reservation-api",
+      "reservation-bootstrap",
       "reservation-console",
       "reservation-migrate",
       "reservation-worker",
     ]),
     "Secret-consuming application services must use explicit allowlists.",
+    errors,
+  );
+  expect(
+    /reservation-migrate:[\s\S]*condition: service_completed_successfully/u.test(serviceBlocks.get("reservation-bootstrap") ?? ""),
+    "Installation bootstrap must run after successful migrations.",
+    errors,
+  );
+  expect(
+    /reservation-bootstrap:[\s\S]*condition: service_completed_successfully/u.test(serviceBlocks.get("reservation-rest") ?? ""),
+    "PostgREST must wait for successful installation bootstrap.",
+    errors,
+  );
+  expect(
+    /reservation-bootstrap-config:\/run\/reservation-config:ro/u.test(serviceBlocks.get("reservation-bootstrap") ?? ""),
+    "Installation bootstrap must receive only its scoped protected files.",
     errors,
   );
   for (const service of secretAllowlistServices) {

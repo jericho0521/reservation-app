@@ -27,6 +27,7 @@ data/whatsapp-sessions
 **/browser-session-secret
 **/internal-service-key
 **/installation-master-key
+**/installation-id
 **/whatsapp-session-key
 **/backup-recovery-key
 **/setup-token

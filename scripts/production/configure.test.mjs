@@ -74,7 +74,7 @@ async function run(command, args, options = {}) {
   });
 }
 
-test("configure creates exactly ten protected secrets and a non-secret release file", async () => {
+test("configure creates exactly ten protected secrets, an installation id, and a non-secret release file", async () => {
   const root = await makeTemporaryDirectory("configure");
   const directory = path.join(root, "config");
   const randomBytes = deterministicRandomBytes();
@@ -84,11 +84,12 @@ test("configure creates exactly ten protected secrets and a non-secret release f
     domain: "book.example.com",
     release: "0.2.0",
     randomBytes,
+    randomUUID: () => "11111111-1111-4111-8111-111111111111",
     now: () => 1_800_000_000_000,
   });
 
   assert.equal(randomBytes.calls(), 10);
-  assert.deepEqual((await readdir(directory)).sort(), [...SECRET_FILE_NAMES, "release.env"].sort());
+  assert.deepEqual((await readdir(directory)).sort(), [...SECRET_FILE_NAMES, "installation-id", "release.env"].sort());
   assert.equal((await lstat(directory)).mode & 0o777, 0o700);
   for (const fileName of SECRET_FILE_NAMES) {
     const file = await lstat(path.join(directory, fileName));
@@ -97,6 +98,11 @@ test("configure creates exactly ten protected secrets and a non-secret release f
     assert.equal(file.mode & 0o777, 0o600, fileName);
   }
   assert.equal((await lstat(path.join(directory, "release.env"))).mode & 0o777, 0o644);
+  assert.equal((await lstat(path.join(directory, "installation-id"))).mode & 0o777, 0o600);
+  assert.equal(
+    await readFile(path.join(directory, "installation-id"), "utf8"),
+    "11111111-1111-4111-8111-111111111111",
+  );
 
   const releaseEnvironment = await readFile(path.join(directory, "release.env"), "utf8");
   assert.match(releaseEnvironment, /^RESERVATION_DOMAIN=book\.example\.com$/mu);
@@ -131,6 +137,7 @@ test("configure is idempotent and never rotates a valid configuration", async ()
   };
 
   const first = await configureProduction({ ...options, randomBytes });
+  const installationIdBefore = await readFile(path.join(directory, "installation-id"), "utf8");
   const before = await Promise.all(
     SECRET_FILE_NAMES.map((fileName) => readFile(path.join(directory, fileName), "utf8")),
   );
@@ -145,6 +152,7 @@ test("configure is idempotent and never rotates a valid configuration", async ()
   );
 
   assert.deepEqual(after, before);
+  assert.equal(await readFile(path.join(directory, "installation-id"), "utf8"), installationIdBefore);
   assert.deepEqual(second.secretDigests, first.secretDigests);
   assert.equal(second.created, false);
 });
@@ -423,6 +431,7 @@ test("the tools image and Docker context pin production inputs and exclude every
   );
   assert.match(dockerfile, /postgresql16-client=16\.14-r0/u);
   assert.match(dockerfile, /su-exec=0\.2-r3/u);
+  assert.match(dockerfile, /COPY scripts\/production\/bootstrap-installation\.mjs \.\/scripts\/production\/bootstrap-installation\.mjs/u);
 
   const dockerignore = await readFile(path.resolve(".dockerignore"), "utf8");
   for (const fileName of SECRET_FILE_NAMES) {

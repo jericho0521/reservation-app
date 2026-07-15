@@ -44,6 +44,8 @@ export * from "./reservation-management.js";
 export * from "./conversations.js";
 export * from "./operations-overview.js";
 export * from "./analytics.js";
+export * from "./installation.js";
+export * from "./sessions.js";
 
 export const RESERVATION_SUPABASE_TABLES = {
   platformTenants: "tenants",

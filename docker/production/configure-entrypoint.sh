@@ -40,6 +40,9 @@ publish() {
 
 publish "$protected/database-password" /run/reservation-db-secrets database-password 0 0
 publish "$protected/database-password" /run/reservation-migrate-secrets database-password 0 0
+publish "$protected/setup-token" /run/reservation-bootstrap-config setup-token 1001 1001
+publish "$protected/installation-id" /run/reservation-bootstrap-config installation-id 1001 1001
+publish "$protected/release.env" /run/reservation-bootstrap-config release.env 1001 1001
 publish "$protected/postgrest-jwt-secret" /run/reservation-rest-secrets postgrest-jwt-secret 1000 1000
 
 database_password=$(/bin/cat "$protected/database-password")

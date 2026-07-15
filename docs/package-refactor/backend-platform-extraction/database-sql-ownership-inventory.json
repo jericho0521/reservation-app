@@ -217,6 +217,16 @@
       "notes": [
         "Backend-owned venue-scoped operations summaries, cancellation audit fields, and bounded descriptive analytics RPCs."
       ]
+    },
+    {
+      "path": "packages/database/migrations/supabase/000021_installation_auth.sql",
+      "classification": "core-platform",
+      "intendedBackendDestination": [
+        "packages/database/migrations/supabase/000021_installation_auth.sql"
+      ],
+      "notes": [
+        "Backend-owned singleton installation, users, venue assignments, hashed sessions and auth tokens, and privileged audit event persistence."
+      ]
     }
   ]
 }

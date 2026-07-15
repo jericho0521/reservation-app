@@ -10,6 +10,7 @@ services:
       - reservation-protected-config:/run/reservation-config
       - reservation-db-secrets:/run/reservation-db-secrets
       - reservation-migrate-secrets:/run/reservation-migrate-secrets
+      - reservation-bootstrap-config:/run/reservation-bootstrap-config
       - reservation-rest-secrets:/run/reservation-rest-secrets
       - reservation-api-secrets:/run/reservation-api-secrets
       - reservation-console-secrets:/run/reservation-console-secrets
@@ -65,10 +66,33 @@ services:
       - reservation-backend
     restart: "no"
 
+  reservation-bootstrap:
+    image: ${RESERVATION_TOOLS_IMAGE:?set RESERVATION_TOOLS_IMAGE to the immutable release image}
+    depends_on:
+      reservation-migrate:
+        condition: service_completed_successfully
+    entrypoint: ["/usr/local/bin/run-with-secrets", "/etc/reservation-secrets/migrate.env", "--"]
+    command: ["node", "/opt/reservation-tools/scripts/production/bootstrap-installation.mjs"]
+    environment:
+      RESERVATION_DATABASE_URL: postgresql://postgres@reservation-db:5432/reservation
+      RESERVATION_PRODUCTION_CONFIG_DIR: /run/reservation-config
+      RESERVATION_RUN_AS_UID: "1001"
+      RESERVATION_RUN_AS_GID: "1001"
+    volumes:
+      - reservation-migrate-secrets:/run/reservation-secrets:ro
+      - reservation-bootstrap-config:/run/reservation-config:ro
+    configs:
+      - source: migrate-secret-allowlist
+        target: /etc/reservation-secrets/migrate.env
+        mode: 0400
+    networks:
+      - reservation-backend
+    restart: "no"
+
   reservation-rest:
     image: postgrest/postgrest:v14.12@sha256:54000f24847d01a2c2302e0041cf0618b875c57fb48507d743cfa9aaa50bf43c
     depends_on:
-      reservation-migrate:
+      reservation-bootstrap:
         condition: service_completed_successfully
     command: ["postgrest", "/etc/postgrest.conf"]
     user: "1000:1000"
@@ -91,7 +115,7 @@ services:
   reservation-api:
     image: ${RESERVATION_API_IMAGE:?load the generated release.env}
     depends_on:
-      reservation-migrate:
+      reservation-bootstrap:
         condition: service_completed_successfully
       reservation-rest:
         condition: service_healthy
@@ -127,7 +151,7 @@ services:
   reservation-worker:
     image: ${RESERVATION_WORKER_IMAGE:?load the generated release.env}
     depends_on:
-      reservation-migrate:
+      reservation-bootstrap:
         condition: service_completed_successfully
       reservation-rest:
         condition: service_healthy
@@ -257,6 +281,7 @@ volumes:
   reservation-protected-config:
   reservation-db-secrets:
   reservation-migrate-secrets:
+  reservation-bootstrap-config:
   reservation-rest-secrets:
   reservation-api-secrets:
   reservation-console-secrets:

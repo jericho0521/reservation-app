@@ -13,6 +13,7 @@ COPY --chmod=0755 docker/production/run-with-secrets.sh /usr/local/bin/run-with-
 COPY --chmod=0755 docker/production/configure-entrypoint.sh /usr/local/bin/configure-production
 COPY scripts/production/configure.mjs ./configure.mjs
 COPY scripts/production/migrate.mjs ./scripts/production/migrate.mjs
+COPY scripts/production/bootstrap-installation.mjs ./scripts/production/bootstrap-installation.mjs
 COPY scripts/production/release-manifest.mjs ./release-manifest.mjs
 COPY packages/database/migrations/supabase ./packages/database/migrations/supabase
 

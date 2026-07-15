@@ -165,6 +165,14 @@
       "scope": "reservation-platform",
       "sha256": "01cce66fb87f9122efa5409ef4b9d4c730ee72ef44e37b0a21854f3e0b181d41",
       "bytes": 11949
+    },
+    {
+      "order": 21,
+      "path": "packages/database/migrations/supabase/000021_installation_auth.sql",
+      "module": "core",
+      "scope": "reservation-platform",
+      "sha256": "41c92f8a97db87eb70f9d2d97027c456d4986237816edbd8d848781ded4fae46",
+      "bytes": 8463
     }
   ],
   "optionalMigrations": [

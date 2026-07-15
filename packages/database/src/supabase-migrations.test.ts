@@ -13,15 +13,37 @@ import {
 
 const indexPath = new URL("../migrations/supabase/migration-index.json", import.meta.url);
 
-test("core plan includes exactly 000001 through 000020 in order", async () => {
+test("core plan includes exactly 000001 through 000021 in order", async () => {
   const index = await readActualIndex();
   const plan = buildSupabaseMigrationPlan(index);
 
   assert.deepEqual(
-    plan.migrations.map((entry) => entry.path.match(/\/(\d{6})_[^/]+\.sql$/)?.[1]),
-    Array.from({ length: 20 }, (_, index) => String(index + 1).padStart(6, "0")),
+    plan.migrations.map((entry) => entry.path.split("/").at(-1)),
+    [
+      "000001_extensions.sql",
+      "000002_platform_tenant_auth.sql",
+      "000003_reservation_catalog.sql",
+      "000004_reservation_resources.sql",
+      "000005_reservation_bookings.sql",
+      "000006_resource_maintenance.sql",
+      "000007_availability_rules.sql",
+      "000008_atomic_reservation_rpc.sql",
+      "000009_core_rls_policies.sql",
+      "000010_core_security_hardening.sql",
+      "000011_platform_idempotency.sql",
+      "000012_whatsapp_business_agent.sql",
+      "000013_whatsapp_staff_takeover.sql",
+      "000014_availability_snapshot_rpc.sql",
+      "000015_experience_studio_foundation.sql",
+      "000016_experience_availability_rules.sql",
+      "000017_experience_knowledge.sql",
+      "000018_reservation_management_tokens.sql",
+      "000019_unified_conversations.sql",
+      "000020_operations_analytics_rpc.sql",
+      "000021_installation_auth.sql",
+    ],
   );
-  assert.equal(plan.migrations.length, 20);
+  assert.equal(plan.migrations.length, 21);
   assert.equal(plan.seeds.length, 0);
 });
 
@@ -37,7 +59,7 @@ test("bundled core migration loader follows an extended validated index", async 
   const rawIndex = await readActualRawIndex();
   rawIndex.coreMigrations.push({
     order: rawIndex.coreMigrations.length + 1,
-    path: "packages/database/migrations/supabase/000021_runtime_readiness_test.sql",
+    path: "packages/database/migrations/supabase/000022_runtime_readiness_test.sql",
     module: "core",
     scope: "reservation-platform",
     sha256: "a".repeat(64),
@@ -50,9 +72,9 @@ test("bundled core migration loader follows an extended validated index", async 
 
   const plan = await loadBundledCoreMigrationPlan(pathToFileURL(extendedIndexPath));
 
-  assert.equal(plan.length, 21);
+  assert.equal(plan.length, 22);
   assert.deepEqual(plan.at(-1), {
-    path: "packages/database/migrations/supabase/000021_runtime_readiness_test.sql",
+    path: "packages/database/migrations/supabase/000022_runtime_readiness_test.sql",
     sha256: "a".repeat(64),
   });
 });
@@ -70,6 +92,39 @@ test("operations overview migration is venue scoped, timezone aware, and bounded
   assert.match(sql, /p_now at time zone/);
   assert.match(sql, /limit 20/);
   assert.match(sql, /revoke all on function public\.read_platform_operations_overview/);
+});
+
+test("installation auth migration stores only hashed capabilities and restricts tables", async () => {
+  const sql = (await readFile(new URL("../migrations/supabase/000021_installation_auth.sql", import.meta.url), "utf8")).toLowerCase();
+
+  for (const table of [
+    "platform_installation",
+    "platform_users",
+    "platform_user_venue_assignments",
+    "platform_sessions",
+    "platform_auth_tokens",
+    "platform_audit_events",
+  ]) {
+    assert.match(sql, new RegExp(`create table(?: if not exists)? public\\.${table}`));
+    assert.match(sql, new RegExp(`revoke all on table public\\.${table} from public, anon, authenticated`));
+    assert.match(sql, new RegExp(`grant [^;]+ on table public\\.${table} to service_role`));
+  }
+  assert.match(sql, /setup_token_hash text/);
+  assert.match(sql, /token_hash text not null unique/);
+  assert.doesNotMatch(sql, /setup_token\s+text|plaintext_token|raw_token/);
+  assert.match(sql, /role text not null check \(role in \('owner', 'staff'\)\)/);
+  assert.match(sql, /status text not null default 'active' check \(status in \('invited', 'active', 'disabled'\)\)/);
+  assert.match(sql, /create or replace function public\.platform_enforce_user_venue_assignment_tenant/);
+  assert.match(sql, /create trigger enforce_platform_user_venue_assignment_tenant/);
+  assert.match(sql, /foreign key \(tenant_id, venue_id\) references public\.venues \(tenant_id, id\)/);
+  assert.match(sql, /foreign key \(tenant_id, actor_user_id\) references public\.platform_users \(tenant_id, id\)/);
+  assert.match(sql, /create or replace function public\.platform_create_first_owner/);
+  assert.match(sql, /select candidate\.\* into installation[\s\S]*for update/);
+  assert.match(sql, /insert into public\.platform_users[\s\S]*update public\.platform_installation/);
+  assert.match(sql, /revoke all on function public\.platform_create_first_owner/);
+  assert.match(sql, /grant execute on function public\.platform_create_first_owner\(text, timestamptz, text, text, text\) to service_role/);
+  assert.doesNotMatch(sql, /grant execute on function public\.platform_create_first_owner[^;]+to (?:public|anon|authenticated)/);
+  assert.doesNotMatch(sql, /grant execute on function public\.platform_enforce_user_venue_assignment_tenant/);
 });
 
 test("experience availability migration owns normalized rules and shared snapshot integration", async () => {
@@ -139,7 +194,7 @@ test("AI retrieval option appends optional AI retrieval migrations after core mi
   const plan = buildSupabaseMigrationPlan(index, { includeAiRetrieval: true });
 
   assert.deepEqual(
-    plan.migrations.slice(20).map((entry) => entry.path),
+    plan.migrations.slice(21).map((entry) => entry.path),
     [
       "packages/database/migrations/supabase/optional/ai-retrieval/000001_knowledge_chunks.sql",
       "packages/database/migrations/supabase/optional/ai-retrieval/000002_langchain_checkpoints.sql",

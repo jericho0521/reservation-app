@@ -254,6 +254,17 @@
       ]
     },
     {
+      "kind": "core-migration",
+      "order": 23,
+      "targetPath": "packages/database/migrations/supabase/000023_venue_scoped_operations.sql",
+      "sourceAssets": [
+        {
+          "path": "packages/database/migrations/supabase/000023_venue_scoped_operations.sql",
+          "section": "Atomic venue-scoped reservation and resource-maintenance mutations"
+        }
+      ]
+    },
+    {
       "kind": "optional-ai-retrieval",
       "targetPath": "packages/database/migrations/supabase/optional/ai-retrieval/000001_knowledge_chunks.sql",
       "sourceAssets": [

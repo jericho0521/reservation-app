@@ -125,9 +125,10 @@ export interface ReservationReadRepositoryPort {
     search: string | null;
     searchFilterExpression: string | null;
     limit: number | null;
+    venueId?: string;
   }): Promise<ReservationReadRepositoryResult<unknown[]>>;
-  getReservationsSummary?(input: ReservationListSummaryInput): Promise<ReservationListSummaryResult>;
-  readReservationById(reservationId: string): Promise<ReservationReadRepositoryResult<unknown>>;
+  getReservationsSummary?(input: ReservationListSummaryInput & { venueId?: string }): Promise<ReservationListSummaryResult>;
+  readReservationById(reservationId: string, venueId?: string): Promise<ReservationReadRepositoryResult<unknown>>;
 }
 
 export type ReservationMutationRepositoryResult<T> = {
@@ -152,12 +153,14 @@ export interface ReservationMutationRepositoryPort {
   updateReservation(input: {
     reservationId: string;
     patch: LegacyReservationUpdatePatch & { updated_at: string };
+    venueId?: string;
   }): Promise<ReservationMutationRepositoryResult<unknown>>;
 }
 
 export interface ReservationCreateRepositoryPort {
   createReservationAtomic(input: {
     reservation: LegacyCoreReservation;
+    venueId?: string;
   }): Promise<ReservationCreateAtomicResult>;
 }
 
@@ -621,6 +624,7 @@ function validateLegacyBookingCreateInput(input: unknown): LegacyBookingCreateVa
 export async function createReservation(input: {
   repository: ReservationCreateRepositoryPort | (() => ReservationCreateRepositoryPort);
   legacyInput: unknown;
+  venueId?: string;
 }): Promise<ReservationApplicationResult<ReservationResponse>> {
   const validated = validateLegacyBookingCreateInput(input.legacyInput);
   if ("error" in validated) {
@@ -636,6 +640,7 @@ export async function createReservation(input: {
       : input.repository;
     const result = await repository.createReservationAtomic({
       reservation: legacyBookingCreateToReservation(validated.data),
+      ...(input.venueId ? { venueId: input.venueId } : {}),
     });
 
     if (!result.ok) {
@@ -658,6 +663,7 @@ export async function listReservations(input: {
   repository: Pick<ReservationReadRepositoryPort, "listReservations" | "getReservationsSummary">;
   search?: string | null;
   today?: string;
+  venueId?: string;
 }): Promise<ReservationApplicationResult<ListReservationsResponse>> {
   try {
     const search = normalizeReservationSearchTerm(input.search);
@@ -666,6 +672,7 @@ export async function listReservations(input: {
       search,
       searchFilterExpression,
       limit: search ? SEARCH_ONLY_LIMIT : null,
+      ...(input.venueId ? { venueId: input.venueId } : {}),
     });
 
     if (error) {
@@ -680,6 +687,7 @@ export async function listReservations(input: {
           search,
           searchFilterExpression,
           today: input.today ?? new Date().toISOString().slice(0, 10),
+          ...(input.venueId ? { venueId: input.venueId } : {}),
         })
       : null;
 
@@ -705,6 +713,7 @@ export async function listReservations(input: {
 export async function readReservationById(input: {
   repository: Pick<ReservationReadRepositoryPort, "readReservationById">;
   reservationId: string;
+  venueId?: string;
 }): Promise<ReservationApplicationResult<ReservationResponse>> {
   const reservationId = input.reservationId;
   if (!reservationIdPattern.test(reservationId)) {
@@ -720,7 +729,7 @@ export async function readReservationById(input: {
   }
 
   try {
-    const { data, error } = await input.repository.readReservationById(reservationId);
+    const { data, error } = await input.repository.readReservationById(reservationId, input.venueId);
 
     if (error) {
       const status = reservationNotFoundError(error) ? 404 : 500;
@@ -751,6 +760,7 @@ export async function updateReservationWithLegacyPatch(input: {
   reservationId: string;
   legacyPatch: unknown;
   now?: () => Date;
+  venueId?: string;
 }): Promise<ReservationApplicationResult<ReservationResponse>> {
   const invalidId = validateReservationId(input.reservationId, "Invalid reservation update data");
   if (invalidId) {
@@ -775,6 +785,7 @@ export async function updateReservationWithLegacyPatch(input: {
         ...validatedPatch.data,
         updated_at: (input.now ?? (() => new Date()))().toISOString(),
       },
+      ...(input.venueId ? { venueId: input.venueId } : {}),
     });
 
     if (error) {
@@ -806,6 +817,7 @@ export async function cancelReservation(input: {
   reservationId: string;
   now?: () => Date;
   audit?: { reason?: string; changedBy?: string };
+  venueId?: string;
 }): Promise<ReservationApplicationResult<ReservationResponse>> {
   const invalidId = validateReservationId(input.reservationId, "Invalid reservation id");
   if (invalidId) {
@@ -826,6 +838,7 @@ export async function cancelReservation(input: {
         ...(input.audit?.reason ? { cancellation_reason: input.audit.reason } : {}),
         ...(input.audit?.changedBy ? { cancelled_by: input.audit.changedBy } : {}),
       },
+      ...(input.venueId ? { venueId: input.venueId } : {}),
     });
 
     if (error) {

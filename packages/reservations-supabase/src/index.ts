@@ -205,10 +205,10 @@ export interface SupabaseReservationRepository
   getResources(serviceId: string): Promise<ReservableResource[]>;
   getResourceLayout(serviceId: string): Promise<ResourceLayout>;
   createReservationAtomic(
-    input: CreateReservationAtomicInput | CreateReservationInput,
+    input: (CreateReservationAtomicInput | CreateReservationInput) & { venueId?: string },
   ): Promise<CreateReservationAtomicResult>;
   createReservationAtomically(
-    input: CreateReservationAtomicInput | CreateReservationInput,
+    input: (CreateReservationAtomicInput | CreateReservationInput) & { venueId?: string },
   ): Promise<Reservation>;
   createReservationWithValidation(
     input: CreateReservationInput,
@@ -288,6 +288,18 @@ interface SupabaseQueryError {
   code?: string;
   status?: number;
   [key: string]: unknown;
+}
+
+function scopedMutationResult<T>(result: QueryResult<T>): QueryResult<T> {
+  if (result.error || result.data !== null) return result;
+  return {
+    data: null,
+    error: {
+      code: "PGRST116",
+      status: 404,
+      message: "Scoped record not found",
+    },
+  };
 }
 
 interface QueryResult<T> {
@@ -773,14 +785,20 @@ export function createSupabaseReservationReadRepository(
       : query;
   }
 
+  function applyVenueFilter(query: SupabaseQueryBuilder, venueId: string | undefined) {
+    return venueId ? query.eq("services.venue_id", venueId) : query;
+  }
+
   return {
-    async listReservations({ searchFilterExpression, limit }) {
-      let query = applyReservationListFilters(
+    async listReservations({ searchFilterExpression, limit, venueId }) {
+      let query = applyVenueFilter(applyReservationListFilters(
         fromTable(client, RESERVATION_SUPABASE_TABLES.bookings)
-        .select(RESERVATION_SUPABASE_SELECTS.reservationCompatibility)
+        .select(venueId
+          ? "*, services!inner(name, venue_id)"
+          : RESERVATION_SUPABASE_SELECTS.reservationCompatibility)
         .order("booking_date", { ascending: false }),
         { searchFilterExpression },
-      );
+      ), venueId);
 
       if (limit) {
         query = query.limit(limit);
@@ -789,19 +807,19 @@ export function createSupabaseReservationReadRepository(
       return await query as QueryResult<unknown[]>;
     },
 
-    async getReservationsSummary({ searchFilterExpression, today }) {
-      const totalQuery = applyReservationListFilters(
+    async getReservationsSummary({ searchFilterExpression, today, venueId }) {
+      const totalQuery = applyVenueFilter(applyReservationListFilters(
         fromTable(client, RESERVATION_SUPABASE_TABLES.bookings)
-          .select("id", { count: "exact", head: true }),
+          .select(venueId ? "id, services!inner(venue_id)" : "id", { count: "exact", head: true }),
         { searchFilterExpression },
-      );
-      const todayQuery = applyReservationListFilters(
+      ), venueId);
+      const todayQuery = applyVenueFilter(applyReservationListFilters(
         fromTable(client, RESERVATION_SUPABASE_TABLES.bookings)
-          .select("id", { count: "exact", head: true })
+          .select(venueId ? "id, services!inner(venue_id)" : "id", { count: "exact", head: true })
           .eq("booking_date", today)
           .eq("status", "confirmed"),
         { searchFilterExpression },
-      );
+      ), venueId);
       const [totalResult, todayResult] = await Promise.all([
         totalQuery as unknown as Promise<QueryResult<unknown[]>>,
         todayQuery as unknown as Promise<QueryResult<unknown[]>>,
@@ -822,10 +840,15 @@ export function createSupabaseReservationReadRepository(
       };
     },
 
-    async readReservationById(reservationId) {
-      return await fromTable(client, RESERVATION_SUPABASE_TABLES.bookings)
-        .select(RESERVATION_SUPABASE_SELECTS.reservationCompatibility)
-        .eq("id", reservationId)
+    async readReservationById(reservationId, venueId) {
+      return await applyVenueFilter(
+        fromTable(client, RESERVATION_SUPABASE_TABLES.bookings)
+          .select(venueId
+            ? "*, services!inner(name, venue_id)"
+            : RESERVATION_SUPABASE_SELECTS.reservationCompatibility)
+          .eq("id", reservationId),
+        venueId,
+      )
         .single() as QueryResult<unknown>;
     },
   };
@@ -835,7 +858,15 @@ export function createSupabaseReservationMutationRepository(
   client: SupabaseLikeClient,
 ): ReservationMutationRepositoryPort {
   return {
-    async updateReservation({ reservationId, patch }) {
+    async updateReservation({ reservationId, patch, venueId }) {
+      if (venueId) {
+        if (!client.rpc) throw new Error("Supabase client does not support scoped reservation mutations");
+        return scopedMutationResult(await client.rpc("platform_update_scoped_reservation", {
+          p_venue_id: venueId,
+          p_reservation_id: reservationId,
+          p_patch: patch,
+        }));
+      }
       return await fromTable(client, RESERVATION_SUPABASE_TABLES.bookings)
         .update(patch)
         .eq("id", reservationId)
@@ -921,17 +952,18 @@ export interface SupabaseResourceMaintenanceResolvedResource {
 }
 
 export interface SupabaseResourceMaintenanceRepository {
-  listActiveMaintenance(serviceId: string): Promise<QueryResult<unknown[]>>;
+  listActiveMaintenance(serviceId: string, venueId?: string): Promise<QueryResult<unknown[]>>;
   resolveResource(input: {
     service_id?: string;
     resource_id?: string;
     metadata?: { resource_label?: unknown } | null;
-  }): Promise<SupabaseResourceMaintenanceResolvedResource>;
-  loadService(serviceId: string): Promise<QueryResult<unknown>>;
-  createMaintenance(row: unknown): Promise<QueryResult<unknown>>;
+  }, venueId?: string): Promise<SupabaseResourceMaintenanceResolvedResource>;
+  loadService(serviceId: string, venueId?: string): Promise<QueryResult<unknown>>;
+  createMaintenance(row: unknown, venueId?: string): Promise<QueryResult<unknown>>;
   endMaintenance(
     id: string,
     input?: { reason?: string | null },
+    venueId?: string,
   ): Promise<QueryResult<unknown>>;
 }
 
@@ -939,15 +971,19 @@ export function createSupabaseResourceMaintenanceRepository(
   client: SupabaseLikeClient,
 ): SupabaseResourceMaintenanceRepository {
   return {
-    async listActiveMaintenance(serviceId) {
-      return await fromTable(client, RESERVATION_SUPABASE_TABLES.serviceSeatMaintenance)
-        .select(RESERVATION_SUPABASE_SELECTS.resourceMaintenance)
+    async listActiveMaintenance(serviceId, venueId) {
+      let query = fromTable(client, RESERVATION_SUPABASE_TABLES.serviceSeatMaintenance)
+        .select(venueId
+          ? `${RESERVATION_SUPABASE_SELECTS.resourceMaintenance}, services!inner(venue_id)`
+          : RESERVATION_SUPABASE_SELECTS.resourceMaintenance)
         .eq("service_id", serviceId)
-        .eq("is_active", true)
+        .eq("is_active", true);
+      if (venueId) query = query.eq("services.venue_id", venueId);
+      return await query
         .order("seat_label") as QueryResult<unknown[]>;
     },
 
-    async resolveResource(input) {
+    async resolveResource(input, venueId) {
       if (!input.resource_id) {
         return {
           serviceId: input.service_id,
@@ -957,9 +993,13 @@ export function createSupabaseResourceMaintenanceRepository(
         };
       }
 
-      const { data, error } = await fromTable(client, RESERVATION_SUPABASE_TABLES.reservableResources)
-        .select(RESERVATION_SUPABASE_SELECTS.resourceMaintenanceResource)
-        .eq("id", input.resource_id)
+      let query = fromTable(client, RESERVATION_SUPABASE_TABLES.reservableResources)
+        .select(venueId
+          ? `${RESERVATION_SUPABASE_SELECTS.resourceMaintenanceResource}, services!inner(venue_id)`
+          : RESERVATION_SUPABASE_SELECTS.resourceMaintenanceResource)
+        .eq("id", input.resource_id);
+      if (venueId) query = query.eq("services.venue_id", venueId);
+      const { data, error } = await query
         .maybeSingle() as QueryResult<Record<string, unknown>>;
 
       if (error) {
@@ -978,21 +1018,38 @@ export function createSupabaseResourceMaintenanceRepository(
       };
     },
 
-    async loadService(serviceId) {
-      return fromTable(client, RESERVATION_SUPABASE_TABLES.services)
+    async loadService(serviceId, venueId) {
+      let query = fromTable(client, RESERVATION_SUPABASE_TABLES.services)
         .select(RESERVATION_SUPABASE_SELECTS.resourceMaintenanceService)
-        .eq("id", serviceId)
+        .eq("id", serviceId);
+      if (venueId) query = query.eq("venue_id", venueId);
+      return query
         .single() as Promise<QueryResult<unknown>>;
     },
 
-    async createMaintenance(row) {
+    async createMaintenance(row, venueId) {
+      if (venueId) {
+        if (!client.rpc) throw new Error("Supabase client does not support scoped maintenance mutations");
+        return scopedMutationResult(await client.rpc("platform_create_scoped_maintenance", {
+          p_venue_id: venueId,
+          p_row: row,
+        }));
+      }
       return fromTable(client, RESERVATION_SUPABASE_TABLES.serviceSeatMaintenance)
         .upsert(row, { onConflict: "service_id,seat_label" })
         .select(RESERVATION_SUPABASE_SELECTS.resourceMaintenance)
         .single() as Promise<QueryResult<unknown>>;
     },
 
-    async endMaintenance(id, input = {}) {
+    async endMaintenance(id, input = {}, venueId) {
+      if (venueId) {
+        if (!client.rpc) throw new Error("Supabase client does not support scoped maintenance mutations");
+        return scopedMutationResult(await client.rpc("platform_end_scoped_maintenance", {
+          p_venue_id: venueId,
+          p_maintenance_id: id,
+          p_reason: input.reason ?? null,
+        }));
+      }
       return fromTable(client, RESERVATION_SUPABASE_TABLES.serviceSeatMaintenance)
         .update({
           is_active: false,
@@ -1373,7 +1430,7 @@ export function createSupabaseReservationRepository(
   }
 
   async function createReservationAtomic(
-    input: CreateReservationAtomicInput | CreateReservationInput,
+    input: (CreateReservationAtomicInput | CreateReservationInput) & { venueId?: string },
   ): Promise<CreateReservationAtomicResult> {
     if (!client.rpc) {
       throw new Error("Supabase client does not support RPC calls");
@@ -1381,7 +1438,10 @@ export function createSupabaseReservationRepository(
 
     const payload = reservationToBookingInsert(input.reservation);
     const data = assertNoSupabaseError(
-      await client.rpc("create_reservation_atomic", { payload }),
+      await client.rpc(
+        input.venueId ? "platform_create_scoped_reservation" : "create_reservation_atomic",
+        input.venueId ? { p_venue_id: input.venueId, p_payload: payload } : { payload },
+      ),
       "Failed to create reservation atomically",
     );
 

@@ -13,7 +13,7 @@ import {
 
 const indexPath = new URL("../migrations/supabase/migration-index.json", import.meta.url);
 
-test("core plan includes exactly 000001 through 000022 in order", async () => {
+test("core plan includes exactly 000001 through 000023 in order", async () => {
   const index = await readActualIndex();
   const plan = buildSupabaseMigrationPlan(index);
 
@@ -42,9 +42,10 @@ test("core plan includes exactly 000001 through 000022 in order", async () => {
       "000020_operations_analytics_rpc.sql",
       "000021_installation_auth.sql",
       "000022_password_reset.sql",
+      "000023_venue_scoped_operations.sql",
     ],
   );
-  assert.equal(plan.migrations.length, 22);
+  assert.equal(plan.migrations.length, 23);
   assert.equal(plan.seeds.length, 0);
 });
 
@@ -60,7 +61,7 @@ test("bundled core migration loader follows an extended validated index", async 
   const rawIndex = await readActualRawIndex();
   rawIndex.coreMigrations.push({
     order: rawIndex.coreMigrations.length + 1,
-    path: "packages/database/migrations/supabase/000023_runtime_readiness_test.sql",
+    path: "packages/database/migrations/supabase/000024_runtime_readiness_test.sql",
     module: "core",
     scope: "reservation-platform",
     sha256: "a".repeat(64),
@@ -73,9 +74,9 @@ test("bundled core migration loader follows an extended validated index", async 
 
   const plan = await loadBundledCoreMigrationPlan(pathToFileURL(extendedIndexPath));
 
-  assert.equal(plan.length, 23);
+  assert.equal(plan.length, 24);
   assert.deepEqual(plan.at(-1), {
-    path: "packages/database/migrations/supabase/000023_runtime_readiness_test.sql",
+    path: "packages/database/migrations/supabase/000024_runtime_readiness_test.sql",
     sha256: "a".repeat(64),
   });
 });
@@ -167,6 +168,29 @@ test("password reset migration consumes one hashed token and revokes existing se
   assert.doesNotMatch(sql, /plaintext_token|raw_token/);
 });
 
+test("authenticated operational mutations are venue-checked inside service-role RPC transactions", async () => {
+  const sql = (await readFile(new URL("../migrations/supabase/000023_venue_scoped_operations.sql", import.meta.url), "utf8")).toLowerCase();
+
+  assert.match(sql, /create or replace function public\.platform_create_scoped_reservation/);
+  assert.match(sql, /where id = requested_service_id\s+and venue_id = p_venue_id\s+for share/);
+  assert.match(sql, /return public\.create_reservation_atomic\(p_payload\)/);
+  assert.match(sql, /create or replace function public\.platform_update_scoped_reservation/);
+  assert.match(sql, /join public\.services as current_service[\s\S]*current_service\.venue_id = p_venue_id[\s\S]*for update of booking, current_service/);
+  assert.match(sql, /target_service_id[\s\S]*and venue_id = p_venue_id\s+for share/);
+  assert.match(sql, /create or replace function public\.platform_create_scoped_maintenance/);
+  assert.match(sql, /create or replace function public\.platform_end_scoped_maintenance/);
+  assert.match(sql, /join public\.services as scoped_service[\s\S]*scoped_service\.venue_id = p_venue_id[\s\S]*for update of candidate, scoped_service/);
+  for (const signature of [
+    "platform_create_scoped_reservation\\(uuid, jsonb\\)",
+    "platform_update_scoped_reservation\\(uuid, uuid, jsonb\\)",
+    "platform_create_scoped_maintenance\\(uuid, jsonb\\)",
+    "platform_end_scoped_maintenance\\(uuid, uuid, text\\)",
+  ]) {
+    assert.match(sql, new RegExp(`revoke all on function public\\.${signature} from public, anon, authenticated`));
+    assert.match(sql, new RegExp(`grant execute on function public\\.${signature} to service_role`));
+  }
+});
+
 test("experience availability migration owns normalized rules and shared snapshot integration", async () => {
   const sql = await readFile(new URL("../migrations/supabase/000016_experience_availability_rules.sql", import.meta.url), "utf8");
 
@@ -234,7 +258,7 @@ test("AI retrieval option appends optional AI retrieval migrations after core mi
   const plan = buildSupabaseMigrationPlan(index, { includeAiRetrieval: true });
 
   assert.deepEqual(
-    plan.migrations.slice(22).map((entry) => entry.path),
+    plan.migrations.slice(23).map((entry) => entry.path),
     [
       "packages/database/migrations/supabase/optional/ai-retrieval/000001_knowledge_chunks.sql",
       "packages/database/migrations/supabase/optional/ai-retrieval/000002_langchain_checkpoints.sql",

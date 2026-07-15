@@ -659,11 +659,11 @@ export async function handleStandaloneApiRequest(
   }
 
   if (method === "GET" && path === "/v1/reservations") {
-    return handleReservationListRequest(url, dependencies.reservationReadRepository);
+    return handleReservationListRequest(request, url, dependencies.reservationReadRepository);
   }
 
   if (method === "GET" && path === "/v1/resource-maintenance") {
-    return handleResourceMaintenanceListRequest(url, dependencies.resourceMaintenanceRepository);
+    return handleResourceMaintenanceListRequest(request, url, dependencies.resourceMaintenanceRepository);
   }
 
   if (method === "POST" && path === "/v1/reservations") {
@@ -709,7 +709,11 @@ export async function handleStandaloneApiRequest(
   if (method === "GET") {
     const reservationId = reservationPattern.exec(path)?.[1];
     if (reservationId) {
-      return handleReservationReadRequest(decodeURIComponent(reservationId), dependencies.reservationReadRepository);
+      return handleReservationReadRequest(
+        decodeURIComponent(reservationId),
+        dependencies.reservationReadRepository,
+        request,
+      );
     }
   }
 
@@ -1213,6 +1217,14 @@ async function authorizeStandalonePlatformDataRequest(
     }
     setRequestHeader(request, "X-Reservation-Tenant-Id", session.tenantId);
     if (venueId) setRequestHeader(request, "X-Reservation-Venue-Id", venueId);
+    if (session.role === "staff" && isOwnerOnlyPlatformDataRoute(request.method.toUpperCase(), normalizePath(parseRequestUrl(request.path).pathname))) {
+      return platformError(403, "forbidden", "Owner access is required.");
+    }
+    if (session.role === "staff"
+      && isVenueScopedPlatformDataRoute(request.method.toUpperCase(), normalizePath(parseRequestUrl(request.path).pathname))
+      && !venueId) {
+      return platformError(403, "forbidden", "A concrete assigned venue is required.");
+    }
     if (session.role === "owner" && venueId && !dependencies.tenantVenueRepository) {
       return platformError(503, "internal_error", "Venue authorization is not configured.");
     }
@@ -1359,6 +1371,21 @@ const protectedRouteMetadata: Readonly<Record<string, readonly RouteMatcher[]>> 
   PATCH: ["/v1/experience/identity", reservationPattern, isWhatsAppOwnerRoute],
   PUT: ["/v1/experience/draft", "/v1/experience/operating-hours", "/v1/experience/channels", experienceServicePattern, experienceResourcePattern, experienceKnowledgePattern, conversationAutomationPattern],
   DELETE: [isWhatsAppOwnerRoute],
+};
+
+const ownerOnlyRouteMetadata: Readonly<Record<string, readonly RouteMatcher[]>> = {
+  GET: [isExperienceOwnerRoute, isWhatsAppConfigurationRoute],
+  POST: [isExperienceOwnerRoute, isWhatsAppConfigurationRoute],
+  PATCH: [isExperienceOwnerRoute, isWhatsAppConfigurationRoute],
+  PUT: [isExperienceOwnerRoute, isWhatsAppConfigurationRoute],
+  DELETE: [isExperienceOwnerRoute, isWhatsAppConfigurationRoute],
+};
+
+const venueScopedRouteMetadata: Readonly<Record<string, readonly RouteMatcher[]>> = {
+  GET: ["/v1/reservations", reservationPattern, "/v1/resource-maintenance"],
+  POST: ["/v1/reservations", reservationCancelPattern, reservationReschedulePattern,
+    "/v1/resource-maintenance", resourceMaintenanceEndPattern],
+  PATCH: [reservationPattern],
 };
 
 async function readChannelRuntimeReadiness(
@@ -1868,6 +1895,7 @@ async function handlePublicExperienceReservationCreateRequest(
   }
   const response = await handleReservationCreateRequest(request, dependencies, {
     tenantId: services.scope.tenantId,
+    venueId: services.scope.venueId,
     path: `/v1/public/experiences/${services.scope.slug}/reservations`,
   });
   if (
@@ -2041,12 +2069,41 @@ function experienceRepositoryUnavailable() {
   return platformError(503, "bad_request", "Experience Studio repository is not configured.");
 }
 
-function isProtectedPlatformDataRoute(method: string, path: string) {
-  return (protectedRouteMetadata[method] ?? []).some((matcher) => {
+function matchesRouteMetadata(
+  metadata: Readonly<Record<string, readonly RouteMatcher[]>>,
+  method: string,
+  path: string,
+) {
+  return (metadata[method] ?? []).some((matcher) => {
     if (typeof matcher === "string") return matcher === path;
     if (typeof matcher === "function") return matcher(path);
     return matcher.test(path);
   });
+}
+
+function isProtectedPlatformDataRoute(method: string, path: string) {
+  return matchesRouteMetadata(protectedRouteMetadata, method, path);
+}
+
+function isOwnerOnlyPlatformDataRoute(method: string, path: string) {
+  return matchesRouteMetadata(ownerOnlyRouteMetadata, method, path);
+}
+
+function isVenueScopedPlatformDataRoute(method: string, path: string) {
+  return matchesRouteMetadata(venueScopedRouteMetadata, method, path);
+}
+
+function isExperienceOwnerRoute(path: string) {
+  return path === "/v1/experience" || path.startsWith("/v1/experience/");
+}
+
+function isWhatsAppConfigurationRoute(path: string) {
+  return whatsappSessionRoutePattern.test(path)
+    || path === whatsappConfigPath
+    || path === whatsappReadinessPath
+    || path === whatsappSimulationPath
+    || path === whatsappKnowledgePath
+    || whatsappKnowledgePattern.test(path);
 }
 
 function isWhatsAppOwnerRoute(path: string) {
@@ -2096,7 +2153,7 @@ async function handleAvailabilityRequest(
 async function handleReservationCreateRequest(
   request: StandaloneApiRequest,
   dependencies: StandaloneApiDependencies,
-  publicContext?: { tenantId: string; path: string },
+  publicContext?: { tenantId: string; venueId: string; path: string },
 ): Promise<StandaloneApiResponse> {
   const requiredKey = requireIdempotencyKey(getHeader(request.headers, "Idempotency-Key"));
   if (!requiredKey.ok) {
@@ -2133,6 +2190,9 @@ async function handleReservationCreateRequest(
   const result = await createReservation({
     repository: dependencies.reservationCreateRepository,
     legacyInput: preparedLegacy.legacyInput,
+    ...((publicContext?.venueId ?? getHeader(request.headers, "X-Reservation-Venue-Id"))
+      ? { venueId: publicContext?.venueId ?? getHeader(request.headers, "X-Reservation-Venue-Id") }
+      : {}),
   });
 
   if (result.status >= 200 && result.status < 300) {
@@ -2535,6 +2595,7 @@ async function handleChatConfirmReservationRequest(
 }
 
 async function handleResourceMaintenanceListRequest(
+  request: StandaloneApiRequest,
   url: URL,
   repository: ResourceMaintenanceRepositoryPort | undefined,
 ): Promise<StandaloneApiResponse> {
@@ -2550,6 +2611,9 @@ async function handleResourceMaintenanceListRequest(
   const result = await listResourceMaintenance({
     repository,
     serviceId,
+    ...(getHeader(request.headers, "X-Reservation-Venue-Id")
+      ? { venueId: getHeader(request.headers, "X-Reservation-Venue-Id") }
+      : {}),
   });
 
   return jsonResponse(result.status, result.body);
@@ -2578,6 +2642,9 @@ async function handleResourceMaintenanceCreateRequest(
     mutate: (repository) => createResourceMaintenance({
       repository,
       data: parsedBody.data,
+      ...(getHeader(request.headers, "X-Reservation-Venue-Id")
+        ? { venueId: getHeader(request.headers, "X-Reservation-Venue-Id") }
+        : {}),
     }),
   });
 }
@@ -2607,6 +2674,9 @@ async function handleResourceMaintenanceEndRequest(
       repository,
       maintenanceId,
       data: parsedBody.data,
+      ...(getHeader(request.headers, "X-Reservation-Venue-Id")
+        ? { venueId: getHeader(request.headers, "X-Reservation-Venue-Id") }
+        : {}),
     }),
   });
 }
@@ -2684,6 +2754,9 @@ async function handleReservationUpdateRequest(
       repository,
       reservationId,
       legacyPatch: preparedPatch.legacyPatch,
+      ...(getHeader(request.headers, "X-Reservation-Venue-Id")
+        ? { venueId: getHeader(request.headers, "X-Reservation-Venue-Id") }
+        : {}),
     }),
   });
 }
@@ -2720,6 +2793,9 @@ async function handleReservationRescheduleRequest(
       repository,
       reservationId,
       legacyPatch: preparedLegacy.legacyInput,
+      ...(getHeader(request.headers, "X-Reservation-Venue-Id")
+        ? { venueId: getHeader(request.headers, "X-Reservation-Venue-Id") }
+        : {}),
     }),
   });
 }
@@ -2753,6 +2829,9 @@ async function handleReservationCancelRequest(
     mutate: (repository) => cancelReservation({
       repository,
       reservationId,
+      ...(getHeader(request.headers, "X-Reservation-Venue-Id")
+        ? { venueId: getHeader(request.headers, "X-Reservation-Venue-Id") }
+        : {}),
       audit: {
         ...(preparedInput.input.reason ? { reason: preparedInput.input.reason } : {}),
         ...(typeof preparedInput.input.metadata?.changed_by === "string" ? { changedBy: preparedInput.input.metadata.changed_by } : {}),
@@ -2805,6 +2884,7 @@ async function handleIdempotentReservationMutation(input: {
 }
 
 async function handleReservationListRequest(
+  request: StandaloneApiRequest,
   url: URL,
   repository: ReservationReadRepositoryPort | undefined,
 ): Promise<StandaloneApiResponse> {
@@ -2815,6 +2895,9 @@ async function handleReservationListRequest(
   const result = await listReservations({
     repository,
     search: url.searchParams.get("search"),
+    ...(getHeader(request.headers, "X-Reservation-Venue-Id")
+      ? { venueId: getHeader(request.headers, "X-Reservation-Venue-Id") }
+      : {}),
   });
 
   return jsonResponse(result.status, result.body);
@@ -2823,11 +2906,15 @@ async function handleReservationListRequest(
 async function handleReservationReadRequest(
   reservationId: string,
   repository: ReservationReadRepositoryPort | undefined,
+  request?: StandaloneApiRequest,
 ): Promise<StandaloneApiResponse> {
   if (!repository) {
     const validationResult = await readReservationById({
       repository: reservationReadRepositoryNotConfigured(),
       reservationId,
+      ...(request && getHeader(request.headers, "X-Reservation-Venue-Id")
+        ? { venueId: getHeader(request.headers, "X-Reservation-Venue-Id") }
+        : {}),
     });
     if (validationResult.status === 400) {
       return jsonResponse(validationResult.status, validationResult.body);
@@ -2839,6 +2926,9 @@ async function handleReservationReadRequest(
   const result = await readReservationById({
     repository,
     reservationId,
+    ...(request && getHeader(request.headers, "X-Reservation-Venue-Id")
+      ? { venueId: getHeader(request.headers, "X-Reservation-Venue-Id") }
+      : {}),
   });
 
   return jsonResponse(result.status, result.body);

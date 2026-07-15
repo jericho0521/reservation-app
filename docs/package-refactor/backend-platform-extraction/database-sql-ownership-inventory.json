@@ -237,6 +237,16 @@
       "notes": [
         "Backend-owned atomic password-reset capability issuance, single-use completion, and session revocation."
       ]
+    },
+    {
+      "path": "packages/database/migrations/supabase/000023_venue_scoped_operations.sql",
+      "classification": "core-platform",
+      "intendedBackendDestination": [
+        "packages/database/migrations/supabase/000023_venue_scoped_operations.sql"
+      ],
+      "notes": [
+        "Backend-owned atomic venue-scoped reservation and resource-maintenance mutation functions."
+      ]
     }
   ]
 }

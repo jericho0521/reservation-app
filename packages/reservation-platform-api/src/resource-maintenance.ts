@@ -65,17 +65,18 @@ export type ResourceMaintenanceRepositoryResult<T> = {
 };
 
 export interface ResourceMaintenanceRepositoryPort {
-  listActiveMaintenance(serviceId: string): Promise<ResourceMaintenanceRepositoryResult<unknown[]>>;
+  listActiveMaintenance(serviceId: string, venueId?: string): Promise<ResourceMaintenanceRepositoryResult<unknown[]>>;
   resolveResource(input: {
     service_id?: string;
     resource_id?: string;
     metadata?: { resource_label?: unknown } | null;
-  }): Promise<ResolvedResourceMaintenanceResource>;
-  loadService(serviceId: string): Promise<ResourceMaintenanceRepositoryResult<unknown>>;
-  createMaintenance(row: LegacyResourceMaintenanceRow): Promise<ResourceMaintenanceRepositoryResult<unknown>>;
+  }, venueId?: string): Promise<ResolvedResourceMaintenanceResource>;
+  loadService(serviceId: string, venueId?: string): Promise<ResourceMaintenanceRepositoryResult<unknown>>;
+  createMaintenance(row: LegacyResourceMaintenanceRow, venueId?: string): Promise<ResourceMaintenanceRepositoryResult<unknown>>;
   endMaintenance(
     id: string,
     input?: { reason?: string | null },
+    venueId?: string,
   ): Promise<ResourceMaintenanceRepositoryResult<unknown>>;
 }
 
@@ -389,11 +390,12 @@ export async function listResourceMaintenance(
   input: {
     repository: Pick<ResourceMaintenanceRepositoryPort, "listActiveMaintenance">;
     serviceId: string;
+    venueId?: string;
   },
 ): Promise<ResourceMaintenanceApplicationResult<ListResourceMaintenanceResponse>> {
   let result: Awaited<ReturnType<ResourceMaintenanceRepositoryPort["listActiveMaintenance"]>>;
   try {
-    result = await input.repository.listActiveMaintenance(input.serviceId);
+    result = await input.repository.listActiveMaintenance(input.serviceId, input.venueId);
   } catch {
     return {
       status: 500,
@@ -424,10 +426,11 @@ export async function createResourceMaintenance(
     >;
     data: CreateResourceMaintenanceInput;
     userId?: string | null;
+    venueId?: string;
   },
 ): Promise<ResourceMaintenanceApplicationResult<ResourceMaintenanceResponse>> {
   try {
-    const resolvedResource = await input.repository.resolveResource(input.data);
+    const resolvedResource = await input.repository.resolveResource(input.data, input.venueId);
     const validatedResource = validateResolvedResourceMaintenanceResource(resolvedResource);
 
     if ("body" in validatedResource) {
@@ -436,6 +439,7 @@ export async function createResourceMaintenance(
 
     const { data: service, error: serviceError } = await input.repository.loadService(
       validatedResource.serviceId,
+      input.venueId,
     );
 
     if (serviceError) {
@@ -453,7 +457,7 @@ export async function createResourceMaintenance(
       return prepared;
     }
 
-    const { data, error } = await input.repository.createMaintenance(prepared.row);
+    const { data, error } = await input.repository.createMaintenance(prepared.row, input.venueId);
 
     if (error) {
       const classified = classifyRepositoryPlatformError(
@@ -477,10 +481,11 @@ export async function endResourceMaintenance(
     repository: Pick<ResourceMaintenanceRepositoryPort, "endMaintenance">;
     maintenanceId: string;
     data: EndResourceMaintenanceInput;
+    venueId?: string;
   },
 ): Promise<ResourceMaintenanceApplicationResult<ResourceMaintenanceResponse>> {
   try {
-    const { data, error } = await input.repository.endMaintenance(input.maintenanceId, input.data);
+    const { data, error } = await input.repository.endMaintenance(input.maintenanceId, input.data, input.venueId);
 
     if (error) {
       const classified = classifyRepositoryPlatformError(error, "Resource maintenance not found.");

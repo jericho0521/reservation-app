@@ -212,6 +212,115 @@ test("cookie mutations reject mismatched CSRF and staff reject unassigned venues
   assert.equal(venueDenied.status, 403);
 });
 
+test("cookie staff cannot access owner configuration routes but can list assigned-venue reservations", async () => {
+  const assignedVenue = "123e4567-e89b-42d3-a456-426614174000";
+  const repositories = authRepository({
+    readSession: async () => ({
+      userId: "223e4567-e89b-42d3-a456-426614174000",
+      tenantId: "tenant-1",
+      role: "staff",
+      venueIds: [assignedVenue],
+      expiresAt: "2026-07-15T12:00:00.000Z",
+    }),
+  });
+  let ownerRepositoryCalls = 0;
+  const dependencies = {
+    sessionAuth: { repositories, allowedOrigins: [authOrigin] },
+    experienceStudioRepository: fakeExperienceRepository({
+      async readWorkspace() {
+        ownerRepositoryCalls += 1;
+        return experienceWorkspaceFixture();
+      },
+    }),
+    whatsappModule: {
+      async getConfig() {
+        ownerRepositoryCalls += 1;
+        return {};
+      },
+    } as StandaloneApiWhatsAppModule,
+  };
+  const cookie = `reservation_session=${"s".repeat(43)}`;
+
+  for (const path of ["/v1/experience/workspace", "/v1/channels/whatsapp/config"]) {
+    const response = await handleStandaloneApiRequest({ method: "GET", path, headers: { cookie } }, dependencies);
+    assert.equal(response.status, 403, path);
+  }
+  assert.equal(ownerRepositoryCalls, 0);
+
+  let observedVenue: string | undefined;
+  const operational = await handleStandaloneApiRequest({
+    method: "GET",
+    path: "/v1/reservations",
+    headers: { cookie },
+  }, {
+    sessionAuth: dependencies.sessionAuth,
+    reservationReadRepository: {
+      async listReservations(input) {
+        observedVenue = input.venueId;
+        return { data: [] };
+      },
+      async readReservationById() { return { data: null }; },
+    },
+  });
+  assert.equal(operational.status, 200);
+  assert.equal(observedVenue, assignedVenue);
+});
+
+test("cookie staff venue scope fails closed before cross-venue reservation and maintenance storage", async () => {
+  const assignedVenue = "123e4567-e89b-42d3-a456-426614174000";
+  const otherVenue = "323e4567-e89b-42d3-a456-426614174000";
+  const repositories = authRepository({
+    readSession: async () => ({
+      userId: "223e4567-e89b-42d3-a456-426614174000",
+      tenantId: "tenant-1",
+      role: "staff",
+      venueIds: [assignedVenue, "223e4567-e89b-42d3-a456-426614174000"],
+      expiresAt: "2026-07-15T12:00:00.000Z",
+    }),
+  });
+  let storageCalls = 0;
+  const dependencies = {
+    sessionAuth: { repositories, allowedOrigins: [authOrigin] },
+    reservationReadRepository: {
+      async listReservations() { storageCalls += 1; return { data: [] }; },
+      async readReservationById() { storageCalls += 1; return { data: null }; },
+    } satisfies ReservationReadRepositoryPort,
+    reservationMutationRepository: {
+      async updateReservation() { storageCalls += 1; return { data: null }; },
+    } satisfies ReservationMutationRepositoryPort,
+    resourceMaintenanceRepository: {
+      async listActiveMaintenance() { storageCalls += 1; return { data: [] }; },
+      async resolveResource() { storageCalls += 1; return {}; },
+      async loadService() { storageCalls += 1; return { data: null }; },
+      async createMaintenance() { storageCalls += 1; return { data: null }; },
+      async endMaintenance() { storageCalls += 1; return { data: null }; },
+    } satisfies ResourceMaintenanceRepositoryPort,
+  };
+  const sessionCookie = `reservation_session=${"s".repeat(43)}`;
+  const mutationHeaders = {
+    cookie: `${sessionCookie}; reservation_csrf=${"c".repeat(43)}`,
+    origin: authOrigin,
+    "x-csrf-token": "c".repeat(43),
+    "x-reservation-venue-id": otherVenue,
+  };
+  const requests = [
+    { method: "GET", path: "/v1/reservations", headers: { cookie: sessionCookie } },
+    { method: "GET", path: "/v1/reservations/123e4567-e89b-42d3-a456-426614174000", headers: { cookie: sessionCookie, "x-reservation-venue-id": otherVenue } },
+    { method: "POST", path: "/v1/reservations", headers: mutationHeaders, body: {} },
+    { method: "PATCH", path: "/v1/reservations/123e4567-e89b-42d3-a456-426614174000", headers: mutationHeaders, body: { status: "completed" } },
+    { method: "POST", path: "/v1/reservations/123e4567-e89b-42d3-a456-426614174000/cancel", headers: mutationHeaders, body: {} },
+    { method: "POST", path: "/v1/reservations/123e4567-e89b-42d3-a456-426614174000/reschedule", headers: mutationHeaders, body: {} },
+    { method: "GET", path: "/v1/resource-maintenance?service_id=123e4567-e89b-42d3-a456-426614174000", headers: { cookie: sessionCookie, "x-reservation-venue-id": otherVenue } },
+    { method: "POST", path: "/v1/resource-maintenance", headers: mutationHeaders, body: {} },
+    { method: "POST", path: "/v1/resource-maintenance/123e4567-e89b-42d3-a456-426614174000/end", headers: mutationHeaders, body: {} },
+  ];
+  for (const request of requests) {
+    const response = await handleStandaloneApiRequest(request, dependencies);
+    assert.equal(response.status, 403, `${request.method} ${request.path}`);
+  }
+  assert.equal(storageCalls, 0);
+});
+
 test("session parsing rejects cookie prefixes and duplicate exact names", async () => {
   for (const cookie of [
     `reservation_session_extra=${"s".repeat(43)}`,

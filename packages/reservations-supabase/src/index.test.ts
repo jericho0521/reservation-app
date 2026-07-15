@@ -965,6 +965,77 @@ test("reservation read repository owns read-by-id query shape", async () => {
   ]);
 });
 
+test("reservation reads bind list and record lookup to the resolved venue", async () => {
+  const calls: RecordedReservationCompatibilityCall[] = [];
+  const client = createReservationCompatibilityClient(
+    [
+      { data: [], error: null },
+      { data: null, error: { code: "PGRST116" } },
+      { data: null, count: 0, error: null },
+      { data: null, count: 0, error: null },
+    ],
+    calls,
+  );
+  const repository = createSupabaseReservationReadRepository(client);
+
+  await repository.listReservations({
+    search: null,
+    searchFilterExpression: null,
+    limit: null,
+    venueId: "venue-a",
+  });
+  await repository.readReservationById("booking-other-venue", "venue-a");
+  await repository.getReservationsSummary?.({
+    search: null,
+    searchFilterExpression: null,
+    today: "2026-07-15",
+    venueId: "venue-a",
+  });
+
+  assert.deepEqual(calls, [
+    {
+      table: RESERVATION_SUPABASE_TABLES.bookings,
+      selectCalls: ["*, services!inner(name, venue_id)"],
+      filters: [{ column: "services.venue_id", value: "venue-a" }],
+      orFilters: [],
+      orders: [{ column: "booking_date", options: { ascending: false } }],
+      limits: [],
+    },
+    {
+      table: RESERVATION_SUPABASE_TABLES.bookings,
+      selectCalls: ["*, services!inner(name, venue_id)"],
+      filters: [
+        { column: "id", value: "booking-other-venue" },
+        { column: "services.venue_id", value: "venue-a" },
+      ],
+      orFilters: [],
+      orders: [],
+      limits: [],
+      cardinality: "single",
+    },
+    {
+      table: RESERVATION_SUPABASE_TABLES.bookings,
+      selectCalls: [{ columns: "id, services!inner(venue_id)", options: { count: "exact", head: true } }],
+      filters: [{ column: "services.venue_id", value: "venue-a" }],
+      orFilters: [],
+      orders: [],
+      limits: [],
+    },
+    {
+      table: RESERVATION_SUPABASE_TABLES.bookings,
+      selectCalls: [{ columns: "id, services!inner(venue_id)", options: { count: "exact", head: true } }],
+      filters: [
+        { column: "booking_date", value: "2026-07-15" },
+        { column: "status", value: "confirmed" },
+        { column: "services.venue_id", value: "venue-a" },
+      ],
+      orFilters: [],
+      orders: [],
+      limits: [],
+    },
+  ]);
+});
+
 test("reservation mutation repository owns update query shape", async () => {
   const calls: RecordedReservationCompatibilityCall[] = [];
   const client = createReservationCompatibilityClient(
@@ -998,6 +1069,34 @@ test("reservation mutation repository owns update query shape", async () => {
       cardinality: "single",
     },
   ]);
+});
+
+test("reservation mutations use the atomic venue-scoped RPC and hide cross-venue ids", async () => {
+  const rpcCalls: unknown[] = [];
+  const repository = createSupabaseReservationMutationRepository({
+    from() { throw new Error("scoped mutation must not update bookings directly"); },
+    async rpc(fn, params) {
+      rpcCalls.push({ fn, params });
+      return { data: null, error: null };
+    },
+  });
+  const patch = { status: "cancelled", updated_at: "2026-01-01T00:00:00.000Z" };
+
+  const result = await repository.updateReservation({
+    reservationId: "booking-other-venue",
+    patch,
+    venueId: "venue-a",
+  });
+
+  assert.equal((result.error as { code?: string } | null)?.code, "PGRST116");
+  assert.deepEqual(rpcCalls, [{
+    fn: "platform_update_scoped_reservation",
+    params: {
+      p_venue_id: "venue-a",
+      p_reservation_id: "booking-other-venue",
+      p_patch: patch,
+    },
+  }]);
 });
 
 test("adapts Supabase service metadata into core reservation service", () => {
@@ -1323,6 +1422,65 @@ test("resource maintenance repository owns Supabase lifecycle query shapes", asy
   assert.equal(typeof createSupabaseResourceMaintenanceRepository, "function");
 });
 
+test("resource maintenance reads and atomic mutations stay inside the resolved venue", async () => {
+  const reads: Array<{ select?: string; filters: Array<{ column: string; value: unknown }> }> = [];
+  const rpcCalls: unknown[] = [];
+  const repository = createSupabaseResourceMaintenanceRepository({
+    from(table: string) {
+      assert.equal(table, RESERVATION_SUPABASE_TABLES.serviceSeatMaintenance);
+      const call = { filters: [] as Array<{ column: string; value: unknown }>, select: undefined as string | undefined };
+      reads.push(call);
+      const result = Promise.resolve({ data: [], error: null });
+      return {
+        select(columns?: string) { call.select = columns; return this; },
+        eq(column: string, value: unknown) { call.filters.push({ column, value }); return this; },
+        order() { return this; },
+        then(resolve: (value: SupabaseTestResult) => unknown) { return result.then(resolve); },
+      };
+    },
+    async rpc(fn, params) {
+      rpcCalls.push({ fn, params });
+      return { data: null, error: null };
+    },
+  });
+
+  await repository.listActiveMaintenance("service-other-venue", "venue-a");
+  const created = await repository.createMaintenance({
+    service_id: "service-other-venue",
+    seat_label: "Room A",
+    reason: "Repair",
+  }, "venue-a");
+  const ended = await repository.endMaintenance("maintenance-other-venue", { reason: "Fixed" }, "venue-a");
+
+  assert.deepEqual(reads, [{
+    select: `${RESERVATION_SUPABASE_SELECTS.resourceMaintenance}, services!inner(venue_id)`,
+    filters: [
+      { column: "service_id", value: "service-other-venue" },
+      { column: "is_active", value: true },
+      { column: "services.venue_id", value: "venue-a" },
+    ],
+  }]);
+  assert.equal((created.error as { code?: string } | null)?.code, "PGRST116");
+  assert.equal((ended.error as { code?: string } | null)?.code, "PGRST116");
+  assert.deepEqual(rpcCalls, [
+    {
+      fn: "platform_create_scoped_maintenance",
+      params: {
+        p_venue_id: "venue-a",
+        p_row: { service_id: "service-other-venue", seat_label: "Room A", reason: "Repair" },
+      },
+    },
+    {
+      fn: "platform_end_scoped_maintenance",
+      params: {
+        p_venue_id: "venue-a",
+        p_maintenance_id: "maintenance-other-venue",
+        p_reason: "Fixed",
+      },
+    },
+  ]);
+});
+
 test("resource maintenance repository fails closed for missing resource ids", async () => {
   const client = {
     from(table: string) {
@@ -1471,7 +1629,7 @@ test("repository loads service graph and validates before non-atomic insert", as
   assert.ok(calls.some((call) => call.table === RESERVATION_SUPABASE_TABLES.reservationItems));
 });
 
-test("repository maps atomic RPC payload and successful booking response", async () => {
+test("repository maps venue-scoped atomic RPC payload and successful booking response", async () => {
   const rpcCalls: Array<{ fn: string; params?: Record<string, unknown> }> = [];
   const client = {
     from() {
@@ -1506,6 +1664,7 @@ test("repository maps atomic RPC payload and successful booking response", async
   };
   const repository = createSupabaseReservationRepository(client);
   const result = await repository.createReservationAtomic({
+    venueId: "venue-a",
     reservation: {
       service_id: "service-1",
       customer_name: "Grace",
@@ -1522,9 +1681,10 @@ test("repository maps atomic RPC payload and successful booking response", async
     },
   });
 
-  assert.equal(rpcCalls[0]?.fn, "create_reservation_atomic");
+  assert.equal(rpcCalls[0]?.fn, "platform_create_scoped_reservation");
   assert.deepEqual(rpcCalls[0]?.params, {
-    payload: {
+    p_venue_id: "venue-a",
+    p_payload: {
       service_id: "service-1",
       user_name: "Grace",
       user_email: "grace@example.com",

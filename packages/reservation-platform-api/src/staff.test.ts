@@ -59,7 +59,7 @@ test("staff cannot invite another staff member", async () => {
   }), (error: unknown) => error instanceof PlatformAuthError && error.code === "owner_required");
 });
 
-test("acceptance atomically consumes the invitation and creates a session", async () => {
+test("acceptance consumes the invitation before creating a session", async () => {
   const repositories = repository();
   const result = await acceptStaffInvitation({
     invitationToken: "i".repeat(43),

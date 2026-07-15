@@ -8,7 +8,6 @@ export default function LoginPage() {
         <h1 id="login-heading">Welcome back</h1>
         <p>Sign in with your owner or staff account.</p>
         <LoginForm />
-        <a className="auth-secondary-link" href="/admin/reset-password">Forgot your password?</a>
       </section>
     </div>
   );

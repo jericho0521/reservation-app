@@ -23,7 +23,7 @@ const passwordHasher: PasswordHasher = {
   async verify(hash, password) { return hash === `hash:${password}`; },
 };
 
-test("owner invitation, staff venue denial, reset, and disable form one production auth lifecycle", async () => {
+test("authentication domain lifecycle covers invitation, venue denial, reset, and disable", async () => {
   const repository = memoryAuthRepository();
   const invitation = await inviteStaff({
     principal: owner,

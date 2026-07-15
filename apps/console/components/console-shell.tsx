@@ -24,7 +24,7 @@ export function ConsoleShell({
         </a>
         <nav aria-label="Owner console">
           <a href="/admin">Overview</a>
-          <a href="/admin/studio">Experience Studio</a>
+          {role === "owner" ? <a href="/admin/setup/business">Business Setup</a> : null}
           <a href="/admin/conversations">Conversations</a>
           <a href="/admin/reservations">Reservations</a>
           <a href="/admin/resources">Resources & maintenance</a>

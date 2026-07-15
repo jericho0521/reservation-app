@@ -1,9 +1,11 @@
 import { SetupError, safeSetupErrorMessage } from "../../components/setup-error";
 import { createConsolePlatformClient } from "../../lib/platform-client";
+import { redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";
 
 export default async function StudioPage() {
+  if (process.env.RESERVATION_CONSOLE_PROFILE !== "evaluation") redirect("/setup/business");
   try {
     const client = createConsolePlatformClient();
     const [presetResult, workspace] = await Promise.all([

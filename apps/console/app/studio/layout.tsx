@@ -32,7 +32,7 @@ export default async function StudioLayout({ children }: { children: ReactNode }
     <div className="studio-workspace">
       <aside className="studio-rail">
         <StudioProgress completed={progress.completed} total={progress.total} percent={progress.percent} />
-        <StudioNavigation statuses={progress.sections} />
+        <StudioNavigation statuses={progress.sections} showPreset={process.env.RESERVATION_CONSOLE_PROFILE === "evaluation"} />
       </aside>
       <div className="studio-content">{children}</div>
     </div>

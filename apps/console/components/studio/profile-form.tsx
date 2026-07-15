@@ -20,16 +20,17 @@ export function ProfileForm({ name, publicSlug }: { name: string; publicSlug: st
   );
 }
 
-export function FormFooter({ dirty, message, pending, status }: {
+export function FormFooter({ dirty, message, pending, status, submitLabel }: {
   dirty: boolean;
   message?: string;
   pending: boolean;
   status: StudioActionState["status"];
+  submitLabel?: string;
 }) {
   return (
     <div className="form-footer">
       <span className={status === "error" ? "form-message error" : "form-message"}>{message ?? (dirty ? "Unsaved changes" : "Draft is up to date")}</span>
-      <button className="primary-action" disabled={pending || !dirty} type="submit">{pending ? "Saving…" : "Save changes"}</button>
+      <button className="primary-action" disabled={pending || !dirty} type="submit">{pending ? "Saving…" : submitLabel ?? "Save changes"}</button>
     </div>
   );
 }

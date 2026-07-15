@@ -10,14 +10,16 @@ import {
 
 export function StudioNavigation({
   statuses,
+  showPreset = false,
 }: {
   statuses: Record<string, StudioSectionStatus>;
+  showPreset?: boolean;
 }) {
   const pathname = usePathname();
 
   return (
     <nav className="studio-navigation" aria-label="Experience setup steps">
-      {studioSections.map((section, index) => {
+      {studioSections.filter((section) => showPreset || section.id !== "preset").map((section, index) => {
         const href = getStudioSectionHref(section.id);
         const active = pathname === href || (section.id === "preset" && pathname === "/studio");
         const status = statuses[section.id] ?? "incomplete";

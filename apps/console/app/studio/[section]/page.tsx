@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { getStudioSection } from "../../../lib/studio-sections";
 
 export default async function StudioSectionPage({
@@ -7,6 +7,7 @@ export default async function StudioSectionPage({
   params: Promise<{ section: string }>;
 }) {
   const { section: sectionId } = await params;
+  if (sectionId === "preset" && process.env.RESERVATION_CONSOLE_PROFILE !== "evaluation") redirect("/setup/business");
   const section = getStudioSection(sectionId);
   if (!section) notFound();
 

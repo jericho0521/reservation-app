@@ -71,6 +71,19 @@ button, input, select, textarea { font: inherit; }
 .auth-panel .studio-form { margin-top: 1.5rem; }
 .auth-submit { width: 100%; border: 0; cursor: pointer; }
 .auth-submit:disabled { cursor: wait; opacity: .65; }
+.setup-progress { overflow-x: auto; }
+.setup-progress ol { min-width: 42rem; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(7, 1fr); list-style: none; }
+.setup-progress a { padding: .75rem .5rem; display: grid; gap: .25rem; color: var(--muted); border-bottom: 2px solid var(--line); font-size: .78rem; text-decoration: none; }
+.setup-progress a[aria-current="step"] { color: var(--text); border-color: var(--accent); }
+.setup-progress .is-complete a { color: var(--accent); }
+.setup-workspace { width: min(72rem, 100%); margin: 0 auto; padding: 2rem; }
+.setup-summary, .setup-form, .setup-details { padding: 1.25rem; }
+.setup-summary { display: grid; gap: 1rem; }
+.setup-record-list { display: grid; gap: .75rem; margin: 0; padding: 0; list-style: none; }
+.setup-record-list li { display: grid; grid-template-columns: minmax(12rem, 1fr) minmax(10rem, 1fr) auto; gap: .75rem; align-items: center; padding: .85rem; border: 1px solid var(--border); border-radius: .75rem; }
+.setup-record-list span, .setup-record-list small, .setup-details summary { color: var(--muted); }
+.setup-details summary { cursor: pointer; font-weight: 700; }
+.setup-details[open] summary { margin-bottom: 1rem; }
 .muted { color: var(--muted); }
 .studio-workspace { width: min(82rem, 100%); margin: 0 auto; display: grid; grid-template-columns: 14rem minmax(0, 1fr); gap: 2.5rem; }
 .studio-rail { min-width: 0; }

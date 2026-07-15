@@ -150,7 +150,7 @@ test("browser auth forms use same-origin cookie requests and replace token-beari
   assert.match(layout, /redirect\("\/location"\)/u);
   assert.match(locationAction, /redirect\("\/"\)/u);
   assert.match(locationPage, /redirect\("\/onboarding"\)/u);
-  assert.match(onboardingPage, /redirect\("\/"\)/u);
+  assert.match(onboardingPage, /redirect\(data\.state\.nextStep \? `\/setup\/\$\{data\.state\.nextStep\}` : "\/"\)/u);
   for (const source of [layout, locationAction, locationPage, onboardingPage]) {
     assert.doesNotMatch(source, /redirect\("\/admin/u);
   }

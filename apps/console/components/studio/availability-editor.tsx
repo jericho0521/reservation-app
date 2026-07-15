@@ -2,14 +2,15 @@
 
 import { useActionState, useMemo, useState } from "react";
 import type { ExperienceOperatingHoursResponse } from "@reservation-platform/sdk";
+import { saveSetupOperatingHoursAction } from "../../app/setup/actions";
 import { saveOperatingHoursAction, type StudioActionState } from "../../app/studio/actions";
 import { createAvailabilityPreviewSlots } from "../../lib/availability-preview";
 
 const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 const initialState: StudioActionState = { status: "idle", message: "" };
 
-export function AvailabilityEditor({ value }: { value: ExperienceOperatingHoursResponse }) {
-  const [state, action, pending] = useActionState(saveOperatingHoursAction, initialState);
+export function AvailabilityEditor({ value, onboarding = false }: { value: ExperienceOperatingHoursResponse; onboarding?: boolean }) {
+  const [state, action, pending] = useActionState(onboarding ? saveSetupOperatingHoursAction : saveOperatingHoursAction, initialState);
   const [sampleDay, setSampleDay] = useState(1);
   const [slotInterval, setSlotInterval] = useState(value.slot_interval_minutes);
   const intervalsByDay = useMemo(() => days.map((_, dayOfWeek) => (
@@ -63,7 +64,7 @@ export function AvailabilityEditor({ value }: { value: ExperienceOperatingHoursR
 
     <div className="form-footer">
       <p className={`form-message ${state.status}`} aria-live="polite">{state.message}</p>
-      <button className="primary-action" type="submit" disabled={pending}>{pending ? "Saving…" : "Save operating hours"}</button>
+      <button className="primary-action" type="submit" disabled={pending}>{pending ? "Saving…" : onboarding ? "Save and continue" : "Save operating hours"}</button>
     </div>
   </form>;
 }

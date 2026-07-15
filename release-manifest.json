@@ -1,0 +1,61 @@
+{
+  "schema_version": 1,
+  "release": "0.1.0",
+  "images": {
+    "api": "ghcr.io/jericho0521/reservation-app-api:0.1.0",
+    "worker": "ghcr.io/jericho0521/reservation-app-worker:0.1.0",
+    "console": "ghcr.io/jericho0521/reservation-app-console:0.1.0",
+    "booking": "ghcr.io/jericho0521/reservation-app-booking:0.1.0",
+    "tools": "ghcr.io/jericho0521/reservation-app-tools:0.1.0"
+  },
+  "assets": [
+    {
+      "path": "package.json",
+      "sha256": "0c0aa4edd59bc383b1ae81e2f7962a0bea21fd0fe8456cb708ae171c9c6128ef"
+    },
+    {
+      "path": "compose.production.yml",
+      "sha256": "b718f63727038b9534e49c4d50098b164ceb3628177a02e090a6a471b7c2c59a"
+    },
+    {
+      "path": "docker/production/Caddyfile",
+      "sha256": "af9b84e4ace81aa518443663063c76c6ef46a8c523747a503f12e073bf639102"
+    },
+    {
+      "path": "docker/production/postgrest.conf",
+      "sha256": "b9dd410925078a958531531337cc8955ee6d0c8a61f073e0e42a75ae2b47de5f"
+    },
+    {
+      "path": "docker/production/allowlists/api.env",
+      "sha256": "79daa35779fd545b4fefb462e86ca9a925d469896a171c099ae481454b6d0708"
+    },
+    {
+      "path": "docker/production/allowlists/console.env",
+      "sha256": "5f161119b36a8e98534f2b800fccb4465b021f47a01cb7872dc1c430411614fb"
+    },
+    {
+      "path": "docker/production/allowlists/migrate.env",
+      "sha256": "fd9c6e0c2d150673bb66e2fb361d24ac1706534cea794bc6b0f90732419ca16f"
+    },
+    {
+      "path": "docker/production/allowlists/worker.env",
+      "sha256": "3197e3429513783c2a6db902e4443b3a3d51601b69cd824702a0a66c5f77346c"
+    },
+    {
+      "path": "scripts/production/install.sh",
+      "sha256": "dadfd0ca17f8c628ff859e79cb78f97dc98c1ac704304e28f1036b29cfe1cc86"
+    },
+    {
+      "path": "scripts/production/preflight.sh",
+      "sha256": "31a6fe6ecf7852a4166687924116f0985f9389f75277ccc670b9f2e73abd2e98"
+    },
+    {
+      "path": "scripts/production/release-manifest.mjs",
+      "sha256": "fe901964b2f323ad736bf9c0a9e3b6b10443155c7876bd5e798dfc895b367323"
+    },
+    {
+      "path": "scripts/production/smoke.mjs",
+      "sha256": "655ec795204950be4266964f7b481e4358ef9be0acd7d0a26ec7f422a7229f68"
+    }
+  ]
+}

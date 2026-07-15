@@ -16,6 +16,8 @@ services:
       - reservation-worker-secrets:/run/reservation-worker-secrets
       - reservation-whatsapp-sessions:/run/reservation-whatsapp-sessions
     network_mode: none
+    logging:
+      driver: "none"
     restart: "no"
 
   reservation-db:

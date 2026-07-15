@@ -60,6 +60,12 @@
     "stack:verify:smoke": "node scripts/run-local-stack-smoke.mjs",
     "production:verify": "node scripts/verify-production-deployment.mjs",
     "production:config:test": "node --test scripts/production/configure.test.mjs",
+    "production:preflight:test": "node --test scripts/production/preflight.test.mjs",
+    "production:release-manifest:generate": "node scripts/production/release-manifest.mjs --generate",
+    "production:release-manifest:check": "node scripts/production/release-manifest.mjs --check",
+    "production:release-manifest:test": "node --test scripts/production/release-manifest.test.mjs",
+    "production:installer:test": "pnpm run production:preflight:test && pnpm run production:release-manifest:test && pnpm run production:release-manifest:check && node --import tsx --test apps/console/lib/setup-landing.test.ts",
+    "production:smoke": "node scripts/production/smoke.mjs",
     "production:compose:check": "docker compose -f compose.production.yml config --quiet",
     "sdk:release-artifacts:generate": "node scripts/generate-sdk-release-artifacts.mjs",
     "sdk:release-artifacts:check": "node scripts/generate-sdk-release-artifacts.mjs --check",
@@ -75,7 +81,7 @@
     "demo:reset": "node scripts/reset-final-demo.mjs",
     "demo:verify": "node scripts/verify-final-demo-readiness.mjs",
     "test": "pnpm run packages:test && pnpm run backend-platform:verify-standalone-api-skeleton && pnpm run database:verify-migration-bundle",
-    "ci:verify": "pnpm run ci:verify-scripts && pnpm test && pnpm run sdk:release-gate && pnpm build && pnpm run deploy:verify"
+    "ci:verify": "pnpm run ci:verify-scripts && pnpm test && pnpm run sdk:release-gate && pnpm build && pnpm run deploy:verify && pnpm run production:installer:test"
   },
   "devDependencies": {
     "@types/node": "^20",

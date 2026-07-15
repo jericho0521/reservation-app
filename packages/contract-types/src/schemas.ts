@@ -534,6 +534,30 @@ export const operationsOverviewResponseSchema = operationsOverviewDataSchema.ext
   }),
 });
 
+export const systemComponentStateSchema = z.enum(["healthy", "degraded", "offline"]);
+export const systemComponentStatusSchema = strictObject({
+  status: systemComponentStateSchema,
+  last_success_at: z.string().optional(),
+  action: z.string().min(1),
+});
+export const systemStatusResponseSchema = strictObject({
+  generated_at: z.string(),
+  status: systemComponentStateSchema,
+  release_version: z.string().min(1),
+  migration_version: z.string().min(1),
+  components: strictObject({
+    database: systemComponentStatusSchema,
+    migrations: systemComponentStatusSchema,
+    worker: systemComponentStatusSchema,
+    email: systemComponentStatusSchema,
+    ai: systemComponentStatusSchema,
+    whatsapp: systemComponentStatusSchema,
+    disk: systemComponentStatusSchema,
+    backup: systemComponentStatusSchema,
+  }),
+  jobs: strictObject({ pending: boundedCountSchema, failed: boundedCountSchema, oldest_age_seconds: boundedCountSchema }),
+});
+
 const analyticsDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 const analyticsRateSchema = z.number().min(0).max(1);
 export const analyticsQuerySchema = strictObject({ from: analyticsDateSchema, to: analyticsDateSchema, include_simulation: z.boolean().optional() });
@@ -546,6 +570,12 @@ export const analyticsResponseSchema = strictObject({
   channel_performance: z.array(strictObject({ channel: z.enum(["web_chat", "whatsapp", "simulation"]), conversations_started: boundedCountSchema, proposal_shown: boundedCountSchema, confirmation_requested: boundedCountSchema, reservations_created: boundedCountSchema, conversion_rate: analyticsRateSchema })).max(3),
   reservations_by_service: z.array(strictObject({ service_id: z.string(), service_name: z.string(), count: boundedCountSchema })).max(20),
   popular_slots: z.array(strictObject({ day_of_week: z.number().int().min(1).max(7), start_time: z.string(), count: boundedCountSchema })).max(20),
+  practitioner_utilization: z.array(strictObject({
+    staff_id: z.string().uuid(), display_name: z.string(), booked_minutes: boundedCountSchema,
+    available_minutes: boundedCountSchema, utilization_rate: analyticsRateSchema,
+  })).max(50),
+  locations: z.array(strictObject({ venue_id: z.string().uuid(), name: z.string(), reservations: boundedCountSchema })).max(50),
+  no_show_rate: analyticsRateSchema,
   funnel: strictObject({ conversations_started: boundedCountSchema, proposal_shown: boundedCountSchema, confirmation_requested: boundedCountSchema, reservations_created: boundedCountSchema }),
   automation: strictObject({ automated_conversations: boundedCountSchema, staff_takeovers: boundedCountSchema, containment_rate: analyticsRateSchema, takeover_rate: analyticsRateSchema }),
 });

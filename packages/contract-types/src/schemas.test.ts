@@ -26,6 +26,7 @@ import {
   aiIntegrationSettingsInputSchema,
   aiIntegrationSettingsResponseSchema,
   aiIntegrationTestResponseSchema,
+  analyticsResponseSchema,
   installationBusinessInputSchema,
   installationBusinessResponseSchema,
   installationLocationInputSchema,
@@ -53,6 +54,19 @@ import {
   listStaffResponseSchema,
   staffAccessPatchSchema,
 } from "./index.js";
+
+test("analytics response validates bounded appointment operations breakdowns", () => {
+  const result = analyticsResponseSchema.safeParse({
+    generated_at: "2026-07-15T00:00:00.000Z", timezone: "UTC", from_date: "2026-07-01", to_date: "2026-07-15", include_simulation: false,
+    totals: { reservations: 4, cancelled: 1, cancellation_rate: 0.25 },
+    reservations_by_day: [], reservations_by_status: [], reservations_by_channel: [], channel_performance: [], reservations_by_service: [], popular_slots: [],
+    practitioner_utilization: [{ staff_id: "11111111-1111-4111-8111-111111111111", display_name: "Alex", booked_minutes: 120, available_minutes: 480, utilization_rate: 0.25 }],
+    locations: [{ venue_id: "22222222-2222-4222-8222-222222222222", name: "Main location", reservations: 4 }], no_show_rate: 0.1,
+    funnel: { conversations_started: 0, proposal_shown: 0, confirmation_requested: 0, reservations_created: 0 },
+    automation: { automated_conversations: 0, staff_takeovers: 0, containment_rate: 0, takeover_rate: 0 },
+  });
+  assert.equal(result.success, true);
+});
 
 test("authentication contracts validate setup, sessions, staff, and password resets", () => {
   const owner = {

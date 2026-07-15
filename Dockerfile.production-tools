@@ -6,14 +6,29 @@ ENV RESERVATION_PRODUCTION_CONFIG_DIR=/run/reservation-config
 WORKDIR /opt/reservation-tools
 
 RUN apk add --no-cache \
+    age \
+    bash \
+    docker-cli \
+    docker-cli-compose \
     postgresql16-client=16.14-r0 \
-    su-exec=0.2-r3
+    su-exec=0.2-r3 \
+    tar
 
 COPY --chmod=0755 docker/production/run-with-secrets.sh /usr/local/bin/run-with-secrets
 COPY --chmod=0755 docker/production/configure-entrypoint.sh /usr/local/bin/configure-production
 COPY scripts/production/configure.mjs ./configure.mjs
 COPY scripts/production/migrate.mjs ./scripts/production/migrate.mjs
 COPY scripts/production/bootstrap-installation.mjs ./scripts/production/bootstrap-installation.mjs
+COPY --chmod=0755 scripts/production/backup.sh ./scripts/production/backup.sh
+COPY scripts/production/backup-manifest.mjs ./scripts/production/backup-manifest.mjs
+COPY --chmod=0755 scripts/production/restore.sh ./scripts/production/restore.sh
+COPY --chmod=0755 scripts/production/verify-backup.sh ./scripts/production/verify-backup.sh
+COPY --chmod=0755 scripts/production/upgrade.sh ./scripts/production/upgrade.sh
+COPY scripts/production/upgrade-plan.mjs ./scripts/production/upgrade-plan.mjs
+COPY --chmod=0755 scripts/production/recover-upgrade.sh ./scripts/production/recover-upgrade.sh
+COPY --chmod=0755 scripts/production/support-bundle.sh ./scripts/production/support-bundle.sh
+COPY scripts/production/support-bundle-sanitize.mjs ./scripts/production/support-bundle-sanitize.mjs
+COPY scripts/production/smoke.mjs ./scripts/production/smoke.mjs
 COPY scripts/production/release-manifest.mjs ./release-manifest.mjs
 COPY packages/database/migrations/supabase ./packages/database/migrations/supabase
 

@@ -6,6 +6,7 @@ export interface StandaloneApiRequest {
   path: string;
   headers?: Record<string, string | string[] | undefined>;
   body?: unknown;
+  clientIp?: string;
   internalPreflight?: "auth-only";
   authenticatedPrincipal?: AuthenticatedPrincipal;
 }

@@ -1,8 +1,9 @@
 # Backend Deployment and Local Stack Operations
 
-The repository supports two distinct operating models:
+The repository supports three distinct operating models:
 
 - A self-contained Docker Compose stack for local development, evaluation, and demonstrations.
+- The supported single-business production Compose installation under `/opt/reservation-platform`.
 - Separately deployed API, console, booking, and database services for production-style environments.
 
 The local stack is not the complete official Supabase product and is not a production deployment template.
@@ -28,7 +29,7 @@ The initial startup:
 
 1. Generates random local database, JWT, service API, and WhatsApp encryption values.
 2. Starts PostgreSQL 16.
-3. Applies indexed core migrations `000001` through `000020` in order.
+3. Applies the complete package-owned core migration index in order.
 4. Records each migration filename and SHA-256 in a local ledger.
 5. Seeds the deterministic `final_demo` dataset when its marker is absent.
 6. Starts PostgREST, the narrow `/rest/v1` gateway, API, console, and booking app.
@@ -125,6 +126,26 @@ The local stack provides PostgreSQL, PostgREST, and the REST compatibility path 
 - TLS termination, production backups, monitoring, or incident controls
 
 WhatsApp simulation is enabled by default so evaluators do not need a phone credential. Live Baileys linked-device mode remains opt-in. QR pairing payloads are returned only through the authorized API/store path and must never appear in logs.
+
+For production incident handling, use [System Status](system-status.md) to interpret safe health checks and [Production Troubleshooting](troubleshooting.md) for channel recovery, credential rotation, low disk, and sanitized support-bundle generation. Do not use unfiltered `docker inspect` or attach raw application logs to a support request because container environment and customer content may be exposed.
+
+## Operate the Single-Business Production Installation
+
+Use [Install the reservation platform on Ubuntu](production-install.md) for the supported prebuilt-image installation. Run Compose commands from `/opt/reservation-platform` with both the generated release selection and production file:
+
+```bash
+cd /opt/reservation-platform
+sudo docker compose --env-file release.env -f compose.production.yml ps --all
+```
+
+The permanent services are the database, PostgREST, API, worker, owner console, public booking app, and Caddy edge. Backup/restore and upgrade operations are explicit one-shot services; they are not long-running containers. Use these guides for ongoing operation:
+
+- [System Status](system-status.md) for safe component and queue health.
+- [Production Troubleshooting](troubleshooting.md) for WhatsApp, provider, job, disk, support, and compromise response.
+- [Encrypted Backup and Verified Restore](backup-restore.md) for off-host recoverability.
+- [Versioned Upgrades and Recovery](upgrades.md) for digest-pinned releases and failed-readiness recovery.
+
+Generate diagnostics only with the sanitized support-bundle entrypoint in the digest-pinned production tools image. The one-shot operations service reads the installation through bounded Compose commands and writes a mode-`0600` archive; it does not collect environment values or customer content.
 
 ## Production-Style API Deployment
 

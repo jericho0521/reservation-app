@@ -386,6 +386,28 @@
       ]
     },
     {
+      "kind": "core-migration",
+      "order": 35,
+      "targetPath": "packages/database/migrations/supabase/000035_system_operations.sql",
+      "sourceAssets": [
+        {
+          "path": "packages/database/migrations/supabase/000035_system_operations.sql",
+          "section": "Persistent component heartbeats, abuse limits, release records, and bounded operational events"
+        }
+      ]
+    },
+    {
+      "kind": "core-migration",
+      "order": 36,
+      "targetPath": "packages/database/migrations/supabase/000036_appointment_analytics.sql",
+      "sourceAssets": [
+        {
+          "path": "packages/database/migrations/supabase/000036_appointment_analytics.sql",
+          "section": "Bounded authoritative appointment analytics by practitioner, location, and no-show status"
+        }
+      ]
+    },
+    {
       "kind": "optional-ai-retrieval",
       "targetPath": "packages/database/migrations/supabase/optional/ai-retrieval/000001_knowledge_chunks.sql",
       "sourceAssets": [

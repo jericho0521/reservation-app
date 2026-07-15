@@ -17,6 +17,7 @@ export const expectedProductionServices = Object.freeze([
   "reservation-console",
   "reservation-booking",
   "reservation-edge",
+  "reservation-operations",
 ]);
 
 const externalImagePatterns = Object.freeze([
@@ -27,11 +28,12 @@ const externalImagePatterns = Object.freeze([
 
 export async function verifyProductionDeployment(options = {}) {
   const root = options.root ?? repoRoot;
-  const [compose, caddy, postgrest, dockerfile, webDockerfile, consoleConfig, packageJson] = await Promise.all([
+  const [compose, caddy, postgrest, dockerfile, toolsDockerfile, webDockerfile, consoleConfig, packageJson] = await Promise.all([
     readFile(path.join(root, "compose.production.yml"), "utf8"),
     readFile(path.join(root, "docker/production/Caddyfile"), "utf8"),
     readFile(path.join(root, "docker/production/postgrest.conf"), "utf8"),
     readFile(path.join(root, "Dockerfile"), "utf8"),
+    readFile(path.join(root, "Dockerfile.production-tools"), "utf8"),
     readFile(path.join(root, "Dockerfile.web"), "utf8"),
     readFile(path.join(root, "apps/console/next.config.ts"), "utf8"),
     readFile(path.join(root, "package.json"), "utf8"),
@@ -78,7 +80,7 @@ export async function verifyProductionDeployment(options = {}) {
   for (const service of ["reservation-db", "reservation-rest", "reservation-api", "reservation-worker", "reservation-console", "reservation-booking", "reservation-edge"]) {
     expect(/restart: unless-stopped/u.test(serviceBlocks.get(service) ?? ""), `${service} must restart unless stopped.`, errors);
   }
-  for (const service of ["reservation-config", "reservation-migrate", "reservation-bootstrap"]) {
+  for (const service of ["reservation-config", "reservation-migrate", "reservation-bootstrap", "reservation-operations"]) {
     expect(/restart: "no"/u.test(serviceBlocks.get(service) ?? ""), `${service} must be one-shot.`, errors);
   }
   expect(
@@ -98,8 +100,9 @@ export async function verifyProductionDeployment(options = {}) {
     errors,
   );
 
+  const protectedConfigurationServices = new Set(["reservation-config", "reservation-operations"]);
   const backupRecoveryKeyMountedToOrdinaryService = [...serviceBlocks.entries()]
-    .some(([service, block]) => service !== "reservation-config" && /backup-recovery-key/u.test(block));
+    .some(([service, block]) => !protectedConfigurationServices.has(service) && /backup-recovery-key/u.test(block));
   expect(!backupRecoveryKeyMountedToOrdinaryService, "Backup recovery key must not reach ordinary services.", errors);
   expect(
     /reservation-protected-config:\/run\/reservation-config/u.test(serviceBlocks.get("reservation-config") ?? ""),
@@ -107,10 +110,16 @@ export async function verifyProductionDeployment(options = {}) {
     errors,
   );
   for (const [service, block] of serviceBlocks) {
-    if (service !== "reservation-config") {
+    if (!protectedConfigurationServices.has(service)) {
       expect(!/reservation-protected-config/u.test(block), `${service} must not mount the complete protected configuration.`, errors);
     }
   }
+  expect(
+    /profiles: \["operations"\]/u.test(serviceBlocks.get("reservation-operations") ?? "")
+      && /\/var\/run\/docker\.sock:\/var\/run\/docker\.sock/u.test(serviceBlocks.get("reservation-operations") ?? ""),
+    "Recovery authority must be isolated in the explicit operations profile.",
+    errors,
+  );
   expect(
     JSON.stringify(secretAllowlistServices) === JSON.stringify([
       "reservation-api",
@@ -178,6 +187,22 @@ export async function verifyProductionDeployment(options = {}) {
   expect((webDockerfile.match(/USER reservation/gu) ?? []).length >= 2, "Both web images must run as non-root.", errors);
   expect(/output:\s*"standalone"/u.test(consoleConfig), "Console must use standalone output.", errors);
   expect(/basePath:\s*"\/admin"/u.test(consoleConfig), "Console must preserve the /admin base path.", errors);
+  expect(
+    /^FROM node:20\.19\.4-alpine3\.22@sha256:[a-f0-9]{64}$/mu.test(toolsDockerfile),
+    "Production tools must use the digest-pinned Alpine base.",
+    errors,
+  );
+  for (const packagePattern of [
+    /^\s+age\s*\\?$/mu,
+    /^\s+bash\s*\\?$/mu,
+    /^\s+docker-cli\s*\\?$/mu,
+    /^\s+docker-cli-compose\s*\\?$/mu,
+    /^\s+postgresql16-client=/mu,
+    /^\s+su-exec=/mu,
+    /^\s+tar\s*$/mu,
+  ]) {
+    expect(packagePattern.test(toolsDockerfile), "Production tools image is missing a required apk package boundary.", errors);
+  }
 
   const scripts = JSON.parse(packageJson).scripts ?? {};
   expect(scripts["production:verify"] === "node scripts/verify-production-deployment.mjs", "production:verify script is missing.", errors);

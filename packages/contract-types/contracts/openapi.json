@@ -290,6 +290,36 @@
           "include_simulation": {
             "type": "boolean"
           },
+          "locations": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "reservations": {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "venue_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "venue_id",
+                "name",
+                "reservations"
+              ],
+              "type": "object"
+            },
+            "maxItems": 50,
+            "type": "array"
+          },
+          "no_show_rate": {
+            "maximum": 1,
+            "minimum": 0,
+            "type": "number"
+          },
           "popular_slots": {
             "items": {
               "additionalProperties": false,
@@ -315,6 +345,42 @@
               "type": "object"
             },
             "maxItems": 20,
+            "type": "array"
+          },
+          "practitioner_utilization": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "available_minutes": {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "booked_minutes": {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "display_name": {
+                  "type": "string"
+                },
+                "staff_id": {
+                  "type": "string"
+                },
+                "utilization_rate": {
+                  "maximum": 1,
+                  "minimum": 0,
+                  "type": "number"
+                }
+              },
+              "required": [
+                "staff_id",
+                "display_name",
+                "booked_minutes",
+                "available_minutes",
+                "utilization_rate"
+              ],
+              "type": "object"
+            },
+            "maxItems": 50,
             "type": "array"
           },
           "reservations_by_channel": {
@@ -464,6 +530,9 @@
           "channel_performance",
           "reservations_by_service",
           "popular_slots",
+          "practitioner_utilization",
+          "locations",
+          "no_show_rate",
           "funnel",
           "automation"
         ],
@@ -3482,6 +3551,122 @@
           "display_name",
           "status",
           "venue_ids"
+        ],
+        "type": "object"
+      },
+      "SystemComponentState": {
+        "enum": [
+          "healthy",
+          "degraded",
+          "offline"
+        ],
+        "type": "string"
+      },
+      "SystemComponentStatus": {
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "type": "string"
+          },
+          "last_success_at": {
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/SystemComponentState"
+          }
+        },
+        "required": [
+          "status",
+          "action"
+        ],
+        "type": "object"
+      },
+      "SystemStatusResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "components": {
+            "additionalProperties": false,
+            "properties": {
+              "ai": {
+                "$ref": "#/components/schemas/SystemComponentStatus"
+              },
+              "backup": {
+                "$ref": "#/components/schemas/SystemComponentStatus"
+              },
+              "database": {
+                "$ref": "#/components/schemas/SystemComponentStatus"
+              },
+              "disk": {
+                "$ref": "#/components/schemas/SystemComponentStatus"
+              },
+              "email": {
+                "$ref": "#/components/schemas/SystemComponentStatus"
+              },
+              "migrations": {
+                "$ref": "#/components/schemas/SystemComponentStatus"
+              },
+              "whatsapp": {
+                "$ref": "#/components/schemas/SystemComponentStatus"
+              },
+              "worker": {
+                "$ref": "#/components/schemas/SystemComponentStatus"
+              }
+            },
+            "required": [
+              "database",
+              "migrations",
+              "worker",
+              "email",
+              "ai",
+              "whatsapp",
+              "disk",
+              "backup"
+            ],
+            "type": "object"
+          },
+          "generated_at": {
+            "type": "string"
+          },
+          "jobs": {
+            "additionalProperties": false,
+            "properties": {
+              "failed": {
+                "minimum": 0,
+                "type": "integer"
+              },
+              "oldest_age_seconds": {
+                "minimum": 0,
+                "type": "integer"
+              },
+              "pending": {
+                "minimum": 0,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "pending",
+              "failed",
+              "oldest_age_seconds"
+            ],
+            "type": "object"
+          },
+          "migration_version": {
+            "type": "string"
+          },
+          "release_version": {
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/SystemComponentState"
+          }
+        },
+        "required": [
+          "generated_at",
+          "status",
+          "release_version",
+          "migration_version",
+          "components",
+          "jobs"
         ],
         "type": "object"
       },
@@ -8500,6 +8685,53 @@
         "summary": "Check whether first-owner setup is available.",
         "tags": [
           "Authentication"
+        ]
+      }
+    },
+    "/v1/system/status": {
+      "get": {
+        "operationId": "getSystemStatus",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/TenantIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/VenueIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/CorrelationIdHeader"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SystemStatusResponse"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformErrorResponse"
+                }
+              }
+            },
+            "description": "Platform error response."
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "summary": "Read safe installation health and recovery actions.",
+        "tags": [
+          "Operations"
         ]
       }
     },

@@ -30,6 +30,9 @@ button, input, select, textarea { font: inherit; }
 .console-sidebar nav { display: grid; gap: .4rem; }
 .console-sidebar nav > a, .nav-disabled { min-height: 2.8rem; padding: .75rem; display: flex; justify-content: space-between; align-items: center; border-radius: .7rem; }
 .console-sidebar nav > a:hover, .console-sidebar nav > a:focus-visible { background: var(--panel-soft); outline: none; }
+.system-component-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr)); gap: 1rem; }
+.system-component header { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+.system-component h2 { margin: 0; text-transform: capitalize; }
 .nav-disabled { color: #687589; cursor: not-allowed; }
 .sidebar-context { margin-top: auto; color: var(--muted); font-size: .8rem; }
 .sidebar-context p { margin: .35rem 0; }
@@ -360,7 +363,7 @@ button, input, select, textarea { font: inherit; }
 .analytics-filters input[type="date"] { padding: .65rem .75rem; border: 1px solid var(--border); border-radius: .6rem; color: var(--text); background: #0b111a; color-scheme: dark; }
 .analytics-filters .simulation-toggle { grid-template-columns: auto 1fr; align-items: center; margin-left: auto; padding-bottom: .65rem; }
 .analytics-filters button { padding: .7rem .9rem; border: 0; border-radius: .6rem; color: var(--accent-ink); background: var(--accent); font-weight: 700; cursor: pointer; }
-.analytics-metrics { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.analytics-metrics { grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr)); }
 .analytics-columns { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(18rem, .65fr); gap: 1rem; align-items: start; }
 .analytics-table-panel, .demand-panel, .analytics-empty { overflow: hidden; border: 1px solid var(--border); border-radius: 1rem; background: var(--panel); }
 .analytics-table-panel > header, .demand-panel > header { padding: 1rem 1.15rem; border-bottom: 1px solid var(--border); }
@@ -376,6 +379,9 @@ button, input, select, textarea { font: inherit; }
 .demand-panel .responsive-table { max-height: 14rem; }
 .analytics-empty { padding: 2.5rem 1.25rem; text-align: center; }
 .analytics-empty p, .panel-padding { color: var(--muted); }
+.appointment-breakdowns { grid-template-columns: minmax(0, 1.4fr) minmax(16rem, .6fr); }
+.utilization-value { display: inline-block; min-width: 3rem; }
+.analytics-table-panel meter { width: 5rem; accent-color: var(--accent); vertical-align: middle; }
 .panel-padding { padding: 1rem 1.15rem; }
 .live-status { display: flex; align-items: center; gap: .55rem; color: var(--muted); font-size: .7rem; }
 .live-status > span { padding: .28rem .45rem; border: 1px solid var(--border); border-radius: 999px; }

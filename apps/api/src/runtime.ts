@@ -1,4 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
+import { statfs } from "node:fs/promises";
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { createAiSdkAgentRuntime } from "@reservation-platform/ai-sdk-adapter";
 import {
@@ -59,6 +60,7 @@ import {
   createSupabaseResourceMaintenanceRepository,
   createSupabasePlatformSessionRepository,
   createSupabasePlatformJobRepository,
+  createSupabaseSystemOperationsRepository,
   createSupabaseTenantVenueRepository,
   createSupabaseWhatsAppChannelRuntime,
   type ExperienceSupabaseLikeClient,
@@ -72,6 +74,8 @@ import {
   type InstallationBusinessSupabaseClient,
   type IntegrationSupabaseClient,
   type PlatformJobsSupabaseClient,
+  type SystemOperationsSupabaseClient,
+  type SystemOperationsRepository,
   type LocationsSupabaseClient,
   type ChannelRuntimeSupabaseClient,
 } from "@project-play/reservations-supabase";
@@ -148,6 +152,8 @@ export interface StandaloneSupabaseEnv extends Record<string, string | undefined
   RESERVATION_WHATSAPP_SESSION_ENCRYPTION_KEY?: string;
   RESERVATION_WHATSAPP_ALLOW_MEMORY_STORE?: string;
   RESERVATION_INSTALLATION_MASTER_KEY?: string;
+  RESERVATION_RELEASE_VERSION?: string;
+  RESERVATION_REQUIRED_MIGRATION_VERSION?: string;
   RESERVATION_PLATFORM_CONFIG_PATH?: string;
   AI_AGENT_PROVIDER?: string;
   AI_AGENT_BASE_URL?: string;
@@ -213,6 +219,7 @@ export interface StandaloneSupabaseRepositoryFactories {
   createOperationsOverviewRepository(client: StandaloneSupabaseClient): NonNullable<StandaloneApiDependencies["operationsOverviewRepository"]>;
   createIntegrationSettingsRepository(client: StandaloneSupabaseClient): NonNullable<StandaloneApiDependencies["integrationSettingsRepository"]>;
   createJobRepository?(client: StandaloneSupabaseClient): NonNullable<StandaloneApiDependencies["notificationJobQueue"]>;
+  createSystemOperationsRepository?(client: StandaloneSupabaseClient): SystemOperationsRepository;
   createTenantVenueRepository(client: StandaloneSupabaseClient): NonNullable<StandaloneApiDependencies["tenantVenueRepository"]>;
   createSessionRepository(client: StandaloneSupabaseClient): NonNullable<StandaloneApiDependencies["sessionAuth"]>["repositories"];
 }
@@ -227,6 +234,8 @@ export interface StandaloneSupabaseRuntimeOptions {
   whatsappSessionEncryptionKey?: string;
   emailConnectionTester?: EmailConnectionTester;
   aiConnectionTester?: AiConnectionTester;
+  releaseVersion?: string;
+  migrationVersion?: string;
   repositoryFactories?: Partial<StandaloneSupabaseRepositoryFactories>;
 }
 
@@ -287,6 +296,7 @@ const defaultRepositoryFactories: StandaloneSupabaseRepositoryFactories = {
   createOperationsOverviewRepository: (client) => createSupabaseOperationsOverviewRepository(client as unknown as OperationsOverviewSupabaseClient),
   createIntegrationSettingsRepository: (client) => createSupabaseIntegrationSettingsRepository(client as unknown as IntegrationSupabaseClient),
   createJobRepository: (client) => createSupabasePlatformJobRepository(client as unknown as PlatformJobsSupabaseClient),
+  createSystemOperationsRepository: (client) => createSupabaseSystemOperationsRepository(client as unknown as SystemOperationsSupabaseClient),
   createTenantVenueRepository: createSupabaseTenantVenueRepository,
   createSessionRepository: (client) => createSupabasePlatformSessionRepository(
     client as unknown as PlatformSessionSupabaseClient,
@@ -383,15 +393,23 @@ export function createStandaloneSupabaseDependencies(
     conversationBookingState,
     aiRuntimeLoader,
   );
+  const readinessCheck = createStandaloneSupabaseReadinessCheck(
+    adminClient,
+    options.loadCoreMigrationPlan ?? loadBundledCoreMigrationPlan,
+  );
+  const systemOperationsRepository = repositoryFactories.createSystemOperationsRepository?.(adminClient);
 
   return {
     ...authDependencies,
     sessionAuth,
     ...platformDependencies,
-    readinessCheck: createStandaloneSupabaseReadinessCheck(
-      adminClient,
-      options.loadCoreMigrationPlan ?? loadBundledCoreMigrationPlan,
-    ),
+    readinessCheck,
+    ...(systemOperationsRepository ? { systemStatus: {
+      repository: systemOperationsRepository,
+      releaseVersion: options.releaseVersion?.trim() || "development",
+      migrationVersion: options.migrationVersion?.trim() || "000036",
+      diskProbe: readRootDiskUsage,
+    }, rateLimitRepository: systemOperationsRepository } : {}),
     ...(managedConversationOrchestrator ? { conversationOrchestrator: managedConversationOrchestrator } : conversationOrchestrator ? { conversationOrchestrator } : {}),
     ...(integrationCredentialEncryptor ? { integrationCredentialEncryptor } : {}),
     ...(integrationCredentialDecryptor ? { integrationCredentialDecryptor } : {}),
@@ -498,6 +516,8 @@ export function createStandaloneSupabaseDependenciesFromEnv(
     sessionAllowedOrigins: options.sessionAllowedOrigins ?? createStandaloneCorsOptionsFromEnv(env).allowedOrigins,
     integrationEncryptionKey: options.integrationEncryptionKey ?? env.RESERVATION_INSTALLATION_MASTER_KEY,
     whatsappSessionEncryptionKey: options.whatsappSessionEncryptionKey ?? env.RESERVATION_WHATSAPP_SESSION_ENCRYPTION_KEY,
+    releaseVersion: options.releaseVersion ?? env.RESERVATION_RELEASE_VERSION,
+    migrationVersion: options.migrationVersion ?? env.RESERVATION_REQUIRED_MIGRATION_VERSION,
   };
   const config = standaloneSupabaseConfigFromEnv(env);
   const normalizedConfig = normalizeStandaloneSupabaseConfig(config);
@@ -527,6 +547,13 @@ export function createStandaloneSupabaseDependenciesFromEnv(
     ...(conversationOrchestrator ? { conversationOrchestrator } : {}),
     ...standaloneWhatsAppDependenciesFromEnv(env, runtimeOptions, normalizedConfig, supabaseDependencies),
   };
+}
+
+async function readRootDiskUsage() {
+  const value = await statfs("/");
+  const total = Number(value.blocks) * Number(value.bsize);
+  const available = Number(value.bavail) * Number(value.bsize);
+  return { usedPercent: total > 0 ? ((total - available) / total) * 100 : 100 };
 }
 
 function createWebChatAgentRuntime(env: StandaloneSupabaseEnv, platformConfig: PlatformRuntimeConfig | undefined, fetchImpl?: typeof fetch) {
@@ -883,8 +910,8 @@ export function standaloneWhatsAppDependenciesFromEnv(
     unifiedConversations,
   });
   if (sessionAdapter) {
-    void service.restoreSessionConnection().catch((error) => {
-      console.error("Failed to restore WhatsApp session connection.", error);
+    void service.restoreSessionConnection().catch(() => {
+      console.error(JSON.stringify({ level: "error", event: "whatsapp_restore_failed", errorCode: "whatsapp_restore_failed" }));
     });
   }
   return {

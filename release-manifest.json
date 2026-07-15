@@ -11,15 +11,15 @@
   "assets": [
     {
       "path": "package.json",
-      "sha256": "0c0aa4edd59bc383b1ae81e2f7962a0bea21fd0fe8456cb708ae171c9c6128ef"
+      "sha256": "a16a7c8648f8ddc4de14de622d4127f5a567e6772eadd4a628a8ad043440006e"
     },
     {
       "path": "compose.production.yml",
-      "sha256": "a1088a74055cd36da28e84b3d6f51b1123d213a5035c5452966a64de5ed52f72"
+      "sha256": "a9ade5f52dd421ab5a2d38270d9651bfcd76083985b55add0e8ad8408ecfef24"
     },
     {
       "path": "docker/production/Caddyfile",
-      "sha256": "af9b84e4ace81aa518443663063c76c6ef46a8c523747a503f12e073bf639102"
+      "sha256": "d1e3fe26ad8fe685bbb080f8f1c097527ee9054e74d8fe316c16ac0558b51248"
     },
     {
       "path": "docker/production/postgrest.conf",
@@ -27,7 +27,7 @@
     },
     {
       "path": "docker/production/allowlists/api.env",
-      "sha256": "79daa35779fd545b4fefb462e86ca9a925d469896a171c099ae481454b6d0708"
+      "sha256": "fabd4741b5e6212d3febe788002ee372d03da4c3aa8e3a0bc28d287464a57be2"
     },
     {
       "path": "docker/production/allowlists/migrate.env",
@@ -47,11 +47,19 @@
     },
     {
       "path": "scripts/production/release-manifest.mjs",
-      "sha256": "3f8592dacae9e97403239cb428d9d5c10bdbc7ba5104465ce03f51b541289563"
+      "sha256": "32395645babb6fd55c2994f020b88ae18bfc6fd8092c6edfcda30b8d28854297"
     },
     {
       "path": "scripts/production/smoke.mjs",
       "sha256": "655ec795204950be4266964f7b481e4358ef9be0acd7d0a26ec7f422a7229f68"
+    },
+    {
+      "path": "scripts/production/support-bundle.sh",
+      "sha256": "452a957bfb9c2160d3b8e1c130ee7d22c708f1d1b65a6c4bdbeab6e53f226e3d"
+    },
+    {
+      "path": "scripts/production/support-bundle-sanitize.mjs",
+      "sha256": "ac9e6b4b2d807f28608057f89aeba4ca2fe26f2b5ea5b307a42700321b69162c"
     }
   ]
 }

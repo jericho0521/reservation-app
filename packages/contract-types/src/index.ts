@@ -455,6 +455,36 @@ export interface OperationsOverviewResponse extends OperationsOverviewData {
   channel_readiness: ExperienceChannelSettingsResponse["readiness"];
 }
 
+export type SystemComponentState = "healthy" | "degraded" | "offline";
+
+export interface SystemComponentStatus {
+  status: SystemComponentState;
+  last_success_at?: string;
+  action: string;
+}
+
+export interface SystemStatusResponse {
+  generated_at: string;
+  status: SystemComponentState;
+  release_version: string;
+  migration_version: string;
+  components: {
+    database: SystemComponentStatus;
+    migrations: SystemComponentStatus;
+    worker: SystemComponentStatus;
+    email: SystemComponentStatus;
+    ai: SystemComponentStatus;
+    whatsapp: SystemComponentStatus;
+    disk: SystemComponentStatus;
+    backup: SystemComponentStatus;
+  };
+  jobs: {
+    pending: number;
+    failed: number;
+    oldest_age_seconds: number;
+  };
+}
+
 export interface AnalyticsQuery {
   from: string;
   to: string;
@@ -474,6 +504,9 @@ export interface AnalyticsResponse {
   channel_performance: Array<{ channel: Exclude<OperationsReservationChannel, "web_booking">; conversations_started: number; proposal_shown: number; confirmation_requested: number; reservations_created: number; conversion_rate: number }>;
   reservations_by_service: Array<{ service_id: string; service_name: string; count: number }>;
   popular_slots: Array<{ day_of_week: number; start_time: string; count: number }>;
+  practitioner_utilization: Array<{ staff_id: string; display_name: string; booked_minutes: number; available_minutes: number; utilization_rate: number }>;
+  locations: Array<{ venue_id: string; name: string; reservations: number }>;
+  no_show_rate: number;
   funnel: { conversations_started: number; proposal_shown: number; confirmation_requested: number; reservations_created: number };
   automation: { automated_conversations: number; staff_takeovers: number; containment_rate: number; takeover_rate: number };
 }

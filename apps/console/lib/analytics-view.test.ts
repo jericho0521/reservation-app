@@ -17,10 +17,13 @@ test("demand chart handles no data and one data point without invalid coordinate
 });
 
 test("analytics supports a one-channel result and exposes the simulation inclusion filter", async () => {
-  const [comparisonSource, filterSource] = await Promise.all([
+  const [comparisonSource, filterSource, breakdownSource] = await Promise.all([
     readFile(new URL("../components/analytics/channel-comparison.tsx", import.meta.url), "utf8"),
     readFile(new URL("../components/analytics/date-range-filter.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../components/analytics/appointment-breakdowns.tsx", import.meta.url), "utf8"),
   ]);
   assert.match(comparisonSource, /rows\.map/u);
   assert.match(filterSource, /include_simulation/u);
+  assert.match(breakdownSource, /<meter[\s\S]*aria-label/u);
+  assert.match(breakdownSource, /responsive-table/u);
 });

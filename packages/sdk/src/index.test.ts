@@ -518,6 +518,13 @@ test("operations overview SDK uses the scoped owner endpoint", async () => {
   assert.equal(new URL(requests[0]!).pathname, "/v1/operations/overview");
 });
 
+test("system status SDK uses the authenticated operations endpoint", async () => {
+  const requests: string[] = [];
+  const client = createReservationPlatformClient({ baseUrl: "https://platform.example", fetch: async (input) => { requests.push(String(input)); return new Response(JSON.stringify({}), { status: 200, headers: { "content-type": "application/json" } }); } });
+  await client.getSystemStatus();
+  assert.equal(new URL(requests[0]!).pathname, "/v1/system/status");
+});
+
 test("analytics SDK serializes the bounded range and simulation toggle", async () => {
   let requested = "";
   const client = createReservationPlatformClient({ baseUrl: "https://platform.example", fetch: async (url) => { requested = String(url); return jsonResponse({}); } });

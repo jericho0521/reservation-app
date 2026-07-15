@@ -277,6 +277,22 @@
       "scope": "reservation-platform",
       "sha256": "42076940dff4874fe0a4d78d45958f1fdc489655ad0a47d2f2c7e8f54a262517",
       "bytes": 28812
+    },
+    {
+      "order": 35,
+      "path": "packages/database/migrations/supabase/000035_system_operations.sql",
+      "module": "core",
+      "scope": "reservation-platform",
+      "sha256": "aa574311982ac4b1a070b37cd34982ecc3e15d88fee4e25cc929e35e66856a41",
+      "bytes": 15237
+    },
+    {
+      "order": 36,
+      "path": "packages/database/migrations/supabase/000036_appointment_analytics.sql",
+      "module": "core",
+      "scope": "reservation-platform",
+      "sha256": "7f16962d52e468f14fcc5a9d99222f7f7f5e6232d0ea96eb69ebd13dbf007ea6",
+      "bytes": 10101
     }
   ],
   "optionalMigrations": [

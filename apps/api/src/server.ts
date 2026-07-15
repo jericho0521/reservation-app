@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { fileURLToPath } from "node:url";
-import { loadPlatformRuntimeConfigFromEnv } from "@reservation-platform/platform-config";
+import { loadPlatformRuntimeConfigFromEnv, safeStructuredLogEntry } from "@reservation-platform/platform-config";
 
 import { platformError, type StandaloneApiRequest, type StandaloneApiResponse } from "./http.js";
 import {
@@ -43,7 +43,7 @@ export interface StandaloneNodeServerOptions {
   logger?: { write(entry: StructuredLogEntry): void };
 }
 
-const defaultMaxBodyBytes = 1024 * 1024;
+const defaultMaxBodyBytes = 64 * 1024;
 const defaultRequestTimeoutMs = 30_000;
 const defaultHeadersTimeoutMs = 10_000;
 const defaultKeepAliveTimeoutMs = 5_000;
@@ -136,6 +136,7 @@ export function createStandaloneNodeServer(
         method,
         path: requestTarget,
         headers,
+        clientIp: clientIpFromRequest(request),
         body: bodyResult.body,
       });
 
@@ -525,6 +526,12 @@ function correlationIdFromRequest(request: IncomingMessage) {
     : randomUUID();
 }
 
+function clientIpFromRequest(request: IncomingMessage) {
+  const forwarded = request.headers["x-forwarded-for"];
+  const firstForwarded = (Array.isArray(forwarded) ? forwarded[0] : forwarded)?.split(",", 1)[0]?.trim();
+  return firstForwarded || request.socket.remoteAddress;
+}
+
 function safeRequestPath(requestTarget: string) {
   try {
     const path = normalizePath(new URL(requestTarget, "http://standalone-api.local").pathname);
@@ -560,7 +567,7 @@ function writeStructuredLog(
 
 const structuredConsoleLogger = {
   write(entry: StructuredLogEntry) {
-    console.log(JSON.stringify(entry));
+    console.log(JSON.stringify(safeStructuredLogEntry(entry)));
   },
 };
 

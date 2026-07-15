@@ -126,6 +126,8 @@ services:
       RESERVATION_RUN_AS_UID: "1001"
       RESERVATION_RUN_AS_GID: "1001"
       RESERVATION_SUPABASE_URL: http://reservation-rest:3000
+      RESERVATION_RELEASE_VERSION: ${RESERVATION_RELEASE:?set RESERVATION_RELEASE}
+      RESERVATION_REQUIRED_MIGRATION_VERSION: "000036"
       RESERVATION_PLATFORM_CORS_ALLOWED_ORIGINS: https://${RESERVATION_DOMAIN:?set RESERVATION_DOMAIN}
       RESERVATION_WHATSAPP_ENABLED: "false"
       RESERVATION_WHATSAPP_ALLOW_MEMORY_STORE: "false"
@@ -160,6 +162,7 @@ services:
       RESERVATION_RUN_AS_UID: "1001"
       RESERVATION_RUN_AS_GID: "1001"
       RESERVATION_SUPABASE_URL: http://reservation-rest:3000
+      RESERVATION_RELEASE_VERSION: ${RESERVATION_RELEASE:?set RESERVATION_RELEASE}
       RESERVATION_WHATSAPP_ENABLED: "true"
       RESERVATION_WHATSAPP_PROVIDER: session_qr
       RESERVATION_WHATSAPP_SESSION_AUTH_DIR: /app/.reservation-whatsapp-sessions
@@ -253,6 +256,32 @@ services:
       retries: 12
       start_period: 10s
     restart: unless-stopped
+
+  reservation-operations:
+    profiles: ["operations"]
+    image: ${RESERVATION_TOOLS_IMAGE:?load the generated release.env}
+    depends_on:
+      reservation-config:
+        condition: service_completed_successfully
+      reservation-db:
+        condition: service_healthy
+    command: ["/opt/reservation-tools/scripts/production/backup.sh"]
+    environment:
+      RESERVATION_DATABASE_URL: postgresql://postgres@reservation-db:5432/reservation
+      RESERVATION_PRODUCTION_CONFIG_DIR: /run/reservation-config
+      RESERVATION_WHATSAPP_SESSION_DIRECTORY: /run/reservation-whatsapp-sessions
+      RESERVATION_BACKUP_DIRECTORY: /backups
+      RESERVATION_INSTALLATION_DIRECTORY: /opt/reservation-installation
+    volumes:
+      - reservation-protected-config:/run/reservation-config
+      - reservation-whatsapp-sessions:/run/reservation-whatsapp-sessions
+      - ${RESERVATION_BACKUP_DIRECTORY:-/var/backups/reservation-platform}:/backups
+      - ${RESERVATION_INSTALLATION_DIRECTORY:-/opt/reservation-platform}:/opt/reservation-installation
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - reservation-backend
+      - reservation-public
+    restart: "no"
 
 configs:
   api-secret-allowlist:

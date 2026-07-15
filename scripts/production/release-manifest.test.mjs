@@ -51,6 +51,8 @@ test("production manifest covers every installer-consumed bundle asset", () => {
     "scripts/production/preflight.sh",
     "scripts/production/release-manifest.mjs",
     "scripts/production/smoke.mjs",
+    "scripts/production/support-bundle.sh",
+    "scripts/production/support-bundle-sanitize.mjs",
   ]);
 });
 

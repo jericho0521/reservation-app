@@ -13,19 +13,22 @@ import {
   createSupabasePlatformJobRepository,
   createSupabaseReservationRepository,
   createSupabaseReservationReadRepository,
+  createSupabaseSystemOperationsRepository,
   type ConversationStateSupabaseClient,
   type ConversationSupabaseClient,
   type ExperienceKnowledgeSupabaseClient,
   type ExperienceSupabaseLikeClient,
   type IntegrationSupabaseClient,
   type PlatformJobsSupabaseClient,
+  type SystemOperationsRepository,
+  type SystemOperationsSupabaseClient,
 } from "@project-play/reservations-supabase";
 import {
   createConversationProcessingDependencies,
   createIntegrationAgentRuntimeLoader,
   toPlatformReservation,
 } from "@reservation-platform/api";
-import { decryptSecretEnvelope } from "@reservation-platform/platform-config";
+import { decryptSecretEnvelope, safeStructuredLogEntry } from "@reservation-platform/platform-config";
 
 import { createWorkerRuntime, type PlatformJobHandler, type WorkerPlatformJob } from "./runtime.js";
 import {
@@ -38,6 +41,7 @@ import { createAiConversationJobHandler } from "./ai-conversation.js";
 import { createProductionWhatsAppRuntime } from "./whatsapp.js";
 
 const pollIntervalMs = 1_000;
+const heartbeatIntervalMs = 15_000;
 
 if (isDirectRun()) {
   void runDirectWorker();
@@ -50,6 +54,7 @@ async function runDirectWorker(): Promise<void> {
   process.once("SIGINT", stop);
 
   logLifecycleEvent("worker_started");
+  let stopHeartbeat: (() => void) | undefined;
 
   try {
     const client = createClient(
@@ -58,6 +63,11 @@ async function runDirectWorker(): Promise<void> {
       { auth: { persistSession: false, autoRefreshToken: false } },
     );
     const repository = createSupabasePlatformJobRepository(client as unknown as PlatformJobsSupabaseClient);
+    const workerId = process.env.RESERVATION_WORKER_ID?.trim() || `${hostname()}:${process.pid}`;
+    stopHeartbeat = startWorkerHeartbeat(
+      createSupabaseSystemOperationsRepository(client as unknown as SystemOperationsSupabaseClient),
+      { workerId, releaseVersion: process.env.RESERVATION_RELEASE_VERSION?.trim() || "development" },
+    );
     const whatsapp = isEnabledEnvironment("RESERVATION_WHATSAPP_ENABLED")
       ? createProductionWhatsAppRuntime({
           client,
@@ -69,7 +79,7 @@ async function runDirectWorker(): Promise<void> {
     const runtime = createWorkerRuntime({
       signal: controller.signal,
       pollIntervalMs,
-      workerId: process.env.RESERVATION_WORKER_ID?.trim() || `${hostname()}:${process.pid}`,
+      workerId,
       repository,
       handlers: {
         ...productionJobHandlers(client, requiredEnvironment("RESERVATION_INSTALLATION_MASTER_KEY")),
@@ -84,9 +94,34 @@ async function runDirectWorker(): Promise<void> {
     process.exitCode = 1;
     logLifecycleEvent("worker_failed");
   } finally {
+    stopHeartbeat?.();
     process.removeListener("SIGTERM", stop);
     process.removeListener("SIGINT", stop);
   }
+}
+
+export function startWorkerHeartbeat(
+  repository: Pick<SystemOperationsRepository, "heartbeat">,
+  options: { workerId: string; releaseVersion: string; intervalMs?: number; now?: () => Date; logger?: (event: string) => void },
+) {
+  const write = async () => {
+    try {
+      await repository.heartbeat({
+        component: "worker",
+        instanceId: options.workerId,
+        releaseVersion: options.releaseVersion,
+        status: "healthy",
+        metadata: {},
+        heartbeatAt: (options.now?.() ?? new Date()).toISOString(),
+      });
+    } catch {
+      (options.logger ?? logLifecycleEvent)("worker_heartbeat_failed");
+    }
+  };
+  void write();
+  const interval = setInterval(() => void write(), options.intervalMs ?? heartbeatIntervalMs);
+  interval.unref();
+  return () => clearInterval(interval);
 }
 
 export function productionJobHandlers(
@@ -259,8 +294,13 @@ function isEnabledEnvironment(name: string) {
   return process.env[name]?.trim().toLowerCase() === "true";
 }
 
-function logLifecycleEvent(event: "worker_started" | "worker_stopped" | "worker_failed"): void {
-  console.log(JSON.stringify({ event }));
+function logLifecycleEvent(event: "worker_started" | "worker_stopped" | "worker_failed" | "worker_heartbeat_failed"): void {
+  console.log(JSON.stringify(safeStructuredLogEntry({
+    level: event === "worker_failed" ? "error" : "info",
+    event,
+    component: "worker",
+    ...(process.env.RESERVATION_RELEASE_VERSION?.trim() ? { release: process.env.RESERVATION_RELEASE_VERSION.trim() } : {}),
+  })));
 }
 
 function isDirectRun(): boolean {

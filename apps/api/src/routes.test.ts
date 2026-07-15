@@ -1192,7 +1192,7 @@ test("public management routes read, reschedule, and replay cancellation without
     method: "POST",
     path: `/v1/public/experiences/apex-racing/manage/${token}/cancel`,
     headers: {},
-    body: { tenant_id: "tenant_attacker", venue_id: "venue_attacker" },
+    body: {},
   }, { serviceApiKey: "secret", reservationManagementRepository: repository });
   const rescheduled = await handleStandaloneApiRequest({
     method: "POST",
@@ -1554,7 +1554,7 @@ test("analytics route validates and forwards a scoped descriptive query", async 
   let observed: unknown;
   const repository: AnalyticsRepository = { async read(scope, query) { observed = { scope, query }; return { data: {
     generated_at: "2026-08-31T00:00:00Z", timezone: "UTC", from_date: query.from, to_date: query.to, include_simulation: query.include_simulation,
-    totals: { reservations: 0, cancelled: 0, cancellation_rate: 0 }, reservations_by_day: [], reservations_by_status: [], reservations_by_channel: [], channel_performance: [], reservations_by_service: [], popular_slots: [],
+    totals: { reservations: 0, cancelled: 0, cancellation_rate: 0 }, reservations_by_day: [], reservations_by_status: [], reservations_by_channel: [], channel_performance: [], reservations_by_service: [], popular_slots: [], practitioner_utilization: [], locations: [], no_show_rate: 0,
     funnel: { conversations_started: 0, proposal_shown: 0, confirmation_requested: 0, reservations_created: 0 }, automation: { automated_conversations: 0, staff_takeovers: 0, containment_rate: 0, takeover_rate: 0 },
   } }; } };
   const headers = { authorization: "Bearer secret", "x-reservation-tenant-id": "tenant_1", "x-reservation-venue-id": "venue_1" };
@@ -1583,7 +1583,7 @@ test("new owner operations reject cross-tenant object and aggregate access", asy
     serviceApiKey: "secret",
     analyticsRepository: { async read(scope, query) { return { data: {
       generated_at: "2026-08-05T00:00:00Z", timezone: "UTC", from_date: query.from, to_date: query.to, include_simulation: false,
-      totals: { reservations: scope.tenantId === "victim" ? 99 : 0, cancelled: 0, cancellation_rate: 0 }, reservations_by_day: [], reservations_by_status: [], reservations_by_channel: [], channel_performance: [], reservations_by_service: [], popular_slots: [],
+      totals: { reservations: scope.tenantId === "victim" ? 99 : 0, cancelled: 0, cancellation_rate: 0 }, reservations_by_day: [], reservations_by_status: [], reservations_by_channel: [], channel_performance: [], reservations_by_service: [], popular_slots: [], practitioner_utilization: [], locations: [], no_show_rate: 0,
       funnel: { conversations_started: 0, proposal_shown: 0, confirmation_requested: 0, reservations_created: 0 }, automation: { automated_conversations: 0, staff_takeovers: 0, containment_rate: 0, takeover_rate: 0 },
     } }; } },
   });
@@ -1943,7 +1943,7 @@ test("enabled WhatsApp session module receives owner lifecycle calls", async () 
       "X-Reservation-Tenant-Id": "tenant_1",
       "X-Reservation-Venue-Id": "venue_1",
     },
-    body: {},
+    body: { tenant_id: "tenant_attacker", venue_id: "venue_attacker" },
   });
   const reconnect = await handler({ method: "POST", path: "/v1/channels/whatsapp/session/reconnect" });
   const status = await handler({ method: "GET", path: "/v1/channels/whatsapp/session/status" });

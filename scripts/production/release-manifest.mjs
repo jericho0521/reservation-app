@@ -26,6 +26,8 @@ export const PRODUCTION_RELEASE_ASSETS = Object.freeze([
   "scripts/production/preflight.sh",
   "scripts/production/release-manifest.mjs",
   "scripts/production/smoke.mjs",
+  "scripts/production/support-bundle.sh",
+  "scripts/production/support-bundle-sanitize.mjs",
 ]);
 
 const manifestName = "release-manifest.json";

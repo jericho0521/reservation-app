@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildAccountActionLink, isCurrentReminder } from "./server.js";
+import { buildAccountActionLink, isCurrentReminder, startWorkerHeartbeat } from "./server.js";
 
 const job = {
   jobId: "job-1",
@@ -31,4 +31,15 @@ test("account email links target the deployed console invitation and reset route
     buildAccountActionLink("password_reset", "reset-token", "https://console.example/admin"),
     "https://console.example/admin/reset-password/reset-token",
   );
+});
+
+test("worker writes a safe startup heartbeat", async () => {
+  const heartbeats: unknown[] = [];
+  const stop = startWorkerHeartbeat({ async heartbeat(input) { heartbeats.push(input); } }, {
+    workerId: "worker-1", releaseVersion: "1.2.3", intervalMs: 60_000,
+    now: () => new Date("2026-07-15T00:00:00Z"),
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+  stop();
+  assert.deepEqual(heartbeats, [{ component: "worker", instanceId: "worker-1", releaseVersion: "1.2.3", status: "healthy", metadata: {}, heartbeatAt: "2026-07-15T00:00:00.000Z" }]);
 });

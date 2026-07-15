@@ -17,6 +17,18 @@ export function securityFindingsForText(file, source) {
   return findings;
 }
 
+export function productionSecurityFindingsForText(file, source) {
+  const findings = [];
+  if (/RESERVATION_PLATFORM_CORS_ALLOWED_ORIGINS\s*[:=]\s*["']?\*/u.test(source)) findings.push(`${file}: enables wildcard credentialed CORS`);
+  if (/console\.(?:log|info|debug)\s*\([^\n]*(?:qr|credential|session[_ ]?key)/iu.test(source)) findings.push(`${file}: logs credential or QR-related data`);
+  for (const line of source.split("\n")) {
+    const image = /^\s*image:\s*(.+?)\s*$/u.exec(line)?.[1];
+    if (image && !image.startsWith("${") && !/@sha256:[0-9a-f]{64}$/u.test(image)) findings.push(`${file}: contains an unpinned production image`);
+  }
+  if (/reservation-(?:db|gateway):[\s\S]{0,600}?\n\s+ports:/u.test(source)) findings.push(`${file}: exposes a database or PostgREST port`);
+  return findings;
+}
+
 export function verifyFinalSecurity() {
   const listed = spawnSync("git", ["ls-files", "-z"], { cwd: repoRoot, encoding: "utf8" });
   if (listed.status !== 0) throw new Error("Unable to enumerate tracked files for security review.");
@@ -32,6 +44,12 @@ export function verifyFinalSecurity() {
       for (const name of forbiddenClientNames) if (source.includes(name)) findings.push(`${path.relative(repoRoot, file)}: generated client bundle contains ${name}`);
     }
   }
+  const compose = readFileSync(path.join(repoRoot, "compose.production.yml"), "utf8");
+  findings.push(...productionSecurityFindingsForText("compose.production.yml", compose));
+  const workerAllowlist = readFileSync(path.join(repoRoot, "docker/production/allowlists/worker.env"), "utf8");
+  if (!workerAllowlist.includes("RESERVATION_WHATSAPP_SESSION_ENCRYPTION_KEY")) findings.push("docker/production/allowlists/worker.env: production WhatsApp encryption is not configured");
+  const caddy = readFileSync(path.join(repoRoot, "docker/production/Caddyfile"), "utf8");
+  if (!caddy.includes("-Server") || !caddy.includes("max_size 1MB") || !caddy.includes("Strict-Transport-Security")) findings.push("docker/production/Caddyfile: required production request and response hardening is missing");
   if (findings.length) throw new Error(`Final security verification failed:\n- ${findings.join("\n- ")}`);
   console.log("Final security verification passed: tracked source and available client bundles contain no credential literals, forbidden client secret names, or QR/credential logging.");
 }

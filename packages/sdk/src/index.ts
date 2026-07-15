@@ -80,6 +80,7 @@ import type {
   ResourceResponse,
   ServiceResponse,
   SetupStatusResponse,
+  SystemStatusResponse,
   StaffAccessPatch,
   StaffInvitationInput,
   StaffInvitationResponse,
@@ -251,6 +252,7 @@ export interface ReservationPlatformClient {
   listReservations(input?: ListReservationsQuery, options?: RequestOptions): Promise<ListReservationsResponse>;
   listConversations(input?: ListConversationsQuery, options?: RequestOptions): Promise<ListConversationsResponse>;
   getOperationsOverview(options?: RequestOptions): Promise<OperationsOverviewResponse>;
+  getSystemStatus(options?: RequestOptions): Promise<SystemStatusResponse>;
   getAnalytics(input: AnalyticsQuery, options?: RequestOptions): Promise<AnalyticsResponse>;
   getConversation(conversationId: string, options?: RequestOptions): Promise<ConversationResponse>;
   listConversationMessages(conversationId: string, input?: ListConversationMessagesQuery, options?: RequestOptions): Promise<ListConversationMessagesResponse>;
@@ -476,6 +478,7 @@ export function createReservationPlatformClient(
     listReservations: (input, options) => request({ method: "GET", path: "/reservations", query: input, options }),
     listConversations: (input, options) => request({ method: "GET", path: "/conversations", query: input, options }),
     getOperationsOverview: (options) => request({ method: "GET", path: "/operations/overview", options }),
+    getSystemStatus: (options) => request({ method: "GET", path: "/system/status", options }),
     getAnalytics: (input, options) => request({ method: "GET", path: "/analytics", query: input, options }),
     getConversation: (conversationId, options) => request({ method: "GET", path: `/conversations/${encodeURIComponent(conversationId)}`, options }),
     listConversationMessages: (conversationId, input, options) => request({ method: "GET", path: `/conversations/${encodeURIComponent(conversationId)}/messages`, query: input, options }),

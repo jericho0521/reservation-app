@@ -52,6 +52,7 @@ export * from "./sessions.js";
 export * from "./staff.js";
 export * from "./integrations.js";
 export * from "./jobs.js";
+export * from "./system-operations.js";
 
 export const RESERVATION_SUPABASE_TABLES = {
   platformTenants: "tenants",

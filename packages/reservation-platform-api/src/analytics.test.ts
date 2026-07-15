@@ -5,6 +5,7 @@ import { readAnalytics } from "./analytics";
 function emptyAnalytics() { return {
   generated_at: "2026-08-05T00:00:00Z", timezone: "Asia/Kuala_Lumpur", from_date: "2026-08-01", to_date: "2026-08-05", include_simulation: false,
   totals: { reservations: 0, cancelled: 0, cancellation_rate: 0 }, reservations_by_day: [], reservations_by_status: [], reservations_by_channel: [], channel_performance: [], reservations_by_service: [], popular_slots: [],
+  practitioner_utilization: [], locations: [], no_show_rate: 0,
   funnel: { conversations_started: 0, proposal_shown: 0, confirmation_requested: 0, reservations_created: 0 }, automation: { automated_conversations: 0, staff_takeovers: 0, containment_rate: 0, takeover_rate: 0 },
 }; }
 

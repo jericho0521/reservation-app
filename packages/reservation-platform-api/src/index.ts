@@ -15,6 +15,7 @@ export * from "./notifications.js";
 export * from "./metadata.js";
 export * from "./operating-hours.js";
 export * from "./operations-overview.js";
+export * from "./system-status.js";
 export * from "./platform-adapters.js";
 export * from "./resource-maintenance.js";
 export * from "./reservations.js";

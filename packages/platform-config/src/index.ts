@@ -8,6 +8,13 @@ export {
   type SecretEnvelopeV1,
 } from "./secret-envelope.js";
 
+export {
+  safeLogValue,
+  safeStructuredLogEntry,
+  type SafeLogLevel,
+  type SafeStructuredLogEntry,
+} from "./safe-logger.js";
+
 export const platformConfigPathEnvName = "RESERVATION_PLATFORM_CONFIG_PATH";
 
 export interface PlatformRuntimeConfig {

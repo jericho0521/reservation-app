@@ -31,6 +31,7 @@ export function ConsoleShell({
           <a href="/admin/resources">Resources & maintenance</a>
           <a href="/admin/channels">Channels & AI</a>
           <a href="/admin/analytics">Analytics</a>
+          {role === "owner" ? <a href="/admin/system">System status</a> : null}
           {role === "owner" ? <a href="/admin/settings/email">Email delivery</a> : null}
           {role === "owner" ? <a href="/admin/settings/ai">AI provider</a> : null}
           {role === "owner" ? <a href="/admin/settings/whatsapp">WhatsApp setup</a> : null}

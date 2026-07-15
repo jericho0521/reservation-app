@@ -357,6 +357,26 @@
       "notes": [
         "Backend-owned durable conversation proposals, channel commands, delivery outbox, and encrypted WhatsApp pairing state."
       ]
+    },
+    {
+      "path": "packages/database/migrations/supabase/000035_system_operations.sql",
+      "classification": "core-platform",
+      "intendedBackendDestination": [
+        "packages/database/migrations/supabase/000035_system_operations.sql"
+      ],
+      "notes": [
+        "Backend-owned component heartbeats, persistent rate limits, backup and upgrade lifecycle records, and bounded operational events."
+      ]
+    },
+    {
+      "path": "packages/database/migrations/supabase/000036_appointment_analytics.sql",
+      "classification": "core-platform",
+      "intendedBackendDestination": [
+        "packages/database/migrations/supabase/000036_appointment_analytics.sql"
+      ],
+      "notes": [
+        "Backend-owned bounded appointment analytics for practitioner utilization, location volume, and no-show rates."
+      ]
     }
   ]
 }

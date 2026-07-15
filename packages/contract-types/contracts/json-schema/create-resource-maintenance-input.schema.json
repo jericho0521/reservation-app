@@ -255,6 +255,36 @@
         "include_simulation": {
           "type": "boolean"
         },
+        "locations": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "reservations": {
+                "minimum": 0,
+                "type": "integer"
+              },
+              "venue_id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "venue_id",
+              "name",
+              "reservations"
+            ],
+            "type": "object"
+          },
+          "maxItems": 50,
+          "type": "array"
+        },
+        "no_show_rate": {
+          "maximum": 1,
+          "minimum": 0,
+          "type": "number"
+        },
         "popular_slots": {
           "items": {
             "additionalProperties": false,
@@ -280,6 +310,42 @@
             "type": "object"
           },
           "maxItems": 20,
+          "type": "array"
+        },
+        "practitioner_utilization": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "available_minutes": {
+                "minimum": 0,
+                "type": "integer"
+              },
+              "booked_minutes": {
+                "minimum": 0,
+                "type": "integer"
+              },
+              "display_name": {
+                "type": "string"
+              },
+              "staff_id": {
+                "type": "string"
+              },
+              "utilization_rate": {
+                "maximum": 1,
+                "minimum": 0,
+                "type": "number"
+              }
+            },
+            "required": [
+              "staff_id",
+              "display_name",
+              "booked_minutes",
+              "available_minutes",
+              "utilization_rate"
+            ],
+            "type": "object"
+          },
+          "maxItems": 50,
           "type": "array"
         },
         "reservations_by_channel": {
@@ -429,6 +495,9 @@
         "channel_performance",
         "reservations_by_service",
         "popular_slots",
+        "practitioner_utilization",
+        "locations",
+        "no_show_rate",
         "funnel",
         "automation"
       ],
@@ -3447,6 +3516,122 @@
         "display_name",
         "status",
         "venue_ids"
+      ],
+      "type": "object"
+    },
+    "SystemComponentState": {
+      "enum": [
+        "healthy",
+        "degraded",
+        "offline"
+      ],
+      "type": "string"
+    },
+    "SystemComponentStatus": {
+      "additionalProperties": false,
+      "properties": {
+        "action": {
+          "type": "string"
+        },
+        "last_success_at": {
+          "type": "string"
+        },
+        "status": {
+          "$ref": "#/$defs/SystemComponentState"
+        }
+      },
+      "required": [
+        "status",
+        "action"
+      ],
+      "type": "object"
+    },
+    "SystemStatusResponse": {
+      "additionalProperties": false,
+      "properties": {
+        "components": {
+          "additionalProperties": false,
+          "properties": {
+            "ai": {
+              "$ref": "#/$defs/SystemComponentStatus"
+            },
+            "backup": {
+              "$ref": "#/$defs/SystemComponentStatus"
+            },
+            "database": {
+              "$ref": "#/$defs/SystemComponentStatus"
+            },
+            "disk": {
+              "$ref": "#/$defs/SystemComponentStatus"
+            },
+            "email": {
+              "$ref": "#/$defs/SystemComponentStatus"
+            },
+            "migrations": {
+              "$ref": "#/$defs/SystemComponentStatus"
+            },
+            "whatsapp": {
+              "$ref": "#/$defs/SystemComponentStatus"
+            },
+            "worker": {
+              "$ref": "#/$defs/SystemComponentStatus"
+            }
+          },
+          "required": [
+            "database",
+            "migrations",
+            "worker",
+            "email",
+            "ai",
+            "whatsapp",
+            "disk",
+            "backup"
+          ],
+          "type": "object"
+        },
+        "generated_at": {
+          "type": "string"
+        },
+        "jobs": {
+          "additionalProperties": false,
+          "properties": {
+            "failed": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "oldest_age_seconds": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "pending": {
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "pending",
+            "failed",
+            "oldest_age_seconds"
+          ],
+          "type": "object"
+        },
+        "migration_version": {
+          "type": "string"
+        },
+        "release_version": {
+          "type": "string"
+        },
+        "status": {
+          "$ref": "#/$defs/SystemComponentState"
+        }
+      },
+      "required": [
+        "generated_at",
+        "status",
+        "release_version",
+        "migration_version",
+        "components",
+        "jobs"
       ],
       "type": "object"
     },

@@ -46,6 +46,7 @@ import {
   readExperienceOperatingHours,
   readExperienceChannelSettings,
   readOperationsOverview,
+  readSystemStatus,
   readExperienceWorkspace,
   readConversation,
   readPublicExperience,
@@ -90,6 +91,7 @@ import {
   type ConversationOrchestratorDependencies,
   type OperatingHoursRepository,
   type OperationsOverviewRepository,
+  type SystemStatusDependencies,
   type PlatformCatalogRepository,
   type PlatformRequestContext,
   type PlatformTenantVenueRepository,
@@ -186,6 +188,7 @@ import type {
 import { createWhatsAppSimulationMessage } from "@reservation-platform/whatsapp";
 
 import { jsonResponse, platformError, type StandaloneApiRequest, type StandaloneApiResponse } from "./http.js";
+import { applyRateLimit, isWhatsAppPairingRateLimitPath, type PersistentRateLimitRepository } from "./rate-limit.js";
 
 export interface StandaloneApiDependencies {
   auth?: StandaloneApiAuthConfig;
@@ -218,6 +221,8 @@ export interface StandaloneApiDependencies {
   reservationReadRepository?: ReservationReadRepositoryPort;
   readinessCheck?: StandaloneApiReadinessCheck;
   readinessCheckTimeoutMs?: number;
+  rateLimitRepository?: PersistentRateLimitRepository;
+  systemStatus?: Omit<SystemStatusDependencies, "readReadiness">;
   resourceMaintenanceRepository?: ResourceMaintenanceRepositoryPort;
   serviceApiKey?: string;
   sessionAuth?: StandaloneSessionAuthConfig;
@@ -444,6 +449,11 @@ export async function handleStandaloneApiRequest(
     );
   }
 
+  if (!isWhatsAppPairingRateLimitPath(method, path)) {
+    const limited = await applyRateLimit(request, dependencies.rateLimitRepository, { serviceApiKey: dependencies.serviceApiKey ?? dependencies.auth?.serviceApiKey });
+    if (limited) return limited;
+  }
+
   const sessionAuthResponse = await handleSessionAuthRoute(method, path, request, dependencies);
   if (sessionAuthResponse) {
     return {
@@ -460,6 +470,23 @@ export async function handleStandaloneApiRequest(
 
     if (request.internalPreflight === "auth-only") {
       return { status: 204, headers: {}, body: undefined };
+    }
+  }
+
+  if (isWhatsAppPairingRateLimitPath(method, path)) {
+    const limited = await applyRateLimit(request, dependencies.rateLimitRepository, { serviceApiKey: dependencies.serviceApiKey ?? dependencies.auth?.serviceApiKey });
+    if (limited) return limited;
+  }
+
+  if (method === "GET" && path === "/v1/system/status") {
+    if (!dependencies.systemStatus) return platformError(503, "bad_request", "System status is not configured.");
+    try {
+      return jsonResponse(200, await readSystemStatus({
+        ...dependencies.systemStatus,
+        readReadiness: dependencies.readinessCheck ?? (async () => ({ database: false, migrations: false })),
+      }));
+    } catch {
+      return platformError(503, "internal_error", "System status is temporarily unavailable.");
     }
   }
 
@@ -1708,6 +1735,7 @@ const protectedRouteMetadata: Readonly<Record<string, readonly RouteMatcher[]>> 
     "/v1/experience/services", "/v1/experience/resources", "/v1/experience/operating-hours",
     "/v1/experience/knowledge", "/v1/experience/channels",
     "/v1/operations/overview",
+    "/v1/system/status",
     "/v1/analytics",
     "/v1/availability", "/v1/reservations", reservationPattern,
     "/v1/conversations", conversationPattern, conversationMessagesPattern,
@@ -1736,6 +1764,7 @@ const protectedRouteMetadata: Readonly<Record<string, readonly RouteMatcher[]>> 
 const ownerOnlyRouteMetadata: Readonly<Record<string, readonly RouteMatcher[]>> = {
   GET: [
     "/v1/installation/business",
+    "/v1/system/status",
     "/v1/integrations/email", "/v1/integrations/ai",
     "/v1/venues", venuePattern,
     servicePattern,
@@ -3632,7 +3661,7 @@ async function invokeWhatsAppModule(
       return platformError(409, "conflict", "WhatsApp session is not connected.");
     }
 
-    console.error("WhatsApp module request failed.", error);
+    console.error(JSON.stringify({ level: "error", event: "whatsapp_request_failed", errorCode: "whatsapp_request_failed" }));
     return platformError(500, "internal_error", "WhatsApp module request failed.");
   }
 }

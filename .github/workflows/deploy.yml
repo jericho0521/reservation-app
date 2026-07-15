@@ -55,6 +55,9 @@ jobs:
       - name: Verify repository
         run: pnpm run ci:verify
 
+      - name: Verify backup and upgrade fixtures
+        run: pnpm run production:operations:test
+
   deploy-staging:
     if: ${{ inputs.environment == 'staging' }}
     needs: verify

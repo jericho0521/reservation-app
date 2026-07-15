@@ -2,7 +2,14 @@
 	encode zstd gzip
 
 	handle /v1/* {
-		reverse_proxy reservation-api:4100
+		@unsupported_method not method GET POST PUT PATCH DELETE OPTIONS HEAD
+		respond @unsupported_method 405
+		request_body {
+			max_size 1MB
+		}
+		reverse_proxy reservation-api:4100 {
+			header_up X-Forwarded-For {remote_host}
+		}
 	}
 
 	handle /admin* {
@@ -14,6 +21,7 @@
 	}
 
 	header {
+		-Server
 		Strict-Transport-Security "max-age=31536000; includeSubDomains"
 		X-Content-Type-Options "nosniff"
 		?Referrer-Policy "strict-origin-when-cross-origin"

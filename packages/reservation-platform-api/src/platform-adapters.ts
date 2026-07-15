@@ -328,6 +328,7 @@ export function toLegacyBookingCreateInput(input: CreateReservationInput) {
     seat_labels: resourceLabels,
     reservation_items: reservationItems,
     interface_type: "form" as const,
+    ...(input.staff_id ? { staff_id: input.staff_id } : {}),
   };
 }
 

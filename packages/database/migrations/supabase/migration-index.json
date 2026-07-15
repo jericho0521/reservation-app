@@ -227,8 +227,24 @@
       "path": "packages/database/migrations/supabase/000028_appointment_availability_management.sql",
       "module": "core",
       "scope": "reservation-platform",
-      "sha256": "86640e4d83e763ffb624a663d33a07824cc8b17f87f6f580249b3168c11546bd",
-      "bytes": 15291
+      "sha256": "080875acf6aa000b49b07e4258623c7b3c0c9fcce911cee73d23fdefefdbf83a",
+      "bytes": 17161
+    },
+    {
+      "order": 29,
+      "path": "packages/database/migrations/supabase/000029_durable_jobs_notifications.sql",
+      "module": "core",
+      "scope": "reservation-platform",
+      "sha256": "3f2279cf7f8e1059e67c84af0b47b84f06e08035c750fbac054f56ed2da0dae1",
+      "bytes": 11000
+    },
+    {
+      "order": 30,
+      "path": "packages/database/migrations/supabase/000030_integration_secrets.sql",
+      "module": "core",
+      "scope": "reservation-platform",
+      "sha256": "2dafb69c2f30eced328e9c683db3967a31fe701b6b41fa483ba642768bac0904",
+      "bytes": 8782
     }
   ],
   "optionalMigrations": [

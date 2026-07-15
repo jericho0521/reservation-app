@@ -48,6 +48,8 @@ export * from "./installation.js";
 export * from "./locations.js";
 export * from "./sessions.js";
 export * from "./staff.js";
+export * from "./integrations.js";
+export * from "./jobs.js";
 
 export const RESERVATION_SUPABASE_TABLES = {
   platformTenants: "tenants",
@@ -400,12 +402,19 @@ function parseAvailabilitySnapshot(raw: unknown): SupabaseAvailabilitySnapshot |
         return staffId ? [staffId] : [];
       })
     : undefined;
+  const maintenanceLabels = new Set(raw.maintenance.flatMap((entry) => {
+    const label = getString(entry.seat_label);
+    return label ? [label] : [];
+  }));
   const unavailableStaffIds = Array.isArray(raw.staff)
     ? raw.staff.flatMap((entry) => {
         const staffId = isRecord(entry) ? getString(entry.staff_id) : null;
+        const resourceLabel = isRecord(entry) ? getString(entry.resource_label) : null;
         return staffId
-          && typeof entry.resource_status === "string"
-          && entry.resource_status !== "available"
+          && (
+            (typeof entry.resource_status === "string" && entry.resource_status !== "available")
+            || (resourceLabel !== null && maintenanceLabels.has(resourceLabel))
+          )
           ? [staffId]
           : [];
       })
@@ -1309,6 +1318,8 @@ function bookingRowToLegacyBooking(booking: Record<string, unknown>) {
     status: getString(booking.status) ?? "confirmed",
     interface_type: booking.interface_type === "chat" ? "chat" : "form",
     staff_id: getString(booking.staff_id) ?? undefined,
+    buffer_before_minutes: getNumber(booking.buffer_before_minutes) ?? undefined,
+    buffer_after_minutes: getNumber(booking.buffer_after_minutes) ?? undefined,
   } satisfies LegacyBookingShape;
 }
 

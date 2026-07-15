@@ -118,6 +118,8 @@ export interface LegacyBookingShape {
   status?: string;
   interface_type: "form" | "chat";
   staff_id?: string;
+  buffer_before_minutes?: number;
+  buffer_after_minutes?: number;
 }
 
 // Stable public API shape used only as adapter input during migration.
@@ -172,6 +174,8 @@ export interface Reservation {
   status?: string;
   interface_type: LegacyBookingShape["interface_type"];
   staff_id?: string;
+  buffer_before_minutes?: number;
+  buffer_after_minutes?: number;
 
   // Stable migration compatibility fields from the current public API.
   seats_booked: number;
@@ -284,7 +288,9 @@ export function adaptLegacyBooking(booking: LegacyBookingShape): Reservation {
         : [{ quantity: booking.seats_booked }],
     status: booking.status,
     interface_type: booking.interface_type,
-    staff_id: booking.staff_id,
+    ...(booking.staff_id ? { staff_id: booking.staff_id } : {}),
+    ...(booking.buffer_before_minutes !== undefined ? { buffer_before_minutes: booking.buffer_before_minutes } : {}),
+    ...(booking.buffer_after_minutes !== undefined ? { buffer_after_minutes: booking.buffer_after_minutes } : {}),
     seats_booked: booking.seats_booked,
     seat_labels: seatLabels,
   };

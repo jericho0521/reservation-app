@@ -780,6 +780,49 @@ test("reservation create service converts legacy input, delegates atomic create,
   }]);
 });
 
+test("public appointment create preserves staff through validation and atomic persistence", async () => {
+  const staffId = "33333333-3333-4333-8333-333333333333";
+  const prepared = prepareReservationCreateInput({
+    service_id: "00000000-0000-4000-8000-000000000010",
+    staff_id: staffId,
+    date: "2026-08-02",
+    start_time: "10:00",
+    end_time: "10:30",
+    quantity: 1,
+    customer: { name: "Ada", email: "ada@example.com", phone: "555-0100" },
+  });
+  assert.equal(prepared.status, 200);
+  if (!("input" in prepared)) assert.fail("expected valid appointment input");
+
+  const legacyInput = prepareLegacyReservationCreate(prepared.input).legacyInput;
+  let persistedStaffId: string | undefined;
+  const result = await createReservation({
+    legacyInput,
+    repository: {
+      async createReservationAtomic(input) {
+        persistedStaffId = input.reservation.staff_id;
+        return {
+          ok: true,
+          atomic: true,
+          booking: {
+            id: "booking-appointment",
+            service_id: input.reservation.service_id,
+            staff_id: input.reservation.staff_id,
+            status: "confirmed",
+            seats_booked: 1,
+          },
+          reservation: input.reservation,
+          validation: { ok: true },
+        };
+      },
+    },
+  });
+
+  assert.equal(persistedStaffId, staffId);
+  assert.equal(result.status, 201);
+  assert.equal("staff_id" in result.body ? result.body.staff_id : undefined, staffId);
+});
+
 test("reservation create service maps atomic failures to platform errors", async () => {
   const legacyInput = {
     service_id: "00000000-0000-4000-8000-000000000020",

@@ -230,6 +230,25 @@ test("staff buffers remove overlapping adjacent slots for the same practitioner"
   assert.deepEqual(slots.filter((slot) => !slot.is_available).map((slot) => slot.available_quantity), [0, 0, 0]);
 });
 
+test("cross-service practitioner conflicts use each service's buffers", () => {
+  const slots = generateAvailabilityTimeSlots(makeService({ total_seats: 2 }), [makeReservation({
+    service_id: "other-service",
+    staff_id: "staff-1",
+    start_time: "10:00",
+    end_time: "10:30",
+    buffer_after_minutes: 20,
+  })], {
+    operatingWindows: [{ start_time: "10:45", end_time: "11:15", interval_minutes: 30 }],
+    durationMinutes: 30,
+    staffId: "staff-1",
+    bufferBeforeMinutes: 0,
+    bufferAfterMinutes: 5,
+  });
+
+  assert.equal(slots[0]?.available_quantity, 0);
+  assert.equal(slots[0]?.is_available, false);
+});
+
 test("a selected practitioner under maintenance has no available capacity", () => {
   const [slot] = generateAvailabilityTimeSlots(makeService({ total_seats: 4 }), [], {
     operatingWindows: [{ start_time: "10:00", end_time: "10:30", interval_minutes: 30 }],

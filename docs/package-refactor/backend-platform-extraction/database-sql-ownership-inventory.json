@@ -297,6 +297,26 @@
       "notes": [
         "Backend-owned practitioner-aware buffered availability, atomic appointment creation, and customer-managed appointment rescheduling."
       ]
+    },
+    {
+      "path": "packages/database/migrations/supabase/000029_durable_jobs_notifications.sql",
+      "classification": "core-platform",
+      "intendedBackendDestination": [
+        "packages/database/migrations/supabase/000029_durable_jobs_notifications.sql"
+      ],
+      "notes": [
+        "Backend-owned durable leased job queue, notification delivery state, and worker transition RPCs."
+      ]
+    },
+    {
+      "path": "packages/database/migrations/supabase/000030_integration_secrets.sql",
+      "classification": "core-platform",
+      "intendedBackendDestination": [
+        "packages/database/migrations/supabase/000030_integration_secrets.sql"
+      ],
+      "notes": [
+        "Backend-owned tenant-scoped integration settings and AES-256-GCM credential envelopes."
+      ]
     }
   ]
 }

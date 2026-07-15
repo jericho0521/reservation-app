@@ -93,11 +93,7 @@ export function generateAvailabilityTimeSlots(
           staff_id: options.staffId,
           buffer_before_minutes: options.bufferBeforeMinutes,
           buffer_after_minutes: options.bufferAfterMinutes,
-        }, [{
-          ...reservation,
-          buffer_before_minutes: options.bufferBeforeMinutes,
-          buffer_after_minutes: options.bufferAfterMinutes,
-        }]))
+        }, [reservation]))
       : getReservationsForSlot(reservations, startTime, endTime);
     const unavailableResourceLabels = getUnavailableResourceLabels(
       slotReservations,

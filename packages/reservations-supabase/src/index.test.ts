@@ -625,6 +625,8 @@ test("availability repository reads and adapts one database snapshot", async () 
             status: "confirmed",
             interface_type: "chat",
             staff_id: "staff-1",
+            buffer_before_minutes: 15,
+            buffer_after_minutes: 20,
           }],
           maintenance: [{ seat_label: "RS2" }],
           resources: [{
@@ -650,7 +652,12 @@ test("availability repository reads and adapts one database snapshot", async () 
             intervals: [{ day_of_week: 1, start_time: "09:00", end_time: "17:00" }],
             closures: [{ date: "2026-08-31" }],
           },
-          staff: [{ staff_id: "staff-1", display_name: "Ada", resource_status: "maintenance" }],
+          staff: [{
+            staff_id: "staff-1",
+            display_name: "Ada",
+            resource_label: "RS2",
+            resource_status: "available",
+          }],
         },
         error: null,
       };
@@ -673,6 +680,8 @@ test("availability repository reads and adapts one database snapshot", async () 
   assert.equal(availability.service.buffer_before_minutes, 10);
   assert.equal(availability.service.buffer_after_minutes, 5);
   assert.equal(availability.bookings[0]?.staff_id, "staff-1");
+  assert.equal(availability.bookings[0]?.buffer_before_minutes, 15);
+  assert.equal(availability.bookings[0]?.buffer_after_minutes, 20);
   assert.equal(availability.staffUnavailable, true);
   assert.deepEqual(availability.operatingHours, {
     timezone: "Asia/Kuala_Lumpur",

@@ -46,6 +46,7 @@ const legacyBookingCreateSchema = z.object({
   items: z.array(legacyReservationItemSchema).optional(),
   reservation_items: z.array(legacyReservationItemSchema).optional(),
   interface_type: z.enum(["form", "chat"]),
+  staff_id: z.string().uuid().optional(),
 });
 
 export type LegacyBookingCreateInput = z.infer<typeof legacyBookingCreateSchema>;
@@ -69,6 +70,7 @@ export interface LegacyCoreReservation {
   items: LegacyReservationItem[];
   status?: string;
   interface_type: "form" | "chat";
+  staff_id?: string;
   seats_booked: number;
   seat_labels: string[];
 }
@@ -492,6 +494,7 @@ export function legacyBookingCreateToReservation(
         : [{ quantity: booking.seats_booked }],
       status: "confirmed",
       interface_type: booking.interface_type,
+      ...(booking.staff_id ? { staff_id: booking.staff_id } : {}),
       seats_booked: booking.seats_booked,
       seat_labels: seatLabels,
     };
@@ -511,6 +514,7 @@ export function legacyBookingCreateToReservation(
     items: nativeItems,
     status: "confirmed",
     interface_type: booking.interface_type,
+    ...(booking.staff_id ? { staff_id: booking.staff_id } : {}),
     seats_booked: booking.seats_booked,
     seat_labels: seatLabels,
   };

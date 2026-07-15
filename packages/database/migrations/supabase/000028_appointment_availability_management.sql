@@ -1,6 +1,35 @@
 -- Practitioner-aware availability, buffered atomic booking, and customer-managed
 -- rescheduling. Legacy services retain the existing reservation behavior.
 
+alter table public.services
+  add column if not exists booking_mode text not null default 'resource'
+    check (booking_mode in ('resource', 'appointment'));
+
+update public.services as service
+set booking_mode = 'appointment'
+where exists (
+  select 1
+  from public.platform_staff_services as assignment
+  where assignment.service_id = service.id
+);
+
+create or replace function public.platform_mark_staff_service_as_appointment()
+returns trigger
+language plpgsql
+set search_path = public
+as $$
+begin
+  update public.services
+  set booking_mode = 'appointment'
+  where id = new.service_id;
+  return new;
+end;
+$$;
+
+create trigger platform_staff_services_mark_appointment
+after insert on public.platform_staff_services
+for each row execute function public.platform_mark_staff_service_as_appointment();
+
 alter function public.create_reservation_atomic(jsonb)
 rename to create_reservation_atomic_legacy;
 
@@ -38,10 +67,7 @@ begin
     return jsonb_build_object('ok', false, 'error_code', 'invalid_service', 'message', 'Service not found');
   end if;
 
-  if not exists (
-    select 1 from public.platform_staff_services as assignment
-    where assignment.service_id = v_service.id
-  ) then
+  if v_service.booking_mode <> 'appointment' then
     return public.create_reservation_atomic_legacy(payload);
   end if;
 
@@ -294,21 +320,49 @@ as $$
       'selection_mode', service.selection_mode,
       'reservation_policy', service.reservation_policy,
       'metadata', service.metadata,
+      'booking_mode', service.booking_mode,
       'duration_minutes', service.duration_minutes,
       'buffer_before_minutes', service.buffer_before_minutes,
       'buffer_after_minutes', service.buffer_after_minutes
     ),
     'bookings', coalesce((
-      select jsonb_agg(to_jsonb(booking) order by booking.start_time, booking.id)
+      select jsonb_agg(
+        to_jsonb(booking) || jsonb_build_object(
+          'buffer_before_minutes', booked_service.buffer_before_minutes,
+          'buffer_after_minutes', booked_service.buffer_after_minutes
+        )
+        order by booking.start_time, booking.id
+      )
       from public.bookings as booking
-      where booking.service_id = service.id
-        and booking.booking_date = p_date
+      join public.services as booked_service on booked_service.id = booking.service_id
+      where booking.booking_date = p_date
         and booking.status in ('pending', 'confirmed')
+        and (
+          booking.service_id = service.id
+          or booking.staff_id in (
+            select staff_service.staff_id
+            from public.platform_staff_services as staff_service
+            where staff_service.service_id = service.id
+          )
+        )
     ), '[]'::jsonb),
     'maintenance', coalesce((
       select jsonb_agg(jsonb_build_object('seat_label', maintenance.seat_label) order by maintenance.seat_label)
       from public.service_seat_maintenance as maintenance
-      where maintenance.service_id = service.id and maintenance.is_active = true
+      join public.reservable_resources as maintained_resource
+        on maintained_resource.service_id = maintenance.service_id
+        and maintained_resource.label = maintenance.seat_label
+      where maintenance.is_active = true
+        and (
+          maintenance.service_id = service.id
+          or maintained_resource.id in (
+            select staff.reservable_resource_id
+            from public.platform_staff_profiles as staff
+            join public.platform_staff_services as staff_service
+              on staff_service.staff_id = staff.id
+            where staff_service.service_id = service.id
+          )
+        )
     ), '[]'::jsonb),
     'resources', coalesce((
       select jsonb_agg(jsonb_build_object(
@@ -330,6 +384,7 @@ as $$
         'staff_id', staff.id,
         'display_name', staff.display_name,
         'reservable_resource_id', staff.reservable_resource_id,
+        'resource_label', resource.label,
         'resource_status', resource.status
       ) order by staff.display_name, staff.id)
       from public.platform_staff_profiles as staff

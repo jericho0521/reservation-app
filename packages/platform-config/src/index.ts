@@ -1,5 +1,13 @@
 import { readFileSync } from "node:fs";
 
+export {
+  SecretDecryptionError,
+  decryptSecretEnvelope,
+  encryptSecretEnvelope,
+  parseSecretEnvelope,
+  type SecretEnvelopeV1,
+} from "./secret-envelope.js";
+
 export const platformConfigPathEnvName = "RESERVATION_PLATFORM_CONFIG_PATH";
 
 export interface PlatformRuntimeConfig {

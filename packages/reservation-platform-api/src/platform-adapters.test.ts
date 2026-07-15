@@ -258,6 +258,21 @@ test("platform reservation create adapter maps SDK input to legacy booking input
   });
 });
 
+test("platform appointment create adapter preserves the selected practitioner", () => {
+  const staffId = "33333333-3333-4333-8333-333333333333";
+  const adapted = toLegacyBookingCreateInput({
+    service_id: "svc_123",
+    staff_id: staffId,
+    date: "2026-01-02",
+    start_time: "12:00",
+    end_time: "13:00",
+    quantity: 1,
+    customer: { name: "Ada", email: "ada@example.com" },
+  });
+
+  assert.equal(adapted.staff_id, staffId);
+});
+
 test("platform reservation create adapter bridges resource ids for legacy assigned-resource routes", () => {
   assert.deepEqual(toLegacyBookingCreateInput({
     service_id: "svc_123",

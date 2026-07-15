@@ -13,7 +13,7 @@ import {
 
 const indexPath = new URL("../migrations/supabase/migration-index.json", import.meta.url);
 
-test("core plan includes exactly 000001 through 000028 in order", async () => {
+test("core plan includes exactly 000001 through 000030 in order", async () => {
   const index = await readActualIndex();
   const plan = buildSupabaseMigrationPlan(index);
 
@@ -48,10 +48,36 @@ test("core plan includes exactly 000001 through 000028 in order", async () => {
       "000026_appointment_staff_timing.sql",
       "000027_staff_access_administration.sql",
       "000028_appointment_availability_management.sql",
+      "000029_durable_jobs_notifications.sql",
+      "000030_integration_secrets.sql",
     ],
   );
-  assert.equal(plan.migrations.length, 28);
+  assert.equal(plan.migrations.length, 30);
   assert.equal(plan.seeds.length, 0);
+});
+
+test("durable jobs use tenant-idempotent enqueue and exclusive leases", async () => {
+  const sql = (await readFile(new URL("../migrations/supabase/000029_durable_jobs_notifications.sql", import.meta.url), "utf8")).toLowerCase();
+  assert.match(sql, /create table public\.platform_jobs/);
+  assert.match(sql, /kind text not null check \(kind in \([\s\S]*'notification\.email'[\s\S]*'conversation\.process_ai'[\s\S]*\)\)/);
+  assert.match(sql, /unique \(tenant_id, idempotency_key\)/);
+  assert.match(sql, /create table public\.platform_notification_deliveries/);
+  assert.match(sql, /create or replace function public\.claim_platform_jobs/);
+  assert.match(sql, /for update skip locked/);
+  assert.match(sql, /leased_until/);
+  assert.match(sql, /job\.lease_owner = p_worker_id\s+and job\.leased_until > now\(\)/);
+  assert.match(sql, /revoke all on table public\.platform_jobs from public, anon, authenticated, service_role/);
+  assert.match(sql, /grant execute on function public\.claim_platform_jobs[^;]+to service_role/);
+});
+
+test("integration settings store only versioned encrypted envelopes", async () => {
+  const sql = (await readFile(new URL("../migrations/supabase/000030_integration_secrets.sql", import.meta.url), "utf8")).toLowerCase();
+  assert.match(sql, /create table public\.platform_integration_settings/);
+  assert.match(sql, /create table public\.platform_integration_credentials/);
+  assert.match(sql, /envelope->>'v' = '1'/);
+  assert.match(sql, /envelope->>'alg' = 'aes-256-gcm'/);
+  assert.match(sql, /revoke all on table public\.platform_integration_credentials from public, anon, authenticated, service_role/);
+  assert.doesNotMatch(sql, /api_key|password text|secret text/);
 });
 
 test("appointment availability migration serializes practitioner writes and closes the legacy bypass", async () => {
@@ -150,7 +176,7 @@ test("bundled core migration loader follows an extended validated index", async 
   const rawIndex = await readActualRawIndex();
   rawIndex.coreMigrations.push({
     order: rawIndex.coreMigrations.length + 1,
-    path: "packages/database/migrations/supabase/000029_runtime_readiness_test.sql",
+    path: "packages/database/migrations/supabase/000031_runtime_readiness_test.sql",
     module: "core",
     scope: "reservation-platform",
     sha256: "a".repeat(64),
@@ -163,9 +189,9 @@ test("bundled core migration loader follows an extended validated index", async 
 
   const plan = await loadBundledCoreMigrationPlan(pathToFileURL(extendedIndexPath));
 
-  assert.equal(plan.length, 29);
+  assert.equal(plan.length, 31);
   assert.deepEqual(plan.at(-1), {
-    path: "packages/database/migrations/supabase/000029_runtime_readiness_test.sql",
+    path: "packages/database/migrations/supabase/000031_runtime_readiness_test.sql",
     sha256: "a".repeat(64),
   });
 });

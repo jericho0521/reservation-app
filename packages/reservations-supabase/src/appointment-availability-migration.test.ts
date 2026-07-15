@@ -10,7 +10,8 @@ const migration = readFileSync(resolve(
 ), "utf8");
 
 test("appointment migration serializes buffered conflicts by practitioner", () => {
-  assert.match(migration, /for update of staff, resource/i);
+  assert.match(migration, /for update of staff/i);
+  assert.match(migration, /for update of resource/i);
   assert.match(migration, /existing\.staff_id = v_staff_id/i);
   assert.match(migration, /existing\.status in \('pending', 'confirmed'\)/i);
   assert.match(migration, /buffer_before_minutes/i);

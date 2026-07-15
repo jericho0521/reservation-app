@@ -2,9 +2,12 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 import {
+  acceptStaffInvitationInputSchema,
+  authenticatedSessionSchema,
   chatConfirmReservationInputSchema,
   chatCreateReservationSessionInputSchema,
   chatMessageResponseSchema,
+  createFirstOwnerInputSchema,
   createReservationInputSchema,
   conversationAutomationInputSchema,
   conversationResponseSchema,
@@ -18,6 +21,8 @@ import {
   experienceServiceInputSchema,
   experienceWorkspaceResponseSchema,
   listReservationsResponseSchema,
+  loginInputSchema,
+  completePasswordResetInputSchema,
   platformErrorBodySchema,
   platformErrorCodeSchema,
   metadataRecordSchema,
@@ -29,8 +34,56 @@ import {
   reservationResponseSchema,
   resourceLayoutResponseSchema,
   rescheduleReservationInputSchema,
+  requestPasswordResetInputSchema,
   serviceResponseSchema,
+  setupStatusResponseSchema,
+  staffInvitationInputSchema,
+  staffInvitationResponseSchema,
 } from "./index.js";
+
+test("authentication contracts validate setup, sessions, staff, and password resets", () => {
+  const owner = {
+    setup_token: "s".repeat(43),
+    email: "owner@example.com",
+    display_name: "Owner",
+    password: "correct horse battery staple",
+  };
+  const session = {
+    user_id: "11111111-1111-4111-8111-111111111111",
+    tenant_id: "tenant_1",
+    role: "owner",
+    venue_ids: ["22222222-2222-4222-8222-222222222222"],
+    expires_at: "2026-07-15T12:00:00.000Z",
+  };
+
+  assert.equal(setupStatusResponseSchema.safeParse({ setup_available: true }).success, true);
+  assert.equal(createFirstOwnerInputSchema.safeParse(owner).success, true);
+  assert.equal(createFirstOwnerInputSchema.safeParse({ ...owner, password: "too-short" }).success, false);
+  assert.equal(loginInputSchema.safeParse({ email: owner.email, password: "anything" }).success, true);
+  assert.equal(authenticatedSessionSchema.safeParse(session).success, true);
+  assert.equal(authenticatedSessionSchema.safeParse({ ...session, session_token: "secret" }).success, false);
+
+  const invitation = {
+    email: "staff@example.com",
+    display_name: "Staff Member",
+    venue_ids: ["22222222-2222-4222-8222-222222222222"],
+  };
+  assert.equal(staffInvitationInputSchema.safeParse(invitation).success, true);
+  assert.equal(staffInvitationInputSchema.safeParse({ ...invitation, venue_ids: [] }).success, false);
+  assert.equal(staffInvitationResponseSchema.safeParse({
+    user_id: "33333333-3333-4333-8333-333333333333",
+    invitation_token: "i".repeat(43),
+    expires_at: "2026-07-16T00:00:00.000Z",
+  }).success, true);
+  assert.equal(acceptStaffInvitationInputSchema.safeParse({
+    display_name: "Staff Member",
+    password: "correct horse battery staple",
+  }).success, true);
+
+  assert.equal(requestPasswordResetInputSchema.safeParse({ email: owner.email }).success, true);
+  assert.equal(completePasswordResetInputSchema.safeParse({ password: "correct horse battery staple" }).success, true);
+  assert.equal(completePasswordResetInputSchema.safeParse({ password: "too-short" }).success, false);
+});
 
 test("platform error codes include payload_too_large", async () => {
   assert.equal(platformErrorCodeSchema.parse("payload_too_large"), "payload_too_large");
@@ -425,6 +478,15 @@ test("contract artifact registry covers current public /v1 API and SDK paths", (
   const operationKeys = new Set(publicContractOperations.map((operation) => `${operation.method.toUpperCase()} ${operation.path}`));
 
   for (const key of [
+    "GET /v1/setup/status",
+    "POST /v1/setup/owner",
+    "POST /v1/auth/login",
+    "POST /v1/auth/logout",
+    "GET /v1/auth/session",
+    "POST /v1/auth/staff/invitations",
+    "POST /v1/auth/staff/invitations/{token}/accept",
+    "POST /v1/auth/password-reset",
+    "POST /v1/auth/password-reset/{token}/complete",
     "GET /v1/metadata",
     "GET /v1/tenants/current",
     "GET /v1/venues",
@@ -524,6 +586,14 @@ test("contract artifact subpaths are exported for package consumers", async () =
   assert.deepEqual(
     openapi.default.paths["/v1/experience/workspace"].get.security,
     [{ bearerAuth: [] }],
+  );
+  assert.deepEqual(
+    openapi.default.paths["/v1/auth/session"].get.security,
+    [{ cookieAuth: [] }],
+  );
+  assert.equal(
+    "content" in openapi.default.paths["/v1/auth/logout"].post.responses["204"],
+    false,
   );
   assert.equal(metadataSchema.default.title, "MetadataResponse");
 });

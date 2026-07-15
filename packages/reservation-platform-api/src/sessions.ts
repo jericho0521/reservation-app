@@ -10,6 +10,10 @@ export interface AuthenticatedPrincipal {
   venueIds: readonly string[];
 }
 
+export interface AuthenticatedSessionRecord extends AuthenticatedPrincipal {
+  expiresAt: string;
+}
+
 export interface InstallationRecord {
   installationId: string;
   tenantId: string;
@@ -43,9 +47,25 @@ export interface PlatformSessionRepository {
   createFirstOwner(input: CreateFirstOwnerStorageInput): Promise<CreateFirstOwnerStorageResult | undefined>;
   createUser(input: Omit<PlatformUserRecord, "userId" | "venueIds"> & { venueIds?: readonly string[] }): Promise<PlatformUserRecord>;
   findUserByEmail(tenantId: string, email: string): Promise<PlatformUserRecord | undefined>;
-  createSession(input: { userId: string; tokenHash: string; expiresAt: string }): Promise<void>;
-  readSession(tokenHash: string, now: string): Promise<AuthenticatedPrincipal | undefined>;
+  createSession(input: {
+    userId: string;
+    expectedPasswordHash: string;
+    tokenHash: string;
+    expiresAt: string;
+  }): Promise<boolean>;
+  readSession(tokenHash: string, now: string): Promise<AuthenticatedSessionRecord | undefined>;
   revokeSession(tokenHash: string, now: string): Promise<void>;
+  createPasswordResetToken(input: {
+    tenantId: string;
+    email: string;
+    tokenHash: string;
+    expiresAt: string;
+  }): Promise<void>;
+  completePasswordReset(input: {
+    tokenHash: string;
+    now: string;
+    passwordHash: string;
+  }): Promise<boolean>;
 }
 
 export interface PasswordHasher {
@@ -65,7 +85,8 @@ export type PlatformAuthErrorCode =
   | "owner_required"
   | "setup_unavailable"
   | "validation_failed"
-  | "invitation_invalid";
+  | "invitation_invalid"
+  | "password_reset_invalid";
 
 export class PlatformAuthError extends Error {
   constructor(
@@ -149,9 +170,53 @@ export async function authenticateSession(input: {
   token: string;
   repositories: PlatformSessionRepository;
   now?: Date;
-}): Promise<AuthenticatedPrincipal | undefined> {
+}): Promise<AuthenticatedSessionRecord | undefined> {
   if (!isOpaqueToken(input.token)) return undefined;
   return input.repositories.readSession(hashOpaqueToken(input.token), (input.now ?? new Date()).toISOString());
+}
+
+export async function requestPasswordReset(input: {
+  input: { email: string };
+  repositories: PlatformSessionRepository;
+  tokenFactory?: () => string;
+  now?: Date;
+}): Promise<void> {
+  const email = normalizeEmail(input.input.email);
+  const installation = await input.repositories.readInstallation();
+  if (!email || !installation?.setupCompleted) return;
+
+  const token = (input.tokenFactory ?? createOpaqueToken)();
+  if (!isOpaqueToken(token)) {
+    throw new PlatformAuthError("validation_failed", 400, "Password reset token generation failed.");
+  }
+  const now = input.now ?? new Date();
+  await input.repositories.createPasswordResetToken({
+    tenantId: installation.tenantId,
+    email,
+    tokenHash: hashOpaqueToken(token),
+    expiresAt: new Date(now.getTime() + 60 * 60 * 1_000).toISOString(),
+  });
+}
+
+export async function completePasswordReset(input: {
+  resetToken: string;
+  input: { password: string };
+  repositories: PlatformSessionRepository;
+  passwordHasher?: PasswordHasher;
+  now?: Date;
+}): Promise<void> {
+  if (!isOpaqueToken(input.resetToken) || !validatePassword(input.input.password)) {
+    throw new PlatformAuthError("validation_failed", 400, "Password reset details are invalid.");
+  }
+  const passwordHash = await (input.passwordHasher ?? argon2idPasswordHasher).hash(input.input.password);
+  const completed = await input.repositories.completePasswordReset({
+    tokenHash: hashOpaqueToken(input.resetToken),
+    now: (input.now ?? new Date()).toISOString(),
+    passwordHash,
+  });
+  if (!completed) {
+    throw new PlatformAuthError("password_reset_invalid", 400, "Password reset token is invalid or expired.");
+  }
 }
 
 export async function logoutSession(input: {
@@ -218,7 +283,15 @@ export async function createSessionResult(input: {
   const tokenHash = hashOpaqueToken(token);
   const expiresAt = new Date(input.now.getTime() + sessionDurationMs).toISOString();
   const principal = principalFromUser(input.user);
-  await input.repositories.createSession({ userId: input.user.userId, tokenHash, expiresAt });
+  const created = await input.repositories.createSession({
+    userId: input.user.userId,
+    expectedPasswordHash: input.user.passwordHash,
+    tokenHash,
+    expiresAt,
+  });
+  if (!created) {
+    throw new PlatformAuthError("invalid_credentials", 401, "Invalid email or password.");
+  }
   return { token, tokenHash, expiresAt, principal };
 }
 

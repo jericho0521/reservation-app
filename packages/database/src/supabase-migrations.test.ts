@@ -13,7 +13,7 @@ import {
 
 const indexPath = new URL("../migrations/supabase/migration-index.json", import.meta.url);
 
-test("core plan includes exactly 000001 through 000021 in order", async () => {
+test("core plan includes exactly 000001 through 000022 in order", async () => {
   const index = await readActualIndex();
   const plan = buildSupabaseMigrationPlan(index);
 
@@ -41,9 +41,10 @@ test("core plan includes exactly 000001 through 000021 in order", async () => {
       "000019_unified_conversations.sql",
       "000020_operations_analytics_rpc.sql",
       "000021_installation_auth.sql",
+      "000022_password_reset.sql",
     ],
   );
-  assert.equal(plan.migrations.length, 21);
+  assert.equal(plan.migrations.length, 22);
   assert.equal(plan.seeds.length, 0);
 });
 
@@ -59,7 +60,7 @@ test("bundled core migration loader follows an extended validated index", async 
   const rawIndex = await readActualRawIndex();
   rawIndex.coreMigrations.push({
     order: rawIndex.coreMigrations.length + 1,
-    path: "packages/database/migrations/supabase/000022_runtime_readiness_test.sql",
+    path: "packages/database/migrations/supabase/000023_runtime_readiness_test.sql",
     module: "core",
     scope: "reservation-platform",
     sha256: "a".repeat(64),
@@ -72,9 +73,9 @@ test("bundled core migration loader follows an extended validated index", async 
 
   const plan = await loadBundledCoreMigrationPlan(pathToFileURL(extendedIndexPath));
 
-  assert.equal(plan.length, 22);
+  assert.equal(plan.length, 23);
   assert.deepEqual(plan.at(-1), {
-    path: "packages/database/migrations/supabase/000022_runtime_readiness_test.sql",
+    path: "packages/database/migrations/supabase/000023_runtime_readiness_test.sql",
     sha256: "a".repeat(64),
   });
 });
@@ -141,6 +142,29 @@ test("installation auth migration stores only hashed capabilities and restricts 
   assert.match(sql, /status = 'active'/);
   assert.match(sql, /grant execute on function public\.platform_create_staff_invitation\(text, text, text, text, text, timestamptz, uuid\[\]\) to service_role/);
   assert.match(sql, /grant execute on function public\.platform_accept_staff_invitation\(text, timestamptz, text, text\) to service_role/);
+});
+
+test("password reset migration consumes one hashed token and revokes existing sessions atomically", async () => {
+  const sql = (await readFile(new URL("../migrations/supabase/000022_password_reset.sql", import.meta.url), "utf8")).toLowerCase();
+
+  assert.match(sql, /create or replace function public\.platform_create_password_reset/);
+  assert.match(sql, /insert into public\.platform_auth_tokens[\s\S]*'password_reset'/);
+  assert.match(sql, /create or replace function public\.platform_complete_password_reset/);
+  assert.match(sql, /candidate\.token_hash = p_token_hash/);
+  assert.match(sql, /candidate\.consumed_at is null/);
+  assert.match(sql, /candidate\.expires_at > p_now/);
+  assert.match(sql, /update public\.platform_users[\s\S]*password_hash = p_password_hash/);
+  assert.match(sql, /update public\.platform_auth_tokens[\s\S]*consumed_at = p_now/);
+  assert.match(sql, /update public\.platform_sessions[\s\S]*revoked_at = p_now/);
+  assert.match(sql, /revoke all on function public\.platform_complete_password_reset[^;]+from public, anon, authenticated/);
+  assert.match(sql, /grant execute on function public\.platform_complete_password_reset\(text, timestamptz, text\) to service_role/);
+  assert.match(sql, /create or replace function public\.platform_create_session/);
+  assert.match(sql, /where candidate\.id = p_user_id\s+for update/);
+  assert.match(sql, /target_user\.password_hash <> p_expected_password_hash/);
+  assert.match(sql, /insert into public\.platform_sessions/);
+  assert.match(sql, /revoke all on function public\.platform_create_session\(uuid, text, text, timestamptz\) from public, anon, authenticated/);
+  assert.match(sql, /grant execute on function public\.platform_create_session\(uuid, text, text, timestamptz\) to service_role/);
+  assert.doesNotMatch(sql, /plaintext_token|raw_token/);
 });
 
 test("experience availability migration owns normalized rules and shared snapshot integration", async () => {
@@ -210,7 +234,7 @@ test("AI retrieval option appends optional AI retrieval migrations after core mi
   const plan = buildSupabaseMigrationPlan(index, { includeAiRetrieval: true });
 
   assert.deepEqual(
-    plan.migrations.slice(21).map((entry) => entry.path),
+    plan.migrations.slice(22).map((entry) => entry.path),
     [
       "packages/database/migrations/supabase/optional/ai-retrieval/000001_knowledge_chunks.sql",
       "packages/database/migrations/supabase/optional/ai-retrieval/000002_langchain_checkpoints.sql",

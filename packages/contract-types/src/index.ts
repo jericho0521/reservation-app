@@ -13,6 +13,57 @@ export interface RequestContext {
   correlation_id?: string;
 }
 
+export type PlatformUserRole = "owner" | "staff";
+
+export interface SetupStatusResponse {
+  setup_available: boolean;
+}
+
+export interface CreateFirstOwnerInput {
+  setup_token: string;
+  email: string;
+  display_name: string;
+  password: string;
+}
+
+export interface LoginInput {
+  email: string;
+  password: string;
+}
+
+export interface AuthenticatedSessionResponse {
+  user_id: string;
+  tenant_id: string;
+  role: PlatformUserRole;
+  venue_ids: string[];
+  expires_at: string;
+}
+
+export interface StaffInvitationInput {
+  email: string;
+  display_name: string;
+  venue_ids: string[];
+}
+
+export interface StaffInvitationResponse {
+  user_id: string;
+  invitation_token: string;
+  expires_at: string;
+}
+
+export interface AcceptStaffInvitationInput {
+  display_name: string;
+  password: string;
+}
+
+export interface RequestPasswordResetInput {
+  email: string;
+}
+
+export interface CompletePasswordResetInput {
+  password: string;
+}
+
 export type ExperiencePresetId =
   | "racing_gaming"
   | "rooms_facilities"

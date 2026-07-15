@@ -141,6 +141,59 @@ export const metadataResponseSchema = strictObject({
   }).optional(),
 });
 
+export const platformUserRoleSchema = z.enum(["owner", "staff"]);
+
+export const setupStatusResponseSchema = strictObject({
+  setup_available: z.boolean(),
+});
+
+export const createFirstOwnerInputSchema = strictObject({
+  setup_token: z.string().min(43).max(128),
+  email: z.string().email().max(320),
+  display_name: z.string().trim().min(1).max(120),
+  password: z.string().min(12).max(128),
+});
+
+export const loginInputSchema = strictObject({
+  email: z.string().email().max(320),
+  password: z.string().min(1).max(128),
+});
+
+export const authenticatedSessionSchema = strictObject({
+  user_id: z.string().uuid(),
+  tenant_id: z.string().min(1),
+  role: platformUserRoleSchema,
+  venue_ids: z.array(z.string().uuid()),
+  expires_at: z.string().datetime(),
+});
+
+export const authenticatedSessionResponseSchema = authenticatedSessionSchema;
+
+export const staffInvitationInputSchema = strictObject({
+  email: z.string().email().max(320),
+  display_name: z.string().trim().min(1).max(120),
+  venue_ids: z.array(z.string().uuid()).min(1),
+});
+
+export const staffInvitationResponseSchema = strictObject({
+  user_id: z.string().uuid(),
+  invitation_token: z.string().min(43).max(128),
+  expires_at: z.string().datetime(),
+});
+
+export const acceptStaffInvitationInputSchema = strictObject({
+  display_name: z.string().trim().min(1).max(120),
+  password: z.string().min(12).max(128),
+});
+
+export const requestPasswordResetInputSchema = strictObject({
+  email: z.string().email().max(320),
+});
+
+export const completePasswordResetInputSchema = strictObject({
+  password: z.string().min(12).max(128),
+});
+
 export const tenantResponseSchema = strictObject({
   tenant_id: z.string(),
   name: z.string().optional(),

@@ -114,6 +114,11 @@ function buildOpenApiArtifact() {
           type: "http",
           scheme: "bearer",
         },
+        cookieAuth: {
+          type: "apiKey",
+          in: "cookie",
+          name: "reservation_session",
+        },
       },
       parameters: {
         TenantIdHeader: {
@@ -178,7 +183,9 @@ function buildOpenApiOperation(operation: ContractOperation) {
     operationId: operation.operationId,
     summary: operation.summary,
     tags: operation.tags,
-    ...(operation.authentication === "public" ? {} : { security: [{ bearerAuth: [] }] }),
+    ...(operation.authentication === "public"
+      ? {}
+      : { security: [{ [operation.authentication === "cookie" ? "cookieAuth" : "bearerAuth"]: [] }] }),
     ...(parameters.length > 0 ? { parameters } : {}),
     ...(operation.requestBodySchema ? {
       requestBody: {
@@ -220,13 +227,15 @@ function buildResponses(operation: ContractOperation) {
           },
         },
       }
-    : {
+    : operation.responseSchema ? {
         description: "Successful response.",
         content: {
           "application/json": {
             schema: componentRef(operation.responseSchema),
           },
         },
+      } : {
+        description: "Successful response.",
       };
 
   return {

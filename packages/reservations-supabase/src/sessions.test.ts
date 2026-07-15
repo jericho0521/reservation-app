@@ -136,6 +136,7 @@ test("active sessions map the authenticated principal and venue assignments", as
     tenantId: "tenant-1",
     role: "staff",
     venueIds: ["venue-1", "venue-2"],
+    expiresAt: "2026-07-15T12:00:00.000Z",
   });
   assert.deepEqual(calls.filter((call) => Array.isArray(call) && ["eq", "is", "gt"].includes(String(call[0]))), [
     ["eq", "token_hash", "b".repeat(64)],
@@ -169,6 +170,7 @@ test("session venue mapping rejects assignments belonging to another tenant", as
     tenantId: "tenant-1",
     role: "staff",
     venueIds: ["venue-1"],
+    expiresAt: "2026-07-15T12:00:00.000Z",
   });
 });
 
@@ -199,7 +201,7 @@ test("user and session writes persist normalized values without plaintext tokens
       },
       error: null,
     },
-    { data: null, error: null },
+    { data: { created: true }, error: null },
     { data: null, error: null },
   ]));
 
@@ -214,19 +216,14 @@ test("user and session writes persist normalized values without plaintext tokens
   });
   await repository.createSession({
     userId: user.userId,
+    expectedPasswordHash: user.passwordHash,
     tokenHash: "b".repeat(64),
     expiresAt: "2026-07-15T12:00:00.000Z",
   });
   await repository.revokeSession("b".repeat(64), "2026-07-15T01:00:00.000Z");
 
   const inserts = calls.filter((call) => Array.isArray(call) && call[0] === "insert");
-  assert.deepEqual(inserts, [
-    ["insert", [{
-      user_id: "user-1",
-      token_hash: "b".repeat(64),
-      expires_at: "2026-07-15T12:00:00.000Z",
-    }]],
-  ]);
+  assert.deepEqual(inserts, []);
   assert.deepEqual(calls.slice(0, 2), [
     ["rpc", "platform_create_user", {
       p_tenant_id: "tenant-1",
@@ -241,9 +238,40 @@ test("user and session writes persist normalized values without plaintext tokens
   ]);
   assert.equal(calls.some((call) => Array.isArray(call) && call[0] === "from"
     && ["platform_users", "platform_user_venue_assignments"].includes(String(call[1]))), false);
+  assert.ok(calls.some((call) => Array.isArray(call)
+    && call[0] === "rpc"
+    && call[1] === "platform_create_session"
+    && JSON.stringify(call[2]) === JSON.stringify({
+      p_user_id: "user-1",
+      p_expected_password_hash: "argon2-hash",
+      p_token_hash: "b".repeat(64),
+      p_expires_at: "2026-07-15T12:00:00.000Z",
+    })));
   assert.equal(JSON.stringify(inserts).includes("opaque-token"), false);
   assert.ok(calls.some((call) => Array.isArray(call) && call[0] === "update"
     && JSON.stringify(call[1]) === JSON.stringify({ revoked_at: "2026-07-15T01:00:00.000Z" })));
+});
+
+test("session creation rejects a password hash changed by a concurrent reset", async () => {
+  const calls: unknown[] = [];
+  const repository = createSupabasePlatformSessionRepository(fakeClient(calls, [
+    { data: { created: false }, error: null },
+  ]));
+  assert.equal(await repository.createSession({
+    userId: "user-1",
+    expectedPasswordHash: "old-argon2-hash",
+    tokenHash: "b".repeat(64),
+    expiresAt: "2026-07-15T12:00:00.000Z",
+  }), false);
+  assert.deepEqual(calls, [
+    ["rpc", "platform_create_session", {
+      p_user_id: "user-1",
+      p_expected_password_hash: "old-argon2-hash",
+      p_token_hash: "b".repeat(64),
+      p_expires_at: "2026-07-15T12:00:00.000Z",
+    }],
+    ["maybeSingle"],
+  ]);
 });
 
 test("first owner creation uses one atomic setup-consumption RPC", async () => {
@@ -348,4 +376,41 @@ test("staff invitation creation and acceptance use atomic hashed-token RPCs", as
     ["maybeSingle"],
   ]);
   assert.doesNotMatch(JSON.stringify(calls), /opaque-invitation-token/u);
+});
+
+test("password reset creation and completion use hashed atomic RPCs", async () => {
+  const calls: unknown[] = [];
+  const repository = createSupabasePlatformSessionRepository(fakeClient(calls, [
+    { data: { created: true }, error: null },
+    { data: { completed: true }, error: null },
+  ]));
+
+  await repository.createPasswordResetToken({
+    tenantId: "tenant-1",
+    email: " OWNER@Example.com ",
+    tokenHash: "d".repeat(64),
+    expiresAt: "2026-07-15T02:00:00.000Z",
+  });
+  assert.equal(await repository.completePasswordReset({
+    tokenHash: "d".repeat(64),
+    now: "2026-07-15T01:30:00.000Z",
+    passwordHash: "$argon2id$new",
+  }), true);
+
+  assert.deepEqual(calls, [
+    ["rpc", "platform_create_password_reset", {
+      p_tenant_id: "tenant-1",
+      p_email: "owner@example.com",
+      p_token_hash: "d".repeat(64),
+      p_expires_at: "2026-07-15T02:00:00.000Z",
+    }],
+    ["maybeSingle"],
+    ["rpc", "platform_complete_password_reset", {
+      p_token_hash: "d".repeat(64),
+      p_now: "2026-07-15T01:30:00.000Z",
+      p_password_hash: "$argon2id$new",
+    }],
+    ["maybeSingle"],
+  ]);
+  assert.doesNotMatch(JSON.stringify(calls), /opaque-reset-token/u);
 });

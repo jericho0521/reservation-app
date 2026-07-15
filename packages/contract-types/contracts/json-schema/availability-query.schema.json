@@ -1,5 +1,25 @@
 {
   "$defs": {
+    "AcceptStaffInvitationInput": {
+      "additionalProperties": false,
+      "properties": {
+        "display_name": {
+          "maxLength": 120,
+          "minLength": 1,
+          "type": "string"
+        },
+        "password": {
+          "maxLength": 128,
+          "minLength": 12,
+          "type": "string"
+        }
+      },
+      "required": [
+        "display_name",
+        "password"
+      ],
+      "type": "object"
+    },
     "AnalyticsQuery": {
       "additionalProperties": false,
       "properties": {
@@ -320,6 +340,41 @@
       },
       "type": "object"
     },
+    "AuthenticatedSessionResponse": {
+      "additionalProperties": false,
+      "properties": {
+        "expires_at": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "role": {
+          "$ref": "#/$defs/PlatformUserRole"
+        },
+        "tenant_id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "user_id": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "venue_ids": {
+          "items": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "user_id",
+        "tenant_id",
+        "role",
+        "venue_ids",
+        "expires_at"
+      ],
+      "type": "object"
+    },
     "AvailabilityQuery": {
       "additionalProperties": false,
       "properties": {
@@ -585,6 +640,20 @@
       ],
       "type": "object"
     },
+    "CompletePasswordResetInput": {
+      "additionalProperties": false,
+      "properties": {
+        "password": {
+          "maxLength": 128,
+          "minLength": 12,
+          "type": "string"
+        }
+      },
+      "required": [
+        "password"
+      ],
+      "type": "object"
+    },
     "ConversationAutomationInput": {
       "additionalProperties": false,
       "properties": {
@@ -800,6 +869,38 @@
       },
       "required": [
         "content"
+      ],
+      "type": "object"
+    },
+    "CreateFirstOwnerInput": {
+      "additionalProperties": false,
+      "properties": {
+        "display_name": {
+          "maxLength": 120,
+          "minLength": 1,
+          "type": "string"
+        },
+        "email": {
+          "format": "email",
+          "maxLength": 320,
+          "type": "string"
+        },
+        "password": {
+          "maxLength": 128,
+          "minLength": 12,
+          "type": "string"
+        },
+        "setup_token": {
+          "maxLength": 128,
+          "minLength": 43,
+          "type": "string"
+        }
+      },
+      "required": [
+        "setup_token",
+        "email",
+        "display_name",
+        "password"
       ],
       "type": "object"
     },
@@ -1871,6 +1972,26 @@
       ],
       "type": "object"
     },
+    "LoginInput": {
+      "additionalProperties": false,
+      "properties": {
+        "email": {
+          "format": "email",
+          "maxLength": 320,
+          "type": "string"
+        },
+        "password": {
+          "maxLength": 128,
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "email",
+        "password"
+      ],
+      "type": "object"
+    },
     "MetadataRecord": {
       "additionalProperties": {
         "$ref": "#/$defs/MetadataValue"
@@ -2197,6 +2318,13 @@
       ],
       "type": "object"
     },
+    "PlatformUserRole": {
+      "enum": [
+        "owner",
+        "staff"
+      ],
+      "type": "string"
+    },
     "PublicBusinessProfileResponse": {
       "additionalProperties": false,
       "properties": {
@@ -2341,6 +2469,20 @@
           "type": "string"
         }
       },
+      "type": "object"
+    },
+    "RequestPasswordResetInput": {
+      "additionalProperties": false,
+      "properties": {
+        "email": {
+          "format": "email",
+          "maxLength": 320,
+          "type": "string"
+        }
+      },
+      "required": [
+        "email"
+      ],
       "type": "object"
     },
     "RescheduleReservationInput": {
@@ -2695,6 +2837,71 @@
       "required": [
         "service_id",
         "name"
+      ],
+      "type": "object"
+    },
+    "SetupStatusResponse": {
+      "additionalProperties": false,
+      "properties": {
+        "setup_available": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "setup_available"
+      ],
+      "type": "object"
+    },
+    "StaffInvitationInput": {
+      "additionalProperties": false,
+      "properties": {
+        "display_name": {
+          "maxLength": 120,
+          "minLength": 1,
+          "type": "string"
+        },
+        "email": {
+          "format": "email",
+          "maxLength": 320,
+          "type": "string"
+        },
+        "venue_ids": {
+          "items": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "minItems": 1,
+          "type": "array"
+        }
+      },
+      "required": [
+        "email",
+        "display_name",
+        "venue_ids"
+      ],
+      "type": "object"
+    },
+    "StaffInvitationResponse": {
+      "additionalProperties": false,
+      "properties": {
+        "expires_at": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "invitation_token": {
+          "maxLength": 128,
+          "minLength": 43,
+          "type": "string"
+        },
+        "user_id": {
+          "format": "uuid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "user_id",
+        "invitation_token",
+        "expires_at"
       ],
       "type": "object"
     },

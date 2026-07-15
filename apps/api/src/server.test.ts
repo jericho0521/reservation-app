@@ -122,6 +122,22 @@ test("returns and safely logs one validated correlation id", async () => {
   assert.equal(entries[0]?.path, "/v1/public/experiences/demo/manage/:redacted");
 });
 
+test("structured logs redact invitation and password-reset capabilities", async () => {
+  const entries: StructuredLogEntry[] = [];
+  const server = createStandaloneNodeServer(async () => jsonResponse(204, undefined), {
+    logger: { write: (entry) => entries.push(entry) },
+  });
+  await withListeningServer(server, async (baseUrl) => {
+    await fetch(`${baseUrl}/v1/auth/staff/invitations/invitation-secret/accept`, { method: "POST" });
+    await fetch(`${baseUrl}/v1/auth/password-reset/reset-secret/complete`, { method: "POST" });
+  });
+  assert.deepEqual(entries.map((entry) => entry.path), [
+    "/v1/auth/staff/invitations/:redacted/accept",
+    "/v1/auth/password-reset/:redacted/complete",
+  ]);
+  assert.doesNotMatch(JSON.stringify(entries), /invitation-secret|reset-secret/u);
+});
+
 test("logs an aborted request exactly once without raw request data", async () => {
   let markHandlerStarted: (() => void) | undefined;
   const handlerStarted = new Promise<void>((resolve) => {
@@ -305,12 +321,50 @@ test("standalone env bootstrap serves configured browser CORS preflight and resp
 
     assert.equal(preflight.status, 204);
     assert.equal(preflight.headers.get("access-control-allow-origin"), "http://frontend.example.test");
-    assert.equal(preflight.headers.get("access-control-allow-methods"), "GET,POST,PATCH,OPTIONS");
+    assert.equal(preflight.headers.get("access-control-allow-credentials"), "true");
+    assert.equal(preflight.headers.get("access-control-allow-methods"), "GET,POST,PUT,PATCH,DELETE,OPTIONS");
     assert.equal(preflight.headers.get("access-control-allow-headers"), "authorization,x-reservation-tenant-id");
     assert.equal(dataResponse.status, 401);
     assert.equal(dataResponse.headers.get("access-control-allow-origin"), "http://frontend.example.test");
     assert.equal(blockedPreflight.status, 403);
     assert.equal(blockedPreflight.headers.get("access-control-allow-origin"), null);
+  });
+});
+
+test("credentialed CORS never reflects wildcard origins", async () => {
+  const server = createStandaloneNodeServer(async () => jsonResponse(200, { ok: true }), {
+    cors: { allowedOrigins: ["*"] },
+  });
+
+  await withListeningServer(server, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/v1/test`, {
+      headers: { Origin: "https://attacker.example" },
+    });
+    assert.equal(response.headers.get("access-control-allow-origin"), null);
+    assert.equal(response.headers.get("access-control-allow-credentials"), null);
+  });
+});
+
+test("writes both authentication Set-Cookie headers without folding them", async () => {
+  const cookies = [
+    "reservation_session=session; Path=/; HttpOnly; Secure; SameSite=Strict",
+    "reservation_csrf=csrf; Path=/; Secure; SameSite=Strict",
+  ];
+  const server = createStandaloneNodeServer(async () => ({
+    ...jsonResponse(200, { ok: true }),
+    headers: { "content-type": "application/json", "set-cookie": cookies },
+  }));
+
+  await withListeningServer(server, async (baseUrl) => {
+    const responseCookies = await new Promise<string[]>((resolve, reject) => {
+      const request = httpRequest(baseUrl, (response) => {
+        response.resume();
+        response.once("end", () => resolve(response.headers["set-cookie"] ?? []));
+      });
+      request.once("error", reject);
+      request.end();
+    });
+    assert.deepEqual(responseCookies, cookies);
   });
 });
 

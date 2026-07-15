@@ -1,3 +1,4 @@
+import { createHash, timingSafeEqual } from "node:crypto";
 import {
   appendStaffReply,
   readAnalytics,
@@ -82,8 +83,28 @@ import {
   type ReservationReadRepositoryPort,
   type ResourceMaintenanceRepositoryPort,
   validatePlatformTenantVenueContext,
+  acceptStaffInvitation,
+  authenticateSession,
+  authorizeVenue,
+  completePasswordReset,
+  createFirstOwner,
+  createOpaqueToken,
+  inviteStaff,
+  loginWithPassword,
+  logoutSession,
+  requestPasswordReset,
+  type PasswordHasher,
+  PlatformAuthError,
+  type PlatformSessionRepository,
+  type StaffRepository,
 } from "@reservation-platform/api";
 import {
+  acceptStaffInvitationInputSchema,
+  completePasswordResetInputSchema,
+  createFirstOwnerInputSchema,
+  loginInputSchema,
+  requestPasswordResetInputSchema,
+  staffInvitationInputSchema,
   chatConfirmReservationInputSchema,
   chatCreateReservationSessionInputSchema,
   chatMessageInputSchema,
@@ -146,8 +167,18 @@ export interface StandaloneApiDependencies {
   readinessCheckTimeoutMs?: number;
   resourceMaintenanceRepository?: ResourceMaintenanceRepositoryPort;
   serviceApiKey?: string;
+  sessionAuth?: StandaloneSessionAuthConfig;
   tenantVenueRepository?: PlatformTenantVenueRepository;
   whatsappModule?: StandaloneApiWhatsAppModule;
+}
+
+export interface StandaloneSessionAuthConfig {
+  repositories: PlatformSessionRepository & StaffRepository;
+  allowedOrigins: readonly string[];
+  passwordHasher?: PasswordHasher;
+  tokenFactory?: () => string;
+  csrfTokenFactory?: () => string;
+  now?: () => Date;
 }
 
 export interface StandaloneApiReadinessState {
@@ -315,6 +346,9 @@ const standaloneHealthBody = {
   readiness: "alive",
 };
 const defaultReadinessCheckTimeoutMs = 2_000;
+const sessionCookieName = "reservation_session";
+const csrfCookieName = "reservation_csrf";
+const sessionMaxAgeSeconds = 43_200;
 
 export function createStandaloneApiHandler(dependencies: StandaloneApiDependencies = {}): StandaloneApiHandler {
   return async (request) => handleStandaloneApiRequest(request, dependencies);
@@ -348,6 +382,14 @@ export async function handleStandaloneApiRequest(
       dependencies.readinessCheck,
       dependencies.readinessCheckTimeoutMs,
     );
+  }
+
+  const sessionAuthResponse = await handleSessionAuthRoute(method, path, request, dependencies.sessionAuth);
+  if (sessionAuthResponse) {
+    return {
+      ...sessionAuthResponse,
+      headers: { ...sessionAuthResponse.headers, "cache-control": "no-store" },
+    };
   }
 
   if (isProtectedPlatformDataRoute(method, path)) {
@@ -812,6 +854,282 @@ export async function handleStandaloneApiRequest(
   return platformError(404, "not_found", "Route not found.");
 }
 
+async function handleSessionAuthRoute(
+  method: string,
+  path: string,
+  request: StandaloneApiRequest,
+  sessionAuth: StandaloneSessionAuthConfig | undefined,
+): Promise<StandaloneApiResponse | undefined> {
+  const isSessionAuthPath = path === "/v1/setup/status"
+    || path === "/v1/setup/owner"
+    || path === "/v1/auth/login"
+    || path === "/v1/auth/logout"
+    || path === "/v1/auth/session"
+    || path === "/v1/auth/staff/invitations"
+    || /^\/v1\/auth\/staff\/invitations\/[^/]+\/accept$/u.test(path)
+    || path === "/v1/auth/password-reset"
+    || /^\/v1\/auth\/password-reset\/[^/]+\/complete$/u.test(path);
+  if (!isSessionAuthPath) return undefined;
+  if (!sessionAuth) return platformError(503, "bad_request", "Session authentication is not configured.");
+
+  try {
+    if (method === "GET" && path === "/v1/setup/status") {
+      const installation = await sessionAuth.repositories.readInstallation();
+      return jsonResponse(200, { setup_available: Boolean(installation && !installation.setupCompleted) });
+    }
+
+    if (method === "POST" && path === "/v1/setup/owner") {
+      const originError = validateSessionOrigin(request, sessionAuth.allowedOrigins);
+      if (originError) return originError;
+      const parsed = createFirstOwnerInputSchema.safeParse(request.body);
+      if (!parsed.success) return platformError(400, "validation_failed", "Owner setup details are invalid.");
+      const result = await createFirstOwner({
+        setupToken: parsed.data.setup_token,
+        input: {
+          email: parsed.data.email,
+          displayName: parsed.data.display_name,
+          password: parsed.data.password,
+        },
+        repositories: sessionAuth.repositories,
+        passwordHasher: sessionAuth.passwordHasher,
+        tokenFactory: sessionAuth.tokenFactory,
+        now: sessionAuth.now?.(),
+      });
+      return sessionCreatedResponse(201, result, sessionAuth);
+    }
+
+    if (method === "POST" && path === "/v1/auth/login") {
+      const originError = validateSessionOrigin(request, sessionAuth.allowedOrigins);
+      if (originError) return originError;
+      const parsed = loginInputSchema.safeParse(request.body);
+      if (!parsed.success) return platformError(400, "validation_failed", "Login details are invalid.");
+      const result = await loginWithPassword({
+        input: parsed.data,
+        repositories: sessionAuth.repositories,
+        passwordHasher: sessionAuth.passwordHasher,
+        tokenFactory: sessionAuth.tokenFactory,
+        now: sessionAuth.now?.(),
+      });
+      return sessionCreatedResponse(200, result, sessionAuth);
+    }
+
+    if (method === "GET" && path === "/v1/auth/session") {
+      const session = await authenticateRequestSession(request, sessionAuth);
+      if (!session) return platformError(401, "unauthorized", "Authentication is required.");
+      return jsonResponse(200, authenticatedSessionBody(session));
+    }
+
+    if (method === "POST" && path === "/v1/auth/logout") {
+      const csrfError = validateSessionCsrf(request, sessionAuth.allowedOrigins);
+      if (csrfError) return csrfError;
+      const token = readCookie(request, sessionCookieName);
+      const session = await authenticateRequestSession(request, sessionAuth);
+      if (!token || !session) return platformError(401, "unauthorized", "Authentication is required.");
+      await logoutSession({ token, repositories: sessionAuth.repositories, now: sessionAuth.now?.() });
+      return {
+        status: 204,
+        headers: { "set-cookie": clearSessionCookies() },
+        body: undefined,
+      };
+    }
+
+    if (method === "POST" && path === "/v1/auth/staff/invitations") {
+      const csrfError = validateSessionCsrf(request, sessionAuth.allowedOrigins);
+      if (csrfError) return csrfError;
+      const session = await authenticateRequestSession(request, sessionAuth);
+      if (!session) return platformError(401, "unauthorized", "Authentication is required.");
+      const parsed = staffInvitationInputSchema.safeParse(request.body);
+      if (!parsed.success) return platformError(400, "validation_failed", "Staff invitation details are invalid.");
+      const result = await inviteStaff({
+        principal: session,
+        input: {
+          email: parsed.data.email,
+          displayName: parsed.data.display_name,
+          venueIds: parsed.data.venue_ids,
+        },
+        repositories: sessionAuth.repositories,
+        passwordHasher: sessionAuth.passwordHasher,
+        tokenFactory: sessionAuth.tokenFactory,
+        now: sessionAuth.now?.(),
+      });
+      return jsonResponse(201, {
+        user_id: result.user.userId,
+        invitation_token: result.invitationToken,
+        expires_at: result.expiresAt,
+      });
+    }
+
+    const invitationMatch = /^\/v1\/auth\/staff\/invitations\/([^/]+)\/accept$/u.exec(path);
+    if (method === "POST" && invitationMatch) {
+      const originError = validateSessionOrigin(request, sessionAuth.allowedOrigins);
+      if (originError) return originError;
+      const parsed = acceptStaffInvitationInputSchema.safeParse(request.body);
+      if (!parsed.success) return platformError(400, "validation_failed", "Staff invitation acceptance details are invalid.");
+      const result = await acceptStaffInvitation({
+        invitationToken: decodeURIComponent(invitationMatch[1]!),
+        input: { displayName: parsed.data.display_name, password: parsed.data.password },
+        repositories: sessionAuth.repositories,
+        passwordHasher: sessionAuth.passwordHasher,
+        tokenFactory: sessionAuth.tokenFactory,
+        now: sessionAuth.now?.(),
+      });
+      return sessionCreatedResponse(200, result, sessionAuth);
+    }
+
+    if (method === "POST" && path === "/v1/auth/password-reset") {
+      const originError = validateSessionOrigin(request, sessionAuth.allowedOrigins);
+      if (originError) return originError;
+      const parsed = requestPasswordResetInputSchema.safeParse(request.body);
+      if (parsed.success) {
+        await requestPasswordReset({
+          input: parsed.data,
+          repositories: sessionAuth.repositories,
+          tokenFactory: sessionAuth.tokenFactory,
+          now: sessionAuth.now?.(),
+        });
+      }
+      return { status: 202, headers: {}, body: undefined };
+    }
+
+    const resetMatch = /^\/v1\/auth\/password-reset\/([^/]+)\/complete$/u.exec(path);
+    if (method === "POST" && resetMatch) {
+      const originError = validateSessionOrigin(request, sessionAuth.allowedOrigins);
+      if (originError) return originError;
+      const parsed = completePasswordResetInputSchema.safeParse(request.body);
+      if (!parsed.success) return platformError(400, "validation_failed", "Password reset details are invalid.");
+      await completePasswordReset({
+        resetToken: decodeURIComponent(resetMatch[1]!),
+        input: parsed.data,
+        repositories: sessionAuth.repositories,
+        passwordHasher: sessionAuth.passwordHasher,
+        now: sessionAuth.now?.(),
+      });
+      return { status: 204, headers: {}, body: undefined };
+    }
+  } catch (error) {
+    return sessionAuthErrorResponse(error);
+  }
+
+  return platformError(404, "not_found", "Route not found.");
+}
+
+function sessionCreatedResponse(
+  status: number,
+  result: Awaited<ReturnType<typeof loginWithPassword>>,
+  sessionAuth: StandaloneSessionAuthConfig,
+): StandaloneApiResponse {
+  const csrfToken = (sessionAuth.csrfTokenFactory ?? createOpaqueToken)();
+  if (!/^[A-Za-z0-9_-]{43}$/u.test(csrfToken)) {
+    return platformError(500, "internal_error", "Session cookie generation failed.");
+  }
+  return {
+    ...jsonResponse(status, authenticatedSessionBody({ ...result.principal, expiresAt: result.expiresAt })),
+    headers: {
+      "content-type": "application/json; charset=utf-8",
+      "set-cookie": sessionCookies(result.token, csrfToken),
+    },
+  };
+}
+
+function authenticatedSessionBody(session: {
+  userId: string;
+  tenantId: string;
+  role: "owner" | "staff";
+  venueIds: readonly string[];
+  expiresAt: string;
+}) {
+  return {
+    user_id: session.userId,
+    tenant_id: session.tenantId,
+    role: session.role,
+    venue_ids: [...session.venueIds],
+    expires_at: session.expiresAt,
+  };
+}
+
+function sessionCookies(sessionToken: string, csrfToken: string): string[] {
+  return [
+    `${sessionCookieName}=${sessionToken}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=${sessionMaxAgeSeconds}`,
+    `${csrfCookieName}=${csrfToken}; Path=/; Secure; SameSite=Strict; Max-Age=${sessionMaxAgeSeconds}`,
+  ];
+}
+
+function clearSessionCookies(): string[] {
+  return [
+    `${sessionCookieName}=; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=0`,
+    `${csrfCookieName}=; Path=/; Secure; SameSite=Strict; Max-Age=0`,
+  ];
+}
+
+async function authenticateRequestSession(
+  request: StandaloneApiRequest,
+  sessionAuth: StandaloneSessionAuthConfig,
+) {
+  const token = readCookie(request, sessionCookieName);
+  return token
+    ? authenticateSession({ token, repositories: sessionAuth.repositories, now: sessionAuth.now?.() })
+    : undefined;
+}
+
+function validateSessionOrigin(
+  request: StandaloneApiRequest,
+  allowedOrigins: readonly string[],
+): StandaloneApiResponse | undefined {
+  const origin = getHeader(request.headers, "Origin");
+  if (!origin || origin === "*" || !allowedOrigins.some((allowed) => allowed !== "*" && allowed === origin)) {
+    return platformError(403, "forbidden", "Request origin is not allowed.");
+  }
+  return undefined;
+}
+
+function validateSessionCsrf(
+  request: StandaloneApiRequest,
+  allowedOrigins: readonly string[],
+): StandaloneApiResponse | undefined {
+  const originError = validateSessionOrigin(request, allowedOrigins);
+  if (originError) return originError;
+  const cookieToken = readCookie(request, csrfCookieName);
+  const headerToken = getHeader(request.headers, "X-CSRF-Token");
+  if (!cookieToken || !headerToken || !constantTimeEqual(cookieToken, headerToken)) {
+    return platformError(403, "forbidden", "CSRF validation failed.");
+  }
+  return undefined;
+}
+
+function constantTimeEqual(left: string, right: string) {
+  const leftDigest = createHash("sha256").update(left, "utf8").digest();
+  const rightDigest = createHash("sha256").update(right, "utf8").digest();
+  return timingSafeEqual(leftDigest, rightDigest);
+}
+
+function readCookie(request: StandaloneApiRequest, name: string): string | undefined {
+  const header = getHeader(request.headers, "Cookie");
+  if (!header) return undefined;
+  let matched: string | undefined;
+  for (const part of header.split(";")) {
+    const separator = part.indexOf("=");
+    if (separator < 0 || part.slice(0, separator).trim() !== name) continue;
+    const value = part.slice(separator + 1).trim();
+    if (!value || matched !== undefined) return undefined;
+    matched = value;
+  }
+  return matched;
+}
+
+function sessionAuthErrorResponse(error: unknown): StandaloneApiResponse {
+  if (!(error instanceof PlatformAuthError)) {
+    return platformError(500, "internal_error", "Authentication request failed.");
+  }
+  const code = error.code === "invalid_credentials"
+    ? "unauthorized"
+    : error.code === "owner_required"
+      ? "forbidden"
+      : error.code === "setup_unavailable"
+        ? "conflict"
+        : "validation_failed";
+  return platformError(error.status, code, error.message);
+}
+
 async function readStandaloneApiReadiness(
   readinessCheck: StandaloneApiReadinessCheck | undefined,
   timeoutMs: number | undefined,
@@ -871,9 +1189,60 @@ async function authorizeStandalonePlatformDataRequest(
   request: StandaloneApiRequest,
   dependencies: StandaloneApiDependencies,
 ): Promise<StandaloneApiResponse | undefined> {
+  const sessionToken = readCookie(request, sessionCookieName);
+  if (sessionToken && dependencies.sessionAuth) {
+    const session = await authenticateSession({
+      token: sessionToken,
+      repositories: dependencies.sessionAuth.repositories,
+      now: dependencies.sessionAuth.now?.(),
+    });
+    if (!session) return platformError(401, "unauthorized", "Authentication is required.");
+    if (request.method !== "GET" && request.method !== "HEAD") {
+      const csrfError = validateSessionCsrf(request, dependencies.sessionAuth.allowedOrigins);
+      if (csrfError) return csrfError;
+    }
+
+    const requestedTenantId = getHeader(request.headers, "X-Reservation-Tenant-Id")?.trim();
+    if (requestedTenantId && requestedTenantId !== session.tenantId) {
+      return platformError(403, "forbidden", "Tenant access is not allowed.");
+    }
+    const requestedVenueId = getHeader(request.headers, "X-Reservation-Venue-Id")?.trim();
+    const venueId = authorizeVenue(session, requestedVenueId);
+    if (requestedVenueId && !venueId) {
+      return platformError(403, "forbidden", "Venue access is not allowed.");
+    }
+    setRequestHeader(request, "X-Reservation-Tenant-Id", session.tenantId);
+    if (venueId) setRequestHeader(request, "X-Reservation-Venue-Id", venueId);
+    if (session.role === "owner" && venueId && !dependencies.tenantVenueRepository) {
+      return platformError(503, "internal_error", "Venue authorization is not configured.");
+    }
+    if (dependencies.tenantVenueRepository) {
+      const validation = await validatePlatformTenantVenueContext(
+        dependencies.tenantVenueRepository,
+        {
+          principal: {
+            subjectId: session.userId,
+            tenantIds: [session.tenantId],
+            ...(session.role === "staff" ? { venueIds: session.venueIds } : {}),
+            roles: [session.role],
+            scopes: [],
+          },
+          subjectId: session.userId,
+          tenantId: session.tenantId,
+          ...(venueId ? { venueId } : {}),
+        },
+        { requireTenant: true },
+      );
+      if (!validation.ok) return jsonResponse(validation.status, validation.body);
+    }
+    return undefined;
+  }
+
   const auth = normalizeStandaloneApiAuthConfig(dependencies);
   if (!auth.serviceApiKey && !auth.verifyBearerToken) {
-    return undefined;
+    return dependencies.sessionAuth
+      ? platformError(401, "unauthorized", "Authentication is required.")
+      : undefined;
   }
 
   const requestContext = readPlatformRequestContext(request.headers ?? {});
@@ -936,6 +1305,15 @@ async function authorizeStandalonePlatformDataRequest(
   }
 
   return undefined;
+}
+
+function setRequestHeader(request: StandaloneApiRequest, name: string, value: string) {
+  const headers = request.headers ?? {};
+  for (const headerName of Object.keys(headers)) {
+    if (headerName.toLowerCase() === name.toLowerCase()) delete headers[headerName];
+  }
+  headers[name.toLowerCase()] = value;
+  request.headers = headers;
 }
 
 function normalizeStandaloneApiAuthConfig(

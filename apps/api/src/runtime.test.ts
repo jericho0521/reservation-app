@@ -334,6 +334,7 @@ test("standalone Supabase runtime wires public and admin clients to repository f
     supabaseServiceRoleKey: "service-role-key",
   }, {
     createClient,
+    sessionAllowedOrigins: ["https://console.example"],
     repositoryFactories: recordingRepositoryFactories(factoryCalls),
   });
 
@@ -353,6 +354,7 @@ test("standalone Supabase runtime wires public and admin clients to repository f
   ]);
 
   assert.deepEqual(factoryCalls, [
+    { name: "createSessionRepository", adminClient: clients[1] },
     { name: "createCatalogRepository", publicClient: clients[0], adminClient: clients[1] },
     { name: "createAvailabilityRepository", publicClient: clients[0], adminClient: clients[1] },
     { name: "createAnalyticsRepository", adminClient: clients[1] },
@@ -386,6 +388,7 @@ test("standalone Supabase runtime wires public and admin clients to repository f
   assert.equal(Boolean(dependencies.operatingHoursRepository), true);
   assert.equal(Boolean(dependencies.operationsOverviewRepository), true);
   assert.equal(Boolean(dependencies.tenantVenueRepository), true);
+  assert.deepEqual(dependencies.sessionAuth?.allowedOrigins, ["https://console.example"]);
 });
 
 test("standalone Supabase runtime skips reservation repositories when manifest disables reservations", () => {
@@ -423,7 +426,8 @@ test("standalone Supabase runtime skips reservation repositories when manifest d
     },
   });
 
-  assert.deepEqual(factoryCalls, []);
+  assert.deepEqual(factoryCalls.map(({ name }) => name), ["createSessionRepository"]);
+  assert.equal(Boolean(dependencies.sessionAuth), true);
   assert.equal(dependencies.catalogRepository, undefined);
   assert.equal(dependencies.reservationCreateRepository, undefined);
 });
@@ -718,6 +722,10 @@ function recordingRepositoryFactories(
     createTenantVenueRepository(client) {
       recordAdminFactoryCall(calls, "createTenantVenueRepository", client);
       return repository as NonNullable<StandaloneApiDependencies["tenantVenueRepository"]>;
+    },
+    createSessionRepository(client) {
+      recordAdminFactoryCall(calls, "createSessionRepository", client);
+      return repository as NonNullable<StandaloneApiDependencies["sessionAuth"]>["repositories"];
     },
   };
 }

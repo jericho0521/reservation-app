@@ -6,15 +6,15 @@ export interface ContractOperation {
   operationId: string;
   summary: string;
   tags: string[];
-  responseSchema: string;
-  successStatus?: "200" | "201";
+  responseSchema?: string;
+  successStatus?: "200" | "201" | "202" | "204";
   querySchema?: string;
   requestBodySchema?: string;
   pathParameters?: string[];
   idempotencyRequired?: boolean;
   moduleGated?: "chat";
   disabledErrorCode?: string;
-  authentication?: "public";
+  authentication?: "public" | "cookie";
 }
 
 const ref = (name: string) => ({ $ref: `#/$defs/${name}` });
@@ -60,6 +60,50 @@ export const publicJsonSchemaDefinitions: Record<string, JsonSchema> = {
     venue_id: stringSchema,
     correlation_id: stringSchema,
   }),
+  PlatformUserRole: {
+    type: "string",
+    enum: ["owner", "staff"],
+  },
+  SetupStatusResponse: objectSchema({
+    setup_available: booleanSchema,
+  }, ["setup_available"]),
+  CreateFirstOwnerInput: objectSchema({
+    setup_token: { type: "string", minLength: 43, maxLength: 128 },
+    email: { type: "string", format: "email", maxLength: 320 },
+    display_name: { type: "string", minLength: 1, maxLength: 120 },
+    password: { type: "string", minLength: 12, maxLength: 128 },
+  }, ["setup_token", "email", "display_name", "password"]),
+  LoginInput: objectSchema({
+    email: { type: "string", format: "email", maxLength: 320 },
+    password: { type: "string", minLength: 1, maxLength: 128 },
+  }, ["email", "password"]),
+  AuthenticatedSessionResponse: objectSchema({
+    user_id: { type: "string", format: "uuid" },
+    tenant_id: { type: "string", minLength: 1 },
+    role: ref("PlatformUserRole"),
+    venue_ids: { type: "array", items: { type: "string", format: "uuid" } },
+    expires_at: { type: "string", format: "date-time" },
+  }, ["user_id", "tenant_id", "role", "venue_ids", "expires_at"]),
+  StaffInvitationInput: objectSchema({
+    email: { type: "string", format: "email", maxLength: 320 },
+    display_name: { type: "string", minLength: 1, maxLength: 120 },
+    venue_ids: { type: "array", minItems: 1, items: { type: "string", format: "uuid" } },
+  }, ["email", "display_name", "venue_ids"]),
+  StaffInvitationResponse: objectSchema({
+    user_id: { type: "string", format: "uuid" },
+    invitation_token: { type: "string", minLength: 43, maxLength: 128 },
+    expires_at: { type: "string", format: "date-time" },
+  }, ["user_id", "invitation_token", "expires_at"]),
+  AcceptStaffInvitationInput: objectSchema({
+    display_name: { type: "string", minLength: 1, maxLength: 120 },
+    password: { type: "string", minLength: 12, maxLength: 128 },
+  }, ["display_name", "password"]),
+  RequestPasswordResetInput: objectSchema({
+    email: { type: "string", format: "email", maxLength: 320 },
+  }, ["email"]),
+  CompletePasswordResetInput: objectSchema({
+    password: { type: "string", minLength: 12, maxLength: 128 },
+  }, ["password"]),
   MetadataResponse: objectSchema({
     api_version: stringSchema,
     modules: stringArraySchema,
@@ -673,6 +717,97 @@ export const publicJsonSchemaDefinitions: Record<string, JsonSchema> = {
 };
 
 export const publicContractOperations: ContractOperation[] = [
+  {
+    method: "get",
+    path: "/v1/setup/status",
+    operationId: "getSetupStatus",
+    summary: "Check whether first-owner setup is available.",
+    tags: ["Authentication"],
+    responseSchema: "SetupStatusResponse",
+    authentication: "public",
+  },
+  {
+    method: "post",
+    path: "/v1/setup/owner",
+    operationId: "createFirstOwner",
+    summary: "Create the installation's first owner.",
+    tags: ["Authentication"],
+    requestBodySchema: "CreateFirstOwnerInput",
+    responseSchema: "AuthenticatedSessionResponse",
+    successStatus: "201",
+    authentication: "public",
+  },
+  {
+    method: "post",
+    path: "/v1/auth/login",
+    operationId: "login",
+    summary: "Create an owner or staff session.",
+    tags: ["Authentication"],
+    requestBodySchema: "LoginInput",
+    responseSchema: "AuthenticatedSessionResponse",
+    authentication: "public",
+  },
+  {
+    method: "post",
+    path: "/v1/auth/logout",
+    operationId: "logout",
+    summary: "Revoke the current session.",
+    tags: ["Authentication"],
+    successStatus: "204",
+    authentication: "cookie",
+  },
+  {
+    method: "get",
+    path: "/v1/auth/session",
+    operationId: "getSession",
+    summary: "Read the current authenticated session.",
+    tags: ["Authentication"],
+    responseSchema: "AuthenticatedSessionResponse",
+    authentication: "cookie",
+  },
+  {
+    method: "post",
+    path: "/v1/auth/staff/invitations",
+    operationId: "inviteStaff",
+    summary: "Invite a staff user to assigned venues.",
+    tags: ["Authentication"],
+    requestBodySchema: "StaffInvitationInput",
+    responseSchema: "StaffInvitationResponse",
+    successStatus: "201",
+    authentication: "cookie",
+  },
+  {
+    method: "post",
+    path: "/v1/auth/staff/invitations/{token}/accept",
+    operationId: "acceptStaffInvitation",
+    summary: "Accept a single-use staff invitation.",
+    tags: ["Authentication"],
+    pathParameters: ["token"],
+    requestBodySchema: "AcceptStaffInvitationInput",
+    responseSchema: "AuthenticatedSessionResponse",
+    authentication: "public",
+  },
+  {
+    method: "post",
+    path: "/v1/auth/password-reset",
+    operationId: "requestPasswordReset",
+    summary: "Request a password reset without revealing account existence.",
+    tags: ["Authentication"],
+    requestBodySchema: "RequestPasswordResetInput",
+    successStatus: "202",
+    authentication: "public",
+  },
+  {
+    method: "post",
+    path: "/v1/auth/password-reset/{token}/complete",
+    operationId: "completePasswordReset",
+    summary: "Complete a single-use password reset.",
+    tags: ["Authentication"],
+    pathParameters: ["token"],
+    requestBodySchema: "CompletePasswordResetInput",
+    successStatus: "204",
+    authentication: "public",
+  },
   {
     method: "get",
     path: "/v1/experience/presets",

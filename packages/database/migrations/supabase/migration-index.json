@@ -173,6 +173,14 @@
       "scope": "reservation-platform",
       "sha256": "2a5fc975898a2dfa5bee0d751ca9e794913951b1956e24effbf0da6aab3fcf73",
       "bytes": 13696
+    },
+    {
+      "order": 22,
+      "path": "packages/database/migrations/supabase/000022_password_reset.sql",
+      "module": "core",
+      "scope": "reservation-platform",
+      "sha256": "3b2bcc0196d684b7555bd8f9c18e3177c58dc0e8b5ad113bb0a88d720dd33f23",
+      "bytes": 4142
     }
   ],
   "optionalMigrations": [

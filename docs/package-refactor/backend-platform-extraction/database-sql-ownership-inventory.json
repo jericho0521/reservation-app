@@ -227,6 +227,16 @@
       "notes": [
         "Backend-owned singleton installation, users, venue assignments, hashed sessions and auth tokens, and privileged audit event persistence."
       ]
+    },
+    {
+      "path": "packages/database/migrations/supabase/000022_password_reset.sql",
+      "classification": "core-platform",
+      "intendedBackendDestination": [
+        "packages/database/migrations/supabase/000022_password_reset.sql"
+      ],
+      "notes": [
+        "Backend-owned atomic password-reset capability issuance, single-use completion, and session revocation."
+      ]
     }
   ]
 }

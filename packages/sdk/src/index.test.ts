@@ -8,6 +8,87 @@ import {
   isPlatformError,
 } from "./index.js";
 
+test("authentication SDK methods use cookie credentials and omit tokens from session bodies", async () => {
+  const requests: Array<{ url: string; init?: RequestInit }> = [];
+  const session = {
+    user_id: "11111111-1111-4111-8111-111111111111",
+    tenant_id: "tenant_1",
+    role: "owner",
+    venue_ids: [],
+    expires_at: "2026-07-15T12:00:00.000Z",
+  };
+  const client = createReservationPlatformClient({
+    baseUrl: "https://platform.example",
+    fetch: async (url, init) => {
+      requests.push({ url: String(url), init });
+      const path = new URL(String(url)).pathname;
+      if (path === "/v1/setup/status") return jsonResponse({ setup_available: true });
+      if (path === "/v1/auth/staff/invitations") {
+        return jsonResponse({
+          user_id: "22222222-2222-4222-8222-222222222222",
+          invitation_token: "i".repeat(43),
+          expires_at: "2026-07-16T00:00:00.000Z",
+        });
+      }
+      if (path.endsWith("/password-reset") || path.endsWith("/complete") || path.endsWith("/logout")) {
+        return new Response(null, { status: path.endsWith("/password-reset") ? 202 : 204 });
+      }
+      return jsonResponse(session);
+    },
+  });
+
+  await client.getSetupStatus();
+  await client.createFirstOwner({
+    setup_token: "s".repeat(43),
+    email: "owner@example.com",
+    display_name: "Owner",
+    password: "correct horse battery staple",
+  });
+  await client.login({ email: "owner@example.com", password: "correct horse battery staple" });
+  await client.getSession();
+  await client.inviteStaff({
+    email: "staff@example.com",
+    display_name: "Staff",
+    venue_ids: ["33333333-3333-4333-8333-333333333333"],
+  });
+  await client.acceptStaffInvitation("opaque/token", {
+    display_name: "Staff",
+    password: "correct horse battery staple",
+  });
+  await client.requestPasswordReset({ email: "owner@example.com" });
+  await client.completePasswordReset("reset/token", { password: "another correct password" });
+  await client.logout();
+
+  assert.deepEqual(requests.map(({ url, init }) => [new URL(url).pathname, init?.method]), [
+    ["/v1/setup/status", "GET"],
+    ["/v1/setup/owner", "POST"],
+    ["/v1/auth/login", "POST"],
+    ["/v1/auth/session", "GET"],
+    ["/v1/auth/staff/invitations", "POST"],
+    ["/v1/auth/staff/invitations/opaque%2Ftoken/accept", "POST"],
+    ["/v1/auth/password-reset", "POST"],
+    ["/v1/auth/password-reset/reset%2Ftoken/complete", "POST"],
+    ["/v1/auth/logout", "POST"],
+  ]);
+  requests.forEach(({ init }) => assert.equal(init?.credentials, "include"));
+  assert.equal(String(requests[1]?.init?.body).includes("session_token"), false);
+});
+
+test("SDK forwards an explicitly configured credentials mode", async () => {
+  let credentials: RequestCredentials | undefined;
+  const client = createReservationPlatformClient({
+    baseUrl: "https://platform.example",
+    credentials: "same-origin",
+    fetch: async (_url, init) => {
+      credentials = init?.credentials;
+      return jsonResponse({ api_version: "v1", modules: [] });
+    },
+  });
+
+  await client.getMetadata();
+  assert.equal(credentials, "same-origin");
+});
+
 test("experience SDK methods use scoped owner and public routes", async () => {
   const requests: Array<{ url: string; init?: RequestInit }> = [];
   const workspace = {

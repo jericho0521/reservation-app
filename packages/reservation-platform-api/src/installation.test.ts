@@ -23,9 +23,11 @@ function repository(): PlatformSessionRepository & { ownerCalls: unknown[]; sess
     },
     async createUser() { throw new Error("unused"); },
     async findUserByEmail() { return undefined; },
-    async createSession(input) { sessionCalls.push(input); },
+    async createSession(input) { sessionCalls.push(input); return true; },
     async readSession() { return undefined; },
     async revokeSession() {},
+    async createPasswordResetToken() {},
+    async completePasswordReset() { return false; },
   };
 }
 

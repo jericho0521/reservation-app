@@ -243,6 +243,17 @@
       ]
     },
     {
+      "kind": "core-migration",
+      "order": 22,
+      "targetPath": "packages/database/migrations/supabase/000022_password_reset.sql",
+      "sourceAssets": [
+        {
+          "path": "packages/database/migrations/supabase/000022_password_reset.sql",
+          "section": "Atomic password-reset token issuance, single-use completion, and session revocation"
+        }
+      ]
+    },
+    {
       "kind": "optional-ai-retrieval",
       "targetPath": "packages/database/migrations/supabase/optional/ai-retrieval/000001_knowledge_chunks.sql",
       "sourceAssets": [

@@ -44,6 +44,7 @@ import {
   createSupabaseReservationReadRepository,
   createSupabaseReservationRepository,
   createSupabaseResourceMaintenanceRepository,
+  createSupabasePlatformSessionRepository,
   createSupabaseTenantVenueRepository,
   type ExperienceSupabaseLikeClient,
   type ExperienceKnowledgeSupabaseClient,
@@ -51,6 +52,7 @@ import {
   type ConversationSupabaseClient,
   type OperationsOverviewSupabaseClient,
   type AnalyticsSupabaseClient,
+  type PlatformSessionSupabaseClient,
 } from "@project-play/reservations-supabase";
 import {
   BaileysWhatsAppSessionAdapter,
@@ -183,6 +185,7 @@ export interface StandaloneSupabaseRepositoryFactories {
   createOperatingHoursRepository(client: StandaloneSupabaseClient): NonNullable<StandaloneApiDependencies["operatingHoursRepository"]>;
   createOperationsOverviewRepository(client: StandaloneSupabaseClient): NonNullable<StandaloneApiDependencies["operationsOverviewRepository"]>;
   createTenantVenueRepository(client: StandaloneSupabaseClient): NonNullable<StandaloneApiDependencies["tenantVenueRepository"]>;
+  createSessionRepository(client: StandaloneSupabaseClient): NonNullable<StandaloneApiDependencies["sessionAuth"]>["repositories"];
 }
 
 export interface StandaloneSupabaseRuntimeOptions {
@@ -190,6 +193,7 @@ export interface StandaloneSupabaseRuntimeOptions {
   fetch?: typeof fetch;
   loadCoreMigrationPlan?: () => Promise<readonly CoreMigrationLedgerEntry[]>;
   platformConfig?: PlatformRuntimeConfig;
+  sessionAllowedOrigins?: readonly string[];
   repositoryFactories?: Partial<StandaloneSupabaseRepositoryFactories>;
 }
 
@@ -240,6 +244,9 @@ const defaultRepositoryFactories: StandaloneSupabaseRepositoryFactories = {
   },
   createOperationsOverviewRepository: (client) => createSupabaseOperationsOverviewRepository(client as unknown as OperationsOverviewSupabaseClient),
   createTenantVenueRepository: createSupabaseTenantVenueRepository,
+  createSessionRepository: (client) => createSupabasePlatformSessionRepository(
+    client as unknown as PlatformSessionSupabaseClient,
+  ),
 };
 
 export function createStandaloneSupabaseDependencies(
@@ -267,6 +274,10 @@ export function createStandaloneSupabaseDependencies(
   );
   const publicAdminClients = { publicClient, adminClient };
   const authDependencies = standaloneServiceAuthDependenciesFromConfig(normalizedConfig);
+  const sessionAuth = {
+    repositories: repositoryFactories.createSessionRepository(adminClient),
+    allowedOrigins: options.sessionAllowedOrigins ?? [],
+  };
   const reservationsEnabled = options.platformConfig ? options.platformConfig.modules.reservations.enabled : true;
   const platformDependencies = reservationsEnabled
     ? {
@@ -291,6 +302,7 @@ export function createStandaloneSupabaseDependencies(
 
   return {
     ...authDependencies,
+    sessionAuth,
     ...platformDependencies,
     readinessCheck: createStandaloneSupabaseReadinessCheck(
       adminClient,
@@ -390,6 +402,7 @@ export function createStandaloneSupabaseDependenciesFromEnv(
   const runtimeOptions = {
     ...options,
     platformConfig,
+    sessionAllowedOrigins: options.sessionAllowedOrigins ?? createStandaloneCorsOptionsFromEnv(env).allowedOrigins,
   };
   const config = standaloneSupabaseConfigFromEnv(env);
   const normalizedConfig = normalizeStandaloneSupabaseConfig(config);

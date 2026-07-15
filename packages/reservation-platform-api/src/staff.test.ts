@@ -13,7 +13,8 @@ function repository(): PlatformSessionRepository & StaffRepository & { calls: un
     async readInstallation() { return undefined; }, async consumeSetupToken() { return undefined; }, async createFirstOwner() { return undefined; },
     async createUser(input) { calls.push(["createUser", input]); return invited; },
     async findUserByEmail() { return undefined; },
-    async createSession(input) { calls.push(["createSession", input]); }, async readSession() { return undefined; }, async revokeSession() {},
+    async createSession(input) { calls.push(["createSession", input]); return true; }, async readSession() { return undefined; }, async revokeSession() {},
+    async createPasswordResetToken() {}, async completePasswordReset() { return false; },
     async createStaffInvitation(input) { calls.push(["createStaffInvitation", input]); return invited; },
     async acceptStaffInvitation(input) { calls.push(["acceptStaffInvitation", input]); return { ...invited, displayName: input.displayName, passwordHash: input.passwordHash, status: "active" }; },
   };

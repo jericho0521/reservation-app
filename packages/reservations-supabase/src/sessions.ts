@@ -37,6 +37,10 @@ export interface AuthenticatedPrincipal {
   venueIds: readonly string[];
 }
 
+export interface AuthenticatedSessionRecord extends AuthenticatedPrincipal {
+  expiresAt: string;
+}
+
 export interface PlatformUserRecord extends AuthenticatedPrincipal {
   email: string;
   displayName: string;
@@ -72,14 +76,26 @@ export interface PlatformSessionRepository extends InstallationRepository {
   ): Promise<PlatformUserRecord | undefined>;
   createSession(input: {
     userId: string;
+    expectedPasswordHash: string;
     tokenHash: string;
     expiresAt: string;
-  }): Promise<void>;
+  }): Promise<boolean>;
   readSession(
     tokenHash: string,
     now: string,
-  ): Promise<AuthenticatedPrincipal | undefined>;
+  ): Promise<AuthenticatedSessionRecord | undefined>;
   revokeSession(tokenHash: string, now: string): Promise<void>;
+  createPasswordResetToken(input: {
+    tenantId: string;
+    email: string;
+    tokenHash: string;
+    expiresAt: string;
+  }): Promise<void>;
+  completePasswordReset(input: {
+    tokenHash: string;
+    now: string;
+    passwordHash: string;
+  }): Promise<boolean>;
 }
 
 export interface PlatformStaffRepository {
@@ -167,12 +183,15 @@ export function createSupabasePlatformSessionRepository(
       if (!sha256Pattern.test(input.tokenHash)) {
         throw new Error("Platform session hash is invalid.");
       }
-      const result = await client.from("platform_sessions").insert([{
-        user_id: input.userId,
-        token_hash: input.tokenHash,
-        expires_at: input.expiresAt,
-      }]);
+      const result = await client.rpc("platform_create_session", {
+        p_user_id: input.userId,
+        p_expected_password_hash: input.expectedPasswordHash,
+        p_token_hash: input.tokenHash,
+        p_expires_at: input.expiresAt,
+      }).maybeSingle();
       assertQuerySucceeded(result, "Failed to create platform session.");
+      return result.data !== null
+        && asRecord(result.data, "platform session creation result").created === true;
     },
     async readSession(tokenHash, now) {
       if (!sha256Pattern.test(tokenHash) || !Number.isFinite(Date.parse(now))) return undefined;
@@ -204,6 +223,7 @@ export function createSupabasePlatformSessionRepository(
         tenantId: user.tenantId,
         role: user.role,
         venueIds: user.venueIds,
+        expiresAt: row.expires_at,
       };
     },
     async revokeSession(tokenHash, now) {
@@ -213,6 +233,29 @@ export function createSupabasePlatformSessionRepository(
         .update({ revoked_at: now })
         .eq("token_hash", tokenHash);
       assertQuerySucceeded(result, "Failed to revoke platform session.");
+    },
+    async createPasswordResetToken(input) {
+      const email = normalizeEmail(input.email);
+      if (!email || !sha256Pattern.test(input.tokenHash)) return;
+      const result = await client.rpc("platform_create_password_reset", {
+        p_tenant_id: input.tenantId,
+        p_email: email,
+        p_token_hash: input.tokenHash,
+        p_expires_at: input.expiresAt,
+      }).maybeSingle();
+      assertQuerySucceeded(result, "Failed to create password reset token.");
+    },
+    async completePasswordReset(input) {
+      if (!sha256Pattern.test(input.tokenHash)) return false;
+      const result = await client.rpc("platform_complete_password_reset", {
+        p_token_hash: input.tokenHash,
+        p_now: input.now,
+        p_password_hash: input.passwordHash,
+      }).maybeSingle();
+      assertQuerySucceeded(result, "Failed to complete password reset.");
+      if (!result.data) return false;
+      const row = asRecord(result.data, "password reset result");
+      return row.completed === true;
     },
     async createStaffInvitation(input) {
       const email = normalizeEmail(input.email);

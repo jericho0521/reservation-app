@@ -1,4 +1,6 @@
 import type {
+  AcceptStaffInvitationInput,
+  AuthenticatedSessionResponse,
   AvailabilityQuery,
   AvailabilityResponse,
   AnalyticsQuery,
@@ -14,6 +16,8 @@ import type {
   ChatMessageInput,
   ChatMessageResponse,
   ChatSessionResponse,
+  CompletePasswordResetInput,
+  CreateFirstOwnerInput,
   CreateReservationInput,
   CreateResourceMaintenanceInput,
   EndResourceMaintenanceInput,
@@ -45,6 +49,7 @@ import type {
   ListServicesResponse,
   ListVenuesQuery,
   ListVenuesResponse,
+  LoginInput,
   MetadataResponse,
   OperationsOverviewResponse,
   PlatformErrorBody,
@@ -53,11 +58,15 @@ import type {
   PublicChatConversationResponse,
   PublicChatMessageInput,
   ReservationResponse,
+  RequestPasswordResetInput,
   RescheduleReservationInput,
   ResourceLayoutResponse,
   ResourceMaintenanceResponse,
   ResourceResponse,
   ServiceResponse,
+  SetupStatusResponse,
+  StaffInvitationInput,
+  StaffInvitationResponse,
   TenantResponse,
   UpdateReservationPatch,
   VenueResponse,
@@ -92,6 +101,7 @@ export interface ReservationPlatformClientOptions {
   venueId?: string;
   apiVersion?: "v1" | string;
   getAccessToken?: () => Promise<string | null | undefined> | string | null | undefined;
+  credentials?: RequestCredentials;
   headers?: HeadersInit | (() => HeadersInit | Promise<HeadersInit>);
   fetch?: typeof fetch;
   timeoutMs?: number;
@@ -150,6 +160,15 @@ export function createIdempotencyKey(prefix = "reservation-platform") {
 }
 
 export interface ReservationPlatformClient {
+  getSetupStatus(options?: RequestOptions): Promise<SetupStatusResponse>;
+  createFirstOwner(input: CreateFirstOwnerInput, options?: RequestOptions): Promise<AuthenticatedSessionResponse>;
+  login(input: LoginInput, options?: RequestOptions): Promise<AuthenticatedSessionResponse>;
+  logout(options?: RequestOptions): Promise<void>;
+  getSession(options?: RequestOptions): Promise<AuthenticatedSessionResponse>;
+  inviteStaff(input: StaffInvitationInput, options?: RequestOptions): Promise<StaffInvitationResponse>;
+  acceptStaffInvitation(token: string, input: AcceptStaffInvitationInput, options?: RequestOptions): Promise<AuthenticatedSessionResponse>;
+  requestPasswordReset(input: RequestPasswordResetInput, options?: RequestOptions): Promise<void>;
+  completePasswordReset(token: string, input: CompletePasswordResetInput, options?: RequestOptions): Promise<void>;
   listExperiencePresets(options?: RequestOptions): Promise<{ presets: ExperiencePresetSummary[] }>;
   getExperienceWorkspace(options?: RequestOptions): Promise<ExperienceWorkspaceResponse>;
   validateExperienceWorkspace(options?: RequestOptions): Promise<ExperienceValidationResponse>;
@@ -231,6 +250,8 @@ interface RequestConfig {
   options?: RequestOptions;
   stream?: boolean;
   public?: boolean;
+  auth?: boolean;
+  emptyResponse?: boolean;
 }
 
 export function createReservationPlatformClient(
@@ -239,6 +260,35 @@ export function createReservationPlatformClient(
   const request = createRequester(clientOptions);
 
   return {
+    getSetupStatus: (options) => request({ method: "GET", path: "/setup/status", options, auth: true }),
+    createFirstOwner: (input, options) => request({ method: "POST", path: "/setup/owner", body: input, options, auth: true }),
+    login: (input, options) => request({ method: "POST", path: "/auth/login", body: input, options, auth: true }),
+    logout: (options) => request({ method: "POST", path: "/auth/logout", options, auth: true, emptyResponse: true }),
+    getSession: (options) => request({ method: "GET", path: "/auth/session", options, auth: true }),
+    inviteStaff: (input, options) => request({ method: "POST", path: "/auth/staff/invitations", body: input, options, auth: true }),
+    acceptStaffInvitation: (token, input, options) => request({
+      method: "POST",
+      path: `/auth/staff/invitations/${encodeURIComponent(token)}/accept`,
+      body: input,
+      options,
+      auth: true,
+    }),
+    requestPasswordReset: (input, options) => request({
+      method: "POST",
+      path: "/auth/password-reset",
+      body: input,
+      options,
+      auth: true,
+      emptyResponse: true,
+    }),
+    completePasswordReset: (token, input, options) => request({
+      method: "POST",
+      path: `/auth/password-reset/${encodeURIComponent(token)}/complete`,
+      body: input,
+      options,
+      auth: true,
+      emptyResponse: true,
+    }),
     listExperiencePresets: (options) => request({ method: "GET", path: "/experience/presets", options }),
     getExperienceWorkspace: (options) => request({ method: "GET", path: "/experience/workspace", options }),
     validateExperienceWorkspace: (options) => request({ method: "GET", path: "/experience/validation", options }),
@@ -407,6 +457,7 @@ function createRequester(clientOptions: ReservationPlatformClientOptions) {
       method: config.method,
       headers,
       signal: controller.signal,
+      credentials: config.auth ? clientOptions.credentials ?? "include" : clientOptions.credentials,
     };
 
     if (config.body !== undefined) {
@@ -438,6 +489,10 @@ function createRequester(clientOptions: ReservationPlatformClientOptions) {
               });
             }
             return response.body as T;
+          }
+
+          if (config.emptyResponse || response.status === 204) {
+            return undefined as T;
           }
 
           return await response.json() as T;

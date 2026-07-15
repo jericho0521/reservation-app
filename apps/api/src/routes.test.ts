@@ -40,6 +40,8 @@ import type {
   OperatingHoursRepository,
   OperationsOverviewRepository,
   PlatformCatalogRepository,
+  PlatformSessionRepository,
+  StaffRepository,
   PlatformTenantVenueRepository,
   ReservationCreateRepositoryPort,
   ReservationMutationRepositoryPort,
@@ -123,6 +125,244 @@ function fakeExperienceRepository(
     ...overrides,
   };
 }
+
+function authRepository(overrides: Partial<PlatformSessionRepository & StaffRepository> = {}): PlatformSessionRepository & StaffRepository {
+  const activeUser = {
+    userId: "223e4567-e89b-42d3-a456-426614174000",
+    tenantId: "tenant-1",
+    email: "owner@example.com",
+    displayName: "Owner",
+    passwordHash: "$argon2id$hash",
+    role: "owner" as const,
+    status: "active" as const,
+    venueIds: ["123e4567-e89b-42d3-a456-426614174000"],
+  };
+  return {
+    async readInstallation() { return { installationId: "installation-1", tenantId: "tenant-1", domain: "console.example", setupCompleted: false }; },
+    async consumeSetupToken() { return undefined; },
+    async createFirstOwner() { return { installation: { installationId: "installation-1", tenantId: "tenant-1", domain: "console.example", setupCompleted: true }, user: activeUser }; },
+    async createUser() { return activeUser; },
+    async findUserByEmail() { return activeUser; },
+    async createSession() { return true; },
+    async readSession() { return { ...activeUser, expiresAt: "2026-07-15T12:00:00.000Z" }; },
+    async revokeSession() {},
+    async createPasswordResetToken() {},
+    async completePasswordReset() { return true; },
+    async createStaffInvitation() { return { ...activeUser, role: "staff", status: "invited" }; },
+    async acceptStaffInvitation() { return { ...activeUser, role: "staff", status: "active" }; },
+    ...overrides,
+  };
+}
+
+const authOrigin = "https://console.example";
+
+test("setup and login issue secure cookies without exposing session tokens", async () => {
+  const authOptions = {
+    allowedOrigins: [authOrigin], passwordHasher: { hash: async () => "$argon2id$hash", verify: async () => true },
+    tokenFactory: () => "s".repeat(43), csrfTokenFactory: () => "c".repeat(43),
+  };
+  for (const [request, repositories] of [[{
+    method: "POST", path: "/v1/setup/owner", headers: { origin: authOrigin },
+    body: { setup_token: "a".repeat(43), email: "owner@example.com", display_name: "Owner", password: "correct horse battery staple" },
+  }, authRepository()], [{
+    method: "POST", path: "/v1/auth/login", headers: { origin: authOrigin },
+    body: { email: "owner@example.com", password: "correct horse battery staple" },
+  }, authRepository({ readInstallation: async () => ({ installationId: "installation-1", tenantId: "tenant-1", domain: "console.example", setupCompleted: true }) })]] as const) {
+    const response = await handleStandaloneApiRequest(request, { sessionAuth: { ...authOptions, repositories } });
+    assert.equal(JSON.stringify(response.body).includes("s".repeat(43)), false);
+    assert.deepEqual(response.headers["set-cookie"], [
+      `reservation_session=${"s".repeat(43)}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=43200`,
+      `reservation_csrf=${"c".repeat(43)}; Path=/; Secure; SameSite=Strict; Max-Age=43200`,
+    ], JSON.stringify({ path: request.path, status: response.status, body: response.body }));
+  }
+});
+
+test("login returns the same generic 401 for unknown email and wrong password", async () => {
+  const bodies = [];
+  for (const repositories of [authRepository({ findUserByEmail: async () => undefined }), authRepository()]) {
+    const response = await handleStandaloneApiRequest({
+      method: "POST", path: "/v1/auth/login", headers: { origin: authOrigin },
+      body: { email: "owner@example.com", password: "wrong" },
+    }, { sessionAuth: { repositories, allowedOrigins: [authOrigin], passwordHasher: { hash: async () => "$hash", verify: async () => false } } });
+    assert.equal(response.status, 401);
+    bodies.push(response.body);
+  }
+  assert.deepEqual(bodies[0], bodies[1]);
+  const blockedOrigin = await handleStandaloneApiRequest({
+    method: "POST", path: "/v1/auth/login", headers: { origin: "https://attacker.example" },
+    body: { email: "owner@example.com", password: "wrong" },
+  }, { sessionAuth: { repositories: authRepository(), allowedOrigins: [authOrigin] } });
+  assert.equal(blockedOrigin.status, 403);
+});
+
+test("cookie mutations reject mismatched CSRF and staff reject unassigned venues", async () => {
+  const cookie = `reservation_session=${"s".repeat(43)}; reservation_csrf=${"c".repeat(43)}`;
+  const csrfDenied = await handleStandaloneApiRequest({
+    method: "PUT", path: "/v1/experience/draft",
+    headers: { cookie, origin: authOrigin, "x-csrf-token": "wrong", "x-reservation-venue-id": "123e4567-e89b-42d3-a456-426614174000" }, body: {},
+  }, { sessionAuth: { repositories: authRepository(), allowedOrigins: [authOrigin] }, experienceStudioRepository: fakeExperienceRepository() });
+  const venueDenied = await handleStandaloneApiRequest({
+    method: "GET", path: "/v1/experience/workspace",
+    headers: { cookie: `reservation_session=${"s".repeat(43)}`, "x-reservation-venue-id": "323e4567-e89b-42d3-a456-426614174000" },
+  }, {
+    sessionAuth: { repositories: authRepository({ readSession: async () => ({ userId: "223e4567-e89b-42d3-a456-426614174000", tenantId: "tenant-1", role: "staff", venueIds: ["123e4567-e89b-42d3-a456-426614174000"], expiresAt: "2026-07-15T12:00:00.000Z" }) }), allowedOrigins: [authOrigin] },
+    experienceStudioRepository: fakeExperienceRepository(),
+  });
+  assert.equal(csrfDenied.status, 403);
+  assert.equal(venueDenied.status, 403);
+});
+
+test("session parsing rejects cookie prefixes and duplicate exact names", async () => {
+  for (const cookie of [
+    `reservation_session_extra=${"s".repeat(43)}`,
+    `reservation_session=${"s".repeat(43)}; reservation_session=${"t".repeat(43)}`,
+  ]) {
+    const response = await handleStandaloneApiRequest({
+      method: "GET", path: "/v1/auth/session", headers: { cookie },
+    }, { sessionAuth: { repositories: authRepository(), allowedOrigins: [authOrigin] } });
+    assert.equal(response.status, 401);
+  }
+});
+
+test("owner cookie cannot use a venue belonging to another tenant", async () => {
+  const response = await handleStandaloneApiRequest({
+    method: "GET",
+    path: "/v1/experience/workspace",
+    headers: {
+      cookie: `reservation_session=${"s".repeat(43)}`,
+      "x-reservation-venue-id": "323e4567-e89b-42d3-a456-426614174000",
+    },
+  }, {
+    sessionAuth: { repositories: authRepository(), allowedOrigins: [authOrigin] },
+    tenantVenueRepository: {
+      async getTenant() { return { data: { id: "tenant-1" } }; },
+      async getVenue() { return { data: { id: "323e4567-e89b-42d3-a456-426614174000", tenant_id: "tenant-other" } }; },
+    },
+    experienceStudioRepository: fakeExperienceRepository(),
+  });
+  assert.equal(response.status, 403);
+});
+
+test("setup status closes after setup and session responses expose no opaque token", async () => {
+  const status = await handleStandaloneApiRequest({ method: "GET", path: "/v1/setup/status" }, {
+    sessionAuth: {
+      repositories: authRepository({
+        readInstallation: async () => ({ installationId: "installation-1", tenantId: "tenant-1", domain: "console.example", setupCompleted: true }),
+      }),
+      allowedOrigins: [authOrigin],
+    },
+  });
+  const session = await handleStandaloneApiRequest({
+    method: "GET",
+    path: "/v1/auth/session",
+    headers: { cookie: `reservation_session=${"s".repeat(43)}` },
+  }, {
+    sessionAuth: { repositories: authRepository(), allowedOrigins: [authOrigin] },
+  });
+
+  assert.deepEqual(status.body, { setup_available: false });
+  assert.equal(session.status, 200);
+  assert.equal(JSON.stringify(session.body).includes("s".repeat(43)), false);
+  assert.equal((session.body as { expires_at: string }).expires_at, "2026-07-15T12:00:00.000Z");
+});
+
+test("logout revokes the hashed session and clears both cookies", async () => {
+  let revoked = false;
+  const response = await handleStandaloneApiRequest({
+    method: "POST",
+    path: "/v1/auth/logout",
+    headers: {
+      origin: authOrigin,
+      cookie: `reservation_session=${"s".repeat(43)}; reservation_csrf=${"c".repeat(43)}`,
+      "x-csrf-token": "c".repeat(43),
+    },
+  }, {
+    sessionAuth: {
+      repositories: authRepository({ revokeSession: async () => { revoked = true; } }),
+      allowedOrigins: [authOrigin],
+    },
+  });
+
+  assert.equal(response.status, 204);
+  assert.equal(revoked, true);
+  assert.deepEqual(response.headers["set-cookie"], [
+    "reservation_session=; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=0",
+    "reservation_csrf=; Path=/; Secure; SameSite=Strict; Max-Age=0",
+  ]);
+});
+
+test("staff invitation is owner-only and invitation acceptance creates a session", async () => {
+  const staffRepository = authRepository({
+    readSession: async () => ({
+      userId: "223e4567-e89b-42d3-a456-426614174000",
+      tenantId: "tenant-1",
+      role: "staff",
+      venueIds: ["123e4567-e89b-42d3-a456-426614174000"],
+      expiresAt: "2026-07-15T12:00:00.000Z",
+    }),
+  });
+  const denied = await handleStandaloneApiRequest({
+    method: "POST",
+    path: "/v1/auth/staff/invitations",
+    headers: {
+      origin: authOrigin,
+      cookie: `reservation_session=${"s".repeat(43)}; reservation_csrf=${"c".repeat(43)}`,
+      "x-csrf-token": "c".repeat(43),
+    },
+    body: { email: "new@example.com", display_name: "New Staff", venue_ids: ["123e4567-e89b-42d3-a456-426614174000"] },
+  }, { sessionAuth: { repositories: staffRepository, allowedOrigins: [authOrigin] } });
+  const accepted = await handleStandaloneApiRequest({
+    method: "POST",
+    path: `/v1/auth/staff/invitations/${"i".repeat(43)}/accept`,
+    headers: { origin: authOrigin },
+    body: { display_name: "New Staff", password: "correct horse battery staple" },
+  }, {
+    sessionAuth: {
+      repositories: authRepository(),
+      allowedOrigins: [authOrigin],
+      passwordHasher: { hash: async () => "$argon2id$new", verify: async () => false },
+      tokenFactory: () => "s".repeat(43),
+      csrfTokenFactory: () => "c".repeat(43),
+    },
+  });
+
+  assert.equal(denied.status, 403);
+  assert.equal(accepted.status, 200);
+  assert.equal(accepted.headers["cache-control"], "no-store");
+  assert.equal(Array.isArray(accepted.headers["set-cookie"]), true);
+});
+
+test("password reset request is account-enumeration safe and completion is single-use", async () => {
+  const responses = await Promise.all([
+    authRepository(),
+    authRepository({ readInstallation: async () => undefined }),
+  ].map((repositories) => handleStandaloneApiRequest({
+    method: "POST",
+    path: "/v1/auth/password-reset",
+    headers: { origin: authOrigin },
+    body: { email: "owner@example.com" },
+  }, {
+    sessionAuth: { repositories, allowedOrigins: [authOrigin], tokenFactory: () => "r".repeat(43) },
+  })));
+  const completion = await handleStandaloneApiRequest({
+    method: "POST",
+    path: `/v1/auth/password-reset/${"r".repeat(43)}/complete`,
+    headers: { origin: authOrigin },
+    body: { password: "correct horse battery staple" },
+  }, {
+    sessionAuth: {
+      repositories: authRepository(),
+      allowedOrigins: [authOrigin],
+      passwordHasher: { hash: async () => "$argon2id$new", verify: async () => false },
+    },
+  });
+
+  assert.deepEqual(responses.map(({ status, body }) => ({ status, body })), [
+    { status: 202, body: undefined },
+    { status: 202, body: undefined },
+  ]);
+  assert.equal(completion.status, 204);
+});
 
 test("owner experience routes require auth and tenant venue context", async () => {
   const unauthorized = await handleStandaloneApiRequest({

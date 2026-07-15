@@ -379,12 +379,14 @@ function corsResponseHeaders(
   const requestedHeaders = getHeader(requestHeaders, "Access-Control-Request-Headers");
   return {
     "access-control-allow-origin": origin,
-    "access-control-allow-methods": "GET,POST,PATCH,OPTIONS",
+    "access-control-allow-credentials": "true",
+    "access-control-allow-methods": "GET,POST,PUT,PATCH,DELETE,OPTIONS",
     "access-control-allow-headers": requestedHeaders || [
       "Authorization",
       "Content-Type",
       "Idempotency-Key",
       "X-Correlation-Id",
+      "X-CSRF-Token",
       "X-Reservation-Tenant-Id",
       "X-Reservation-Venue-Id",
     ].join(", "),
@@ -395,7 +397,7 @@ function corsResponseHeaders(
 
 function isAllowedCorsOrigin(origin: string, cors: StandaloneCorsOptions | undefined) {
   const allowedOrigins = cors?.allowedOrigins ?? [];
-  return allowedOrigins.includes("*") || allowedOrigins.includes(origin);
+  return allowedOrigins.includes(origin);
 }
 
 function serializeStandaloneResponseBody(result: StandaloneApiResponse) {
@@ -526,10 +528,10 @@ function correlationIdFromRequest(request: IncomingMessage) {
 function safeRequestPath(requestTarget: string) {
   try {
     const path = normalizePath(new URL(requestTarget, "http://standalone-api.local").pathname);
-    return path.replace(
-      /^(\/v1\/public\/experiences\/[^/]+\/manage\/)[^/]+(?=\/|$)/u,
-      "$1:redacted",
-    );
+    return path
+      .replace(/^(\/v1\/public\/experiences\/[^/]+\/manage\/)[^/]+(?=\/|$)/u, "$1:redacted")
+      .replace(/^(\/v1\/auth\/staff\/invitations\/)[^/]+(?=\/accept$)/u, "$1:redacted")
+      .replace(/^(\/v1\/auth\/password-reset\/)[^/]+(?=\/complete$)/u, "$1:redacted");
   } catch {
     return "/";
   }

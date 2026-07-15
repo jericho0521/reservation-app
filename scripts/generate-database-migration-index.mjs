@@ -38,6 +38,7 @@ const expectedCoreTargets = [
   "packages/database/migrations/supabase/000019_unified_conversations.sql",
   "packages/database/migrations/supabase/000020_operations_analytics_rpc.sql",
   "packages/database/migrations/supabase/000021_installation_auth.sql",
+  "packages/database/migrations/supabase/000022_password_reset.sql",
 ];
 
 const optionalAiPrefix = "packages/database/migrations/supabase/optional/ai-retrieval/";

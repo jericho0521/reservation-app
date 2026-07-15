@@ -10,7 +10,7 @@ export interface StandaloneApiRequest {
 
 export interface StandaloneApiResponse {
   status: number;
-  headers: Record<string, string>;
+  headers: Record<string, string | string[]>;
   body: unknown;
 }
 

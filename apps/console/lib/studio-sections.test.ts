@@ -19,7 +19,7 @@ test("Studio sections preserve the approved guided order", () => {
     "branding",
     "publish",
   ]);
-  assert.equal(getStudioSectionHref("availability"), "/studio/availability");
+  assert.equal(getStudioSectionHref("availability"), "/admin/studio/availability");
 });
 
 test("Studio progress combines saved sections with server validation issues", () => {

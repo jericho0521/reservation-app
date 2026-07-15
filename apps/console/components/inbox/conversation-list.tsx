@@ -8,7 +8,7 @@ export function ConversationList({ conversations, channel }: { conversations: Co
       <button type="submit">Apply</button>
     </form>
     {conversations.length === 0 ? <div className="inbox-empty"><strong>No conversations yet</strong><p>Customer web chat, WhatsApp, and simulation messages will appear here.</p></div> : <ol className="conversation-list">
-      {conversations.map((conversation) => <li key={conversation.conversation_id}><a href={`/conversations/${encodeURIComponent(conversation.conversation_id)}`}>
+      {conversations.map((conversation) => <li key={conversation.conversation_id}><a href={`/admin/conversations/${encodeURIComponent(conversation.conversation_id)}`}>
         <div><strong>{conversationPreview(conversation)}</strong><span>{conversationChannelLabel(conversation.channel)}</span></div>
         <div><span className={`automation-badge is-${conversation.automation_state}`}>{conversation.automation_state === "manual" ? "Staff takeover" : "Automated"}</span><time>{formatTime(conversation.last_message_at ?? conversation.updated_at)}</time></div>
       </a></li>)}

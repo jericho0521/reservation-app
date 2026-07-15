@@ -21,7 +21,7 @@ export default async function StudioSectionPage({
         <span className="status-pill">Guided setup</span>
         <h2>{section.shortLabel} workspace</h2>
         <p>This section is connected to the saved experience draft and ready for its focused editor.</p>
-        <a className="secondary-action" href="/studio">Review preset catalogue</a>
+        <a className="secondary-action" href="/admin/studio">Review preset catalogue</a>
       </section>
     </div>
   );

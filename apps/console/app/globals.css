@@ -62,6 +62,12 @@ button, input, select, textarea { font: inherit; }
 .preset-card dd { margin: 0; font-size: .85rem; }
 .setup-error { max-width: 42rem; margin: 10vh auto; padding: 2rem; }
 .setup-error h1 { margin-bottom: .4rem; }
+.auth-page { min-height: 100vh; padding: 2rem; display: grid; place-items: center; }
+.auth-panel { width: min(30rem, 100%); }
+.auth-panel h1 { margin: .5rem 0; font-size: clamp(2rem, 8vw, 3.5rem); }
+.auth-panel .studio-form { margin-top: 1.5rem; }
+.auth-submit { width: 100%; border: 0; cursor: pointer; }
+.auth-submit:disabled { cursor: wait; opacity: .65; }
 .muted { color: var(--muted); }
 .studio-workspace { width: min(82rem, 100%); margin: 0 auto; display: grid; grid-template-columns: 14rem minmax(0, 1fr); gap: 2.5rem; }
 .studio-rail { min-width: 0; }

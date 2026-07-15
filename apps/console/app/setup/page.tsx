@@ -1,3 +1,5 @@
+import { SetupOwnerForm } from "../../components/auth/setup-owner-form";
+
 type SetupQueryValue = string | string[] | undefined;
 
 export interface SetupLandingState {
@@ -39,13 +41,11 @@ export default async function SetupLandingPage({
         <p>{state.detail}</p>
       </header>
       <section className="panel" aria-labelledby="setup-next-step">
-        <span className="status-pill">{state.ready ? "Phase 1 ready" : "Setup link required"}</span>
-        <h2 id="setup-next-step">{state.ready ? "Next: create the first owner" : "Open the protected link again"}</h2>
-        <p>
-          {state.ready
-            ? "This readiness page does not create or store an account yet. The next product phase adds the single-use owner setup operation at this same address."
-            : "The setup capability is intentionally accepted only from the generated link. The token is not displayed or copied into this page."}
-        </p>
+        <span className="status-pill">{state.ready ? "Secure owner setup" : "Setup link required"}</span>
+        <h2 id="setup-next-step">{state.ready ? "Create the first owner" : "Open the protected link again"}</h2>
+        {state.ready && typeof token === "string"
+          ? <SetupOwnerForm setupToken={token} />
+          : <p>The setup capability is accepted only from the generated link. The token is not displayed or copied into this page.</p>}
       </section>
     </div>
   );

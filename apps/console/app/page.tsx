@@ -24,7 +24,7 @@ export default async function OverviewPage() {
           <section className="metric-grid" aria-label="Daily operations metrics"><MetricCard label="Bookings today" value={overview.reservations.today} detail={`${overview.reservations.confirmed} confirmed · ${overview.reservations.cancelled} cancelled`} accent /><MetricCard label="Available resources" value={`${overview.resources.available}/${overview.resources.total}`} detail={`${overview.resources.maintenance} under maintenance`} /><MetricCard label="Open conversations" value={overview.conversations.open} detail={`${overview.conversations.staff_takeover} staff takeover`} /></section>
           <div className="overview-columns"><TodayTimeline reservations={overview.reservations.timeline} timezone={overview.timezone} /><ChannelStatus readiness={overview.channel_readiness} /></div>
         </>}
-        {workspace ? <section className="panel callout-panel"><div><span className="eyebrow">Experience state</span><h2>{formatPreset(workspace.profile.preset_id)}</h2><p>{workspace.published ? `Published version ${workspace.published.version}` : "Not published yet"}{workspace.draft ? ` · Draft version ${workspace.draft.version}` : ""}</p></div><a className="primary-action" href="/studio">Open Studio</a></section> : null}
+        {workspace ? <section className="panel callout-panel"><div><span className="eyebrow">Experience state</span><h2>{formatPreset(workspace.profile.preset_id)}</h2><p>{workspace.published ? `Published version ${workspace.published.version}` : "Not published yet"}{workspace.draft ? ` · Draft version ${workspace.draft.version}` : ""}</p></div><a className="primary-action" href="/admin/studio">Open Studio</a></section> : null}
       </div>
     );
   } catch (error) {

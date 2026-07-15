@@ -17,7 +17,7 @@ export default async function StaffSettingsPage() {
 
   return <div className="page-stack">
     <header className="page-header"><span className="eyebrow">Settings · Access</span><h1>Staff access</h1><p>Invite operators, assign only the locations they need, and disable access without deleting history.</p></header>
-    <section className="panel setup-summary"><h2>Invite staff</h2><p>Email delivery arrives with Phase 3. Until then, the invitation link appears exactly once for private transfer.</p><StaffInvitationForm locations={locations} /></section>
+    <section className="panel setup-summary"><h2>Invite staff</h2><p>Configured email delivery sends the invitation automatically. Otherwise, a manual invitation link appears exactly once.</p><StaffInvitationForm locations={locations} /></section>
     <section className="staff-access-list" aria-label="Staff accounts">
       {staff.length === 0 ? <article className="panel setup-summary"><h2>No staff accounts yet</h2><p>Create the first invitation above.</p></article> : staff.map((member) => {
         const options = venueAssignmentOptions(locations, member.venue_ids);

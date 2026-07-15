@@ -11,7 +11,15 @@
   },
   "devDependencies": {
     "@types/node": "^20",
+    "@types/nodemailer": "^8.0.1",
     "tsx": "^4.21.0",
     "typescript": "^5"
+  },
+  "dependencies": {
+    "@project-play/reservations-supabase": "workspace:*",
+    "@reservation-platform/api": "workspace:*",
+    "@reservation-platform/platform-config": "workspace:*",
+    "@supabase/supabase-js": "^2.90.1",
+    "nodemailer": "^9.0.3"
   }
 }

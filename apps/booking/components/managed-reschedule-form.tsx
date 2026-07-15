@@ -37,7 +37,7 @@ export function ManagedRescheduleForm({
     }
     setLoading(true);
     try {
-      setSlots(await loadManagedRescheduleAvailability(client, slug, reservation, nextDate));
+      setSlots(await loadManagedRescheduleAvailability(client, slug, token, reservation, nextDate));
     } catch {
       setSlots([]);
       setNotice({ kind: "error", message: "Available times could not be loaded. Please try again." });
@@ -50,7 +50,7 @@ export function ManagedRescheduleForm({
     setSelectedStart("");
     setNotice(undefined);
     void refreshAvailability(date);
-  }, [client, date, reservation.service_id, reservation.staff_id, slug]);
+  }, [client, date, reservation.service_id, reservation.staff_id, slug, token]);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();

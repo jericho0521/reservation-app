@@ -5,6 +5,8 @@ import {
   type CoreMigrationLedgerEntry,
 } from "@reservation-platform/database";
 import {
+  decryptSecretEnvelope,
+  encryptSecretEnvelope,
   loadPlatformRuntimeConfigFromEnv,
   PlatformRuntimeConfigError,
   platformConfigPathEnvName,
@@ -25,6 +27,7 @@ import {
   prepareLegacyReservationCreate,
   type AvailabilityRepositoryPort,
   type ConversationOrchestratorDependencies,
+  type EmailConnectionTester,
   type ExperienceScope,
   type PlatformCatalogRepository,
   type ReservationCreateRepositoryPort,
@@ -36,6 +39,7 @@ import {
   createSupabaseExperienceStudioRepository,
   createSupabaseExperienceKnowledgeRepository,
   createSupabaseIdempotencyRepository,
+  createSupabaseIntegrationSettingsRepository,
   createSupabaseInstallationBusinessRepository,
   createSupabaseInstallationLocationsRepository,
   createSupabaseOperatingHoursRepository,
@@ -47,6 +51,7 @@ import {
   createSupabaseReservationRepository,
   createSupabaseResourceMaintenanceRepository,
   createSupabasePlatformSessionRepository,
+  createSupabasePlatformJobRepository,
   createSupabaseTenantVenueRepository,
   type ExperienceSupabaseLikeClient,
   type ExperienceKnowledgeSupabaseClient,
@@ -56,6 +61,8 @@ import {
   type AnalyticsSupabaseClient,
   type PlatformSessionSupabaseClient,
   type InstallationBusinessSupabaseClient,
+  type IntegrationSupabaseClient,
+  type PlatformJobsSupabaseClient,
   type LocationsSupabaseClient,
 } from "@project-play/reservations-supabase";
 import {
@@ -96,6 +103,7 @@ export const STANDALONE_SUPABASE_ENV_NAMES = {
   whatsappSessionAuthDir: "RESERVATION_WHATSAPP_SESSION_AUTH_DIR",
   whatsappSessionEncryptionKey: "RESERVATION_WHATSAPP_SESSION_ENCRYPTION_KEY",
   whatsappAllowMemoryStore: "RESERVATION_WHATSAPP_ALLOW_MEMORY_STORE",
+  installationMasterKey: "RESERVATION_INSTALLATION_MASTER_KEY",
   platformConfigPath: platformConfigPathEnvName,
 } as const;
 
@@ -128,6 +136,7 @@ export interface StandaloneSupabaseEnv extends Record<string, string | undefined
   RESERVATION_WHATSAPP_SESSION_AUTH_DIR?: string;
   RESERVATION_WHATSAPP_SESSION_ENCRYPTION_KEY?: string;
   RESERVATION_WHATSAPP_ALLOW_MEMORY_STORE?: string;
+  RESERVATION_INSTALLATION_MASTER_KEY?: string;
   RESERVATION_PLATFORM_CONFIG_PATH?: string;
   AI_AGENT_PROVIDER?: string;
   AI_AGENT_BASE_URL?: string;
@@ -190,6 +199,8 @@ export interface StandaloneSupabaseRepositoryFactories {
   createExperienceKnowledgeRepository(client: StandaloneSupabaseClient): NonNullable<StandaloneApiDependencies["experienceKnowledgeRepository"]>;
   createOperatingHoursRepository(client: StandaloneSupabaseClient): NonNullable<StandaloneApiDependencies["operatingHoursRepository"]>;
   createOperationsOverviewRepository(client: StandaloneSupabaseClient): NonNullable<StandaloneApiDependencies["operationsOverviewRepository"]>;
+  createIntegrationSettingsRepository(client: StandaloneSupabaseClient): NonNullable<StandaloneApiDependencies["integrationSettingsRepository"]>;
+  createJobRepository?(client: StandaloneSupabaseClient): NonNullable<StandaloneApiDependencies["notificationJobQueue"]>;
   createTenantVenueRepository(client: StandaloneSupabaseClient): NonNullable<StandaloneApiDependencies["tenantVenueRepository"]>;
   createSessionRepository(client: StandaloneSupabaseClient): NonNullable<StandaloneApiDependencies["sessionAuth"]>["repositories"];
 }
@@ -200,6 +211,8 @@ export interface StandaloneSupabaseRuntimeOptions {
   loadCoreMigrationPlan?: () => Promise<readonly CoreMigrationLedgerEntry[]>;
   platformConfig?: PlatformRuntimeConfig;
   sessionAllowedOrigins?: readonly string[];
+  integrationEncryptionKey?: string;
+  emailConnectionTester?: EmailConnectionTester;
   repositoryFactories?: Partial<StandaloneSupabaseRepositoryFactories>;
 }
 
@@ -255,6 +268,8 @@ const defaultRepositoryFactories: StandaloneSupabaseRepositoryFactories = {
     return createSupabaseOperatingHoursRepository({ rpc: client.rpc.bind(client) });
   },
   createOperationsOverviewRepository: (client) => createSupabaseOperationsOverviewRepository(client as unknown as OperationsOverviewSupabaseClient),
+  createIntegrationSettingsRepository: (client) => createSupabaseIntegrationSettingsRepository(client as unknown as IntegrationSupabaseClient),
+  createJobRepository: (client) => createSupabasePlatformJobRepository(client as unknown as PlatformJobsSupabaseClient),
   createTenantVenueRepository: createSupabaseTenantVenueRepository,
   createSessionRepository: (client) => createSupabasePlatformSessionRepository(
     client as unknown as PlatformSessionSupabaseClient,
@@ -290,6 +305,7 @@ export function createStandaloneSupabaseDependencies(
     repositories: repositoryFactories.createSessionRepository(adminClient),
     allowedOrigins: options.sessionAllowedOrigins ?? [],
   };
+  const sessionRepository = sessionAuth.repositories;
   const reservationsEnabled = options.platformConfig ? options.platformConfig.modules.reservations.enabled : true;
   const platformDependencies = reservationsEnabled
     ? {
@@ -309,10 +325,13 @@ export function createStandaloneSupabaseDependencies(
         experienceKnowledgeRepository: repositoryFactories.createExperienceKnowledgeRepository(adminClient),
         operatingHoursRepository: repositoryFactories.createOperatingHoursRepository(adminClient),
         operationsOverviewRepository: repositoryFactories.createOperationsOverviewRepository(adminClient),
+        integrationSettingsRepository: repositoryFactories.createIntegrationSettingsRepository(adminClient),
+        notificationJobQueue: repositoryFactories.createJobRepository!(adminClient),
         tenantVenueRepository: repositoryFactories.createTenantVenueRepository(adminClient),
       }
     : {};
   const conversationOrchestrator = createWebChatOrchestrator(platformDependencies);
+  const integrationEncryptionKey = options.integrationEncryptionKey?.trim();
 
   return {
     ...authDependencies,
@@ -323,6 +342,20 @@ export function createStandaloneSupabaseDependencies(
       options.loadCoreMigrationPlan ?? loadBundledCoreMigrationPlan,
     ),
     ...(conversationOrchestrator ? { conversationOrchestrator } : {}),
+    ...(integrationEncryptionKey
+      ? {
+          integrationCredentialEncryptor: (credential: Record<string, unknown>) => (
+            encryptSecretEnvelope(credential, integrationEncryptionKey)
+          ),
+          integrationCredentialDecryptor: (envelope: Parameters<typeof decryptSecretEnvelope>[0]) => (
+            decryptSecretEnvelope<Record<string, unknown>>(envelope, integrationEncryptionKey)
+          ),
+        }
+      : {}),
+    ...(options.emailConnectionTester ? { emailConnectionTester: options.emailConnectionTester } : {}),
+    emailTestRecipientResolver: async (principal) => (
+      (await sessionRepository.findUserById?.(principal.tenantId, principal.userId))?.email
+    ),
   };
 }
 
@@ -417,6 +450,7 @@ export function createStandaloneSupabaseDependenciesFromEnv(
     ...options,
     platformConfig,
     sessionAllowedOrigins: options.sessionAllowedOrigins ?? createStandaloneCorsOptionsFromEnv(env).allowedOrigins,
+    integrationEncryptionKey: options.integrationEncryptionKey ?? env.RESERVATION_INSTALLATION_MASTER_KEY,
   };
   const config = standaloneSupabaseConfigFromEnv(env);
   const normalizedConfig = normalizeStandaloneSupabaseConfig(config);

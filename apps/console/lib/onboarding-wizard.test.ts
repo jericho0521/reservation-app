@@ -17,6 +17,7 @@ test("production onboarding has one server-backed page for every fixed step", as
   }
   assert.match(loader, /getInstallationBusiness/u);
   assert.match(loader, /listInstallationLocations/u);
+  assert.match(loader, /getEmailIntegrationSettings/u);
   assert.match(loader, /venueId: business\.profile\.venue_id/u);
 });
 

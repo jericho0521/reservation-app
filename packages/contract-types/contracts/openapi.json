@@ -1065,6 +1065,141 @@
         },
         "type": "object"
       },
+      "EmailIntegrationSettingsInput": {
+        "additionalProperties": false,
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "from_address": {
+            "format": "email",
+            "maxLength": 320,
+            "type": "string"
+          },
+          "from_name": {
+            "maxLength": 120,
+            "minLength": 1,
+            "type": "string"
+          },
+          "host": {
+            "maxLength": 255,
+            "minLength": 1,
+            "type": "string"
+          },
+          "password": {
+            "maxLength": 1024,
+            "minLength": 1,
+            "type": "string",
+            "writeOnly": true
+          },
+          "port": {
+            "maximum": 65535,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "tls_mode": {
+            "$ref": "#/components/schemas/EmailTlsMode"
+          },
+          "username": {
+            "maxLength": 320,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "enabled",
+          "host",
+          "port",
+          "tls_mode",
+          "from_address"
+        ],
+        "type": "object"
+      },
+      "EmailIntegrationSettingsResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "configured": {
+            "type": "boolean"
+          },
+          "credential_present": {
+            "type": "boolean"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "from_address": {
+            "format": "email",
+            "maxLength": 320,
+            "type": "string"
+          },
+          "from_name": {
+            "maxLength": 120,
+            "minLength": 1,
+            "type": "string"
+          },
+          "host": {
+            "maxLength": 255,
+            "minLength": 1,
+            "type": "string"
+          },
+          "port": {
+            "maximum": 65535,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "provider": {
+            "const": "smtp",
+            "type": "string"
+          },
+          "tls_mode": {
+            "$ref": "#/components/schemas/EmailTlsMode"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "enabled",
+          "provider",
+          "configured",
+          "credential_present"
+        ],
+        "type": "object"
+      },
+      "EmailIntegrationTestResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "error_code": {
+            "enum": [
+              "not_configured",
+              "connection_failed"
+            ],
+            "type": "string"
+          },
+          "message": {
+            "maxLength": 160,
+            "minLength": 1,
+            "type": "string"
+          },
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok",
+          "message"
+        ],
+        "type": "object"
+      },
+      "EmailTlsMode": {
+        "enum": [
+          "required",
+          "starttls",
+          "plain"
+        ],
+        "type": "string"
+      },
       "EndResourceMaintenanceInput": {
         "additionalProperties": false,
         "properties": {
@@ -3155,6 +3290,13 @@
       "StaffInvitationResponse": {
         "additionalProperties": false,
         "properties": {
+          "delivery": {
+            "enum": [
+              "email",
+              "manual"
+            ],
+            "type": "string"
+          },
           "expires_at": {
             "format": "date-time",
             "type": "string"
@@ -3171,7 +3313,7 @@
         },
         "required": [
           "user_id",
-          "invitation_token",
+          "delivery",
           "expires_at"
         ],
         "type": "object"
@@ -5935,6 +6077,155 @@
         "summary": "Configure the appointment business and first location.",
         "tags": [
           "Onboarding"
+        ]
+      }
+    },
+    "/v1/integrations/email": {
+      "get": {
+        "operationId": "getEmailIntegrationSettings",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/TenantIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/VenueIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/CorrelationIdHeader"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmailIntegrationSettingsResponse"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformErrorResponse"
+                }
+              }
+            },
+            "description": "Platform error response."
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "summary": "Read sanitized SMTP delivery settings.",
+        "tags": [
+          "Integrations"
+        ]
+      },
+      "put": {
+        "operationId": "updateEmailIntegrationSettings",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/TenantIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/VenueIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/CorrelationIdHeader"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EmailIntegrationSettingsInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmailIntegrationSettingsResponse"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformErrorResponse"
+                }
+              }
+            },
+            "description": "Platform error response."
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "summary": "Save SMTP delivery settings and optional write-only credentials.",
+        "tags": [
+          "Integrations"
+        ]
+      }
+    },
+    "/v1/integrations/email/test": {
+      "post": {
+        "operationId": "testEmailIntegration",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/TenantIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/VenueIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/CorrelationIdHeader"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmailIntegrationTestResponse"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformErrorResponse"
+                }
+              }
+            },
+            "description": "Platform error response."
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "summary": "Run a bounded SMTP connection test.",
+        "tags": [
+          "Integrations"
         ]
       }
     },

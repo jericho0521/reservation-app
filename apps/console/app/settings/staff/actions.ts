@@ -27,8 +27,10 @@ export async function inviteStaffAction(
     revalidatePath("/settings/staff");
     return {
       status: "success",
-      message: "Invitation created. Copy this link now; it cannot be shown again.",
-      invitationUrl: await invitationUrl(result.invitation_token),
+      message: result.delivery === "email"
+        ? "Invitation created and queued for email delivery."
+        : "Invitation created. Copy this link now; it cannot be shown again.",
+      ...(result.invitation_token ? { invitationUrl: await invitationUrl(result.invitation_token) } : {}),
       expiresAt: result.expires_at,
     };
   } catch (error) {

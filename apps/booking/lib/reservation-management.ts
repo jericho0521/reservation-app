@@ -20,13 +20,14 @@ export async function loadManagedReservation(
 }
 
 export async function loadManagedRescheduleAvailability(
-  client: Pick<ReservationPlatformClient, "listPublicExperienceAvailability">,
+  client: Pick<ReservationPlatformClient, "listManagedReservationAvailability">,
   slug: string,
+  token: string,
   reservation: Pick<ReservationResponse, "service_id" | "staff_id" | "quantity">,
   date: string,
 ): Promise<AvailabilitySlot[]> {
   if (!reservation.staff_id) return [];
-  const result = await client.listPublicExperienceAvailability(slug, {
+  const result = await client.listManagedReservationAvailability(slug, token, {
     service_id: reservation.service_id,
     date,
     quantity: reservation.quantity,

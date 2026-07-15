@@ -317,6 +317,36 @@
       "notes": [
         "Backend-owned tenant-scoped integration settings and AES-256-GCM credential envelopes."
       ]
+    },
+    {
+      "path": "packages/database/migrations/supabase/000031_appointment_correctness_followup.sql",
+      "classification": "core-platform",
+      "intendedBackendDestination": [
+        "packages/database/migrations/supabase/000031_appointment_correctness_followup.sql"
+      ],
+      "notes": [
+        "Backend-owned forward-only appointment mode, practitioner maintenance, and cross-service availability corrections."
+      ]
+    },
+    {
+      "path": "packages/database/migrations/supabase/000032_appointment_staff_operations.sql",
+      "classification": "core-platform",
+      "intendedBackendDestination": [
+        "packages/database/migrations/supabase/000032_appointment_staff_operations.sql"
+      ],
+      "notes": [
+        "Backend-owned tenant-scoped appointment lifecycle transition and staff rescheduling operations."
+      ]
+    },
+    {
+      "path": "packages/database/migrations/supabase/000033_appointment_notification_jobs.sql",
+      "classification": "core-platform",
+      "intendedBackendDestination": [
+        "packages/database/migrations/supabase/000033_appointment_notification_jobs.sql"
+      ],
+      "notes": [
+        "Backend-owned transactional appointment email intents and stale reminder supersession."
+      ]
     }
   ]
 }

@@ -47,6 +47,7 @@ export interface PlatformSessionRepository {
   createFirstOwner(input: CreateFirstOwnerStorageInput): Promise<CreateFirstOwnerStorageResult | undefined>;
   createUser(input: Omit<PlatformUserRecord, "userId" | "venueIds"> & { venueIds?: readonly string[] }): Promise<PlatformUserRecord>;
   findUserByEmail(tenantId: string, email: string): Promise<PlatformUserRecord | undefined>;
+  findUserById?(tenantId: string, userId: string): Promise<PlatformUserRecord | undefined>;
   createSession(input: {
     userId: string;
     expectedPasswordHash: string;
@@ -180,22 +181,26 @@ export async function requestPasswordReset(input: {
   repositories: PlatformSessionRepository;
   tokenFactory?: () => string;
   now?: Date;
-}): Promise<void> {
+}): Promise<{ tenantId: string; recipient: string; token: string; referenceId: string } | undefined> {
   const email = normalizeEmail(input.input.email);
   const installation = await input.repositories.readInstallation();
-  if (!email || !installation?.setupCompleted) return;
+  if (!email || !installation?.setupCompleted) return undefined;
+  const user = await input.repositories.findUserByEmail(installation.tenantId, email);
+  if (!user || user.status === "disabled") return undefined;
 
   const token = (input.tokenFactory ?? createOpaqueToken)();
   if (!isOpaqueToken(token)) {
     throw new PlatformAuthError("validation_failed", 400, "Password reset token generation failed.");
   }
   const now = input.now ?? new Date();
+  const referenceId = hashOpaqueToken(token);
   await input.repositories.createPasswordResetToken({
     tenantId: installation.tenantId,
     email,
-    tokenHash: hashOpaqueToken(token),
+    tokenHash: referenceId,
     expiresAt: new Date(now.getTime() + 60 * 60 * 1_000).toISOString(),
   });
+  return { tenantId: installation.tenantId, recipient: email, token, referenceId };
 }
 
 export async function completePasswordReset(input: {

@@ -227,8 +227,8 @@
       "path": "packages/database/migrations/supabase/000028_appointment_availability_management.sql",
       "module": "core",
       "scope": "reservation-platform",
-      "sha256": "080875acf6aa000b49b07e4258623c7b3c0c9fcce911cee73d23fdefefdbf83a",
-      "bytes": 17161
+      "sha256": "86640e4d83e763ffb624a663d33a07824cc8b17f87f6f580249b3168c11546bd",
+      "bytes": 15291
     },
     {
       "order": 29,
@@ -245,6 +245,30 @@
       "scope": "reservation-platform",
       "sha256": "2dafb69c2f30eced328e9c683db3967a31fe701b6b41fa483ba642768bac0904",
       "bytes": 8782
+    },
+    {
+      "order": 31,
+      "path": "packages/database/migrations/supabase/000031_appointment_correctness_followup.sql",
+      "module": "core",
+      "scope": "reservation-platform",
+      "sha256": "c9071c8c179fc9e6dd569b16aa3df87ca6364495a749d6f57092612c687f3f1e",
+      "bytes": 26683
+    },
+    {
+      "order": 32,
+      "path": "packages/database/migrations/supabase/000032_appointment_staff_operations.sql",
+      "module": "core",
+      "scope": "reservation-platform",
+      "sha256": "ad863fecbad97201e61acc4133e29b07aa81eed00ae4518c16b4b976bcb58145",
+      "bytes": 13193
+    },
+    {
+      "order": 33,
+      "path": "packages/database/migrations/supabase/000033_appointment_notification_jobs.sql",
+      "module": "core",
+      "scope": "reservation-platform",
+      "sha256": "d85bd88d10c510b5c35b98e41e01c841af643f5be34e37f29daee063743cddff",
+      "bytes": 6701
     }
   ],
   "optionalMigrations": [

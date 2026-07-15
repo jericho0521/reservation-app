@@ -485,6 +485,7 @@ test("standalone Supabase runtime wires public and admin clients to repository f
     { name: "createExperienceKnowledgeRepository", adminClient: clients[1] },
     { name: "createOperatingHoursRepository", adminClient: clients[1] },
     { name: "createOperationsOverviewRepository", adminClient: clients[1] },
+    { name: "createIntegrationSettingsRepository", adminClient: clients[1] },
     { name: "createTenantVenueRepository", adminClient: clients[1] },
   ]);
 
@@ -505,8 +506,40 @@ test("standalone Supabase runtime wires public and admin clients to repository f
   assert.equal(Boolean(dependencies.experienceKnowledgeRepository), true);
   assert.equal(Boolean(dependencies.operatingHoursRepository), true);
   assert.equal(Boolean(dependencies.operationsOverviewRepository), true);
+  assert.equal(Boolean(dependencies.integrationSettingsRepository), true);
   assert.equal(Boolean(dependencies.tenantVenueRepository), true);
   assert.deepEqual(dependencies.sessionAuth?.allowedOrigins, ["https://console.example"]);
+});
+
+test("standalone Supabase runtime wires installation-key encryption and an injected email connection tester", () => {
+  const emailConnectionTester = { async test() {} };
+  const dependencies = createStandaloneSupabaseDependencies({
+    supabaseUrl: "https://example.supabase.co",
+    supabaseAnonKey: "anon-key",
+    supabaseServiceRoleKey: "service-role-key",
+  }, {
+    createClient: (_url, key) => fakeSupabaseClient(key),
+    repositoryFactories: recordingRepositoryFactories([]),
+    integrationEncryptionKey: "installation-master-key",
+    emailConnectionTester,
+  });
+
+  const envelope = dependencies.integrationCredentialEncryptor?.({ username: "mailer", password: "secret" });
+  assert.ok(envelope);
+  assert.equal(JSON.stringify(envelope).includes("secret"), false);
+  assert.deepEqual(dependencies.integrationCredentialDecryptor?.(envelope), { username: "mailer", password: "secret" });
+  assert.equal(dependencies.emailConnectionTester, emailConnectionTester);
+
+  const withoutKey = createStandaloneSupabaseDependencies({
+    supabaseUrl: "https://example.supabase.co",
+    supabaseAnonKey: "anon-key",
+    supabaseServiceRoleKey: "service-role-key",
+  }, {
+    createClient: (_url, key) => fakeSupabaseClient(key),
+    repositoryFactories: recordingRepositoryFactories([]),
+  });
+  assert.equal(withoutKey.integrationCredentialEncryptor, undefined);
+  assert.equal(withoutKey.integrationCredentialDecryptor, undefined);
 });
 
 test("standalone Supabase runtime skips reservation repositories when manifest disables reservations", () => {
@@ -844,6 +877,10 @@ function recordingRepositoryFactories(
     createOperationsOverviewRepository(client) {
       recordAdminFactoryCall(calls, "createOperationsOverviewRepository", client);
       return repository as NonNullable<StandaloneApiDependencies["operationsOverviewRepository"]>;
+    },
+    createIntegrationSettingsRepository(client) {
+      recordAdminFactoryCall(calls, "createIntegrationSettingsRepository", client);
+      return repository as NonNullable<StandaloneApiDependencies["integrationSettingsRepository"]>;
     },
     createTenantVenueRepository(client) {
       recordAdminFactoryCall(calls, "createTenantVenueRepository", client);

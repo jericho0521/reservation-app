@@ -104,6 +104,7 @@ export const RESERVATION_SUPABASE_IDEMPOTENCY_RPCS = {
 
 export const RESERVATION_SUPABASE_AVAILABILITY_RPCS = {
   readSnapshot: "read_reservation_availability_snapshot",
+  readManagedSnapshot: "read_managed_reservation_availability_snapshot",
 } as const;
 
 const IDEMPOTENCY_UNSCOPED_TENANT = "__platform_unscoped__";
@@ -250,6 +251,7 @@ export interface SupabaseAvailabilityRepository {
     date: string;
     venueId?: string;
     staffId?: string;
+    management?: { publicSlug: string; tokenHash: string };
   }): Promise<SupabaseAvailabilityRead>;
 }
 
@@ -656,8 +658,23 @@ export function createSupabasePlatformCatalogRepository(
 
     async createResource(scope, value) {
       const client = adminClient();
-      const service = await readScopedService(client, scope.venueId, value.service_id);
+      const service = await readScopedServiceMode(client, scope.venueId, value.service_id);
       if (service.error || !service.data) return toCatalogReadResult(service);
+      if (isRecord(service.data) && service.data.booking_mode === "appointment") {
+        if (!client.rpc) throw new Error("Supabase client does not support RPC calls");
+        if (value.kind !== "custom" || value.capacity !== 1) {
+          return { data: null, error: { message: "Appointment practitioners must be capacity-1 custom resources" } };
+        }
+        return toCatalogReadResult(await client.rpc(
+          "platform_create_appointment_practitioner_resource",
+          {
+            p_tenant_id: scope.tenantId,
+            p_venue_id: scope.venueId,
+            p_service_id: value.service_id,
+            p_display_name: value.label,
+          },
+        ));
+      }
       return toCatalogReadResult(await fromTable(client, RESERVATION_SUPABASE_TABLES.reservableResources)
         .insert([resourceMutationRow(value)])
         .select("*")
@@ -733,6 +750,14 @@ function readScopedService(client: SupabaseLikeClient, venueId: string, serviceI
     .single() as Promise<QueryResult<unknown>>;
 }
 
+function readScopedServiceMode(client: SupabaseLikeClient, venueId: string, serviceId: string) {
+  return fromTable(client, RESERVATION_SUPABASE_TABLES.services)
+    .select("id, booking_mode")
+    .eq("id", serviceId)
+    .eq("venue_id", venueId)
+    .single() as Promise<QueryResult<unknown>>;
+}
+
 function isActiveServiceRow(value: unknown) {
   return !isRecord(value) || !isRecord(value.metadata) || value.metadata.is_active !== false;
 }
@@ -747,23 +772,33 @@ export function createSupabaseAvailabilityRepository(
   const { adminClient } = resolvePlatformCatalogClients(input);
 
   return {
-    async readAvailability({ serviceId, date, venueId, staffId }) {
+    async readAvailability({ serviceId, date, venueId, staffId, management }) {
       const admin = adminClient();
       if (!admin.rpc) {
         throw new Error("Supabase client does not support RPC calls");
       }
 
-      const result = await admin.rpc(
-        RESERVATION_SUPABASE_AVAILABILITY_RPCS.readSnapshot,
-        { p_service_id: serviceId, p_date: date },
-      );
+      const result = management
+        ? await admin.rpc(RESERVATION_SUPABASE_AVAILABILITY_RPCS.readManagedSnapshot, {
+            p_public_slug: management.publicSlug,
+            p_token_hash: management.tokenHash,
+            p_date: date,
+          })
+        : await admin.rpc(
+            RESERVATION_SUPABASE_AVAILABILITY_RPCS.readSnapshot,
+            { p_service_id: serviceId, p_date: date },
+          );
       if (result.error) {
         throw result.error;
       }
 
-      const snapshot = parseAvailabilitySnapshot(result.data);
+      const managedEnvelope = management && isRecord(result.data) ? result.data : undefined;
+      const snapshot = parseAvailabilitySnapshot(management
+        ? managedEnvelope?.ok === true ? managedEnvelope.snapshot : null
+        : result.data);
       if (
         !snapshot
+        || snapshot.service.id !== serviceId
         || (venueId && snapshot.service.venue_id !== venueId)
         || (staffId && !snapshot.staffIds?.includes(staffId))
       ) {
@@ -836,7 +871,7 @@ export function createSupabaseReservationReadRepository(
   }
 
   return {
-    async listReservations({ searchFilterExpression, limit, venueId }) {
+    async listReservations({ searchFilterExpression, limit, venueId, date, status, staffId }) {
       let query = applyVenueFilter(applyReservationListFilters(
         fromTable(client, RESERVATION_SUPABASE_TABLES.bookings)
         .select(venueId
@@ -845,6 +880,10 @@ export function createSupabaseReservationReadRepository(
         .order("booking_date", { ascending: false }),
         { searchFilterExpression },
       ), venueId);
+
+      if (date) query = query.eq("booking_date", date);
+      if (status) query = query.eq("status", status);
+      if (staffId) query = query.eq("staff_id", staffId);
 
       if (limit) {
         query = query.limit(limit);
@@ -904,6 +943,29 @@ export function createSupabaseReservationMutationRepository(
   client: SupabaseLikeClient,
 ): ReservationMutationRepositoryPort {
   return {
+    async staffCreateAppointment(input) {
+      if (!client.rpc) throw new Error("Supabase client does not support appointment operations");
+      return scopedMutationResult(await client.rpc("platform_staff_create_appointment", {
+        p_tenant_id: input.tenantId, p_venue_id: input.venueId, p_actor_user_id: input.actorUserId,
+        p_payload: reservationToBookingInsert(input.reservation),
+      }));
+    },
+    async transitionAppointment(input) {
+      if (!client.rpc) throw new Error("Supabase client does not support appointment operations");
+      return scopedMutationResult(await client.rpc("platform_transition_appointment", {
+        p_tenant_id: input.tenantId, p_venue_id: input.venueId, p_actor_user_id: input.actorUserId,
+        p_booking_id: input.reservationId, p_expected_status: input.expectedStatus,
+        p_target_status: input.targetStatus, p_reason: input.reason ?? null,
+      }));
+    },
+    async staffRescheduleAppointment(input) {
+      if (!client.rpc) throw new Error("Supabase client does not support appointment operations");
+      return scopedMutationResult(await client.rpc("platform_staff_reschedule_appointment", {
+        p_tenant_id: input.tenantId, p_venue_id: input.venueId, p_actor_user_id: input.actorUserId,
+        p_booking_id: input.reservationId, p_expected_status: input.expectedStatus,
+        p_date: input.date, p_start_time: input.startTime, p_staff_id: input.staffId, p_reason: input.reason,
+      }));
+    },
     async updateReservation({ reservationId, patch, venueId }) {
       if (venueId) {
         if (!client.rpc) throw new Error("Supabase client does not support scoped reservation mutations");
@@ -1297,6 +1359,7 @@ function reservationToBookingInsert(reservation: Reservation) {
     })),
     status: reservation.status ?? "confirmed",
     interface_type: reservation.interface_type,
+    ...(reservation.channel ? { channel: reservation.channel } : {}),
     ...(reservation.staff_id ? { staff_id: reservation.staff_id } : {}),
   };
 }

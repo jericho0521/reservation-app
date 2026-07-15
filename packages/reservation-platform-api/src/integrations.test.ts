@@ -260,6 +260,7 @@ test("SMTP connection tests are bounded and sanitize provider failures", async (
   let decrypted = false;
   const failed = await testEmailIntegration({
     principal: owner,
+    recipient: "owner@example.com",
     repository,
     decryptCredential(value) {
       assert.equal(value, envelope);
@@ -269,6 +270,7 @@ test("SMTP connection tests are bounded and sanitize provider failures", async (
     tester: { async test(input) {
       assert.deepEqual(input.settings, { host: "smtp.example.com", port: 587, tlsMode: "starttls", from: "bookings@example.com" });
       assert.equal(input.credential.password, "must-not-leak");
+      assert.equal(input.recipient, "owner@example.com");
       throw new Error("provider leaked must-not-leak at internal host 10.0.0.1");
     } },
     timeoutMs: 10,
@@ -279,6 +281,7 @@ test("SMTP connection tests are bounded and sanitize provider failures", async (
 
   const timedOut = await testEmailIntegration({
     principal: owner,
+    recipient: "owner@example.com",
     repository,
     decryptCredential: () => ({ username: "mailer", password: "secret" }),
     tester: { test: () => new Promise<void>(() => {}) },

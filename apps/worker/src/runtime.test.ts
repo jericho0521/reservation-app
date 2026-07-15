@@ -161,6 +161,39 @@ test("unknown kinds and exhausted retries fail terminally", async () => {
   }
 });
 
+test("notification delivery outcomes record success, retry, and exhaustion safely", async () => {
+  for (const outcome of ["success", "retry", "failed"] as const) {
+    const controller = new AbortController();
+    const calls: unknown[] = [];
+    const claimed = job({ attempts: outcome === "failed" ? 5 : 1, maxAttempts: 5 });
+    const runtime = createWorkerRuntime({
+      signal: controller.signal,
+      workerId: "worker-a",
+      repository: jobRepository(calls, [claimed]),
+      handlers: {
+        "notification.email": async () => {
+          controller.abort();
+          if (outcome === "success") return { providerMessageId: "provider-safe-id" };
+          const error = new Error("provider details are private") as Error & { code: string };
+          error.code = "provider_unavailable";
+          throw error;
+        },
+      },
+      now: () => new Date("2026-07-15T00:00:00.000Z"),
+      outcomeReporter: {
+        async attempt() { calls.push(["delivery-attempt"]); },
+        async delivered(_job, messageId) { calls.push(["delivery-success", messageId]); },
+        async retrying(_job, availableAt, code) { calls.push(["delivery-retry", availableAt, code]); },
+        async failed(_job, code) { calls.push(["delivery-failed", code]); },
+      },
+    });
+    await runtime.start();
+    assert.equal(calls.some((call) => Array.isArray(call) && call[0] === "delivery-attempt"), true);
+    assert.equal(calls.some((call) => Array.isArray(call) && call[0] === `delivery-${outcome === "success" ? "success" : outcome}`), true);
+    assert.doesNotMatch(JSON.stringify(calls), /provider details are private/u);
+  }
+});
+
 function job(overrides: Record<string, unknown> = {}) {
   return {
     jobId: "job-1",

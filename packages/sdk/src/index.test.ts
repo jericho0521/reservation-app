@@ -27,6 +27,7 @@ test("authentication SDK methods use cookie credentials and omit tokens from ses
         return jsonResponse({
           user_id: "22222222-2222-4222-8222-222222222222",
           invitation_token: "i".repeat(43),
+          delivery: "manual",
           expires_at: "2026-07-16T00:00:00.000Z",
         });
       }
@@ -138,6 +139,47 @@ test("onboarding SDK methods use installation and location routes", async () => 
     ["/v1/locations/location%2F1", "PATCH"],
   ]);
   assert.deepEqual(requests[1]?.body, businessInput);
+});
+
+test("email integration SDK keeps SMTP credentials in write requests only", async () => {
+  const requests: Array<{ path: string; method: string; body?: unknown }> = [];
+  const response = {
+    enabled: true,
+    provider: "smtp" as const,
+    configured: true,
+    host: "smtp.example.com",
+    port: 587,
+    tls_mode: "starttls" as const,
+    from_address: "bookings@example.com",
+    credential_present: true,
+  };
+  const client = createReservationPlatformClient({
+    baseUrl: "https://platform.example",
+    fetch: async (input, init) => {
+      const path = new URL(String(input)).pathname;
+      requests.push({ path, method: init?.method ?? "GET", body: init?.body ? JSON.parse(String(init.body)) : undefined });
+      return jsonResponse(path.endsWith("/test") ? { ok: true, message: "SMTP connection succeeded." } : response);
+    },
+  });
+  assert.deepEqual(await client.getEmailIntegrationSettings(), response);
+  const input = {
+    enabled: true,
+    host: "smtp.example.com",
+    port: 587,
+    tls_mode: "starttls" as const,
+    from_address: "bookings@example.com",
+    username: "mailer",
+    password: "write-only-secret",
+  };
+  assert.deepEqual(await client.updateEmailIntegrationSettings(input), response);
+  assert.deepEqual(await client.testEmailIntegration(), { ok: true, message: "SMTP connection succeeded." });
+  assert.deepEqual(requests.map(({ path, method }) => [path, method]), [
+    ["/v1/integrations/email", "GET"],
+    ["/v1/integrations/email", "PUT"],
+    ["/v1/integrations/email/test", "POST"],
+  ]);
+  assert.deepEqual(requests[1]?.body, input);
+  assert.equal(JSON.stringify(response).includes("write-only-secret"), false);
 });
 
 test("SDK forwards an explicitly configured credentials mode", async () => {
@@ -391,6 +433,10 @@ test("customer management SDK methods encode opaque token paths and stay public"
     },
   });
   await client.getManagedReservation("luma studio", "opaque/token");
+  await client.listManagedReservationAvailability("luma studio", "opaque/token", {
+    service_id: "service_1",
+    date: "2026-08-02",
+  });
   await client.cancelManagedReservation("luma studio", "opaque/token");
   await client.rescheduleManagedReservation("luma studio", "opaque/token", {
     date: "2026-08-02",
@@ -399,6 +445,7 @@ test("customer management SDK methods encode opaque token paths and stay public"
   });
   assert.deepEqual(requests.map(({ url, init }) => [new URL(url).pathname, init?.method]), [
     ["/v1/public/experiences/luma%20studio/manage/opaque%2Ftoken", "GET"],
+    ["/v1/public/experiences/luma%20studio/manage/opaque%2Ftoken/availability", "GET"],
     ["/v1/public/experiences/luma%20studio/manage/opaque%2Ftoken/cancel", "POST"],
     ["/v1/public/experiences/luma%20studio/manage/opaque%2Ftoken/reschedule", "POST"],
   ]);
@@ -567,6 +614,45 @@ test("SDK maps createReservation to POST /v1/reservations with context headers",
   assert.equal(headers.get("X-Reservation-Venue-Id"), "venue_123");
   assert.equal(headers.get("X-Correlation-Id"), "corr_123");
   assert.equal(headers.get("Idempotency-Key"), "idem_123");
+});
+
+test("SDK maps audited staff appointment operations to protected routes", async () => {
+  const calls: Array<{ path: string; method: string; body?: unknown }> = [];
+  const client = createReservationPlatformClient({
+    baseUrl: "https://api.example.test",
+    fetch: async (url, init) => {
+      calls.push({
+        path: new URL(String(url)).pathname,
+        method: init?.method ?? "GET",
+        ...(init?.body ? { body: JSON.parse(String(init.body)) } : {}),
+      });
+      return jsonResponse({
+        reservation_id: "33333333-3333-4333-8333-333333333333",
+        status: "confirmed",
+        service_id: "44444444-4444-4444-8444-444444444444",
+        quantity: 1,
+      });
+    },
+  });
+  const create = {
+    service_id: "44444444-4444-4444-8444-444444444444",
+    staff_id: "55555555-5555-4555-8555-555555555555",
+    date: "2026-07-20", start_time: "09:00", end_time: "10:00", quantity: 1,
+    customer: { name: "Alex", email: "alex@example.com" },
+  };
+  await client.createStaffAppointment(create, { idempotencyKey: "staff-create-123" });
+  await client.transitionAppointment("33333333-3333-4333-8333-333333333333", {
+    expected_status: "confirmed", target_status: "no_show", reason: "Customer did not arrive",
+  }, { idempotencyKey: "transition-123" });
+  await client.staffRescheduleAppointment("33333333-3333-4333-8333-333333333333", {
+    expected_status: "confirmed", date: "2026-07-20", start_time: "10:00",
+    staff_id: "55555555-5555-4555-8555-555555555555", reason: "Customer requested later",
+  }, { idempotencyKey: "reschedule-123" });
+  assert.deepEqual(calls, [
+    { path: "/v1/reservations/staff", method: "POST", body: create },
+    { path: "/v1/reservations/33333333-3333-4333-8333-333333333333/transition", method: "POST", body: { expected_status: "confirmed", target_status: "no_show", reason: "Customer did not arrive" } },
+    { path: "/v1/reservations/33333333-3333-4333-8333-333333333333/staff-reschedule", method: "POST", body: { expected_status: "confirmed", date: "2026-07-20", start_time: "10:00", staff_id: "55555555-5555-4555-8555-555555555555", reason: "Customer requested later" } },
+  ]);
 });
 
 test("SDK builds base URL, API version, encoded paths, query strings, and returns raw JSON", async () => {

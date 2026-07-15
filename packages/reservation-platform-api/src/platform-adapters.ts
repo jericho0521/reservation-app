@@ -30,6 +30,13 @@ function stringValue(value: unknown) {
   return typeof value === "string" && value.length > 0 ? value : undefined;
 }
 
+function appointmentStatusValue(value: unknown): ReservationResponse["status"] {
+  return value === "pending" || value === "confirmed" || value === "completed"
+    || value === "cancelled" || value === "no_show"
+    ? value
+    : "confirmed";
+}
+
 function numberValue(value: unknown) {
   return typeof value === "number" && Number.isFinite(value) ? value : undefined;
 }
@@ -328,6 +335,7 @@ export function toLegacyBookingCreateInput(input: CreateReservationInput) {
     seat_labels: resourceLabels,
     reservation_items: reservationItems,
     interface_type: "form" as const,
+    ...(input.source === "staff" ? { channel: "staff" as const } : {}),
     ...(input.staff_id ? { staff_id: input.staff_id } : {}),
   };
 }
@@ -375,7 +383,7 @@ export function toPlatformReservation(row: unknown): ReservationResponse {
   const record = asRecord(row);
   return {
     reservation_id: stringValue(record.id) ?? stringValue(record.reservation_id) ?? "",
-    status: stringValue(record.status) ?? "confirmed",
+    status: appointmentStatusValue(record.status),
     tenant_id: stringValue(record.tenant_id),
     venue_id: stringValue(record.venue_id),
     service_id: stringValue(record.service_id) ?? "",

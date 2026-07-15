@@ -173,6 +173,7 @@ export interface Reservation {
   items: ReservationItem[];
   status?: string;
   interface_type: LegacyBookingShape["interface_type"];
+  channel?: "web_booking" | "web_chat" | "whatsapp" | "staff" | "simulation";
   staff_id?: string;
   buffer_before_minutes?: number;
   buffer_after_minutes?: number;

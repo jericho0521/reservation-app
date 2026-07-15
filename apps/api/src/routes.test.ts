@@ -33,6 +33,7 @@ import type {
   IdempotencyCommitRecord,
   IdempotencyRecord,
   IdempotencyRepository,
+  IntegrationSettingsRepository,
   ExperienceStudioRepository,
   ExperienceKnowledgeRepository,
   ConversationRepository,
@@ -48,6 +49,7 @@ import type {
   ReservationManagementRepository,
   ReservationReadRepositoryPort,
   ResourceMaintenanceRepositoryPort,
+  SecretEnvelopeV1,
 } from "@reservation-platform/api";
 
 import {
@@ -158,6 +160,41 @@ function authRepository(overrides: Partial<PlatformSessionRepository & StaffRepo
 
 const authOrigin = "https://console.example";
 
+function integrationRepositoryFixture() {
+  let settings: Awaited<ReturnType<IntegrationSettingsRepository["read"]>> = {
+    tenantId: "tenant-1",
+    kind: "email",
+    enabled: true,
+    provider: "smtp",
+    publicConfig: { host: "smtp.example.com", port: 587, tls_mode: "starttls", from_address: "bookings@example.com" },
+    credentialPresent: true,
+    updatedAt: "2026-07-15T00:00:00.000Z",
+  };
+  let storedEnvelope: SecretEnvelopeV1 | undefined = {
+    v: 1, alg: "aes-256-gcm", iv: "iv", tag: "tag", ciphertext: "ciphertext",
+  };
+  const repository: IntegrationSettingsRepository = {
+    async read() { return settings; },
+    async saveSettings(input) {
+      storedEnvelope = input.envelope ?? storedEnvelope;
+      settings = {
+        tenantId: input.tenantId,
+        kind: input.kind,
+        enabled: input.enabled,
+        provider: input.provider,
+        publicConfig: input.publicConfig,
+        credentialPresent: storedEnvelope !== undefined,
+        updatedAt: "2026-07-15T01:00:00.000Z",
+      };
+      return settings;
+    },
+    async rotateCredential(input) { storedEnvelope = input.envelope; },
+    async readCredential() { return storedEnvelope; },
+    async deleteCredential() { storedEnvelope = undefined; },
+  };
+  return repository;
+}
+
 test("setup and login issue secure cookies without exposing session tokens", async () => {
   const authOptions = {
     allowedOrigins: [authOrigin], passwordHasher: { hash: async () => "$argon2id$hash", verify: async () => true },
@@ -266,6 +303,77 @@ test("cookie staff cannot access owner configuration routes but can list assigne
   });
   assert.equal(operational.status, 200);
   assert.equal(observedVenue, assignedVenue);
+});
+
+test("owner email integration routes keep SMTP credentials write-only and sanitize connection tests", async () => {
+  const repository = integrationRepositoryFixture();
+  const cookie = `reservation_session=${"s".repeat(43)}; reservation_csrf=${"c".repeat(43)}`;
+  const writeHeaders = { cookie, origin: authOrigin, "x-csrf-token": "c".repeat(43) };
+  let encryptedCredential: Record<string, unknown> | undefined;
+  const dependencies = {
+    sessionAuth: { repositories: authRepository(), allowedOrigins: [authOrigin] },
+    tenantVenueRepository: tenantVenueRepository({
+      async getVenue(id) { return { data: { id, tenant_id: "tenant-1" } }; },
+    }),
+    integrationSettingsRepository: repository,
+    integrationCredentialEncryptor(credential: Record<string, unknown>) {
+      encryptedCredential = credential;
+      return { v: 1 as const, alg: "aes-256-gcm" as const, iv: "iv", tag: "tag", ciphertext: "ciphertext" };
+    },
+    integrationCredentialDecryptor() {
+      return encryptedCredential ?? { username: "mailer", password: "write-only-secret" };
+    },
+    emailConnectionTester: { async test(input: { credential: { password?: string } }) {
+      assert.equal(input.credential.password, "write-only-secret");
+    } },
+    emailTestRecipientResolver: async () => "owner@example.com",
+  };
+  const saved = await handleStandaloneApiRequest({
+    method: "PUT", path: "/v1/integrations/email", headers: writeHeaders,
+    body: {
+      enabled: true,
+      host: "smtp.example.com",
+      port: 587,
+      tls_mode: "starttls",
+      from_address: "bookings@example.com",
+      username: "mailer",
+      password: "write-only-secret",
+    },
+  }, dependencies);
+  assert.equal(saved.status, 200, JSON.stringify(saved.body));
+  assert.equal(JSON.stringify(saved.body).includes("write-only-secret"), false);
+  assert.equal(JSON.stringify(saved.body).includes("username"), false);
+  assert.deepEqual(encryptedCredential, { username: "mailer", password: "write-only-secret" });
+
+  const read = await handleStandaloneApiRequest({
+    method: "GET", path: "/v1/integrations/email", headers: { cookie },
+  }, dependencies);
+  assert.equal(read.status, 200);
+  assert.equal(JSON.stringify(read.body).includes("ciphertext"), false);
+  assert.equal(JSON.stringify(read.body).includes("write-only-secret"), false);
+
+  const tested = await handleStandaloneApiRequest({
+    method: "POST", path: "/v1/integrations/email/test", headers: writeHeaders, body: {},
+  }, dependencies);
+  assert.deepEqual(tested, { status: 200, headers: { "content-type": "application/json; charset=utf-8" }, body: { ok: true, message: "Test email sent to the owner address." } });
+});
+
+test("email integration routes are owner-only and require CSRF for writes", async () => {
+  const cookie = `reservation_session=${"s".repeat(43)}; reservation_csrf=${"c".repeat(43)}`;
+  const staffRepositories = authRepository({ readSession: async () => ({
+    userId: "223e4567-e89b-42d3-a456-426614174000", tenantId: "tenant-1", role: "staff", venueIds: [], expiresAt: "2026-07-15T12:00:00.000Z",
+  }) });
+  const repository = integrationRepositoryFixture();
+  const staffRead = await handleStandaloneApiRequest({ method: "GET", path: "/v1/integrations/email", headers: { cookie } }, {
+    sessionAuth: { repositories: staffRepositories, allowedOrigins: [authOrigin] },
+    integrationSettingsRepository: repository,
+  });
+  const csrfDenied = await handleStandaloneApiRequest({ method: "PUT", path: "/v1/integrations/email", headers: { cookie }, body: {} }, {
+    sessionAuth: { repositories: authRepository(), allowedOrigins: [authOrigin] },
+    integrationSettingsRepository: repository,
+  });
+  assert.equal(staffRead.status, 403);
+  assert.equal(csrfDenied.status, 403);
 });
 
 test("cookie owners also require a concrete venue for venue-scoped operations", async () => {
@@ -1011,6 +1119,31 @@ test("public management routes read, reschedule, and replay cancellation without
   assert.equal((cancelled.body as { status: string }).status, "cancelled");
   assert.equal(rescheduled.status, 200);
   assert.deepEqual(calls, ["read", "cancel", "reschedule:2026-08-02:10:30:33333333-3333-4333-8333-333333333333"]);
+});
+
+test("managed availability hashes the token and uses the self-excluding repository scope", async () => {
+  const token = "abcdefghijklmnopqrstuvwxyzABCDEFGH123456789";
+  let availabilityInput: unknown;
+  const response = await handleStandaloneApiRequest({
+    method: "GET",
+    path: `/v1/public/experiences/apex-racing/manage/${token}/availability?service_id=svc_123&date=2026-08-02&staff_id=staff-1`,
+    headers: {},
+  }, {
+    availabilityRepository: availabilityRepository({
+      async readAvailability(input) {
+        availabilityInput = input;
+        return { service: availabilityService(), bookings: [], maintenanceResourceLabels: [] };
+      },
+    }),
+  });
+
+  assert.equal(response.status, 200);
+  assert.equal((availabilityInput as { management?: { publicSlug?: string } }).management?.publicSlug, "apex-racing");
+  assert.match(
+    (availabilityInput as { management?: { tokenHash?: string } }).management?.tokenHash ?? "",
+    /^[a-f0-9]{64}$/u,
+  );
+  assert.notEqual((availabilityInput as { management?: { tokenHash?: string } }).management?.tokenHash, token);
 });
 
 test("public booking routes disappear when web booking is disabled", async () => {

@@ -61,8 +61,9 @@ export type IntegrationCredentialDecryptor = (
 
 export interface EmailConnectionTester {
   test(input: {
-    settings: { host: string; port: number; tlsMode: EmailTlsMode; from: string };
+    settings: { host: string; port: number; tlsMode: EmailTlsMode; from: string; fromName?: string };
     credential: { username?: string; password?: string };
+    recipient: string;
   }): Promise<void>;
 }
 
@@ -94,6 +95,7 @@ export async function saveEmailIntegrationSettings(input: {
         port: value.port,
         tls_mode: value.tls_mode,
         from_address: value.from_address,
+        ...(value.from_name ? { from_name: value.from_name } : {}),
       },
       ...(value.username && value.password
         ? { credential: { username: value.username, password: value.password } }
@@ -107,6 +109,7 @@ export async function saveEmailIntegrationSettings(input: {
 
 export async function testEmailIntegration(input: {
   principal: AuthenticatedPrincipal;
+  recipient?: string;
   repository: Pick<IntegrationSettingsRepository, "read" | "readCredential">;
   decryptCredential: IntegrationCredentialDecryptor;
   tester: EmailConnectionTester;
@@ -120,12 +123,15 @@ export async function testEmailIntegration(input: {
   if (!settings) {
     return { ok: false, message: "Save email settings before testing the connection.", error_code: "not_configured" };
   }
+  if (!input.recipient) {
+    return { ok: false, message: "The owner email address is unavailable.", error_code: "connection_failed" };
+  }
   try {
     const publicConfig = parseEmailPublicConfig(settings.publicConfig);
     const envelope = await input.repository.readCredential(input.principal.tenantId, "email");
     const credential = envelope ? parseEmailCredential(input.decryptCredential(envelope)) : {};
-    await withDeadline(input.tester.test({ settings: publicConfig, credential }), input.timeoutMs);
-    return { ok: true, message: "SMTP connection succeeded." };
+    await withDeadline(input.tester.test({ settings: publicConfig, credential, recipient: input.recipient }), input.timeoutMs);
+    return { ok: true, message: "Test email sent to the owner address." };
   } catch {
     return { ok: false, message: "SMTP connection could not be established.", error_code: "connection_failed" };
   }
@@ -246,6 +252,7 @@ function emailSettingsResponse(
     port: config.port,
     tls_mode: config.tlsMode,
     from_address: config.from,
+    ...(config.fromName ? { from_name: config.fromName } : {}),
     credential_present: settings.credentialPresent,
     updated_at: settings.updatedAt,
   };
@@ -258,6 +265,7 @@ function parseEmailPublicConfig(value: Record<string, unknown>) {
     port: value.port,
     tls_mode: value.tls_mode,
     from_address: value.from_address,
+    from_name: value.from_name,
   };
   const parsed = emailIntegrationSettingsInputSchema.safeParse(input);
   if (!parsed.success) throw validationError("Stored email integration settings are invalid.");
@@ -266,6 +274,7 @@ function parseEmailPublicConfig(value: Record<string, unknown>) {
     port: parsed.data.port,
     tlsMode: parsed.data.tls_mode,
     from: parsed.data.from_address,
+    fromName: parsed.data.from_name,
   };
 }
 

@@ -13,7 +13,7 @@ import {
 
 const indexPath = new URL("../migrations/supabase/migration-index.json", import.meta.url);
 
-test("core plan includes exactly 000001 through 000030 in order", async () => {
+test("core plan includes exactly 000001 through 000033 in order", async () => {
   const index = await readActualIndex();
   const plan = buildSupabaseMigrationPlan(index);
 
@@ -50,9 +50,12 @@ test("core plan includes exactly 000001 through 000030 in order", async () => {
       "000028_appointment_availability_management.sql",
       "000029_durable_jobs_notifications.sql",
       "000030_integration_secrets.sql",
+      "000031_appointment_correctness_followup.sql",
+      "000032_appointment_staff_operations.sql",
+      "000033_appointment_notification_jobs.sql",
     ],
   );
-  assert.equal(plan.migrations.length, 30);
+  assert.equal(plan.migrations.length, 33);
   assert.equal(plan.seeds.length, 0);
 });
 
@@ -68,6 +71,22 @@ test("durable jobs use tenant-idempotent enqueue and exclusive leases", async ()
   assert.match(sql, /job\.lease_owner = p_worker_id\s+and job\.leased_until > now\(\)/);
   assert.match(sql, /revoke all on table public\.platform_jobs from public, anon, authenticated, service_role/);
   assert.match(sql, /grant execute on function public\.claim_platform_jobs[^;]+to service_role/);
+});
+
+test("appointment notifications are transactionally enqueued and old reminders are superseded", async () => {
+  const sql = (await readFile(new URL("../migrations/supabase/000033_appointment_notification_jobs.sql", import.meta.url), "utf8")).toLowerCase();
+  assert.match(sql, /create trigger platform_bookings_enqueue_notification_jobs/);
+  assert.match(sql, /after insert or update of status, booking_date, start_time, end_time, staff_id/);
+  assert.match(sql, /service\.booking_mode = 'appointment'/);
+  assert.match(sql, /error_code = 'superseded'[\s\S]*reminder\.payload ->> 'kind' = 'appointment_reminder'/);
+  assert.match(sql, /'expectedappointmentstart', v_occurrence_key/);
+  assert.match(sql, /on conflict \(tenant_id, idempotency_key\) do nothing/);
+  assert.match(sql, /create or replace function public\.platform_record_notification_attempt/);
+  assert.match(sql, /attempts = platform_notification_deliveries\.attempts \+ 1/);
+  assert.match(sql, /create or replace function public\.platform_record_notification_delivered/);
+  assert.match(sql, /provider_message_id = left\(nullif\(p_provider_message_id/);
+  assert.match(sql, /create or replace function public\.platform_record_notification_retry/);
+  assert.match(sql, /final_failure_code = case when p_final then p_error_code else null end/);
 });
 
 test("integration settings store only versioned encrypted envelopes", async () => {
@@ -91,6 +110,22 @@ test("appointment availability migration serializes practitioner writes and clos
   assert.match(sql, /resource_status', resource\.status/);
   assert.match(sql, /revoke all on function public\.create_reservation_atomic_legacy\(jsonb\) from public, anon, authenticated, service_role/);
   assert.doesNotMatch(sql, /grant execute on function public\.create_reservation_atomic_legacy/);
+});
+
+test("appointment correctness follow-up keeps stable modes and self-excluding managed availability", async () => {
+  const sql = (await readFile(new URL("../migrations/supabase/000031_appointment_correctness_followup.sql", import.meta.url), "utf8")).toLowerCase();
+
+  assert.match(sql, /add column if not exists booking_mode text/);
+  assert.match(sql, /platform_create_appointment_practitioner_resource/);
+  assert.match(sql, /insert into public\.platform_staff_profiles/);
+  assert.match(sql, /join public\.platform_staff_services as staff_service[\s\S]*staff_service\.service_id = service\.id/);
+  assert.match(sql, /public\.platform_appointment_slot_is_allowed/);
+  assert.match(sql, /existing\.id <> v_booking\.id/);
+  assert.match(sql, /create or replace function public\.read_managed_reservation_availability_snapshot/);
+  assert.match(sql, /where entry ->> 'id' <> v_booking_id::text/);
+  assert.match(sql, /v_before := jsonb_build_object\([\s\S]*'date'[\s\S]*'staff_id'[\s\S]*'status'/);
+  assert.doesNotMatch(sql, /v_before := to_jsonb\(v_booking\)/);
+  assert.match(sql, /grant execute on function public\.read_managed_reservation_availability_snapshot\(text, text, date\) to service_role/);
 });
 
 test("staff access administration is tenant-safe, audited, and blocks placeholder activation", async () => {
@@ -176,7 +211,7 @@ test("bundled core migration loader follows an extended validated index", async 
   const rawIndex = await readActualRawIndex();
   rawIndex.coreMigrations.push({
     order: rawIndex.coreMigrations.length + 1,
-    path: "packages/database/migrations/supabase/000031_runtime_readiness_test.sql",
+    path: "packages/database/migrations/supabase/000034_runtime_readiness_test.sql",
     module: "core",
     scope: "reservation-platform",
     sha256: "a".repeat(64),
@@ -189,9 +224,9 @@ test("bundled core migration loader follows an extended validated index", async 
 
   const plan = await loadBundledCoreMigrationPlan(pathToFileURL(extendedIndexPath));
 
-  assert.equal(plan.length, 31);
+  assert.equal(plan.length, 34);
   assert.deepEqual(plan.at(-1), {
-    path: "packages/database/migrations/supabase/000031_runtime_readiness_test.sql",
+    path: "packages/database/migrations/supabase/000034_runtime_readiness_test.sql",
     sha256: "a".repeat(64),
   });
 });

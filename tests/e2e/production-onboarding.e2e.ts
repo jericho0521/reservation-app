@@ -33,7 +33,8 @@ test("onboarding implementation uses platform APIs and derives the production or
     "publishExperienceDraft",
   ]) assert.match(implementation, new RegExp(`\\.${apiCall}\\(`, "u"));
   assert.doesNotMatch(implementation, /localStorage|sessionStorage/iu);
-  assert.match(loader, /emailReady:\s*false/u);
+  assert.match(loader, /getEmailIntegrationSettings/u);
+  assert.match(loader, /emailReady:\s*email\.enabled && email\.configured/u);
 
   const records = {
     ownerCreated: true,

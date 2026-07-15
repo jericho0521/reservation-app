@@ -23,19 +23,19 @@ test("invalid management links become not found without exposing token state", a
 
 test("managed reschedule availability is scoped to the existing service and practitioner", async () => {
   let query: unknown;
+  let receivedToken: string | undefined;
   const slots = await loadManagedRescheduleAvailability({
-    listPublicExperienceAvailability: async (_slug, input) => {
+    listManagedReservationAvailability: async (_slug, token, input) => {
+      receivedToken = token;
       query = input;
       return { slots: [
         { start_time: "10:00", end_time: "10:30", available_quantity: 1, is_available: true },
         { start_time: "10:30", end_time: "11:00", available_quantity: 0, is_available: false },
       ] };
     },
-  }, "luma-studio", {
-    reservation_id: "reservation_1",
+  }, "luma-studio", "management-token", {
     service_id: "service_1",
     staff_id: "33333333-3333-4333-8333-333333333333",
-    status: "confirmed",
     quantity: 1,
   }, "2026-08-02");
 
@@ -45,6 +45,7 @@ test("managed reschedule availability is scoped to the existing service and prac
     quantity: 1,
     staff_id: "33333333-3333-4333-8333-333333333333",
   });
+  assert.equal(receivedToken, "management-token");
   assert.deepEqual(slots.map((slot) => slot.start_time), ["10:00"]);
 });
 

@@ -18,9 +18,10 @@ export default async function ChannelsSetupPage() {
     <header className="page-header"><span className="eyebrow">Business setup · 6 of 7</span><h1>Choose customer channels</h1><p>Web booking is the production baseline. AI chat and WhatsApp remain optional until their provider setup is ready.</p></header>
     <ChannelSettings onboarding value={data.channels} />
     <section className="panel setup-summary" aria-labelledby="email-delivery-status">
-      <span className="status-pill">Phase 3 integration</span>
-      <h2 id="email-delivery-status">Appointment emails are not configured yet</h2>
-      <p>Web booking can be published now. Confirmation and reminder email delivery will be enabled in Phase 3 and is not counted as ready by this setup wizard.</p>
+      <span className={`status-pill ${data.email?.enabled && data.email.configured ? "ready" : "degraded"}`}>{data.email?.enabled && data.email.configured ? "Email ready" : "Optional setup"}</span>
+      <h2 id="email-delivery-status">{data.email?.enabled && data.email.configured ? "Appointment email is configured" : "Connect appointment email"}</h2>
+      <p>{data.email?.enabled && data.email.configured ? "The worker can use your saved SMTP connection for confirmation and reminder delivery." : "Web booking can be published without email. Add your SMTP account now or return to it from owner settings."}</p>
+      <a className="secondary-action" href="/admin/settings/email">Configure email delivery</a>
     </section>
   </main>;
 }

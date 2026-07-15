@@ -1030,6 +1030,141 @@
       },
       "type": "object"
     },
+    "EmailIntegrationSettingsInput": {
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "from_address": {
+          "format": "email",
+          "maxLength": 320,
+          "type": "string"
+        },
+        "from_name": {
+          "maxLength": 120,
+          "minLength": 1,
+          "type": "string"
+        },
+        "host": {
+          "maxLength": 255,
+          "minLength": 1,
+          "type": "string"
+        },
+        "password": {
+          "maxLength": 1024,
+          "minLength": 1,
+          "type": "string",
+          "writeOnly": true
+        },
+        "port": {
+          "maximum": 65535,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "tls_mode": {
+          "$ref": "#/$defs/EmailTlsMode"
+        },
+        "username": {
+          "maxLength": 320,
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "enabled",
+        "host",
+        "port",
+        "tls_mode",
+        "from_address"
+      ],
+      "type": "object"
+    },
+    "EmailIntegrationSettingsResponse": {
+      "additionalProperties": false,
+      "properties": {
+        "configured": {
+          "type": "boolean"
+        },
+        "credential_present": {
+          "type": "boolean"
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "from_address": {
+          "format": "email",
+          "maxLength": 320,
+          "type": "string"
+        },
+        "from_name": {
+          "maxLength": 120,
+          "minLength": 1,
+          "type": "string"
+        },
+        "host": {
+          "maxLength": 255,
+          "minLength": 1,
+          "type": "string"
+        },
+        "port": {
+          "maximum": 65535,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "provider": {
+          "const": "smtp",
+          "type": "string"
+        },
+        "tls_mode": {
+          "$ref": "#/$defs/EmailTlsMode"
+        },
+        "updated_at": {
+          "format": "date-time",
+          "type": "string"
+        }
+      },
+      "required": [
+        "enabled",
+        "provider",
+        "configured",
+        "credential_present"
+      ],
+      "type": "object"
+    },
+    "EmailIntegrationTestResponse": {
+      "additionalProperties": false,
+      "properties": {
+        "error_code": {
+          "enum": [
+            "not_configured",
+            "connection_failed"
+          ],
+          "type": "string"
+        },
+        "message": {
+          "maxLength": 160,
+          "minLength": 1,
+          "type": "string"
+        },
+        "ok": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "ok",
+        "message"
+      ],
+      "type": "object"
+    },
+    "EmailTlsMode": {
+      "enum": [
+        "required",
+        "starttls",
+        "plain"
+      ],
+      "type": "string"
+    },
     "EndResourceMaintenanceInput": {
       "additionalProperties": false,
       "properties": {
@@ -3120,6 +3255,13 @@
     "StaffInvitationResponse": {
       "additionalProperties": false,
       "properties": {
+        "delivery": {
+          "enum": [
+            "email",
+            "manual"
+          ],
+          "type": "string"
+        },
         "expires_at": {
           "format": "date-time",
           "type": "string"
@@ -3136,7 +3278,7 @@
       },
       "required": [
         "user_id",
-        "invitation_token",
+        "delivery",
         "expires_at"
       ],
       "type": "object"

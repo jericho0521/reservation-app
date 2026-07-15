@@ -474,6 +474,42 @@ test("catalog mutations preserve scoped service rows and archive instead of dele
   assert.equal(calls.some((call) => "delete" in call), false);
 });
 
+test("appointment practitioner resource creation uses the atomic profile RPC", async () => {
+  const calls: unknown[] = [];
+  const client = {
+    from(table: string) {
+      assert.equal(table, RESERVATION_SUPABASE_TABLES.services);
+      return {
+        select(columns: string) {
+          assert.equal(columns, "id, booking_mode");
+          return this;
+        },
+        eq() { return this; },
+        async single() {
+          return { data: { id: "service-1", booking_mode: "appointment" }, error: null };
+        },
+      };
+    },
+    async rpc(name: string, params?: Record<string, unknown>) {
+      calls.push([name, params]);
+      return { data: { id: "resource-1", service_id: "service-1", label: "Ada" }, error: null };
+    },
+  };
+  const repository = createSupabasePlatformCatalogRepository(client as never);
+  const result = await repository.createResource!(
+    { tenantId: "tenant-1", venueId: "venue-1" },
+    { service_id: "service-1", label: "Ada", kind: "custom", capacity: 1 },
+  );
+
+  assert.equal((result.data as { id: string }).id, "resource-1");
+  assert.deepEqual(calls, [["platform_create_appointment_practitioner_resource", {
+    p_tenant_id: "tenant-1",
+    p_venue_id: "venue-1",
+    p_service_id: "service-1",
+    p_display_name: "Ada",
+  }]]);
+});
+
 test("catalog repository preserves strict service query errors without fallback reads", async () => {
   const calls: RecordedCatalogRead[] = [];
   const publicClient = createCatalogReadClient(
@@ -697,6 +733,55 @@ test("availability repository reads and adapts one database snapshot", async () 
       params: { p_service_id: "service-1", p_date: "2026-01-02" },
     },
   ]);
+});
+
+test("managed availability uses the token-scoped snapshot RPC", async () => {
+  const rpcCalls: Array<{ fn: string; params?: Record<string, unknown> }> = [];
+  const repository = createSupabaseAvailabilityRepository({
+    from() {
+      throw new Error("managed availability snapshot should not issue table reads");
+    },
+    async rpc(fn: string, params?: Record<string, unknown>) {
+      rpcCalls.push({ fn, params });
+      return {
+        data: {
+          ok: true,
+          snapshot: {
+            service: {
+              id: "service-1",
+              venue_id: "venue-1",
+              name: "Consultation",
+              total_seats: 1,
+              created_at: "2026-01-01T00:00:00.000Z",
+            },
+            bookings: [],
+            maintenance: [],
+            resources: [],
+            layout: null,
+            staff: [{ staff_id: "staff-1", resource_status: "available" }],
+          },
+        },
+        error: null,
+      };
+    },
+  });
+
+  const availability = await repository.readAvailability({
+    serviceId: "service-1",
+    date: "2026-08-02",
+    staffId: "staff-1",
+    management: { publicSlug: "luma-studio", tokenHash: "hashed-token" },
+  });
+
+  assert.equal(availability.service.id, "service-1");
+  assert.deepEqual(rpcCalls, [{
+    fn: RESERVATION_SUPABASE_AVAILABILITY_RPCS.readManagedSnapshot,
+    params: {
+      p_public_slug: "luma-studio",
+      p_token_hash: "hashed-token",
+      p_date: "2026-08-02",
+    },
+  }]);
 });
 
 test("availability repository rejects staff outside the service and location assignments", async () => {
@@ -1025,6 +1110,29 @@ test("reservation read repository skips optional list filters when absent", asyn
   ]);
 });
 
+test("reservation read repository applies bounded working-day filters", async () => {
+  const calls: RecordedReservationCompatibilityCall[] = [];
+  const client = createReservationCompatibilityClient([{ data: [], error: null }], calls);
+  const repository = createSupabaseReservationReadRepository(client);
+
+  await repository.listReservations({
+    search: null,
+    searchFilterExpression: null,
+    limit: null,
+    venueId: "venue-a",
+    date: "2026-07-20",
+    status: "confirmed",
+    staffId: "33333333-3333-4333-8333-333333333333",
+  });
+
+  assert.deepEqual(calls[0]?.filters, [
+    { column: "services.venue_id", value: "venue-a" },
+    { column: "booking_date", value: "2026-07-20" },
+    { column: "status", value: "confirmed" },
+    { column: "staff_id", value: "33333333-3333-4333-8333-333333333333" },
+  ]);
+});
+
 test("reservation read repository owns exact summary count query shape", async () => {
   const calls: RecordedReservationCompatibilityCall[] = [];
   const client = createReservationCompatibilityClient(
@@ -1227,6 +1335,78 @@ test("reservation mutations use the atomic venue-scoped RPC and hide cross-venue
       p_patch: patch,
     },
   }]);
+});
+
+test("appointment mutations use actor-scoped atomic RPCs", async () => {
+  const rpcCalls: unknown[] = [];
+  const repository = createSupabaseReservationMutationRepository({
+    from() { throw new Error("appointment operations must use RPCs"); },
+    async rpc(fn, params) {
+      rpcCalls.push({ fn, params });
+      return { data: { ok: true, booking: { id: "booking-1" } }, error: null };
+    },
+  });
+
+  await repository.transitionAppointment?.({
+    tenantId: "tenant-a", venueId: "11111111-1111-4111-8111-111111111111",
+    actorUserId: "22222222-2222-4222-8222-222222222222", reservationId: "33333333-3333-4333-8333-333333333333",
+    expectedStatus: "confirmed", targetStatus: "no_show", reason: "Customer did not arrive",
+  });
+  await repository.staffRescheduleAppointment?.({
+    tenantId: "tenant-a", venueId: "11111111-1111-4111-8111-111111111111",
+    actorUserId: "22222222-2222-4222-8222-222222222222", reservationId: "33333333-3333-4333-8333-333333333333",
+    expectedStatus: "confirmed", date: "2026-07-20", startTime: "10:00",
+    staffId: "44444444-4444-4444-8444-444444444444", reason: "Customer requested later",
+  });
+
+  assert.deepEqual(rpcCalls, [
+    { fn: "platform_transition_appointment", params: {
+      p_tenant_id: "tenant-a", p_venue_id: "11111111-1111-4111-8111-111111111111",
+      p_actor_user_id: "22222222-2222-4222-8222-222222222222", p_booking_id: "33333333-3333-4333-8333-333333333333",
+      p_expected_status: "confirmed", p_target_status: "no_show", p_reason: "Customer did not arrive",
+    } },
+    { fn: "platform_staff_reschedule_appointment", params: {
+      p_tenant_id: "tenant-a", p_venue_id: "11111111-1111-4111-8111-111111111111",
+      p_actor_user_id: "22222222-2222-4222-8222-222222222222", p_booking_id: "33333333-3333-4333-8333-333333333333",
+      p_expected_status: "confirmed", p_date: "2026-07-20", p_start_time: "10:00",
+      p_staff_id: "44444444-4444-4444-8444-444444444444", p_reason: "Customer requested later",
+    } },
+  ]);
+});
+
+test("staff appointment creation forwards actor and operational payload to the audited RPC", async () => {
+  let call: unknown;
+  const repository = createSupabaseReservationMutationRepository({
+    from() { throw new Error("staff creation must use its RPC"); },
+    async rpc(fn, params) { call = { fn, params }; return { data: { ok: true, booking: {} }, error: null }; },
+  });
+  await repository.staffCreateAppointment?.({
+    tenantId: "tenant-a",
+    venueId: "11111111-1111-4111-8111-111111111111",
+    actorUserId: "22222222-2222-4222-8222-222222222222",
+    reservation: {
+      service_id: "33333333-3333-4333-8333-333333333333",
+      staff_id: "44444444-4444-4444-8444-444444444444",
+      customer_name: "Alex", customer_email: "alex@example.com", booking_date: "2026-07-20",
+      start_time: "09:00", end_time: "10:00", quantity: 1, items: [{ quantity: 1 }],
+      interface_type: "form", channel: "staff", seats_booked: 1, seat_labels: [],
+    },
+  });
+  assert.deepEqual(call, {
+    fn: "platform_staff_create_appointment",
+    params: {
+      p_tenant_id: "tenant-a", p_venue_id: "11111111-1111-4111-8111-111111111111",
+      p_actor_user_id: "22222222-2222-4222-8222-222222222222",
+      p_payload: {
+        service_id: "33333333-3333-4333-8333-333333333333",
+        user_name: "Alex", user_email: "alex@example.com", user_phone: undefined,
+        booking_date: "2026-07-20", start_time: "09:00", end_time: "10:00",
+        seats_booked: 1, seat_labels: [], reservation_items: [{ resource_id: null, resource_label: null, quantity: 1 }],
+        status: "confirmed", interface_type: "form", channel: "staff",
+        staff_id: "44444444-4444-4444-8444-444444444444",
+      },
+    },
+  });
 });
 
 test("adapts Supabase service metadata into core reservation service", () => {

@@ -177,8 +177,13 @@ export const staffInvitationInputSchema = strictObject({
 
 export const staffInvitationResponseSchema = strictObject({
   user_id: z.string().uuid(),
-  invitation_token: z.string().min(43).max(128),
+  invitation_token: z.string().min(43).max(128).optional(),
+  delivery: z.enum(["email", "manual"]),
   expires_at: z.string().datetime(),
+}).superRefine((value, context) => {
+  if (value.delivery === "manual" && !value.invitation_token) {
+    context.addIssue({ code: z.ZodIssueCode.custom, message: "Manual delivery requires an invitation token." });
+  }
 });
 
 export const staffMemberResponseSchema = strictObject({
@@ -209,6 +214,42 @@ export const requestPasswordResetInputSchema = strictObject({
 
 export const completePasswordResetInputSchema = strictObject({
   password: z.string().min(12).max(128),
+});
+
+export const emailTlsModeSchema = z.enum(["required", "starttls", "plain"]);
+
+export const emailIntegrationSettingsInputSchema = strictObject({
+  enabled: z.boolean(),
+  host: z.string().trim().min(1).max(255),
+  port: z.number().int().min(1).max(65_535),
+  tls_mode: emailTlsModeSchema,
+  from_address: z.string().trim().email().max(320),
+  from_name: z.string().trim().min(1).max(120).optional(),
+  username: z.string().trim().min(1).max(320).optional(),
+  password: z.string().min(1).max(1_024).optional(),
+}).superRefine((value, context) => {
+  if ((value.username === undefined) !== (value.password === undefined)) {
+    context.addIssue({ code: z.ZodIssueCode.custom, message: "Username and password must be supplied together." });
+  }
+});
+
+export const emailIntegrationSettingsResponseSchema = strictObject({
+  enabled: z.boolean(),
+  provider: z.literal("smtp"),
+  configured: z.boolean(),
+  host: z.string().min(1).max(255).optional(),
+  port: z.number().int().min(1).max(65_535).optional(),
+  tls_mode: emailTlsModeSchema.optional(),
+  from_address: z.string().email().max(320).optional(),
+  from_name: z.string().min(1).max(120).optional(),
+  credential_present: z.boolean(),
+  updated_at: z.string().datetime().optional(),
+});
+
+export const emailIntegrationTestResponseSchema = strictObject({
+  ok: z.boolean(),
+  message: z.string().min(1).max(160),
+  error_code: z.enum(["not_configured", "connection_failed"]).optional(),
 });
 
 export const installationLocationInputSchema = strictObject({
@@ -652,9 +693,17 @@ export const createReservationInputSchema = strictObject({
   payment_reference: paymentReferenceSchema.optional(),
 });
 
+export const appointmentStatusSchema = z.enum([
+  "pending",
+  "confirmed",
+  "completed",
+  "cancelled",
+  "no_show",
+]);
+
 export const reservationResponseSchema = strictObject({
   reservation_id: z.string(),
-  status: z.string(),
+  status: appointmentStatusSchema,
   tenant_id: z.string().optional(),
   venue_id: z.string().optional(),
   service_id: z.string(),
@@ -675,14 +724,29 @@ export const reservationResponseSchema = strictObject({
   management_expires_at: z.string().optional(),
 });
 
+export const transitionAppointmentInputSchema = strictObject({
+  expected_status: appointmentStatusSchema,
+  target_status: appointmentStatusSchema,
+  reason: z.string().trim().max(500).optional(),
+});
+
+export const staffRescheduleAppointmentInputSchema = strictObject({
+  expected_status: appointmentStatusSchema,
+  date: localDateSchema,
+  start_time: localTimeSchema,
+  staff_id: z.string().uuid(),
+  reason: z.string().trim().min(1).max(500),
+});
+
 export const listReservationsQuerySchema = strictObject({
   tenant_id: z.string().optional(),
   venue_id: z.string().optional(),
   service_id: z.string().optional(),
-  status: z.string().optional(),
+  status: appointmentStatusSchema.optional(),
   customer_id: z.string().optional(),
   start_at: z.string().optional(),
   end_at: z.string().optional(),
+  staff_id: z.string().uuid().optional(),
 });
 
 export const reservationListSummarySchema = strictObject({

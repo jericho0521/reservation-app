@@ -36,7 +36,7 @@ function StatusTransitionForm({ reservation, next }: { reservation: ReservationR
     <input type="hidden" name="reservation_id" value={reservation.reservation_id} />
     <input type="hidden" name="expected_status" value={reservation.status} />
     <input type="hidden" name="target_status" value={next} />
-    <label>{requiresReason ? "Audit reason" : "Operational note (optional)"}<textarea name="reason" rows={2} required={requiresReason} placeholder={requiresReason ? `Why is this appointment ${statusLabel(next).toLocaleLowerCase()}?` : "Add context for the audit trail"} /></label>
+    <label>{requiresReason ? "Audit reason" : "Operational note (optional)"}<textarea name="transition_reason" rows={2} required={requiresReason} placeholder={requiresReason ? `Why is this appointment ${statusLabel(next).toLocaleLowerCase()}?` : "Add context for the audit trail"} /></label>
     <button className={next === "cancelled" ? "danger-action" : "secondary-action"} type="submit" disabled={pending}>{pending ? "Saving…" : statusActionLabel(next)}</button>
     <ActionMessage state={state} />
   </form>;
@@ -51,7 +51,6 @@ function RescheduleForm({ reservation }: { reservation: ReservationResponse }) {
       <input type="hidden" name="reservation_id" value={reservation.reservation_id} />
       <input type="hidden" name="expected_status" value={reservation.status} />
       <div className="form-columns"><label>Date<input type="date" name="date" defaultValue={reservation.date ?? ""} required /></label><label>Start time<input type="time" name="start_time" defaultValue={reservation.start_time?.slice(0, 5) ?? ""} required /></label></div>
-      <label>End time<input type="time" name="end_time" defaultValue={reservation.end_time?.slice(0, 5) ?? ""} required /></label>
       <label>Audit reason<textarea name="reason" rows={2} required placeholder="Why is the appointment moving?" /></label>
       <button className="primary-action" type="submit" disabled={pending}>{pending ? "Rescheduling…" : "Reschedule appointment"}</button>
       <ActionMessage state={state} />

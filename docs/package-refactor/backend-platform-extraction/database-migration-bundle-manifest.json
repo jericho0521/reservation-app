@@ -342,6 +342,39 @@
       ]
     },
     {
+      "kind": "core-migration",
+      "order": 31,
+      "targetPath": "packages/database/migrations/supabase/000031_appointment_correctness_followup.sql",
+      "sourceAssets": [
+        {
+          "path": "packages/database/migrations/supabase/000031_appointment_correctness_followup.sql",
+          "section": "Forward-only appointment mode, practitioner maintenance, and cross-service availability corrections"
+        }
+      ]
+    },
+    {
+      "kind": "core-migration",
+      "order": 32,
+      "targetPath": "packages/database/migrations/supabase/000032_appointment_staff_operations.sql",
+      "sourceAssets": [
+        {
+          "path": "packages/database/migrations/supabase/000032_appointment_staff_operations.sql",
+          "section": "Tenant-scoped appointment lifecycle transitions and staff rescheduling RPCs"
+        }
+      ]
+    },
+    {
+      "kind": "core-migration",
+      "order": 33,
+      "targetPath": "packages/database/migrations/supabase/000033_appointment_notification_jobs.sql",
+      "sourceAssets": [
+        {
+          "path": "packages/database/migrations/supabase/000033_appointment_notification_jobs.sql",
+          "section": "Transactional appointment email intents and stale reminder supersession"
+        }
+      ]
+    },
+    {
       "kind": "optional-ai-retrieval",
       "targetPath": "packages/database/migrations/supabase/optional/ai-retrieval/000001_knowledge_chunks.sql",
       "sourceAssets": [

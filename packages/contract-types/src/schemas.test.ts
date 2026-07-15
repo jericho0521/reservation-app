@@ -20,6 +20,9 @@ import {
   experienceResourceInputSchema,
   experienceServiceInputSchema,
   experienceWorkspaceResponseSchema,
+  emailIntegrationSettingsInputSchema,
+  emailIntegrationSettingsResponseSchema,
+  emailIntegrationTestResponseSchema,
   installationBusinessInputSchema,
   installationBusinessResponseSchema,
   installationLocationInputSchema,
@@ -80,6 +83,7 @@ test("authentication contracts validate setup, sessions, staff, and password res
   assert.equal(staffInvitationResponseSchema.safeParse({
     user_id: "33333333-3333-4333-8333-333333333333",
     invitation_token: "i".repeat(43),
+    delivery: "manual",
     expires_at: "2026-07-16T00:00:00.000Z",
   }).success, true);
   assert.equal(acceptStaffInvitationInputSchema.safeParse({
@@ -135,6 +139,36 @@ test("installation onboarding contracts require a business, timezone, and first 
       timezone: input.timezone,
     }],
   }).success, true);
+});
+
+test("email integration contracts keep credentials write-only and bound response detail", () => {
+  const input = {
+    enabled: true,
+    host: "smtp.example.com",
+    port: 587,
+    tls_mode: "starttls",
+    from_address: "bookings@example.com",
+    username: "mailer",
+    password: "secret",
+  };
+  assert.equal(emailIntegrationSettingsInputSchema.safeParse(input).success, true);
+  assert.equal(emailIntegrationSettingsInputSchema.safeParse({ ...input, password: undefined }).success, false);
+  assert.equal(emailIntegrationSettingsInputSchema.safeParse({ ...input, port: 0 }).success, false);
+  const response = {
+    enabled: true,
+    provider: "smtp",
+    configured: true,
+    host: input.host,
+    port: input.port,
+    tls_mode: input.tls_mode,
+    from_address: input.from_address,
+    credential_present: true,
+    updated_at: "2026-07-15T00:00:00.000Z",
+  };
+  assert.equal(emailIntegrationSettingsResponseSchema.safeParse(response).success, true);
+  assert.equal(emailIntegrationSettingsResponseSchema.safeParse({ ...response, password: "must-not-leak" }).success, false);
+  assert.equal(emailIntegrationTestResponseSchema.safeParse({ ok: false, message: "Connection failed.", error_code: "connection_failed" }).success, true);
+  assert.equal(emailIntegrationTestResponseSchema.safeParse({ ok: false, message: "x".repeat(161) }).success, false);
 });
 
 test("platform error codes include payload_too_large", async () => {
@@ -377,6 +411,13 @@ test("public contract schemas reject unknown object properties like generated JS
 });
 
 test("reservationResponseSchema accepts minimal responses and rejects request-only fields", () => {
+  assert.equal(reservationResponseSchema.safeParse({
+    reservation_id: "resv_123",
+    status: "unexpected",
+    service_id: "svc_123",
+    quantity: 1,
+  }).success, false);
+
   assert.equal(reservationResponseSchema.safeParse({
     reservation_id: "resv_123",
     status: "confirmed",

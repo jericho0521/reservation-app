@@ -18,12 +18,60 @@ import {
   readReservationById,
   normalizeReservationSearchTerm,
   rescheduleReservationWithLegacyPatch,
+  staffRescheduleAppointment,
+  transitionAppointment,
   toPlatformCancelledReservation,
   updateReservationWithLegacyPatch,
   type ReservationCreateRepositoryPort,
   type ReservationMutationRepositoryPort,
   type ReservationReadRepositoryPort,
 } from "./reservations.js";
+
+test("appointment lifecycle maps atomic operation conflicts without exposing booking data", async () => {
+  const repository: ReservationMutationRepositoryPort = {
+    async updateReservation() { return { data: null }; },
+    async transitionAppointment() { return { data: { ok: false, error_code: "invalid_transition" } }; },
+  };
+  const result = await transitionAppointment({
+    repository,
+    tenantId: "tenant-a",
+    venueId: "11111111-1111-4111-8111-111111111111",
+    actorUserId: "22222222-2222-4222-8222-222222222222",
+    reservationId: "33333333-3333-4333-8333-333333333333",
+    expectedStatus: "completed",
+    targetStatus: "confirmed",
+  });
+  assert.equal(result.status, 409);
+  assert.deepEqual(result.body, {
+    error: {
+      code: "conflict",
+      message: "The requested appointment status transition is not allowed.",
+      status: 409,
+      details: { operation_code: "invalid_transition" },
+    },
+  });
+});
+
+test("staff reschedule maps successful atomic bookings to the typed response", async () => {
+  const repository: ReservationMutationRepositoryPort = {
+    async updateReservation() { return { data: null }; },
+    async staffRescheduleAppointment() {
+      return { data: { ok: true, booking: {
+        id: "33333333-3333-4333-8333-333333333333", service_id: "44444444-4444-4444-8444-444444444444",
+        staff_id: "55555555-5555-4555-8555-555555555555", booking_date: "2026-07-20",
+        start_time: "10:00", end_time: "11:00", seats_booked: 1, status: "confirmed",
+      } } };
+    },
+  };
+  const result = await staffRescheduleAppointment({
+    repository, tenantId: "tenant-a", venueId: "11111111-1111-4111-8111-111111111111",
+    actorUserId: "22222222-2222-4222-8222-222222222222", reservationId: "33333333-3333-4333-8333-333333333333",
+    expectedStatus: "confirmed", date: "2026-07-20", startTime: "10:00",
+    staffId: "55555555-5555-4555-8555-555555555555", reason: "Customer requested later",
+  });
+  assert.equal(result.status, 200);
+  assert.equal("staff_id" in result.body ? result.body.staff_id : undefined, "55555555-5555-4555-8555-555555555555");
+});
 
 const apiPackageSrcDir = dirname(fileURLToPath(import.meta.url));
 

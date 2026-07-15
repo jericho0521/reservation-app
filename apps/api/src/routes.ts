@@ -52,6 +52,10 @@ import {
   readManagedReservation,
   cancelManagedReservation,
   rescheduleManagedReservation,
+  hashReservationManagementToken,
+  transitionAppointment,
+  staffRescheduleAppointment,
+  staffCreateAppointment,
   rescheduleReservationWithLegacyPatch,
   saveExperienceDraft,
   updateExperienceIdentity,
@@ -63,6 +67,11 @@ import {
   updatePlatformResource,
   updatePlatformService,
   updateReservationWithLegacyPatch,
+  readEmailIntegrationSettings,
+  saveEmailIntegrationSettings,
+  testEmailIntegration,
+  enqueueAppointmentNotificationsSafely,
+  enqueueAccountLinkNotification,
   type AvailabilityRepositoryPort,
   type AnalyticsRepository,
   type AuthenticatedPlatformPrincipal,
@@ -83,6 +92,11 @@ import {
   type ReservationManagementRepository,
   type ReservationReadRepositoryPort,
   type ResourceMaintenanceRepositoryPort,
+  type EmailConnectionTester,
+  type IntegrationCredentialDecryptor,
+  type IntegrationCredentialEncryptor,
+  type IntegrationSettingsRepository,
+  type NotificationJobQueue,
   validatePlatformTenantVenueContext,
   acceptStaffInvitation,
   authenticateSession,
@@ -118,6 +132,8 @@ import {
   staffInvitationInputSchema,
   staffAccessPatchSchema,
   rescheduleManagedReservationInputSchema,
+  staffRescheduleAppointmentInputSchema,
+  transitionAppointmentInputSchema,
   chatConfirmReservationInputSchema,
   chatCreateReservationSessionInputSchema,
   chatMessageInputSchema,
@@ -127,6 +143,7 @@ import {
   experienceIdentityInputSchema,
   experienceResourceInputSchema,
   experienceServiceInputSchema,
+  emailIntegrationSettingsInputSchema,
   archiveCatalogItemInputSchema,
   publishExperienceInputSchema,
   publicChatConfirmationInputSchema,
@@ -172,6 +189,13 @@ export interface StandaloneApiDependencies {
   installationLocationsRepository?: InstallationLocationsRepository;
   experienceStudioRepository?: ExperienceStudioRepository;
   experienceKnowledgeRepository?: ExperienceKnowledgeRepository;
+  integrationSettingsRepository?: IntegrationSettingsRepository;
+  integrationCredentialEncryptor?: IntegrationCredentialEncryptor;
+  integrationCredentialDecryptor?: IntegrationCredentialDecryptor;
+  emailConnectionTester?: EmailConnectionTester;
+  emailTestRecipientResolver?: (principal: import("@reservation-platform/api").AuthenticatedPrincipal) => Promise<string | undefined>;
+  notificationJobQueue?: NotificationJobQueue;
+  appointmentReminderMinutes?: number;
   operatingHoursRepository?: OperatingHoursRepository;
   operationsOverviewRepository?: OperationsOverviewRepository;
   reservationCreateRepository?: ReservationCreateRepositoryPort;
@@ -334,6 +358,8 @@ const whatsappConversationMessagesPattern = /^\/v1\/channels\/whatsapp\/conversa
 const reservationPattern = /^\/v1\/reservations\/([^/]+)$/;
 const reservationCancelPattern = /^\/v1\/reservations\/([^/]+)\/cancel$/;
 const reservationReschedulePattern = /^\/v1\/reservations\/([^/]+)\/reschedule$/;
+const appointmentTransitionPattern = /^\/v1\/reservations\/([^/]+)\/transition$/;
+const appointmentStaffReschedulePattern = /^\/v1\/reservations\/([^/]+)\/staff-reschedule$/;
 const conversationPattern = /^\/v1\/conversations\/([^/]+)$/;
 const conversationMessagesPattern = /^\/v1\/conversations\/([^/]+)\/messages$/;
 const conversationAutomationPattern = /^\/v1\/conversations\/([^/]+)\/automation$/;
@@ -343,6 +369,7 @@ const publicExperienceServicesPattern = /^\/v1\/public\/experiences\/([^/]+)\/se
 const publicExperienceAvailabilityPattern = /^\/v1\/public\/experiences\/([^/]+)\/availability$/;
 const publicExperienceReservationsPattern = /^\/v1\/public\/experiences\/([^/]+)\/reservations$/;
 const publicExperienceManagementPattern = /^\/v1\/public\/experiences\/([^/]+)\/manage\/([^/]+)$/;
+const publicExperienceManagementAvailabilityPattern = /^\/v1\/public\/experiences\/([^/]+)\/manage\/([^/]+)\/availability$/;
 const publicExperienceManagementCancelPattern = /^\/v1\/public\/experiences\/([^/]+)\/manage\/([^/]+)\/cancel$/;
 const publicExperienceManagementReschedulePattern = /^\/v1\/public\/experiences\/([^/]+)\/manage\/([^/]+)\/reschedule$/;
 const publicExperienceChatMessagePattern = /^\/v1\/public\/experiences\/([^/]+)\/chat\/messages$/;
@@ -402,7 +429,7 @@ export async function handleStandaloneApiRequest(
     );
   }
 
-  const sessionAuthResponse = await handleSessionAuthRoute(method, path, request, dependencies.sessionAuth);
+  const sessionAuthResponse = await handleSessionAuthRoute(method, path, request, dependencies);
   if (sessionAuthResponse) {
     return {
       ...sessionAuthResponse,
@@ -418,6 +445,54 @@ export async function handleStandaloneApiRequest(
 
     if (request.internalPreflight === "auth-only") {
       return { status: 204, headers: {}, body: undefined };
+    }
+  }
+
+  if (path === "/v1/integrations/email" && (method === "GET" || method === "PUT")) {
+    const principal = request.authenticatedPrincipal;
+    if (!principal) return platformError(401, "unauthorized", "Authentication is required.");
+    if (!dependencies.integrationSettingsRepository) {
+      return platformError(503, "internal_error", "Email integration storage is not configured.");
+    }
+    try {
+      if (method === "GET") {
+        return jsonResponse(200, await readEmailIntegrationSettings({
+          principal,
+          repository: dependencies.integrationSettingsRepository,
+        }));
+      }
+      if (!dependencies.integrationCredentialEncryptor) {
+        return platformError(503, "internal_error", "Email credential encryption is not configured.");
+      }
+      const parsed = emailIntegrationSettingsInputSchema.safeParse(request.body);
+      if (!parsed.success) return platformError(400, "validation_failed", "Email integration settings are invalid.");
+      return jsonResponse(200, await saveEmailIntegrationSettings({
+        principal,
+        settings: parsed.data,
+        repository: dependencies.integrationSettingsRepository,
+        encryptCredential: dependencies.integrationCredentialEncryptor,
+      }));
+    } catch (error) {
+      return integrationErrorResponse(error);
+    }
+  }
+
+  if (path === "/v1/integrations/email/test" && method === "POST") {
+    const principal = request.authenticatedPrincipal;
+    if (!principal) return platformError(401, "unauthorized", "Authentication is required.");
+    if (!dependencies.integrationSettingsRepository || !dependencies.integrationCredentialDecryptor || !dependencies.emailConnectionTester) {
+      return platformError(503, "internal_error", "Email connection testing is not configured.");
+    }
+    try {
+      return jsonResponse(200, await testEmailIntegration({
+        principal,
+        recipient: await dependencies.emailTestRecipientResolver?.(principal),
+        repository: dependencies.integrationSettingsRepository,
+        decryptCredential: dependencies.integrationCredentialDecryptor,
+        tester: dependencies.emailConnectionTester,
+      }));
+    } catch (error) {
+      return integrationErrorResponse(error);
     }
   }
 
@@ -667,6 +742,15 @@ export async function handleStandaloneApiRequest(
   }
 
   if (method === "GET") {
+    const availabilityMatch = publicExperienceManagementAvailabilityPattern.exec(path);
+    if (availabilityMatch) {
+      return handlePublicReservationManagementAvailabilityRequest(
+        availabilityMatch[1]!,
+        availabilityMatch[2]!,
+        url,
+        dependencies,
+      );
+    }
     const match = publicExperienceManagementPattern.exec(path);
     if (match) return handlePublicReservationManagementRequest(match[1]!, match[2]!, dependencies, "read");
   }
@@ -747,6 +831,10 @@ export async function handleStandaloneApiRequest(
     return handleReservationCreateRequest(request, dependencies);
   }
 
+  if (method === "POST" && path === "/v1/reservations/staff") {
+    return handleStaffAppointmentCreateRequest(request, dependencies);
+  }
+
   if (method === "POST" && path === "/v1/resource-maintenance") {
     return handleResourceMaintenanceCreateRequest(request, dependencies);
   }
@@ -767,6 +855,16 @@ export async function handleStandaloneApiRequest(
     if (reservationId) {
       return handleReservationUpdateRequest(request, decodeURIComponent(reservationId), dependencies);
     }
+  }
+
+  if (method === "POST") {
+    const reservationId = appointmentTransitionPattern.exec(path)?.[1];
+    if (reservationId) return handleAppointmentTransitionRequest(request, decodeURIComponent(reservationId), dependencies);
+  }
+
+  if (method === "POST") {
+    const reservationId = appointmentStaffReschedulePattern.exec(path)?.[1];
+    if (reservationId) return handleAppointmentStaffRescheduleRequest(request, decodeURIComponent(reservationId), dependencies);
   }
 
   if (method === "POST") {
@@ -939,8 +1037,9 @@ async function handleSessionAuthRoute(
   method: string,
   path: string,
   request: StandaloneApiRequest,
-  sessionAuth: StandaloneSessionAuthConfig | undefined,
+  dependencies: StandaloneApiDependencies,
 ): Promise<StandaloneApiResponse | undefined> {
+  const sessionAuth = dependencies.sessionAuth;
   const isSessionAuthPath = path === "/v1/setup/status"
     || path === "/v1/setup/owner"
     || path === "/v1/auth/login"
@@ -1035,9 +1134,17 @@ async function handleSessionAuthRoute(
         tokenFactory: sessionAuth.tokenFactory,
         now: sessionAuth.now?.(),
       });
+      const emailed = await enqueueAccountEmail(dependencies, {
+        tenantId: session.tenantId,
+        kind: "staff_invitation",
+        recipient: result.user.email,
+        referenceId: result.user.userId,
+        token: result.invitationToken,
+      });
       return jsonResponse(201, {
         user_id: result.user.userId,
-        invitation_token: result.invitationToken,
+        ...(!emailed ? { invitation_token: result.invitationToken } : {}),
+        delivery: emailed ? "email" : "manual",
         expires_at: result.expiresAt,
       });
     }
@@ -1094,11 +1201,18 @@ async function handleSessionAuthRoute(
       if (originError) return originError;
       const parsed = requestPasswordResetInputSchema.safeParse(request.body);
       if (parsed.success) {
-        await requestPasswordReset({
+        const result = await requestPasswordReset({
           input: parsed.data,
           repositories: sessionAuth.repositories,
           tokenFactory: sessionAuth.tokenFactory,
           now: sessionAuth.now?.(),
+        });
+        if (result) await enqueueAccountEmail(dependencies, {
+          tenantId: result.tenantId,
+          kind: "password_reset",
+          recipient: result.recipient,
+          referenceId: result.referenceId,
+          token: result.token,
         });
       }
       return { status: 202, headers: {}, body: undefined };
@@ -1124,6 +1238,35 @@ async function handleSessionAuthRoute(
   }
 
   return platformError(404, "not_found", "Route not found.");
+}
+
+async function enqueueAccountEmail(
+  dependencies: StandaloneApiDependencies,
+  input: {
+    tenantId: string;
+    kind: "staff_invitation" | "password_reset";
+    recipient: string;
+    referenceId: string;
+    token: string;
+  },
+) {
+  if (!dependencies.integrationSettingsRepository || !dependencies.notificationJobQueue
+    || !dependencies.integrationCredentialEncryptor) return false;
+  try {
+    const settings = await dependencies.integrationSettingsRepository.read(input.tenantId, "email");
+    if (!settings?.enabled) return false;
+    await enqueueAccountLinkNotification({
+      tenantId: input.tenantId,
+      jobs: dependencies.notificationJobQueue,
+      kind: input.kind,
+      recipient: input.recipient,
+      referenceId: input.referenceId,
+      encryptedAction: dependencies.integrationCredentialEncryptor({ token: input.token }),
+    });
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function sessionCreatedResponse(
@@ -1261,6 +1404,14 @@ function onboardingErrorResponse(error: unknown): StandaloneApiResponse {
     return platformError(403, "forbidden", "Owner access is required.");
   }
   return platformError(500, "internal_error", "Business onboarding request failed.");
+}
+
+function integrationErrorResponse(error: unknown): StandaloneApiResponse {
+  if (error instanceof PlatformAuthError) {
+    if (error.code === "owner_required") return platformError(403, "forbidden", "Owner access is required.");
+    if (error.code === "validation_failed") return platformError(400, "validation_failed", error.message);
+  }
+  return platformError(500, "internal_error", "Email integration request failed.");
 }
 
 async function readStandaloneApiReadiness(
@@ -1477,6 +1628,7 @@ type RouteMatcher = string | RegExp | ((path: string) => boolean);
 const protectedRouteMetadata: Readonly<Record<string, readonly RouteMatcher[]>> = {
   GET: [
     "/v1/installation/business", "/v1/locations",
+    "/v1/integrations/email",
     "/v1/experience/presets", "/v1/experience/workspace", "/v1/experience/validation",
     "/v1/experience/services", "/v1/experience/resources", "/v1/experience/operating-hours",
     "/v1/experience/knowledge", "/v1/experience/channels",
@@ -1490,32 +1642,35 @@ const protectedRouteMetadata: Readonly<Record<string, readonly RouteMatcher[]>> 
   ],
   POST: [
     "/v1/locations",
+    "/v1/integrations/email/test",
     "/v1/experience/publish",
     "/v1/experience/services", "/v1/experience/resources", "/v1/experience/knowledge",
     experienceServiceArchivePattern, experienceResourceArchivePattern,
     experienceKnowledgeArchivePattern,
-    "/v1/reservations", reservationCancelPattern, reservationReschedulePattern,
+    "/v1/reservations", "/v1/reservations/staff", reservationCancelPattern, reservationReschedulePattern,
+    appointmentTransitionPattern, appointmentStaffReschedulePattern,
     "/v1/resource-maintenance", resourceMaintenanceEndPattern,
     conversationMessagesPattern,
     isChatReservationSessionRoute, isWhatsAppOwnerRoute,
   ],
   PATCH: ["/v1/experience/identity", installationLocationPattern, reservationPattern, isWhatsAppOwnerRoute],
-  PUT: ["/v1/installation/business", "/v1/experience/draft", "/v1/experience/operating-hours", "/v1/experience/channels", experienceServicePattern, experienceResourcePattern, experienceKnowledgePattern, conversationAutomationPattern],
+  PUT: ["/v1/installation/business", "/v1/integrations/email", "/v1/experience/draft", "/v1/experience/operating-hours", "/v1/experience/channels", experienceServicePattern, experienceResourcePattern, experienceKnowledgePattern, conversationAutomationPattern],
   DELETE: [isWhatsAppOwnerRoute],
 };
 
 const ownerOnlyRouteMetadata: Readonly<Record<string, readonly RouteMatcher[]>> = {
   GET: [
     "/v1/installation/business",
+    "/v1/integrations/email",
     "/v1/venues", venuePattern,
     servicePattern,
     resourcePattern, resourceLayoutPattern,
     isExperienceOwnerRoute,
     isWhatsAppConfigurationRoute,
   ],
-  POST: ["/v1/locations", isExperienceOwnerRoute, isWhatsAppConfigurationRoute],
+  POST: ["/v1/locations", "/v1/integrations/email/test", isExperienceOwnerRoute, isWhatsAppConfigurationRoute],
   PATCH: [installationLocationPattern, isExperienceOwnerRoute, isWhatsAppConfigurationRoute],
-  PUT: ["/v1/installation/business", isExperienceOwnerRoute, isWhatsAppConfigurationRoute],
+  PUT: ["/v1/installation/business", "/v1/integrations/email", isExperienceOwnerRoute, isWhatsAppConfigurationRoute],
   DELETE: [isExperienceOwnerRoute, isWhatsAppConfigurationRoute],
 };
 
@@ -1524,7 +1679,8 @@ const venueScopedRouteMetadata: Readonly<Record<string, readonly RouteMatcher[]>
     "/v1/availability", "/v1/services", "/v1/resources",
     "/v1/reservations", reservationPattern, "/v1/resource-maintenance",
   ],
-  POST: ["/v1/reservations", reservationCancelPattern, reservationReschedulePattern,
+  POST: ["/v1/reservations", "/v1/reservations/staff", reservationCancelPattern, reservationReschedulePattern,
+    appointmentTransitionPattern, appointmentStaffReschedulePattern,
     "/v1/resource-maintenance", resourceMaintenanceEndPattern],
   PATCH: [reservationPattern],
 };
@@ -2115,6 +2271,30 @@ async function handlePublicReservationManagementRescheduleRequest(
   return jsonResponse(result.status, result.body);
 }
 
+async function handlePublicReservationManagementAvailabilityRequest(
+  encodedSlug: string,
+  encodedToken: string,
+  url: URL,
+  dependencies: StandaloneApiDependencies,
+) {
+  let publicSlug: string;
+  let token: string;
+  try {
+    publicSlug = decodeURIComponent(encodedSlug).trim().toLowerCase();
+    token = decodeURIComponent(encodedToken);
+  } catch {
+    return platformError(404, "not_found", "Reservation management link is invalid or expired.");
+  }
+  const tokenHash = await hashReservationManagementToken(token);
+  if (!publicSlug || !tokenHash) {
+    return platformError(404, "not_found", "Reservation management link is invalid or expired.");
+  }
+  return handleAvailabilityRequest(url, dependencies.availabilityRepository, undefined, {
+    publicSlug,
+    tokenHash,
+  });
+}
+
 function decodeConversationId(encodedId: string) {
   try {
     const value = decodeURIComponent(encodedId).trim();
@@ -2305,6 +2485,7 @@ async function handleAvailabilityRequest(
   url: URL,
   repository: AvailabilityRepositoryPort | undefined,
   venueId?: string,
+  management?: { publicSlug: string; tokenHash: string },
 ): Promise<StandaloneApiResponse> {
   const preparedQuery = prepareAvailabilityQuery(url);
   if (preparedQuery.status !== 200) {
@@ -2319,6 +2500,7 @@ async function handleAvailabilityRequest(
     repository,
     query: url,
     ...(venueId ? { venueId } : {}),
+    ...(management ? { management } : {}),
   });
 
   return jsonResponse(result.status, result.body);
@@ -2374,6 +2556,7 @@ async function handleReservationCreateRequest(
       status: result.status,
       body: result.body,
     });
+    await enqueueReservationResultNotifications(request, dependencies, result.body, "confirmed", publicContext);
   }
 
   return jsonResponse(result.status, result.body);
@@ -2893,9 +3076,39 @@ async function handleIdempotentResourceMaintenanceMutation(input: {
       status: result.status,
       body: result.body,
     });
+    const event = input.path.endsWith("/reschedule")
+      ? "rescheduled"
+      : input.path.endsWith("/cancel") ? "cancelled" : undefined;
+    if (event) await enqueueReservationResultNotifications(input.request, input.dependencies, result.body, event);
   }
 
   return jsonResponse(result.status, result.body);
+}
+
+async function enqueueReservationResultNotifications(
+  request: StandaloneApiRequest,
+  dependencies: StandaloneApiDependencies,
+  body: unknown,
+  event: "confirmed" | "rescheduled" | "cancelled",
+  publicContext?: { tenantId: string; venueId: string },
+) {
+  if (!dependencies.notificationJobQueue || !body || typeof body !== "object" || Array.isArray(body)) return;
+  const appointment = body as ReservationResponse;
+  if (typeof appointment.reservation_id !== "string") return;
+  const tenantId = publicContext?.tenantId
+    ?? request.authenticatedPrincipal?.tenantId
+    ?? getHeader(request.headers, "X-Reservation-Tenant-Id");
+  if (!tenantId) return;
+  await enqueueAppointmentNotificationsSafely({
+    appointment,
+    tenantId,
+    ...(publicContext?.venueId ?? getHeader(request.headers, "X-Reservation-Venue-Id")
+      ? { venueId: publicContext?.venueId ?? getHeader(request.headers, "X-Reservation-Venue-Id") }
+      : {}),
+    jobs: dependencies.notificationJobQueue,
+    reminderMinutes: dependencies.appointmentReminderMinutes ?? 1_440,
+    event,
+  });
 }
 
 async function handleReservationUpdateRequest(
@@ -2970,6 +3183,83 @@ async function handleReservationRescheduleRequest(
       ...(getHeader(request.headers, "X-Reservation-Venue-Id")
         ? { venueId: getHeader(request.headers, "X-Reservation-Venue-Id") }
         : {}),
+    }),
+  });
+}
+
+async function handleAppointmentTransitionRequest(request: StandaloneApiRequest, reservationId: string, dependencies: StandaloneApiDependencies) {
+  const principal = request.authenticatedPrincipal;
+  const venueId = getHeader(request.headers, "X-Reservation-Venue-Id");
+  const requiredKey = requireIdempotencyKey(getHeader(request.headers, "Idempotency-Key"));
+  if (!requiredKey.ok) return jsonResponse(requiredKey.status, requiredKey.body);
+  const invalidId = validateReservationMutationId(reservationId, "Invalid appointment id");
+  if (invalidId) return invalidId;
+  const parsed = transitionAppointmentInputSchema.safeParse(request.body);
+  if (!principal || !venueId || !parsed.success) {
+    return platformError(400, "validation_failed", "Appointment transition details are invalid.");
+  }
+  return handleIdempotentReservationMutation({
+    request,
+    dependencies,
+    idempotencyKey: requiredKey.key,
+    path: `/v1/reservations/${reservationId}/transition`,
+    fingerprintValue: parsed.data as unknown as JsonValue,
+    mutate: (repository) => transitionAppointment({
+      repository, tenantId: principal.tenantId, venueId,
+      actorUserId: principal.userId, reservationId, expectedStatus: parsed.data.expected_status,
+      targetStatus: parsed.data.target_status, ...(parsed.data.reason ? { reason: parsed.data.reason } : {}),
+    }),
+  });
+}
+
+async function handleStaffAppointmentCreateRequest(request: StandaloneApiRequest, dependencies: StandaloneApiDependencies) {
+  const principal = request.authenticatedPrincipal;
+  const venueId = getHeader(request.headers, "X-Reservation-Venue-Id");
+  const requiredKey = requireIdempotencyKey(getHeader(request.headers, "Idempotency-Key"));
+  if (!requiredKey.ok) return jsonResponse(requiredKey.status, requiredKey.body);
+  const preparedInput = prepareReservationCreateInput(request.body);
+  if (!principal || !venueId || preparedInput.status !== 200) {
+    return platformError(400, "validation_failed", "Staff appointment details are invalid.");
+  }
+  const preparedLegacy = prepareLegacyReservationCreate({ ...preparedInput.input, source: "staff" });
+  return handleIdempotentReservationMutation({
+    request,
+    dependencies,
+    idempotencyKey: requiredKey.key,
+    path: "/v1/reservations/staff",
+    fingerprintValue: preparedInput.input as unknown as JsonValue,
+    mutate: (repository) => staffCreateAppointment({
+      repository,
+      tenantId: principal.tenantId,
+      venueId,
+      actorUserId: principal.userId,
+      legacyInput: preparedLegacy.legacyInput,
+    }),
+  });
+}
+
+async function handleAppointmentStaffRescheduleRequest(request: StandaloneApiRequest, reservationId: string, dependencies: StandaloneApiDependencies) {
+  const principal = request.authenticatedPrincipal;
+  const venueId = getHeader(request.headers, "X-Reservation-Venue-Id");
+  const requiredKey = requireIdempotencyKey(getHeader(request.headers, "Idempotency-Key"));
+  if (!requiredKey.ok) return jsonResponse(requiredKey.status, requiredKey.body);
+  const invalidId = validateReservationMutationId(reservationId, "Invalid appointment id");
+  if (invalidId) return invalidId;
+  const parsed = staffRescheduleAppointmentInputSchema.safeParse(request.body);
+  if (!principal || !venueId || !parsed.success) {
+    return platformError(400, "validation_failed", "Appointment reschedule details are invalid.");
+  }
+  return handleIdempotentReservationMutation({
+    request,
+    dependencies,
+    idempotencyKey: requiredKey.key,
+    path: `/v1/reservations/${reservationId}/staff-reschedule`,
+    fingerprintValue: parsed.data as unknown as JsonValue,
+    mutate: (repository) => staffRescheduleAppointment({
+      repository, tenantId: principal.tenantId, venueId,
+      actorUserId: principal.userId, reservationId, expectedStatus: parsed.data.expected_status,
+      date: parsed.data.date, startTime: parsed.data.start_time, staffId: parsed.data.staff_id,
+      reason: parsed.data.reason,
     }),
   });
 }
@@ -3069,6 +3359,9 @@ async function handleReservationListRequest(
   const result = await listReservations({
     repository,
     search: url.searchParams.get("search"),
+    ...(url.searchParams.get("start_at")?.slice(0, 10) ? { date: url.searchParams.get("start_at")!.slice(0, 10) } : {}),
+    ...(url.searchParams.get("status") ? { status: url.searchParams.get("status")! } : {}),
+    ...(url.searchParams.get("staff_id") ? { staffId: url.searchParams.get("staff_id")! } : {}),
     ...(getHeader(request.headers, "X-Reservation-Venue-Id")
       ? { venueId: getHeader(request.headers, "X-Reservation-Venue-Id") }
       : {}),

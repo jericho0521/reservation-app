@@ -47,7 +47,8 @@ export interface StaffInvitationInput {
 
 export interface StaffInvitationResponse {
   user_id: string;
-  invitation_token: string;
+  invitation_token?: string;
+  delivery: "email" | "manual";
   expires_at: string;
 }
 
@@ -79,6 +80,38 @@ export interface RequestPasswordResetInput {
 
 export interface CompletePasswordResetInput {
   password: string;
+}
+
+export type EmailTlsMode = "required" | "starttls" | "plain";
+
+export interface EmailIntegrationSettingsInput {
+  enabled: boolean;
+  host: string;
+  port: number;
+  tls_mode: EmailTlsMode;
+  from_address: string;
+  from_name?: string;
+  username?: string;
+  password?: string;
+}
+
+export interface EmailIntegrationSettingsResponse {
+  enabled: boolean;
+  provider: "smtp";
+  configured: boolean;
+  host?: string;
+  port?: number;
+  tls_mode?: EmailTlsMode;
+  from_address?: string;
+  from_name?: string;
+  credential_present: boolean;
+  updated_at?: string;
+}
+
+export interface EmailIntegrationTestResponse {
+  ok: boolean;
+  message: string;
+  error_code?: "not_configured" | "connection_failed";
 }
 
 export interface InstallationLocationInput {
@@ -689,7 +722,7 @@ export interface CreateReservationInput {
 
 export interface ReservationResponse {
   reservation_id: string;
-  status: string;
+  status: AppointmentStatus;
   tenant_id?: string;
   venue_id?: string;
   service_id: string;
@@ -710,6 +743,22 @@ export interface ReservationResponse {
   management_expires_at?: string;
 }
 
+export type AppointmentStatus = "pending" | "confirmed" | "completed" | "cancelled" | "no_show";
+
+export interface TransitionAppointmentInput {
+  expected_status: AppointmentStatus;
+  target_status: AppointmentStatus;
+  reason?: string;
+}
+
+export interface StaffRescheduleAppointmentInput {
+  expected_status: AppointmentStatus;
+  date: string;
+  start_time: string;
+  staff_id: string;
+  reason: string;
+}
+
 export interface RescheduleManagedReservationInput {
   date: string;
   start_time: string;
@@ -720,11 +769,12 @@ export interface ListReservationsQuery {
   tenant_id?: string;
   venue_id?: string;
   service_id?: string;
-  status?: string;
+  status?: AppointmentStatus;
   customer_id?: string;
   search?: string;
   start_at?: string;
   end_at?: string;
+  staff_id?: string;
 }
 
 export interface ReservationListSummary {

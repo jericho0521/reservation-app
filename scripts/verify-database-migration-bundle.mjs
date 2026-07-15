@@ -54,6 +54,9 @@ const expectedCoreTargets = [
   "packages/database/migrations/supabase/000028_appointment_availability_management.sql",
   "packages/database/migrations/supabase/000029_durable_jobs_notifications.sql",
   "packages/database/migrations/supabase/000030_integration_secrets.sql",
+  "packages/database/migrations/supabase/000031_appointment_correctness_followup.sql",
+  "packages/database/migrations/supabase/000032_appointment_staff_operations.sql",
+  "packages/database/migrations/supabase/000033_appointment_notification_jobs.sql",
 ];
 
 const optionalAiPrefix = "packages/database/migrations/supabase/optional/ai-retrieval/";

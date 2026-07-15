@@ -1,6 +1,7 @@
 import {
   cancelReservationInputSchema,
   createReservationInputSchema,
+  type AppointmentStatus,
   type ListReservationsResponse,
   type ReservationListSummary,
   type ReservationResponse,
@@ -46,6 +47,7 @@ const legacyBookingCreateSchema = z.object({
   items: z.array(legacyReservationItemSchema).optional(),
   reservation_items: z.array(legacyReservationItemSchema).optional(),
   interface_type: z.enum(["form", "chat"]),
+  channel: z.enum(["web_booking", "web_chat", "whatsapp", "staff", "simulation"]).optional(),
   staff_id: z.string().uuid().optional(),
 });
 
@@ -70,6 +72,7 @@ export interface LegacyCoreReservation {
   items: LegacyReservationItem[];
   status?: string;
   interface_type: "form" | "chat";
+  channel?: "web_booking" | "web_chat" | "whatsapp" | "staff" | "simulation";
   staff_id?: string;
   seats_booked: number;
   seat_labels: string[];
@@ -129,6 +132,9 @@ export interface ReservationReadRepositoryPort {
     searchFilterExpression: string | null;
     limit: number | null;
     venueId?: string;
+    date?: string;
+    status?: string;
+    staffId?: string;
   }): Promise<ReservationReadRepositoryResult<unknown[]>>;
   getReservationsSummary?(input: ReservationListSummaryInput & { venueId?: string }): Promise<ReservationListSummaryResult>;
   readReservationById(reservationId: string, venueId?: string): Promise<ReservationReadRepositoryResult<unknown>>;
@@ -158,6 +164,80 @@ export interface ReservationMutationRepositoryPort {
     patch: LegacyReservationUpdatePatch & { updated_at: string };
     venueId?: string;
   }): Promise<ReservationMutationRepositoryResult<unknown>>;
+  transitionAppointment?(input: {
+    tenantId: string; venueId: string; actorUserId: string; reservationId: string;
+    expectedStatus: AppointmentStatus; targetStatus: AppointmentStatus; reason?: string;
+  }): Promise<ReservationMutationRepositoryResult<unknown>>;
+  staffRescheduleAppointment?(input: {
+    tenantId: string; venueId: string; actorUserId: string; reservationId: string;
+    expectedStatus: AppointmentStatus; date: string; startTime: string; staffId: string; reason: string;
+  }): Promise<ReservationMutationRepositoryResult<unknown>>;
+  staffCreateAppointment?(input: {
+    tenantId: string; venueId: string; actorUserId: string; reservation: LegacyCoreReservation;
+  }): Promise<ReservationMutationRepositoryResult<unknown>>;
+}
+
+export async function staffCreateAppointment(input: {
+  repository: ReservationMutationRepositoryPort;
+  tenantId: string; venueId: string; actorUserId: string; legacyInput: LegacyBookingCreateInput;
+}): Promise<ReservationApplicationResult<ReservationResponse>> {
+  if (!input.repository.staffCreateAppointment) return appointmentOperationUnavailable();
+  return normalizeAppointmentOperation(await input.repository.staffCreateAppointment({
+    tenantId: input.tenantId,
+    venueId: input.venueId,
+    actorUserId: input.actorUserId,
+    reservation: legacyBookingCreateToReservation(input.legacyInput),
+  }));
+}
+
+export async function transitionAppointment(input: {
+  repository: ReservationMutationRepositoryPort;
+  tenantId: string; venueId: string; actorUserId: string; reservationId: string;
+  expectedStatus: AppointmentStatus; targetStatus: AppointmentStatus; reason?: string;
+}): Promise<ReservationApplicationResult<ReservationResponse>> {
+  if (!input.repository.transitionAppointment) return appointmentOperationUnavailable();
+  return normalizeAppointmentOperation(await input.repository.transitionAppointment(input));
+}
+
+export async function staffRescheduleAppointment(input: {
+  repository: ReservationMutationRepositoryPort;
+  tenantId: string; venueId: string; actorUserId: string; reservationId: string;
+  expectedStatus: AppointmentStatus; date: string; startTime: string; staffId: string; reason: string;
+}): Promise<ReservationApplicationResult<ReservationResponse>> {
+  if (!input.repository.staffRescheduleAppointment) return appointmentOperationUnavailable();
+  return normalizeAppointmentOperation(await input.repository.staffRescheduleAppointment(input));
+}
+
+function normalizeAppointmentOperation(result: ReservationMutationRepositoryResult<unknown>): ReservationApplicationResult<ReservationResponse> {
+  if (result.error) return { status: 500, body: platformErrorBody("internal_error", "Failed to operate appointment", 500) };
+  const record = result.data && typeof result.data === "object" && !Array.isArray(result.data)
+    ? result.data as Record<string, unknown> : {};
+  if (record.ok === true && record.booking) return { status: 200, body: toPlatformReservation(record.booking) };
+  const code = record.error_code;
+  if (code === "not_found") return { status: 404, body: platformErrorBody("not_found", "Appointment not found", 404) };
+  if (code === "forbidden") return { status: 403, body: platformErrorBody("forbidden", "Appointment access is not allowed", 403) };
+  const conflictMessages: Record<string, string> = {
+    stale: "The appointment changed since it was loaded.",
+    invalid_transition: "The requested appointment status transition is not allowed.",
+    reason_required: "An audit reason is required for this appointment operation.",
+    outside_availability: "The requested time is outside the configured booking availability.",
+    invalid_staff: "The selected practitioner is not available for this service and location.",
+    unavailable: "The selected practitioner is unavailable due to maintenance.",
+    conflict: "The selected practitioner already has a conflicting appointment.",
+    invalid_service: "The selected service is not available at this location.",
+    invalid_reservation: "The appointment details are invalid.",
+    maintenance_conflict: "The selected practitioner is unavailable due to maintenance.",
+    resource_conflict: "The selected practitioner already has a conflicting appointment.",
+    not_enough_capacity: "The requested appointment capacity is unavailable.",
+  };
+  if (typeof code === "string" && conflictMessages[code]) {
+    return { status: 409, body: platformErrorBody("conflict", conflictMessages[code], 409, { operation_code: code }) };
+  }
+  return appointmentOperationUnavailable();
+}
+
+function appointmentOperationUnavailable(): ReservationApplicationResult<ReservationResponse> {
+  return { status: 503, body: platformErrorBody("internal_error", "Appointment operations are not configured", 503) };
 }
 
 export interface ReservationCreateRepositoryPort {
@@ -494,6 +574,7 @@ export function legacyBookingCreateToReservation(
         : [{ quantity: booking.seats_booked }],
       status: "confirmed",
       interface_type: booking.interface_type,
+      ...(booking.channel ? { channel: booking.channel } : {}),
       ...(booking.staff_id ? { staff_id: booking.staff_id } : {}),
       seats_booked: booking.seats_booked,
       seat_labels: seatLabels,
@@ -514,6 +595,7 @@ export function legacyBookingCreateToReservation(
     items: nativeItems,
     status: "confirmed",
     interface_type: booking.interface_type,
+    ...(booking.channel ? { channel: booking.channel } : {}),
     ...(booking.staff_id ? { staff_id: booking.staff_id } : {}),
     seats_booked: booking.seats_booked,
     seat_labels: seatLabels,
@@ -676,6 +758,9 @@ export async function listReservations(input: {
   search?: string | null;
   today?: string;
   venueId?: string;
+  date?: string;
+  status?: string;
+  staffId?: string;
 }): Promise<ReservationApplicationResult<ListReservationsResponse>> {
   try {
     const search = normalizeReservationSearchTerm(input.search);
@@ -685,6 +770,9 @@ export async function listReservations(input: {
       searchFilterExpression,
       limit: search ? SEARCH_ONLY_LIMIT : null,
       ...(input.venueId ? { venueId: input.venueId } : {}),
+      ...(input.date ? { date: input.date } : {}),
+      ...(input.status ? { status: input.status } : {}),
+      ...(input.staffId ? { staffId: input.staffId } : {}),
     });
 
     if (error) {

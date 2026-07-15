@@ -74,6 +74,7 @@ export interface PlatformSessionRepository extends InstallationRepository {
     tenantId: string,
     email: string,
   ): Promise<PlatformUserRecord | undefined>;
+  findUserById?(tenantId: string, userId: string): Promise<PlatformUserRecord | undefined>;
   createSession(input: {
     userId: string;
     expectedPasswordHash: string;
@@ -190,6 +191,19 @@ export function createSupabasePlatformSessionRepository(
         .select(userSelect)
         .eq("tenant_id", tenantId)
         .eq("email", normalizedEmail)
+        .eq("status", "active")
+        .maybeSingle();
+      assertQuerySucceeded(result, "Failed to read platform user.");
+      if (!result.data) return undefined;
+      const user = adaptUser(result.data);
+      return user.status === "active" ? user : undefined;
+    },
+    async findUserById(tenantId, userId) {
+      const result = await client
+        .from("platform_users")
+        .select(userSelect)
+        .eq("tenant_id", tenantId)
+        .eq("id", userId)
         .eq("status", "active")
         .maybeSingle();
       assertQuerySucceeded(result, "Failed to read platform user.");

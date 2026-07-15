@@ -272,10 +272,29 @@ importers:
         version: 5.9.3
 
   apps/worker:
+    dependencies:
+      '@project-play/reservations-supabase':
+        specifier: workspace:*
+        version: link:../../packages/reservations-supabase
+      '@reservation-platform/api':
+        specifier: workspace:*
+        version: link:../../packages/reservation-platform-api
+      '@reservation-platform/platform-config':
+        specifier: workspace:*
+        version: link:../../packages/platform-config
+      '@supabase/supabase-js':
+        specifier: ^2.90.1
+        version: 2.90.1
+      nodemailer:
+        specifier: ^9.0.3
+        version: 9.0.3
     devDependencies:
       '@types/node':
         specifier: ^20
         version: 20.19.28
+      '@types/nodemailer':
+        specifier: ^8.0.1
+        version: 8.0.1
       tsx:
         specifier: ^4.21.0
         version: 4.21.0
@@ -1041,6 +1060,9 @@ packages:
   '@types/node@20.19.28':
     resolution: {integrity: sha512-VyKBr25BuFDzBFCK5sUM6ZXiWfqgCTwTAOK8qzGV/m9FCirXYDlmczJ+d5dXBAQALGCdRRdbteKYfJ84NGEusw==}
 
+  '@types/nodemailer@8.0.1':
+    resolution: {integrity: sha512-PxpaInm8V1JQDd4j0ds5HfvWQk8JupS1C0Picb96QJsrrRDjBH+DlK7L4ZdNSqNULhiZRQHc40nLVShaGxXAMw==}
+
   '@types/phoenix@1.6.7':
     resolution: {integrity: sha512-oN9ive//QSBkf19rfDv45M7eZPi0eEXylht2OLEXicu5b4KoQ1OzXIw+xDSGWxSxe1JmepRR/ZH283vsu518/Q==}
 
@@ -1205,6 +1227,10 @@ packages:
         optional: true
       sass:
         optional: true
+
+  nodemailer@9.0.3:
+    resolution: {integrity: sha512-n+YP+NKwR5zRWa60k3GiQ6Q3B4KXCoAw40dAKeCtYn020iNN74aWK2liXIC3ZEATeGql7we3tE3t8QwhY0eskw==}
+    engines: {node: '>=6.0.0'}
 
   on-exit-leak-free@2.1.2:
     resolution: {integrity: sha512-0eJJY6hXLGf1udHwfNftBqH+g73EU4B504nZeKpz1sYRKafAghwxEJunB2O7rDZkL4PGfsMVnTXZ2EjibbqcsA==}
@@ -1765,6 +1791,10 @@ snapshots:
     dependencies:
       undici-types: 6.21.0
 
+  '@types/nodemailer@8.0.1':
+    dependencies:
+      '@types/node': 20.19.28
+
   '@types/phoenix@1.6.7': {}
 
   '@types/react-dom@19.2.3(@types/react@19.2.17)':
@@ -1948,6 +1978,8 @@ snapshots:
     transitivePeerDependencies:
       - '@babel/core'
       - babel-plugin-macros
+
+  nodemailer@9.0.3: {}
 
   on-exit-leak-free@2.1.2: {}
 

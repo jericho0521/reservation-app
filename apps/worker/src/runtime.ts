@@ -34,7 +34,14 @@ export interface WorkerJobRepository {
   fail(jobId: string, workerId: string, errorCode: string): Promise<void>;
 }
 
-export type PlatformJobHandler = (job: WorkerPlatformJob) => Promise<void>;
+export type PlatformJobHandler = (job: WorkerPlatformJob) => Promise<void | { providerMessageId?: string }>;
+
+export interface JobOutcomeReporter {
+  attempt(job: WorkerPlatformJob): Promise<void>;
+  delivered(job: WorkerPlatformJob, providerMessageId?: string): Promise<void>;
+  retrying(job: WorkerPlatformJob, availableAt: string, errorCode: string): Promise<void>;
+  failed(job: WorkerPlatformJob, errorCode: string): Promise<void>;
+}
 
 export interface JobWorkerOptions {
   signal: AbortSignal;
@@ -46,6 +53,7 @@ export interface JobWorkerOptions {
   leaseSeconds?: number;
   now?: () => Date;
   afterBatch?: () => void;
+  outcomeReporter?: JobOutcomeReporter;
 }
 
 export function createWorkerRuntime(options: WorkerLoopOptions): WorkerRuntime;
@@ -109,20 +117,33 @@ async function dispatchJob(
   }
 
   try {
-    await handler(job);
+    await safeReport(() => options.outcomeReporter?.attempt(job));
+    const result = await handler(job);
+    await safeReport(() => options.outcomeReporter?.delivered(job, result?.providerMessageId));
     await options.repository.complete(job.jobId, options.workerId);
   } catch (error) {
     const failure = classifyPlatformJobError(error);
     if (failure.transient && job.attempts < job.maxAttempts) {
+      const availableAt = nextRetryAt(now(), job.attempts);
       await options.repository.retry(
         job.jobId,
         options.workerId,
-        nextRetryAt(now(), job.attempts),
+        availableAt,
         failure.code,
       );
+      await safeReport(() => options.outcomeReporter?.retrying(job, availableAt, failure.code));
       return;
     }
+    await safeReport(() => options.outcomeReporter?.failed(job, failure.code));
     await options.repository.fail(job.jobId, options.workerId, failure.code);
+  }
+}
+
+async function safeReport(report: () => Promise<void> | undefined) {
+  try {
+    await report();
+  } catch {
+    // Delivery reporting must not strand a leased job.
   }
 }
 

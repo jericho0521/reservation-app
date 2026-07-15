@@ -34,7 +34,7 @@ export async function loadOnboardingData() {
   }
 
   const options = { venueId: business.profile.venue_id };
-  const [{ locations }, { services }, { resources }, operatingHours, channels, workspace, validation] = await Promise.all([
+  const [{ locations }, { services }, { resources }, operatingHours, channels, workspace, validation, email] = await Promise.all([
     unscopedClient.listInstallationLocations(),
     unscopedClient.listExperienceServices(options),
     unscopedClient.listExperienceResources(undefined, options),
@@ -42,6 +42,7 @@ export async function loadOnboardingData() {
     unscopedClient.getExperienceChannelSettings(options),
     unscopedClient.getExperienceWorkspace(options),
     unscopedClient.validateExperienceWorkspace(options),
+    unscopedClient.getEmailIntegrationSettings(),
   ]);
   const activeServices = services.filter((service) => service.is_active !== false);
   const activePractitioners = resources.filter((resource) => resource.is_active !== false);
@@ -56,6 +57,7 @@ export async function loadOnboardingData() {
     channels,
     workspace,
     validation,
+    email,
     state: deriveOnboardingState({
       ownerCreated: session.role === "owner",
       businessConfigured: true,
@@ -64,9 +66,7 @@ export async function loadOnboardingData() {
       activePractitioners: activePractitioners.length,
       operatingIntervals: operatingHours.intervals.length,
       webBookingReady: channels.channels.web_booking && channels.readiness.web_booking.ready,
-      // Transactional appointment email belongs to Phase 3. Web booking can be
-      // published now without pretending email delivery is configured.
-      emailReady: false,
+      emailReady: email.enabled && email.configured,
       published: Boolean(workspace.published),
     }),
   };

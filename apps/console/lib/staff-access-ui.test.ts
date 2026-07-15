@@ -35,13 +35,13 @@ test("pending invitations cannot be activated from staff administration", async 
   assert.match(page, /becomes active only when the recipient accepts/u);
 });
 
-test("login does not advertise password recovery before a secure delivery channel exists", async () => {
+test("login exposes enumeration-safe password recovery backed by durable email delivery", async () => {
   const [login, reset] = await Promise.all([
     readFile(new URL("../app/login/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/reset-password/page.tsx", import.meta.url), "utf8"),
   ]);
 
-  assert.doesNotMatch(login, /Forgot your password/u);
-  assert.doesNotMatch(reset, /PasswordResetRequestForm/u);
-  assert.match(reset, /does not have a secure reset-delivery channel configured/u);
+  assert.match(login, /Forgot your password/u);
+  assert.match(reset, /PasswordResetRequestForm/u);
+  assert.match(reset, /If the account exists and email delivery is enabled/u);
 });

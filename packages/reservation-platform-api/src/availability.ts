@@ -20,6 +20,7 @@ export interface AvailabilityReadInput {
   date: string;
   venueId?: string;
   staffId?: string;
+  management?: { publicSlug: string; tokenHash: string };
 }
 
 export interface AvailabilityRead {
@@ -55,6 +56,7 @@ export interface ListAvailabilityInput {
   query: AvailabilityQuerySearchParamsInput;
   now?: Date;
   venueId?: string;
+  management?: { publicSlug: string; tokenHash: string };
 }
 
 export function prepareAvailabilityQuery(
@@ -93,6 +95,7 @@ export async function listAvailability({
   query,
   now = new Date(),
   venueId,
+  management,
 }: ListAvailabilityInput): Promise<AvailabilityServiceResult> {
   const preparedQuery = prepareAvailabilityQuery(query);
   if (preparedQuery.status !== 200) {
@@ -113,6 +116,7 @@ export async function listAvailability({
       date,
       ...(venueId ? { venueId } : {}),
       ...(staffId ? { staffId } : {}),
+      ...(management ? { management } : {}),
     });
     const windows = availability.operatingHours
       ? getOperatingWindowsForDate(availability.operatingHours, date, now)

@@ -17,6 +17,9 @@ import type {
   ChatMessageResponse,
   ChatSessionResponse,
   CompletePasswordResetInput,
+  EmailIntegrationSettingsInput,
+  EmailIntegrationSettingsResponse,
+  EmailIntegrationTestResponse,
   InstallationBusinessInput,
   InstallationBusinessResponse,
   InstallationLocationInput,
@@ -77,6 +80,8 @@ import type {
   StaffInvitationInput,
   StaffInvitationResponse,
   StaffMemberResponse,
+  TransitionAppointmentInput,
+  StaffRescheduleAppointmentInput,
   TenantResponse,
   UpdateReservationPatch,
   VenueResponse,
@@ -181,6 +186,9 @@ export interface ReservationPlatformClient {
   acceptStaffInvitation(token: string, input: AcceptStaffInvitationInput, options?: RequestOptions): Promise<AuthenticatedSessionResponse>;
   requestPasswordReset(input: RequestPasswordResetInput, options?: RequestOptions): Promise<void>;
   completePasswordReset(token: string, input: CompletePasswordResetInput, options?: RequestOptions): Promise<void>;
+  getEmailIntegrationSettings(options?: RequestOptions): Promise<EmailIntegrationSettingsResponse>;
+  updateEmailIntegrationSettings(input: EmailIntegrationSettingsInput, options?: RequestOptions): Promise<EmailIntegrationSettingsResponse>;
+  testEmailIntegration(options?: RequestOptions): Promise<EmailIntegrationTestResponse>;
   getInstallationBusiness(options?: RequestOptions): Promise<InstallationBusinessResponse>;
   configureInstallationBusiness(input: InstallationBusinessInput, options?: RequestOptions): Promise<InstallationBusinessResponse>;
   listInstallationLocations(options?: RequestOptions): Promise<ListInstallationLocationsResponse>;
@@ -213,6 +221,7 @@ export interface ReservationPlatformClient {
   listPublicExperienceAvailability(slug: string, input: AvailabilityQuery, options?: RequestOptions): Promise<AvailabilityResponse>;
   createPublicExperienceReservation(slug: string, input: CreateReservationInput, options?: RequestOptions): Promise<ReservationResponse>;
   getManagedReservation(slug: string, token: string, options?: RequestOptions): Promise<ReservationResponse>;
+  listManagedReservationAvailability(slug: string, token: string, input: AvailabilityQuery, options?: RequestOptions): Promise<AvailabilityResponse>;
   cancelManagedReservation(slug: string, token: string, options?: RequestOptions): Promise<ReservationResponse>;
   rescheduleManagedReservation(slug: string, token: string, input: RescheduleManagedReservationInput, options?: RequestOptions): Promise<ReservationResponse>;
   sendPublicChatMessage(slug: string, input: PublicChatMessageInput, options?: RequestOptions): Promise<PublicChatConversationResponse>;
@@ -229,6 +238,7 @@ export interface ReservationPlatformClient {
   getResourceLayout(layoutId: string, options?: RequestOptions): Promise<ResourceLayoutResponse>;
   listAvailability(input: AvailabilityQuery, options?: RequestOptions): Promise<AvailabilityResponse>;
   createReservation(input: CreateReservationInput, options?: RequestOptions): Promise<ReservationResponse>;
+  createStaffAppointment(input: CreateReservationInput, options?: RequestOptions): Promise<ReservationResponse>;
   getReservation(reservationId: string, options?: RequestOptions): Promise<ReservationResponse>;
   listReservations(input?: ListReservationsQuery, options?: RequestOptions): Promise<ListReservationsResponse>;
   listConversations(input?: ListConversationsQuery, options?: RequestOptions): Promise<ListConversationsResponse>;
@@ -247,6 +257,8 @@ export interface ReservationPlatformClient {
   updateReservation(reservationId: string, patch: UpdateReservationPatch, options?: RequestOptions): Promise<ReservationResponse>;
   cancelReservation(reservationId: string, input?: CancelReservationInput, options?: RequestOptions): Promise<ReservationResponse>;
   rescheduleReservation(reservationId: string, input: RescheduleReservationInput, options?: RequestOptions): Promise<ReservationResponse>;
+  transitionAppointment(reservationId: string, input: TransitionAppointmentInput, options?: RequestOptions): Promise<ReservationResponse>;
+  staffRescheduleAppointment(reservationId: string, input: StaffRescheduleAppointmentInput, options?: RequestOptions): Promise<ReservationResponse>;
   listResourceMaintenance(input?: ListResourceMaintenanceQuery, options?: RequestOptions): Promise<ListResourceMaintenanceResponse>;
   createResourceMaintenance(input: CreateResourceMaintenanceInput, options?: RequestOptions): Promise<ResourceMaintenanceResponse>;
   endResourceMaintenance(maintenanceId: string, input?: EndResourceMaintenanceInput, options?: RequestOptions): Promise<ResourceMaintenanceResponse>;
@@ -315,6 +327,9 @@ export function createReservationPlatformClient(
       auth: true,
       emptyResponse: true,
     }),
+    getEmailIntegrationSettings: (options) => request({ method: "GET", path: "/integrations/email", options, auth: true }),
+    updateEmailIntegrationSettings: (input, options) => request({ method: "PUT", path: "/integrations/email", body: input, options, auth: true }),
+    testEmailIntegration: (options) => request({ method: "POST", path: "/integrations/email/test", body: {}, options, auth: true }),
     getInstallationBusiness: (options) => request({ method: "GET", path: "/installation/business", options, auth: true }),
     configureInstallationBusiness: (input, options) => request({ method: "PUT", path: "/installation/business", body: input, options, auth: true }),
     listInstallationLocations: (options) => request({ method: "GET", path: "/locations", options, auth: true }),
@@ -390,6 +405,13 @@ export function createReservationPlatformClient(
       options,
       public: true,
     }),
+    listManagedReservationAvailability: (slug, token, input, options) => request({
+      method: "GET",
+      path: `/public/experiences/${encodeURIComponent(slug)}/manage/${encodeURIComponent(token)}/availability`,
+      query: input,
+      options,
+      public: true,
+    }),
     cancelManagedReservation: (slug, token, options) => request({
       method: "POST",
       path: `/public/experiences/${encodeURIComponent(slug)}/manage/${encodeURIComponent(token)}/cancel`,
@@ -436,6 +458,7 @@ export function createReservationPlatformClient(
     getResourceLayout: (layoutId, options) => request({ method: "GET", path: `/resource-layouts/${encodeURIComponent(layoutId)}`, options }),
     listAvailability: (input, options) => request({ method: "GET", path: "/availability", query: input, options }),
     createReservation: (input, options) => request({ method: "POST", path: "/reservations", body: input, options }),
+    createStaffAppointment: (input, options) => request({ method: "POST", path: "/reservations/staff", body: input, options }),
     getReservation: (reservationId, options) => request({ method: "GET", path: `/reservations/${encodeURIComponent(reservationId)}`, options }),
     listReservations: (input, options) => request({ method: "GET", path: "/reservations", query: input, options }),
     listConversations: (input, options) => request({ method: "GET", path: "/conversations", query: input, options }),
@@ -454,6 +477,8 @@ export function createReservationPlatformClient(
     updateReservation: (reservationId, patch, options) => request({ method: "PATCH", path: `/reservations/${encodeURIComponent(reservationId)}`, body: patch, options }),
     cancelReservation: (reservationId, input, options) => request({ method: "POST", path: `/reservations/${encodeURIComponent(reservationId)}/cancel`, body: input ?? {}, options }),
     rescheduleReservation: (reservationId, input, options) => request({ method: "POST", path: `/reservations/${encodeURIComponent(reservationId)}/reschedule`, body: input, options }),
+    transitionAppointment: (reservationId, input, options) => request({ method: "POST", path: `/reservations/${encodeURIComponent(reservationId)}/transition`, body: input, options }),
+    staffRescheduleAppointment: (reservationId, input, options) => request({ method: "POST", path: `/reservations/${encodeURIComponent(reservationId)}/staff-reschedule`, body: input, options }),
     listResourceMaintenance: (input, options) => request({ method: "GET", path: "/resource-maintenance", query: input, options }),
     createResourceMaintenance: (input, options) => request({ method: "POST", path: "/resource-maintenance", body: input, options }),
     endResourceMaintenance: (maintenanceId, input, options) => request({ method: "POST", path: `/resource-maintenance/${encodeURIComponent(maintenanceId)}/end`, body: input ?? {}, options }),

@@ -1,7 +1,14 @@
 import { expect, test } from "@playwright/test";
-import { bookingOrigin, originAvailable } from "./support/release-fixture";
+import {
+  bookingOrigin,
+  localBrowserFixtureAvailable,
+  localBrowserManagementToken,
+  localBrowserPublicSlug,
+  originAvailable,
+} from "./support/release-fixture";
 
-const publicSlug = process.env.RESERVATION_BROWSER_PUBLIC_SLUG?.trim();
+const publicSlug = process.env.RESERVATION_BROWSER_PUBLIC_SLUG?.trim()
+  || (localBrowserFixtureAvailable ? localBrowserPublicSlug : undefined);
 
 test("customer can reach the shared public booking journey", async ({ page, request }) => {
   test.skip(!(await originAvailable(request, bookingOrigin)), "Booking origin is not available.");
@@ -15,7 +22,10 @@ test("customer can reach the shared public booking journey", async ({ page, requ
 
 test("booking management requires an explicit customer capability", async ({ page, request }) => {
   test.skip(!(await originAvailable(request, bookingOrigin)), "Booking origin is not available.");
-  const managementPath = process.env.RESERVATION_BROWSER_MANAGEMENT_PATH?.trim();
+  const managementPath = process.env.RESERVATION_BROWSER_MANAGEMENT_PATH?.trim()
+    || (localBrowserFixtureAvailable
+      ? `/${localBrowserPublicSlug}/manage/${localBrowserManagementToken}`
+      : undefined);
   test.skip(!managementPath, "RESERVATION_BROWSER_MANAGEMENT_PATH is required for the management journey.");
 
   await page.goto(new URL(managementPath!, bookingOrigin).toString());

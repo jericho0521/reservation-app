@@ -1,6 +1,11 @@
 -- Deterministic final demonstration dataset for local/allowlisted databases only.
 begin;
 
+delete from public.platform_sessions where user_id in (
+  select id from public.platform_users where tenant_id = 'final_demo'
+);
+delete from public.platform_user_venue_assignments where tenant_id = 'final_demo';
+delete from public.platform_users where tenant_id = 'final_demo';
 delete from public.bookings where service_id in (
   '00000000-0000-4000-8000-000000000201', '00000000-0000-4000-8000-000000000202', '00000000-0000-4000-8000-000000000203'
 );
@@ -21,6 +26,12 @@ insert into public.venues (id, tenant_id, name) values
   ('00000000-0000-4000-8000-000000000101', 'final_demo', 'Apex Racing Lab'),
   ('00000000-0000-4000-8000-000000000102', 'final_demo', 'Harbour Rooms'),
   ('00000000-0000-4000-8000-000000000103', 'final_demo', 'Luma Appointments');
+insert into public.platform_users (id, tenant_id, email, display_name, password_hash, role, status) values
+  ('00000000-0000-4000-8000-000000000701', 'final_demo', 'browser-owner@example.test', 'Browser Fixture Owner', 'local-browser-fixture-disabled-login', 'owner', 'active');
+insert into public.platform_user_venue_assignments (tenant_id, user_id, venue_id) values
+  ('final_demo', '00000000-0000-4000-8000-000000000701', '00000000-0000-4000-8000-000000000101');
+insert into public.platform_sessions (id, user_id, token_hash, expires_at) values
+  ('00000000-0000-4000-8000-000000000702', '00000000-0000-4000-8000-000000000701', 'fa5e2abea2501849521c69a22b04b264ec714256b069573c898f1598a6031749', now() + interval '30 days');
 insert into public.platform_business_profiles (id, tenant_id, venue_id, name, public_slug, preset_id, status) values
   ('00000000-0000-4000-8000-000000000111', 'final_demo', '00000000-0000-4000-8000-000000000101', 'Apex Racing Lab', 'apex-racing-demo', 'racing_gaming', 'published'),
   ('00000000-0000-4000-8000-000000000112', 'final_demo', '00000000-0000-4000-8000-000000000102', 'Harbour Rooms', 'harbour-rooms-demo', 'rooms_facilities', 'published'),
@@ -61,6 +72,8 @@ insert into public.reservation_items (booking_id, service_id, resource_id, resou
   ('00000000-0000-4000-8000-000000000401', '00000000-0000-4000-8000-000000000201', '00000000-0000-4000-8000-000000000301', 'Simulator A', 1),
   ('00000000-0000-4000-8000-000000000402', '00000000-0000-4000-8000-000000000201', '00000000-0000-4000-8000-000000000302', 'Simulator B', 1),
   ('00000000-0000-4000-8000-000000000403', '00000000-0000-4000-8000-000000000202', '00000000-0000-4000-8000-000000000304', 'Harbour One', 1);
+insert into public.platform_reservation_management_tokens (id, booking_id, token_hash, expires_at) values
+  ('00000000-0000-4000-8000-000000000703', '00000000-0000-4000-8000-000000000401', '1481be4aedd353e8289aa206fd6097e082ce5f969544eeb4f841a1576cfd1296', now() + interval '30 days');
 insert into public.service_seat_maintenance (id, service_id, seat_label, reason, is_active) values
   ('00000000-0000-4000-8000-000000000501', '00000000-0000-4000-8000-000000000201', 'Simulator C', 'Scheduled wheel calibration', true);
 

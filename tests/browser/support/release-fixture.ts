@@ -2,6 +2,11 @@ import type { APIRequestContext, Page } from "@playwright/test";
 
 export const consoleOrigin = process.env.RESERVATION_BROWSER_CONSOLE_URL?.trim() || "http://127.0.0.1:4300";
 export const bookingOrigin = process.env.RESERVATION_BROWSER_BOOKING_URL?.trim() || "http://127.0.0.1:4400";
+export const localBrowserFixtureAvailable = isLoopbackOrigin(consoleOrigin) && isLoopbackOrigin(bookingOrigin);
+export const localBrowserPublicSlug = "apex-racing-demo";
+export const localBrowserConversationId = "00000000-0000-4000-8000-000000000602";
+export const localBrowserManagementToken = "browser-fixture-management-token-0000000001";
+const localBrowserSessionToken = "browser-fixture-session-token-0000000000001";
 
 export async function originAvailable(request: APIRequestContext, origin: string) {
   try {
@@ -15,12 +20,19 @@ export async function originAvailable(request: APIRequestContext, origin: string
 export function hasConsoleAuthentication() {
   return Boolean(
     process.env.RESERVATION_BROWSER_STORAGE_STATE?.trim()
+      || browserSessionToken()
       || (process.env.RESERVATION_BROWSER_OWNER_EMAIL?.trim() && process.env.RESERVATION_BROWSER_OWNER_PASSWORD),
   );
 }
 
 export async function openAuthenticatedConsole(page: Page, path: string) {
-  if (!process.env.RESERVATION_BROWSER_STORAGE_STATE?.trim()) {
+  const sessionToken = browserSessionToken();
+  if (!process.env.RESERVATION_BROWSER_STORAGE_STATE?.trim() && sessionToken) {
+    await page.context().addCookies([
+      { name: "reservation_session", value: sessionToken, url: consoleOrigin, sameSite: "Lax" },
+      { name: "reservation_active_venue", value: "00000000-0000-4000-8000-000000000101", url: consoleOrigin, sameSite: "Lax" },
+    ]);
+  } else if (!process.env.RESERVATION_BROWSER_STORAGE_STATE?.trim()) {
     await page.goto(`${consoleOrigin}/admin/login`);
     await page.getByLabel("Email address").fill(process.env.RESERVATION_BROWSER_OWNER_EMAIL ?? "");
     await page.getByLabel("Password").fill(process.env.RESERVATION_BROWSER_OWNER_PASSWORD ?? "");
@@ -32,4 +44,14 @@ export async function openAuthenticatedConsole(page: Page, path: string) {
 
 export function mutationsEnabled() {
   return process.env.RESERVATION_BROWSER_MUTATIONS === "true";
+}
+
+function browserSessionToken() {
+  return process.env.RESERVATION_BROWSER_SESSION_TOKEN?.trim()
+    || (localBrowserFixtureAvailable ? localBrowserSessionToken : undefined);
+}
+
+function isLoopbackOrigin(origin: string) {
+  const hostname = new URL(origin).hostname;
+  return hostname === "127.0.0.1" || hostname === "localhost";
 }

@@ -8,6 +8,8 @@ import {
 } from "@playwright/test";
 import {
   hasConsoleAuthentication,
+  localBrowserFixtureAvailable,
+  localBrowserManagementToken,
   openAuthenticatedConsole,
 } from "./support/release-fixture";
 
@@ -21,7 +23,8 @@ const bookingOrigin = originFromEnv(
 );
 const bookingSlug = process.env.RESERVATION_BROWSER_BOOKING_SLUG?.trim()
   || "apex-racing-demo";
-const managementToken = process.env.RESERVATION_BROWSER_MANAGEMENT_TOKEN?.trim();
+const managementToken = process.env.RESERVATION_BROWSER_MANAGEMENT_TOKEN?.trim()
+  || (localBrowserFixtureAvailable ? localBrowserManagementToken : undefined);
 
 test.describe("console accessibility", () => {
   let consoleAvailable = false;

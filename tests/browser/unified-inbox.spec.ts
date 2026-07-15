@@ -2,6 +2,8 @@ import { expect, test } from "@playwright/test";
 import {
   consoleOrigin,
   hasConsoleAuthentication,
+  localBrowserConversationId,
+  localBrowserFixtureAvailable,
   mutationsEnabled,
   openAuthenticatedConsole,
   originAvailable,
@@ -20,7 +22,8 @@ test("unified inbox offers channel filtering", async ({ page }) => {
 });
 
 test("conversation takeover gates direct staff replies", async ({ page }) => {
-  const conversationId = process.env.RESERVATION_BROWSER_CONVERSATION_ID?.trim();
+  const conversationId = process.env.RESERVATION_BROWSER_CONVERSATION_ID?.trim()
+    || (localBrowserFixtureAvailable ? localBrowserConversationId : undefined);
   test.skip(!conversationId, "RESERVATION_BROWSER_CONVERSATION_ID is required for takeover validation.");
 
   await openAuthenticatedConsole(page, `/admin/conversations/${encodeURIComponent(conversationId!)}`);

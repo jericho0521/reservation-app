@@ -9,6 +9,7 @@ export default defineConfig({
   retries: process.env.CI ? 1 : 0,
   reporter: "list",
   timeout: 30_000,
+  workers: 1,
   expect: { timeout: 10_000 },
   use: {
     ...(storageState ? { storageState } : {}),

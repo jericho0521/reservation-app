@@ -52,7 +52,7 @@ button, a { font: inherit; }
 .manage-card > p, .manage-card form p { color: #5c6168; line-height: 1.6; }
 .manage-card dl { margin: 2rem 0; display: grid; grid-template-columns: repeat(2, 1fr); border-top: 1px solid #e2e1dc; }
 .manage-card dl div { padding: 1rem 0; border-bottom: 1px solid #e2e1dc; }
-.manage-card dt { color: #747980; font-size: .7rem; text-transform: uppercase; }
+.manage-card dt { color: #64748b; font-size: .7rem; text-transform: uppercase; }
 .manage-card dd { margin: .3rem 0 0; font-weight: 800; text-transform: capitalize; }
 .manage-card form { margin-top: 2rem; padding: 1.2rem; border: 1px solid #f1b9b4; border-radius: 1rem; background: #fff5f4; }
 .manage-card form button { padding: .8rem 1rem; border: 0; border-radius: 999px; background: #9f2922; color: white; cursor: pointer; font-weight: 800; }

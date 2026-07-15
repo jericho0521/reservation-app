@@ -103,7 +103,10 @@ production_compose() {
     "$@"
 }
 
-if [ "$resume" = "true" ]; then
+if [ "$resume" = "false" ]; then
+  [ ! -e "$INSTALL_DIR" ] && [ ! -L "$INSTALL_DIR" ] \
+    || fail "installation path already exists; use --resume only for the same release and domain"
+else
   [ ! -L "$INSTALL_DIR" ] && [ -d "$INSTALL_DIR" ] || fail "resume requires the existing regular installation directory"
   [ ! -L "$release_file" ] && [ -f "$release_file" ] || fail "resume requires the existing regular release.env"
   [ ! -L "$INSTALL_DIR/compose.production.yml" ] && [ -f "$INSTALL_DIR/compose.production.yml" ] \
@@ -229,6 +232,25 @@ production_compose up -d \
   reservation-worker \
   reservation-console \
   reservation-booking
+
+worker_id=$(production_compose ps -q reservation-worker 2>/dev/null) \
+  || fail "worker readiness could not inspect the reservation worker"
+[ -n "$worker_id" ] || fail "worker readiness could not find the reservation worker"
+worker_attempt=0
+while :; do
+  worker_health=$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}missing{{end}}' "$worker_id" 2>/dev/null) \
+    || fail "worker readiness could not inspect the reservation worker"
+  case $worker_health in
+    healthy) break ;;
+    unhealthy) fail "reservation worker became unhealthy; run docker compose logs reservation-worker" ;;
+    starting) ;;
+    *) fail "reservation worker has no health check" ;;
+  esac
+  worker_attempt=$((worker_attempt + 1))
+  [ "$worker_attempt" -lt 60 ] \
+    || fail "worker readiness timed out; run docker compose logs reservation-worker"
+  sleep 2
+done
 
 # INSTALL_STEP: start-edge
 if [ "$rollback_edge_required" = "true" ]; then

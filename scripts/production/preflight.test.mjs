@@ -169,6 +169,33 @@ test("installer resume stops only its matching edge before the default port pref
   assert.doesNotMatch(installer, /docker compose[^\n]*(?:down|rm)/u);
 });
 
+test("installer refuses an existing target unless resume was explicitly requested", async () => {
+  const installer = await readFile("scripts/production/install.sh", "utf8");
+  const refusal = installer.indexOf('[ ! -e "$INSTALL_DIR" ] && [ ! -L "$INSTALL_DIR" ]');
+  const preflight = installer.indexOf("# INSTALL_STEP: preflight");
+  const createTarget = installer.indexOf("# INSTALL_STEP: create-target");
+  assert.ok(refusal >= 0 && refusal < preflight && refusal < createTarget);
+  assert.match(installer, /if \[ "\$resume" = "false" \]; then/u);
+  assert.match(installer, /installation path already exists; use --resume only for the same release and domain/u);
+});
+
+test("installer waits for the reservation worker health check before starting the edge", async () => {
+  const installer = await readFile("scripts/production/install.sh", "utf8");
+  const privateServices = installer.indexOf("# INSTALL_STEP: start-private-services");
+  const workerLookup = installer.indexOf("worker_id=$(production_compose ps -q reservation-worker", privateServices);
+  const workerHealth = installer.indexOf("worker_health=$(docker inspect --format", workerLookup);
+  const healthyGate = installer.indexOf("healthy) break", workerHealth);
+  const boundedTimeout = installer.indexOf('worker_attempt" -lt 60', workerHealth);
+  const startEdge = installer.indexOf("# INSTALL_STEP: start-edge");
+  assert.ok(privateServices >= 0);
+  assert.ok(workerLookup > privateServices);
+  assert.ok(workerHealth > workerLookup);
+  assert.ok(healthyGate > workerHealth);
+  assert.ok(boundedTimeout > healthyGate && boundedTimeout < startEdge);
+  assert.match(installer, /reservation worker became unhealthy/u);
+  assert.match(installer, /worker readiness timed out/u);
+});
+
 test("installer verifies the exact release bundle before creating the target", async () => {
   const [installer, toolsDockerfile] = await Promise.all([
     readFile("scripts/production/install.sh", "utf8"),

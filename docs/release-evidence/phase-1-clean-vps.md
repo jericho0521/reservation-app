@@ -19,7 +19,7 @@ The following checks were run locally through `2026-07-15T16:36:35+08:00` during
 
 | Check | Result |
 | --- | --- |
-| Deterministic OS/resource preflight, installer-order/resume/rollback, smoke, retry, redaction, and demo-absence tests | PASS — 15/15 |
+| Deterministic OS/resource preflight, installer-order/resume/rollback, existing-target refusal, worker-health gating, smoke, retry, redaction, and demo-absence tests | PASS — 17/17 |
 | Release-manifest generator/verifier unit tests | PASS — 3/3 |
 | Current-candidate release-manifest drift check | PASS |
 | Production tools image build and in-image network-disabled/read-only manifest verification | PASS |

@@ -43,7 +43,7 @@
     },
     {
       "path": "scripts/production/install.sh",
-      "sha256": "dadfd0ca17f8c628ff859e79cb78f97dc98c1ac704304e28f1036b29cfe1cc86"
+      "sha256": "15b31578bc21727a1074d25679a1182df41d17548456099413a58e998d7195cf"
     },
     {
       "path": "scripts/production/preflight.sh",

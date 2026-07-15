@@ -263,11 +263,14 @@ async function processConversationMessage(input: {
     if (outbound.error || !outbound.data) throw outbound.error ?? new Error("reply unavailable");
     return { status: 200, body: { conversation, message: outbound.data, ...(proposal ? { proposal } : {}) } };
   } catch {
-    const handoff = await input.dependencies.conversations.append(scope, conversation.conversation_id, {
+    const appendHandoff = conversation.channel === "whatsapp" && input.dependencies.conversations.appendAutomationReplyWithOutbox
+      ? input.dependencies.conversations.appendAutomationReplyWithOutbox.bind(input.dependencies.conversations)
+      : input.dependencies.conversations.append.bind(input.dependencies.conversations);
+    const handoff = await appendHandoff(scope, conversation.conversation_id, {
       channel: conversation.channel,
       direction: "outbound",
       senderType: "automation",
-      deliveryState: "sent",
+      deliveryState: conversation.channel === "whatsapp" ? "pending" : "sent",
       externalMessageId: `ai-handoff:${input.inbound.message_id}`,
       content: "The booking assistant is temporarily unavailable. Please wait while staff checks this for you.",
       metadata: { event: "assistant.handoff" },
@@ -326,11 +329,14 @@ export async function confirmConversationBooking(input: {
     try {
       const reservation = await input.dependencies.tools.createReservation(scope, reservationInput(rebound, conversation.channel), `conversation-confirm-${proposal.proposalId}`);
       await input.dependencies.state.complete(scope, proposal.proposalId, reservation);
-      const message = await input.dependencies.conversations.append(scope, conversation.conversation_id, {
+      const appendConfirmation = conversation.channel === "whatsapp" && input.dependencies.conversations.appendAutomationReplyWithOutbox
+        ? input.dependencies.conversations.appendAutomationReplyWithOutbox.bind(input.dependencies.conversations)
+        : input.dependencies.conversations.append.bind(input.dependencies.conversations);
+      const message = await appendConfirmation(scope, conversation.conversation_id, {
         channel: conversation.channel,
         direction: "outbound",
         senderType: "automation",
-        deliveryState: "sent",
+        deliveryState: conversation.channel === "whatsapp" ? "pending" : "sent",
         content: `Booking confirmed. Reference: ${reservation.reservation_id}`,
         reservationId: reservation.reservation_id,
         metadata: { event: "booking.confirmed", proposal_id: proposal.proposalId },

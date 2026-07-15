@@ -350,91 +350,6 @@ create table public.platform_whatsapp_pairing_state (
 create trigger platform_whatsapp_pairing_state_updated_at before update on public.platform_whatsapp_pairing_state
 for each row execute function public.set_updated_at();
 
-create or replace function public.platform_append_whatsapp_outbound(
-  p_tenant_id text,
-  p_venue_id uuid,
-  p_conversation_id uuid,
-  p_sender_type text,
-  p_external_message_id text,
-  p_content text,
-  p_reservation_id uuid default null,
-  p_metadata jsonb default '{}'::jsonb
-)
-returns public.platform_conversation_messages
-language plpgsql
-security definer
-set search_path = public
-as $$
-declare
-  v_message public.platform_conversation_messages;
-  v_target text;
-  v_outbox_id uuid;
-begin
-  if p_sender_type not in ('automation', 'staff', 'system') then
-    raise exception 'Unsupported WhatsApp sender.' using errcode = '22023';
-  end if;
-
-  select participant.channel_identifier into v_target
-  from public.platform_conversations as conversation
-  join public.platform_conversation_participants as participant
-    on participant.conversation_id = conversation.id
-   and participant.role = 'customer'
-  where conversation.id = p_conversation_id
-    and conversation.tenant_id = p_tenant_id
-    and conversation.venue_id = p_venue_id
-    and conversation.channel = 'whatsapp';
-
-  if nullif(trim(v_target), '') is null then
-    raise exception 'WhatsApp delivery target is unavailable.' using errcode = 'P0002';
-  end if;
-
-  select * into v_message
-  from public.append_platform_conversation_message(
-    p_tenant_id,
-    p_venue_id,
-    p_conversation_id,
-    'whatsapp',
-    'outbound',
-    p_sender_type,
-    'pending',
-    p_external_message_id,
-    p_content,
-    p_reservation_id,
-    coalesce(p_metadata, '{}'::jsonb)
-  );
-
-  insert into public.platform_channel_outbox (
-    tenant_id, venue_id, conversation_id, message_id, channel, target, content, idempotency_key
-  ) values (
-    p_tenant_id,
-    p_venue_id,
-    p_conversation_id,
-    v_message.id,
-    'whatsapp',
-    v_target,
-    p_content,
-    'message:' || v_message.id::text
-  )
-  on conflict (message_id) do update
-    set message_id = excluded.message_id
-  returning id into v_outbox_id;
-
-  insert into public.platform_jobs (
-    tenant_id, venue_id, kind, payload, max_attempts, idempotency_key
-  ) values (
-    p_tenant_id,
-    p_venue_id,
-    'whatsapp.deliver_outbound',
-    jsonb_build_object('outboxId', v_outbox_id),
-    5,
-    'whatsapp-outbox:' || v_outbox_id::text
-  )
-  on conflict (tenant_id, idempotency_key) do nothing;
-
-  return v_message;
-end;
-$$;
-
 create or replace function public.platform_claim_whatsapp_outbox(p_outbox_id uuid)
 returns jsonb
 language plpgsql
@@ -805,7 +720,6 @@ revoke all on function public.platform_read_whatsapp_channel_state(text) from pu
 revoke all on function public.platform_read_whatsapp_pairing_state(text) from public, anon, authenticated;
 revoke all on function public.platform_append_whatsapp_staff_reply(text, uuid, uuid, text, text) from public, anon, authenticated;
 revoke all on function public.platform_append_whatsapp_automation_reply(text, uuid, uuid, text, text, jsonb) from public, anon, authenticated;
-revoke all on function public.platform_append_whatsapp_outbound(text, uuid, uuid, text, text, text, uuid, jsonb) from public, anon, authenticated;
 revoke all on function public.platform_claim_whatsapp_outbox(uuid) from public, anon, authenticated;
 revoke all on function public.platform_complete_whatsapp_outbox(uuid, text) from public, anon, authenticated;
 revoke all on function public.platform_release_whatsapp_outbox(uuid, text) from public, anon, authenticated;
@@ -815,7 +729,6 @@ grant execute on function public.platform_read_whatsapp_channel_state(text) to s
 grant execute on function public.platform_read_whatsapp_pairing_state(text) to service_role;
 grant execute on function public.platform_append_whatsapp_staff_reply(text, uuid, uuid, text, text) to service_role;
 grant execute on function public.platform_append_whatsapp_automation_reply(text, uuid, uuid, text, text, jsonb) to service_role;
-grant execute on function public.platform_append_whatsapp_outbound(text, uuid, uuid, text, text, text, uuid, jsonb) to service_role;
 grant execute on function public.platform_claim_whatsapp_outbox(uuid) to service_role;
 grant execute on function public.platform_complete_whatsapp_outbox(uuid, text) to service_role;
 grant execute on function public.platform_release_whatsapp_outbox(uuid, text) to service_role;

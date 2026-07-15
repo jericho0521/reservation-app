@@ -71,7 +71,7 @@ test("channel runtime persists restart-safe proposals and service-role-only comm
   assert.match(sql, /reservation_id <> p_reservation_id/);
   assert.match(sql, /booking\.id = p_reservation_id[\s\S]*venue\.id = p_venue_id[\s\S]*venue\.tenant_id = p_tenant_id/);
   assert.match(sql, /revoke all on table public\.platform_channel_outbox from public, anon, authenticated, service_role/);
-  assert.match(sql, /platform_append_whatsapp_outbound[\s\S]*append_platform_conversation_message[\s\S]*platform_channel_outbox[\s\S]*whatsapp\.deliver_outbound/);
+  assert.match(sql, /platform_append_whatsapp_automation_reply[\s\S]*append_platform_conversation_message[\s\S]*platform_channel_outbox[\s\S]*whatsapp\.deliver_outbound/);
   assert.match(sql, /platform_claim_whatsapp_outbox[\s\S]*status = 'sending'/);
   assert.match(sql, /platform_complete_whatsapp_outbox[\s\S]*delivery_state = 'sent'/);
   assert.match(sql, /platform_release_whatsapp_outbox[\s\S]*delivery_state = 'failed'/);

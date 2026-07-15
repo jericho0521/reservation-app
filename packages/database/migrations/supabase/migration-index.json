@@ -275,8 +275,8 @@
       "path": "packages/database/migrations/supabase/000034_channel_runtime.sql",
       "module": "core",
       "scope": "reservation-platform",
-      "sha256": "c2ed93caf149d4fd99dfc42cacc84c76b0ae798c9843650b2c6229fc4eaf4b1f",
-      "bytes": 31433
+      "sha256": "42076940dff4874fe0a4d78d45958f1fdc489655ad0a47d2f2c7e8f54a262517",
+      "bytes": 28812
     }
   ],
   "optionalMigrations": [

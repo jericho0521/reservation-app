@@ -36,7 +36,7 @@ test("WhatsApp outbound messages use the transactional outbox RPC", async () => 
     },
   });
 
-  const result = await repository.append(
+  const result = await repository.appendAutomationReplyWithOutbox?.(
     { tenantId: "tenant_1", venueId: "venue_1" },
     "conversation_1",
     {
@@ -49,7 +49,7 @@ test("WhatsApp outbound messages use the transactional outbox RPC", async () => 
   );
 
   assert.equal(result.data?.delivery_state, "pending");
-  assert.equal(calls[0]?.[0], "platform_append_whatsapp_outbound");
+  assert.equal(calls[0]?.[0], "platform_append_whatsapp_automation_reply");
   assert.equal(calls[0]?.[1]?.p_external_message_id, "ai-reply:message_inbound");
   assert.equal("p_delivery_state" in (calls[0]?.[1] ?? {}), false);
 });

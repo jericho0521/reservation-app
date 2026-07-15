@@ -85,25 +85,19 @@ export function createSupabaseConversationRepository(client: ConversationSupabas
       return adaptMany(result, adaptMessage);
     },
     async append(scope, conversationId, input) {
-      const isWhatsAppOutbound = input.channel === "whatsapp" && input.direction === "outbound";
-      const result = await client.rpc(
-        isWhatsAppOutbound ? "platform_append_whatsapp_outbound" : "append_platform_conversation_message",
-        {
-          p_tenant_id: scope.tenantId,
-          p_venue_id: scope.venueId,
-          p_conversation_id: conversationId,
-          p_sender_type: input.senderType,
-          p_external_message_id: input.externalMessageId ?? null,
-          p_content: input.content,
-          p_reservation_id: input.reservationId ?? null,
-          p_metadata: input.metadata ?? {},
-          ...(isWhatsAppOutbound ? {} : {
-            p_channel: input.channel,
-            p_direction: input.direction,
-            p_delivery_state: input.deliveryState ?? "sent",
-          }),
-        },
-      );
+      const result = await client.rpc("append_platform_conversation_message", {
+        p_tenant_id: scope.tenantId,
+        p_venue_id: scope.venueId,
+        p_conversation_id: conversationId,
+        p_channel: input.channel,
+        p_direction: input.direction,
+        p_sender_type: input.senderType,
+        p_delivery_state: input.deliveryState ?? "sent",
+        p_external_message_id: input.externalMessageId ?? null,
+        p_content: input.content,
+        p_reservation_id: input.reservationId ?? null,
+        p_metadata: input.metadata ?? {},
+      });
       return adaptOne(result, adaptMessage);
     },
     async appendStaffReplyWithOutbox(scope, conversationId, input) {

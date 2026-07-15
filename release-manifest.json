@@ -15,7 +15,7 @@
     },
     {
       "path": "compose.production.yml",
-      "sha256": "0a786910cea45b61dac1b7feaeaf4331c2c78f35f38a7d9f7a8e48eac709c2f5"
+      "sha256": "a1088a74055cd36da28e84b3d6f51b1123d213a5035c5452966a64de5ed52f72"
     },
     {
       "path": "docker/production/Caddyfile",
@@ -30,10 +30,6 @@
       "sha256": "79daa35779fd545b4fefb462e86ca9a925d469896a171c099ae481454b6d0708"
     },
     {
-      "path": "docker/production/allowlists/console.env",
-      "sha256": "5f161119b36a8e98534f2b800fccb4465b021f47a01cb7872dc1c430411614fb"
-    },
-    {
       "path": "docker/production/allowlists/migrate.env",
       "sha256": "fd9c6e0c2d150673bb66e2fb361d24ac1706534cea794bc6b0f90732419ca16f"
     },
@@ -43,7 +39,7 @@
     },
     {
       "path": "scripts/production/install.sh",
-      "sha256": "15b31578bc21727a1074d25679a1182df41d17548456099413a58e998d7195cf"
+      "sha256": "3a5b35795e5c6da07d41c2e94212465c3c2a0e3dd1e3fdd71262dbf75ce29fac"
     },
     {
       "path": "scripts/production/preflight.sh",
@@ -51,7 +47,7 @@
     },
     {
       "path": "scripts/production/release-manifest.mjs",
-      "sha256": "fe901964b2f323ad736bf9c0a9e3b6b10443155c7876bd5e798dfc895b367323"
+      "sha256": "3f8592dacae9e97403239cb428d9d5c10bdbc7ba5104465ce03f51b541289563"
     },
     {
       "path": "scripts/production/smoke.mjs",

@@ -277,17 +277,13 @@ test("cookie owners also require a concrete venue for venue-scoped operations", 
     "123e4567-e89b-42d3-a456-426614174000",
     "223e4567-e89b-42d3-a456-426614174000",
   ]]) {
-    const response = await handleStandaloneApiRequest({
-      method: "GET",
-      path: "/v1/reservations",
-      headers: { cookie },
-    }, {
+    const dependencies = {
       sessionAuth: {
         repositories: authRepository({
           readSession: async () => ({
             userId: "223e4567-e89b-42d3-a456-426614174000",
             tenantId: "tenant-1",
-            role: "owner",
+            role: "owner" as const,
             venueIds,
             expiresAt: "2026-07-15T12:00:00.000Z",
           }),
@@ -295,8 +291,24 @@ test("cookie owners also require a concrete venue for venue-scoped operations", 
         allowedOrigins: [authOrigin],
       },
       reservationReadRepository,
-    });
-    assert.equal(response.status, 403);
+      availabilityRepository: availabilityRepository({
+        async readAvailability() {
+          storageCalls += 1;
+          return {
+            service: availabilityService(),
+            bookings: [],
+            maintenanceResourceLabels: [],
+          };
+        },
+      }),
+    };
+    for (const path of [
+      "/v1/reservations",
+      "/v1/availability?service_id=svc_123&date=2026-07-01",
+    ]) {
+      const response = await handleStandaloneApiRequest({ method: "GET", path, headers: { cookie } }, dependencies);
+      assert.equal(response.status, 403, path);
+    }
   }
   assert.equal(storageCalls, 0);
 });
@@ -340,12 +352,9 @@ test("cookie staff cannot escape through legacy catalog, availability, or WhatsA
   const paths = [
     "/v1/venues",
     `/v1/venues/${assignedVenue}`,
-    "/v1/services",
     "/v1/services/service-other-venue",
-    "/v1/resources",
     "/v1/resources/resource-other-venue",
     "/v1/resource-layouts/layout-other-venue",
-    "/v1/availability?service_id=service-other-venue&date=2026-07-15",
     "/v1/channels/whatsapp/conversations",
     "/v1/channels/whatsapp/conversations/conversation-other-venue/messages",
   ];
@@ -388,6 +397,74 @@ test("cookie staff cannot escape through legacy catalog, availability, or WhatsA
   });
   assert.equal(unified.status, 200);
   assert.deepEqual(unifiedScope, { tenantId: "tenant-1", venueId: assignedVenue });
+});
+
+test("cookie staff catalog lists and availability are forced to the resolved assigned venue", async () => {
+  const assignedVenue = "123e4567-e89b-42d3-a456-426614174000";
+  const cookie = `reservation_session=${"s".repeat(43)}`;
+  const observed: unknown[] = [];
+  const sessionAuth = {
+    repositories: authRepository({
+      readSession: async () => ({
+        userId: "223e4567-e89b-42d3-a456-426614174000",
+        tenantId: "tenant-1",
+        role: "staff" as const,
+        venueIds: [assignedVenue],
+        expiresAt: "2026-07-15T12:00:00.000Z",
+      }),
+    }),
+    allowedOrigins: [authOrigin],
+  };
+  const dependencies = {
+    sessionAuth,
+    catalogRepository: catalogRepository({
+      async listServices(input) { observed.push({ operation: "services", input }); return { data: [] }; },
+      async listResources(input) { observed.push({ operation: "resources", input }); return { data: [] }; },
+    }),
+    availabilityRepository: availabilityRepository({
+      async readAvailability(input) {
+        observed.push({ operation: "availability", input });
+        return { service: availabilityService(), bookings: [], maintenanceResourceLabels: [] };
+      },
+    }),
+  };
+
+  for (const path of [
+    "/v1/services?venue_id=323e4567-e89b-42d3-a456-426614174000",
+    "/v1/resources?venue_id=323e4567-e89b-42d3-a456-426614174000",
+    "/v1/availability?service_id=svc_123&date=2026-07-15",
+  ]) {
+    const response = await handleStandaloneApiRequest({ method: "GET", path, headers: { cookie } }, dependencies);
+    assert.equal(response.status, 200, path);
+  }
+  assert.deepEqual(observed, [
+    { operation: "services", input: { venueId: assignedVenue, includeInactive: false } },
+    { operation: "resources", input: { serviceId: null, venueId: assignedVenue, includeInactive: false } },
+    { operation: "availability", input: { serviceId: "svc_123", date: "2026-07-15", venueId: assignedVenue } },
+  ]);
+
+  let calls = 0;
+  const missingVenue = await handleStandaloneApiRequest({
+    method: "GET",
+    path: "/v1/services",
+    headers: { cookie },
+  }, {
+    sessionAuth: {
+      ...sessionAuth,
+      repositories: authRepository({
+        readSession: async () => ({
+          userId: "223e4567-e89b-42d3-a456-426614174000",
+          tenantId: "tenant-1",
+          role: "staff",
+          venueIds: [assignedVenue, "223e4567-e89b-42d3-a456-426614174001"],
+          expiresAt: "2026-07-15T12:00:00.000Z",
+        }),
+      }),
+    },
+    catalogRepository: catalogRepository({ async listServices() { calls += 1; return { data: [] }; } }),
+  });
+  assert.equal(missingVenue.status, 403);
+  assert.equal(calls, 0);
 });
 
 test("owner configures the appointment business while staff only list assigned locations", async () => {

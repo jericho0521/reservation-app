@@ -197,6 +197,14 @@
       "scope": "reservation-platform",
       "sha256": "3bb2fa8ef875cb1c8fbf1dce61371f45848f0c8141acb180a10930565c793d65",
       "bytes": 11175
+    },
+    {
+      "order": 25,
+      "path": "packages/database/migrations/supabase/000025_availability_snapshot_venue_scope.sql",
+      "module": "core",
+      "scope": "reservation-platform",
+      "sha256": "4b4bc54921960ff4c6fc47087054f6ae7412b97b5b61019e1f71b12365cca60b",
+      "bytes": 2653
     }
   ],
   "optionalMigrations": [

@@ -187,6 +187,7 @@ test("availability list service derives date, reads repository, and maps slots w
 
   const result = await listAvailability({
     repository,
+    venueId: "venue_123",
     query: new URLSearchParams({
       service_id: "svc_123",
       start_at: "2026-07-01T12:00:00.000Z",
@@ -196,6 +197,7 @@ test("availability list service derives date, reads repository, and maps slots w
   assert.deepEqual(repositoryCall, {
     serviceId: "svc_123",
     date: "2026-07-01",
+    venueId: "venue_123",
   });
   assert.equal(result.status, 200);
 

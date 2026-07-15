@@ -1,13 +1,22 @@
 import assert from "node:assert/strict";
 import { generateKeyPairSync, sign } from "node:crypto";
 import test from "node:test";
-import { InMemoryConversationBookingStateStore, type ConversationOrchestratorDependencies, type ConversationRepository } from "@reservation-platform/api";
+import { createCapacityPolicy } from "@project-play/reservations-core";
+import {
+  InMemoryConversationBookingStateStore,
+  type AvailabilityRepositoryPort,
+  type ConversationOrchestratorDependencies,
+  type ConversationRepository,
+  type PlatformCatalogRepository,
+  type ReservationCreateRepositoryPort,
+} from "@reservation-platform/api";
 
 import { createStandaloneApiHandler } from "./routes.js";
 import type { StandaloneApiDependencies } from "./routes.js";
 import {
   createStandaloneSupabaseDependencies,
   createStandaloneSupabaseDependenciesFromEnv,
+  createConversationBookingTools,
   StandaloneSupabaseConfigError,
   standaloneWhatsAppDependenciesFromEnv,
   type StandaloneSupabaseClient,
@@ -15,6 +24,111 @@ import {
   type StandaloneSupabasePublicAdminClients,
   type StandaloneSupabaseRepositoryFactories,
 } from "./runtime.js";
+
+test("public chat booking tools keep the published venue through validation, availability, and creation", async () => {
+  const serviceId = "123e4567-e89b-42d3-a456-426614174000";
+  const catalogScopes: unknown[] = [];
+  let availabilityInput: unknown;
+  let createInput: unknown;
+  const catalogRepository: PlatformCatalogRepository = {
+    async listVenues() { return { data: [] }; },
+    async getVenue() { return { data: null }; },
+    async listServices(input) {
+      catalogScopes.push(input);
+      return { data: [{
+        id: serviceId,
+        name: "Consultation",
+        total_seats: 1,
+        resource_kind: "seat",
+        selection_mode: "capacity",
+      }] };
+    },
+    async getService() { throw new Error("public chat must not read a raw service id"); },
+    async listResources() { return { data: [] }; },
+    async getResource() { return { data: null }; },
+    async getResourceLayout() { return { data: null }; },
+  };
+  const availabilityRepository: AvailabilityRepositoryPort = {
+    async readAvailability(input) {
+      availabilityInput = input;
+      return {
+        service: {
+          id: serviceId,
+          name: "Consultation",
+          description: "",
+          total_seats: 1,
+          resource_kind: "seat",
+          selection_mode: "quantity",
+          policy: createCapacityPolicy(1),
+          resources: [],
+          layout: { kind: "none", resources: [] },
+        },
+        bookings: [],
+        maintenanceResourceLabels: [],
+      };
+    },
+  };
+  const reservationCreateRepository: ReservationCreateRepositoryPort = {
+    async createReservationAtomic(input) {
+      createInput = input;
+      return {
+        ok: true,
+        atomic: true,
+        booking: {
+          id: "reservation-a",
+          service_id: input.reservation.service_id,
+          user_name: input.reservation.customer_name,
+          user_email: input.reservation.customer_email,
+          user_phone: input.reservation.customer_phone,
+          booking_date: input.reservation.booking_date,
+          start_time: input.reservation.start_time,
+          end_time: input.reservation.end_time,
+          seats_booked: input.reservation.seats_booked,
+          seat_labels: [],
+          status: "confirmed",
+          interface_type: "chat",
+        },
+        reservation: input.reservation,
+        validation: { ok: true },
+      };
+    },
+  };
+  const tools = createConversationBookingTools({
+    catalogRepository,
+    availabilityRepository,
+    reservationCreateRepository,
+  });
+  const scope = { tenantId: "tenant-a", venueId: "venue-a" };
+
+  assert.equal(await tools.getService(scope, "service-other-venue"), undefined);
+  await assert.rejects(
+    () => tools.checkAvailability(scope, { serviceId: "service-other-venue", date: "2026-07-20" }),
+    /outside the published experience/i,
+  );
+  const availability = await tools.checkAvailability(scope, { serviceId, date: "2026-07-20" });
+  assert.ok(availability.slots.length > 0);
+  await tools.createReservation(scope, {
+    service_id: serviceId,
+    date: "2026-07-20",
+    start_time: "09:00",
+    end_time: "10:00",
+    quantity: 1,
+    customer: { name: "Ada", email: "ada@example.com", phone: "555" },
+    source: "web_chat",
+  }, "proposal-a");
+
+  assert.deepEqual(catalogScopes, [
+    { venueId: "venue-a" },
+    { venueId: "venue-a" },
+    { venueId: "venue-a" },
+  ]);
+  assert.deepEqual(availabilityInput, {
+    serviceId,
+    date: "2026-07-20",
+    venueId: "venue-a",
+  });
+  assert.equal((createInput as { venueId?: string }).venueId, "venue-a");
+});
 
 test("standalone Supabase env factory returns default dependencies when config is absent", () => {
   const dependencies = createStandaloneSupabaseDependenciesFromEnv({}, {

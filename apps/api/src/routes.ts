@@ -720,7 +720,11 @@ export async function handleStandaloneApiRequest(
   }
 
   if (method === "GET" && path === "/v1/availability") {
-    return handleAvailabilityRequest(url, dependencies.availabilityRepository);
+    return handleAvailabilityRequest(
+      url,
+      dependencies.availabilityRepository,
+      getHeader(request.headers, "X-Reservation-Venue-Id"),
+    );
   }
 
   if (method === "GET" && path === "/v1/reservations") {
@@ -783,7 +787,7 @@ export async function handleStandaloneApiRequest(
   }
 
   if (method === "GET") {
-    const catalogResponse = await handleCatalogRequest(path, url, dependencies.catalogRepository);
+    const catalogResponse = await handleCatalogRequest(path, url, dependencies.catalogRepository, request);
     if (catalogResponse) {
       return catalogResponse;
     }
@@ -1453,10 +1457,9 @@ const protectedRouteMetadata: Readonly<Record<string, readonly RouteMatcher[]>> 
 const ownerOnlyRouteMetadata: Readonly<Record<string, readonly RouteMatcher[]>> = {
   GET: [
     "/v1/installation/business",
-    "/v1/availability",
     "/v1/venues", venuePattern,
-    "/v1/services", servicePattern,
-    "/v1/resources", resourcePattern, resourceLayoutPattern,
+    servicePattern,
+    resourcePattern, resourceLayoutPattern,
     isExperienceOwnerRoute,
     isWhatsAppConfigurationRoute,
   ],
@@ -1467,7 +1470,10 @@ const ownerOnlyRouteMetadata: Readonly<Record<string, readonly RouteMatcher[]>> 
 };
 
 const venueScopedRouteMetadata: Readonly<Record<string, readonly RouteMatcher[]>> = {
-  GET: ["/v1/reservations", reservationPattern, "/v1/resource-maintenance"],
+  GET: [
+    "/v1/availability", "/v1/services", "/v1/resources",
+    "/v1/reservations", reservationPattern, "/v1/resource-maintenance",
+  ],
   POST: ["/v1/reservations", reservationCancelPattern, reservationReschedulePattern,
     "/v1/resource-maintenance", resourceMaintenanceEndPattern],
   PATCH: [reservationPattern],
@@ -1959,7 +1965,7 @@ async function handlePublicExperienceAvailabilityRequest(
   if (!serviceId || !services.services.some((service) => service.service_id === serviceId)) {
     return platformError(404, "not_found", "Service is not available for this experience.");
   }
-  return handleAvailabilityRequest(url, dependencies.availabilityRepository);
+  return handleAvailabilityRequest(url, dependencies.availabilityRepository, services.scope.venueId);
 }
 
 async function handlePublicExperienceReservationCreateRequest(
@@ -2220,6 +2226,7 @@ function isChatReservationSessionRoute(path: string) {
 async function handleAvailabilityRequest(
   url: URL,
   repository: AvailabilityRepositoryPort | undefined,
+  venueId?: string,
 ): Promise<StandaloneApiResponse> {
   const preparedQuery = prepareAvailabilityQuery(url);
   if (preparedQuery.status !== 200) {
@@ -2233,6 +2240,7 @@ async function handleAvailabilityRequest(
   const result = await listAvailability({
     repository,
     query: url,
+    ...(venueId ? { venueId } : {}),
   });
 
   return jsonResponse(result.status, result.body);
@@ -3026,11 +3034,17 @@ async function handleCatalogRequest(
   path: string,
   url: URL,
   repository: PlatformCatalogRepository | undefined,
+  request: StandaloneApiRequest,
 ): Promise<StandaloneApiResponse | undefined> {
+  const scopedUrl = new URL(url);
+  const venueId = getHeader(request.headers, "X-Reservation-Venue-Id");
+  if (venueId && (path === "/v1/services" || path === "/v1/resources")) {
+    scopedUrl.searchParams.set("venue_id", venueId);
+  }
   const result = await handlePlatformCatalogRequest({
     path,
     repository,
-    url,
+    url: scopedUrl,
   });
   if (!result) {
     return undefined;

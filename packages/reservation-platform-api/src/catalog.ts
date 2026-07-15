@@ -486,8 +486,10 @@ function readPlatformCatalogAction(
 
   if (path === "/v1/resources") {
     const searchParams = readCatalogSearchParams(url);
+    const venueId = searchParams.get("venue_id");
     return (repository) => listPlatformResources(repository, {
       serviceId: searchParams.get("service_id"),
+      ...(venueId ? { venueId } : {}),
       includeInactive: searchParams.get("include_inactive") === "true",
     });
   }

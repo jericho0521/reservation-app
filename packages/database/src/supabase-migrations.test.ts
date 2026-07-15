@@ -13,7 +13,7 @@ import {
 
 const indexPath = new URL("../migrations/supabase/migration-index.json", import.meta.url);
 
-test("core plan includes exactly 000001 through 000024 in order", async () => {
+test("core plan includes exactly 000001 through 000025 in order", async () => {
   const index = await readActualIndex();
   const plan = buildSupabaseMigrationPlan(index);
 
@@ -44,10 +44,20 @@ test("core plan includes exactly 000001 through 000024 in order", async () => {
       "000022_password_reset.sql",
       "000023_venue_scoped_operations.sql",
       "000024_installation_business_onboarding.sql",
+      "000025_availability_snapshot_venue_scope.sql",
     ],
   );
-  assert.equal(plan.migrations.length, 24);
+  assert.equal(plan.migrations.length, 25);
   assert.equal(plan.seeds.length, 0);
+});
+
+test("availability snapshot exposes its venue for application-layer scope enforcement", async () => {
+  const sql = (await readFile(new URL("../migrations/supabase/000025_availability_snapshot_venue_scope.sql", import.meta.url), "utf8")).toLowerCase();
+
+  assert.match(sql, /create or replace function public\.read_reservation_availability_snapshot/);
+  assert.match(sql, /'venue_id', services\.venue_id/);
+  assert.match(sql, /revoke all on function public\.read_reservation_availability_snapshot\(uuid, date\) from public, anon, authenticated/);
+  assert.match(sql, /grant execute on function public\.read_reservation_availability_snapshot\(uuid, date\) to service_role/);
 });
 
 test("installation business onboarding is atomic, appointment-specific, and service-role only", async () => {
@@ -82,7 +92,7 @@ test("bundled core migration loader follows an extended validated index", async 
   const rawIndex = await readActualRawIndex();
   rawIndex.coreMigrations.push({
     order: rawIndex.coreMigrations.length + 1,
-    path: "packages/database/migrations/supabase/000025_runtime_readiness_test.sql",
+    path: "packages/database/migrations/supabase/000026_runtime_readiness_test.sql",
     module: "core",
     scope: "reservation-platform",
     sha256: "a".repeat(64),
@@ -95,9 +105,9 @@ test("bundled core migration loader follows an extended validated index", async 
 
   const plan = await loadBundledCoreMigrationPlan(pathToFileURL(extendedIndexPath));
 
-  assert.equal(plan.length, 25);
+  assert.equal(plan.length, 26);
   assert.deepEqual(plan.at(-1), {
-    path: "packages/database/migrations/supabase/000025_runtime_readiness_test.sql",
+    path: "packages/database/migrations/supabase/000026_runtime_readiness_test.sql",
     sha256: "a".repeat(64),
   });
 });
@@ -279,7 +289,7 @@ test("AI retrieval option appends optional AI retrieval migrations after core mi
   const plan = buildSupabaseMigrationPlan(index, { includeAiRetrieval: true });
 
   assert.deepEqual(
-    plan.migrations.slice(24).map((entry) => entry.path),
+    plan.migrations.slice(index.coreMigrations.length).map((entry) => entry.path),
     [
       "packages/database/migrations/supabase/optional/ai-retrieval/000001_knowledge_chunks.sql",
       "packages/database/migrations/supabase/optional/ai-retrieval/000002_langchain_checkpoints.sql",

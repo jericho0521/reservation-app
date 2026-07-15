@@ -107,6 +107,7 @@ const IDEMPOTENCY_UNSCOPED_TENANT = "__platform_unscoped__";
 
 export interface ServiceMetadataRow {
   id: string;
+  venue_id?: string;
   name: string;
   description?: string | null;
   total_seats: number;
@@ -237,6 +238,7 @@ export interface SupabaseAvailabilityRepository {
   readAvailability(input: {
     serviceId: string;
     date: string;
+    venueId?: string;
   }): Promise<SupabaseAvailabilityRead>;
 }
 
@@ -708,7 +710,7 @@ export function createSupabaseAvailabilityRepository(
   const { adminClient } = resolvePlatformCatalogClients(input);
 
   return {
-    async readAvailability({ serviceId, date }) {
+    async readAvailability({ serviceId, date, venueId }) {
       const admin = adminClient();
       if (!admin.rpc) {
         throw new Error("Supabase client does not support RPC calls");
@@ -723,7 +725,7 @@ export function createSupabaseAvailabilityRepository(
       }
 
       const snapshot = parseAvailabilitySnapshot(result.data);
-      if (!snapshot) {
+      if (!snapshot || (venueId && snapshot.service.venue_id !== venueId)) {
         throw createSupabaseNotFoundError(`Service not found: ${serviceId}`);
       }
 

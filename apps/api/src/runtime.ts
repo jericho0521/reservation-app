@@ -504,7 +504,11 @@ export function createConversationBookingTools(input: {
       if (!("services" in services.body) || !services.body.services.some((service) => service.service_id === serviceId)) {
         throw new Error("Service is outside the published experience.");
       }
-      const result = await listAvailability({ repository: input.availabilityRepository, query: new URLSearchParams({ service_id: serviceId, date }) });
+      const result = await listAvailability({
+        repository: input.availabilityRepository,
+        query: new URLSearchParams({ service_id: serviceId, date }),
+        venueId: scope.venueId,
+      });
       if (!("slots" in result.body)) throw new Error(result.body.error.message);
       return result.body;
     },

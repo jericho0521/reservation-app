@@ -18,6 +18,7 @@ export type AvailabilityQuerySearchParamsInput =
 export interface AvailabilityReadInput {
   serviceId: string;
   date: string;
+  venueId?: string;
 }
 
 export interface AvailabilityRead {
@@ -51,6 +52,7 @@ export interface ListAvailabilityInput {
   repository: AvailabilityRepositoryPort | (() => AvailabilityRepositoryPort);
   query: AvailabilityQuerySearchParamsInput;
   now?: Date;
+  venueId?: string;
 }
 
 export function prepareAvailabilityQuery(
@@ -88,6 +90,7 @@ export async function listAvailability({
   repository,
   query,
   now = new Date(),
+  venueId,
 }: ListAvailabilityInput): Promise<AvailabilityServiceResult> {
   const preparedQuery = prepareAvailabilityQuery(query);
   if (preparedQuery.status !== 200) {
@@ -102,7 +105,11 @@ export async function listAvailability({
 
   try {
     const resolvedRepository = typeof repository === "function" ? repository() : repository;
-    const availability = await resolvedRepository.readAvailability({ serviceId, date });
+    const availability = await resolvedRepository.readAvailability({
+      serviceId,
+      date,
+      ...(venueId ? { venueId } : {}),
+    });
     const windows = availability.operatingHours
       ? getOperatingWindowsForDate(availability.operatingHours, date, now)
       : undefined;

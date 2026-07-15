@@ -684,6 +684,46 @@ test("availability repository maps an empty snapshot to service not found", asyn
   );
 });
 
+test("availability repository hides snapshots outside the resolved venue", async () => {
+  const repository = createSupabaseAvailabilityRepository({
+    from() {
+      throw new Error("availability snapshot should not issue table reads");
+    },
+    async rpc() {
+      return {
+        data: {
+          service: {
+            id: "service-other-venue",
+            venue_id: "venue-b",
+            name: "Private service",
+            total_seats: 1,
+            created_at: "2026-01-01T00:00:00.000Z",
+          },
+          bookings: [],
+          maintenance: [],
+          resources: [],
+          layout: null,
+        },
+        error: null,
+      };
+    },
+  });
+
+  await assert.rejects(
+    () => repository.readAvailability({
+      serviceId: "service-other-venue",
+      date: "2026-01-02",
+      venueId: "venue-a",
+    }),
+    (error: unknown) => (
+      typeof error === "object"
+      && error !== null
+      && "code" in error
+      && error.code === "PGRST116"
+    ),
+  );
+});
+
 test("availability repository rejects malformed snapshot envelopes", async () => {
   const repository = createSupabaseAvailabilityRepository({
     from() {

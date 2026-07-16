@@ -228,7 +228,7 @@ The complete proof is opt-in and is not added to the fast package `pnpm test` co
 - Never pass setup, session, management, provider, SMTP, database, or encryption credentials in command-line arguments.
 - Bind all host ports to `127.0.0.1`.
 - Keep the database, PostgREST, worker, Mailpit SMTP, and AI provider services on private networks.
-- Do not use host Docker socket mounts inside containers.
+- Do not mount the host Docker socket into application or provider containers. The existing `reservation-operations` profile is the sole exception because the supported restore workflow must stop and restart the exact Compose project; the proof activates it only for the bounded backup/restore phase and verifies that no other service receives the socket.
 - Do not run application containers as root when their production images specify a non-root user.
 - Do not disable CSRF, authentication, tenant/location checks, idempotency, encryption, or log redaction for the proof.
 - Treat the generated workspace and evidence directory as sensitive temporary state and remove them by default.

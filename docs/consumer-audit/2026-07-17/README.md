@@ -25,6 +25,13 @@ SDK tarball workflow needs an unpublished transitive package workaround, and
 the production installation documentation contradicts the current release
 tutorial.
 
+An expanded functional pass subsequently executed 100 API checks with real
+mutations. The corrected baseline produced 79 passes, 14 failures, and 7
+configuration-blocked operations. Focused retests then proved valid reservation
+PATCH, installation configuration, Studio validation/publish, and a complete
+customer booking through the rendered web UI. The remaining failures listed
+below were reproduced with valid identifiers and inputs where fixtures exist.
+
 ## Environment
 
 - macOS, Apple Silicon
@@ -42,7 +49,13 @@ tutorial.
 | `pnpm run stack:verify:live` | PASS with setup caveat | Passed after setting `COMPOSE_PROJECT_NAME=reservation-consumer-audit`; verified three published flagship businesses and authenticated owner workspace access. |
 | `pnpm run stack:verify:smoke` | PASS | 3/3: health, catalog/availability, WhatsApp readiness. |
 | `pnpm run test:browser` | PASS | 51/51 against the live loopback Docker URLs across desktop, mobile, and tablet Chromium. |
+| Real customer web-UI booking | PASS | Selected service, future date, live slot, available simulator, and customer details; confirmed a real reservation and rendered its management link. |
 | External packed SDK read/write flow | PASS with packaging workaround | Read Apex Racing Lab, selected availability, and created confirmed reservation `29bbd55c-1c96-487b-b20c-aa24104edc94`. |
+| Public booking lifecycle | PASS except reschedule fixture | Created a booking, received a management token, read the booking, queried managed availability, cancelled it, and read the cancelled state. Reschedule is blocked because the seeded racing business has no valid practitioner mapping. |
+| Owner booking lifecycle | PASS with PATCH contract caveat | Created, read, listed, customer-updated, rescheduled, transitioned to completed, and cancelled real bookings. Contract-declared `source` and `notes` PATCH fields are rejected by the compatibility shim. |
+| Studio lifecycle | PASS | Read workspace/presets, saved and validated a web-only draft, published it, and created/updated/archived services, resources, and knowledge. Operating-hours and channel updates passed. |
+| Staff lifecycle | PASS | Invited staff, accepted the invitation, listed staff, and updated access. The staff-create reservation route also created a booking. |
+| Unified inbox lifecycle | PASS | WhatsApp simulation created a conversation; list/get/messages, staff takeover, staff reply, and resume-automation all passed. |
 | `pnpm run stack:verify:persistence` | PASS | 1/1; full Compose down/up preserved the database marker. The SDK-created reservation also remained confirmed afterward. |
 | WhatsApp credential-free simulation | PASS | Produced a durable unified conversation and a booking-format response. |
 | Public web-chat send and poll | FAIL | Send returned HTTP 202 and conversation `198c24e9-62c7-4acc-b8b8-9eb897fc20c9`; both message-list polls returned HTTP 500. |
@@ -53,6 +66,22 @@ The clean archive copy could not complete the last `deploy:verify` security step
 because that check requires Git metadata. Re-running the same command from the
 source checkout passed; this is an audit-environment limitation rather than a
 deployment failure.
+
+## Expanded functional matrix
+
+| Area | Passing operations | Remaining failure or block |
+| --- | --- | --- |
+| Setup and authentication | Setup status, completed-setup guard, invalid-login rejection, seeded owner session, reset privacy, invalid reset token, logout | A real first-owner creation was not repeated because the demo seed is already configured. |
+| Catalog and operations | Metadata, venue list, service/resource list and detail, availability, operations overview, system status, analytics | Current-tenant route returns 404; venue detail returns 500; no real layout fixture exists and an unknown layout returns 500. |
+| Public reservation | Experience, services, availability, create, manage read, managed availability, cancel, cancelled read | Managed reschedule needs a valid practitioner, but the seeded demo contains no staff-profile mapping. |
+| Owner reservation | Create, get, list, supported customer PATCH, reschedule, transition, cancel, staff-create | Contract-declared `source` and `notes` PATCH fields return 400. Staff-specific reschedule is blocked without a practitioner profile. |
+| Resource maintenance | List | Both full and minimal valid create requests return 500, so end-maintenance cannot be reached. |
+| Installation | Read business, configure with a unique location, create location, update location | List-locations returns 500, including after successful creation. |
+| Experience Studio | Presets, workspace, validation, draft save, valid web-only publish, identity, services, resources, hours, knowledge, channels | Publishing correctly blocks a draft when WhatsApp is enabled but not ready. |
+| Staff and security | Invite, accept, list, disable access, CSRF enforcement | No API path creates the missing reservable practitioner profiles used by appointment reschedule. |
+| Email and AI settings | Read settings; AI credential revoke | Docker does not configure the installation master key, so even disabled settings cannot be saved and connection tests return 503. |
+| WhatsApp | Simulation, readiness, status, reconnect, logout, inbox lifecycle | Session start returns 500; QR correctly returns 409 while unavailable. Real pairing needs a phone. |
+| Web/AI chat | Public message submission returns 202 | Public message polling returns 500. Authenticated chat create/send/stream/confirm are blocked because that module is disabled. |
 
 ## Findings
 
@@ -73,6 +102,60 @@ The fresh stack also reports that no AI provider is configured. That should
 produce an explicit unavailable/fallback state, not make conversation reads
 fail. Diagnose this route and add a live Docker regression that sends and polls
 one public chat message.
+
+### P1 — Several contracted catalog routes fail in the Docker runtime
+
+The OpenAPI/SDK surface advertises `GET /v1/tenants/current`, but the live API
+returns 404 `Route not found`. `GET /v1/venues` returns four valid venues, while
+`GET /v1/venues/{venue_id}` returns HTTP 500 for an ID taken directly from that
+list. The seed has no `resource_layouts` rows, and requesting an unknown layout
+returns HTTP 500 instead of 404.
+
+Add live contract tests that feed a list response identifier into each detail
+route. Either supply a layout fixture or return a stable 404 for a missing
+layout.
+
+### P1 — Resource maintenance cannot be created
+
+`POST /v1/resource-maintenance` returned HTTP 500 `Invalid resource maintenance
+data` with both the full schema-valid timestamp body and the minimal body used
+by the route's own unit test (`service_id`, `resource_id`, and `reason`). Listing
+maintenance succeeds, but creation failure prevents the end-maintenance
+lifecycle from being exercised.
+
+### P1 — Docker omits credential encryption required by in-console settings
+
+The owner can read email and AI settings, but saving even disabled settings
+returns HTTP 503: `Email credential encryption is not configured` or `AI
+credential encryption is not configured`. The local config generator creates a
+WhatsApp session encryption key but does not provide the installation master key
+used by integration settings. Connection tests consequently return 503 as well.
+
+This directly conflicts with the intended no-environment-file owner workflow:
+operators cannot configure AI or email from the console until Docker generates
+and persists the integration encryption key.
+
+### P1 — Installation location listing fails after successful writes
+
+The owner can read the installation, configure it with a unique location, create
+another location, and update that location. `GET /v1/locations` nevertheless
+returns HTTP 500 `Business onboarding request failed`, including immediately
+after successful creation.
+
+### P1 — Reservation PATCH contract exceeds runtime support
+
+A real booking can be updated successfully when PATCH contains supported
+customer name/email fields. The same endpoint rejects contract-declared
+`source` and `notes` fields with a compatibility-shim error. Either implement
+the advertised fields or remove them from the public schema and SDK until they
+are supported.
+
+### P2 — WhatsApp session start reports an internal failure
+
+Readiness, simulation, status, reconnect, logout, and the entire unified-inbox
+lifecycle pass. Starting the QR session on the fresh Docker stack returns HTTP
+500 `WhatsApp module request failed`; an unconfigured provider should return an
+actionable readiness/conflict response rather than a generic internal failure.
 
 ### P1 — Production installation documentation contradicts the current release
 
@@ -134,7 +217,12 @@ Proven in Docker:
 - clean image build, migration, seed, startup, and health ordering;
 - live owner/public pages at three viewport classes;
 - public catalog and availability reads;
-- a real SDK-created reservation and restart persistence;
+- real public, owner, staff-route, SDK, and rendered-UI reservation creation;
+- management-token read/availability/cancel, owner reschedule/transition/cancel,
+  and restart persistence;
+- Studio service/resource/knowledge CRUD, operating hours, channel updates,
+  validation, and publication;
+- staff invite/accept/list/access updates and unified-inbox takeover/reply;
 - WhatsApp simulation and readiness reporting;
 - loopback-only public ports and internal data services.
 
@@ -152,11 +240,15 @@ Not proven:
 ## Recommended next test order
 
 1. Fix the public chat read failure and add a live send/poll regression.
-2. Repair release/version documentation and make the SDK artifact installable
+2. Fix venue detail, current tenant, location list, resource maintenance create,
+   and the contracted reservation PATCH fields.
+3. Generate the installation master key in Docker, then verify AI/email settings
+   can be saved from the owner console.
+4. Repair release/version documentation and make the SDK artifact installable
    without local overrides.
-3. Run a clean production-bundle installation, create the first owner, publish
+5. Run a clean production-bundle installation, create the first owner, publish
    one appointment business, and repeat the browser/SDK/persistence proofs.
-4. Add dedicated credentials and verify one real AI response, one WhatsApp QR
+6. Add dedicated credentials and verify one real AI response, one WhatsApp QR
    connection/inbound message, and one SMTP notification.
-5. Exercise backup, destructive reset, restore, and version upgrade on a copy of
+7. Exercise backup, destructive reset, restore, and version upgrade on a copy of
    the installation before calling the deployment path production-ready.

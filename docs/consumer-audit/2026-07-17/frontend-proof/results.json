@@ -1,0 +1,100 @@
+{
+  "run_date": "2026-07-17",
+  "source_commit": "6793609",
+  "compose_project": "reservation-real-frontend-proof",
+  "classification_note": "A proof check can pass by correctly detecting a product failure or configuration block; journey outcomes are classified separately.",
+  "suites": [
+    { "name": "isolated Docker build and health", "status": "pass", "passed": 6, "failed": 0 },
+    { "name": "customer real-browser journey", "status": "pass", "passed": 1, "failed": 0 },
+    { "name": "owner real-browser proof checks", "status": "pass", "passed": 6, "failed": 0 },
+    { "name": "external packed-SDK frontend", "status": "pass", "passed": 1, "failed": 0 },
+    { "name": "repository Playwright matrix", "status": "pass", "passed": 51, "failed": 0 },
+    { "name": "pnpm run test", "status": "pass", "exit_code": 0 }
+  ],
+  "video_evidence": [
+    {
+      "journey": "customer-book-manage-cancel",
+      "file": "tmp/frontend-proof/videos/customer-book-manage-cancel.webm",
+      "duration_seconds": 10.6,
+      "size_bytes": 710630,
+      "format": "WebM VP8 1280x720"
+    },
+    {
+      "journey": "owner-console-operations",
+      "file": "tmp/frontend-proof/videos/owner-console-operations.webm",
+      "duration_seconds": 17.6,
+      "size_bytes": 1366362,
+      "format": "WebM VP8 1280x720"
+    },
+    {
+      "journey": "external-packed-sdk-booking",
+      "file": "tmp/frontend-proof/videos/external-packed-sdk-booking.webm",
+      "duration_seconds": 4.68,
+      "size_bytes": 265487,
+      "format": "WebM VP8 1280x720"
+    }
+  ],
+  "journeys": [
+    {
+      "id": "customer-book-manage-cancel",
+      "classification": "pass",
+      "ui_result": "Customer selected a service, live slot and resource, entered details, confirmed, opened the private management page, and cancelled.",
+      "database_result": "Reservation 9da5ff03-ae56-4d64-8337-03ef94807eff is cancelled with the expected test customer and date."
+    },
+    {
+      "id": "external-sdk-booking",
+      "classification": "pass_with_workaround",
+      "ui_result": "The disposable frontend loaded live catalog and availability and rendered a real confirmation.",
+      "database_result": "Reservation db27d52e-022f-40fe-8feb-65629ea697a3 is confirmed with the expected external test customer and date.",
+      "workaround": "pnpm-workspace.yaml overrides the SDK's unpublished contract-types dependency to the local packed tarball."
+    },
+    {
+      "id": "owner-command-center-surfaces",
+      "classification": "pass",
+      "ui_result": "Overview, reservations, Studio, analytics, system, channels, inbox, AI and email settings rendered through the shipped console."
+    },
+    {
+      "id": "owner-create-appointment",
+      "classification": "product_failure",
+      "ui_result": "The only practitioner option is the disabled placeholder, so Create appointment remains disabled.",
+      "database_result": "The venue has three available resources and zero with platform_staff_id metadata."
+    },
+    {
+      "id": "owner-studio-edit-publish",
+      "classification": "pass_with_ux_defect",
+      "ui_result": "Profile and channel edits saved, preview validated, and Publish was clicked. The page immediately rendered Save a draft first instead of a success confirmation.",
+      "database_result": "Apex Racing Lab Final Proof version 5 is published."
+    },
+    {
+      "id": "owner-whatsapp-simulation-inbox",
+      "classification": "pass",
+      "ui_result": "Simulation produced an automation reply; staff took over, sent a durable reply, and resumed automation.",
+      "database_result": "The newest proof conversation is automated after resume and contains five durable staff messages from repeated proof runs."
+    },
+    {
+      "id": "owner-ai-settings-save",
+      "classification": "configuration_block",
+      "ui_result": "Saving disabled AI settings reports: AI credential encryption is not configured."
+    },
+    {
+      "id": "owner-email-settings-save",
+      "classification": "configuration_block",
+      "ui_result": "Saving disabled email settings reports: Email credential encryption is not configured."
+    },
+    {
+      "id": "owner-staff-access",
+      "classification": "product_failure",
+      "ui_result": "The shipped page renders the generic This page couldn't load error boundary."
+    },
+    {
+      "id": "owner-whatsapp-qr-start",
+      "classification": "product_failure",
+      "ui_result": "Start QR pairing renders the generic This page couldn't load error boundary; no QR payload was logged or committed."
+    }
+  ],
+  "external_provider_limits": [
+    "No real WhatsApp account was paired.",
+    "No real AI provider key was supplied.",
+    "No real SMTP server was supplied."
+  ]
+}

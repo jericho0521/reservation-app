@@ -2,7 +2,7 @@
 
 **Date:** 2026-07-16
 
-**Status:** Conversation design approved; pending written-spec review
+**Status:** Approved for implementation planning
 
 **Product version under test:** `0.2.0`
 

@@ -144,6 +144,91 @@ test("durable inbound persists before enqueue and the worker processes it", asyn
   assert.equal(fixture.appendInputs.at(-1)?.externalMessageId, "ai-reply:message_1");
 });
 
+test("persisted WhatsApp confirmation consumes the latest proposal exactly once", async () => {
+  const fixture = createFixture({ channel: "whatsapp", responder: { content: "Please confirm the 2pm slot.", supported: true, booking: preparedBooking } });
+  const accepted = await acceptConversationInbound({
+    scope,
+    message: { channel: "whatsapp", channelThreadId: "60123@s.whatsapp.net", externalMessageId: "wamid-book", content: "Book the simulator", participant: { channelIdentifier: "60123@s.whatsapp.net" } },
+    conversations: fixture.dependencies.conversations,
+    jobs: { async enqueue() { return { jobId: "job_1" }; } },
+  });
+  assert.equal(accepted.status, 202);
+  const proposed = await processPersistedConversationInbound({
+    scope,
+    conversationId: "conversation_1",
+    messageId: "message_1",
+    dependencies: fixture.dependencies,
+  });
+  assert.equal(proposed.status, 200);
+
+  const firstInbound = await fixture.dependencies.conversations.append(scope, "conversation_1", {
+    channel: "whatsapp",
+    direction: "inbound",
+    senderType: "customer",
+    deliveryState: "delivered",
+    externalMessageId: "wamid-confirm-1",
+    content: "confirm",
+  });
+  const first = await processPersistedConversationInbound({
+    scope,
+    conversationId: "conversation_1",
+    messageId: firstInbound.data!.message_id,
+    dependencies: fixture.dependencies,
+  });
+  assert.equal(first.status, 200);
+  assert.equal("reservation" in first.body && first.body.reservation?.reservation_id, "reservation_1");
+
+  const replayInbound = await fixture.dependencies.conversations.append(scope, "conversation_1", {
+    channel: "whatsapp",
+    direction: "inbound",
+    senderType: "customer",
+    deliveryState: "delivered",
+    externalMessageId: "wamid-confirm-2",
+    content: "confirm",
+  });
+  const replay = await processPersistedConversationInbound({
+    scope,
+    conversationId: "conversation_1",
+    messageId: replayInbound.data!.message_id,
+    dependencies: fixture.dependencies,
+  });
+  assert.equal(replay.status, 200);
+  assert.equal(fixture.createCalls.length, 1);
+  assert.equal(fixture.responderCalls, 2);
+});
+
+test("persisted WhatsApp yes without an active proposal follows the responder path", async () => {
+  const fixture = createFixture({
+    channel: "whatsapp",
+    responder: { content: "Yes — how can I help with your booking?", supported: true },
+  });
+  const accepted = await acceptConversationInbound({
+    scope,
+    message: {
+      channel: "whatsapp",
+      channelThreadId: "60123@s.whatsapp.net",
+      externalMessageId: "wamid-yes-without-proposal",
+      content: "yes",
+      participant: { channelIdentifier: "60123@s.whatsapp.net" },
+    },
+    conversations: fixture.dependencies.conversations,
+    jobs: { async enqueue() { return { jobId: "job_1" }; } },
+  });
+  assert.equal(accepted.status, 202);
+
+  const processed = await processPersistedConversationInbound({
+    scope,
+    conversationId: "conversation_1",
+    messageId: "message_1",
+    dependencies: fixture.dependencies,
+  });
+
+  assert.equal(processed.status, 200);
+  assert.equal(fixture.responderCalls, 1);
+  assert.equal(fixture.messages.at(-1)?.content, "Yes — how can I help with your booking?");
+  assert.equal(fixture.messages.at(-1)?.direction, "outbound");
+});
+
 test("WhatsApp automation replies persist through the durable outbox operation", async () => {
   const fixture = createFixture({ channel: "whatsapp", responder: { content: "Choose a service.", supported: true } });
   let outboxCalls = 0;

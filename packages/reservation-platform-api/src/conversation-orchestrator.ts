@@ -214,6 +214,17 @@ export async function processPersistedConversationInbound(input: {
     if (!inbound || inbound.direction !== "inbound" || inbound.sender_type !== "customer") {
       return failure(404, "not_found", "Persisted conversation message not found.");
     }
+    if (conversationResult.data.channel === "whatsapp" && isExplicitBookingConfirmation(inbound.content)) {
+      const proposal = await input.dependencies.state.loadLatestActive(scope, conversationResult.data.conversation_id);
+      if (proposal) {
+        return confirmConversationBooking({
+          scope,
+          conversationId: conversationResult.data.conversation_id,
+          proposalId: proposal.proposalId,
+          dependencies: input.dependencies,
+        });
+      }
+    }
     return processConversationMessage({
       scope,
       conversation: conversationResult.data,
@@ -225,6 +236,10 @@ export async function processPersistedConversationInbound(input: {
     await safeAudit(input.dependencies.audit, { type: "conversation.workflow.failed", scope });
     return failure(503, "storage_unavailable", "Conversation workflow is temporarily unavailable.", true);
   }
+}
+
+function isExplicitBookingConfirmation(content: string) {
+  return /^(confirm|yes|confirm booking)$/iu.test(content.trim());
 }
 
 async function processConversationMessage(input: {

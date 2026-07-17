@@ -1,8 +1,11 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { mkdtemp, readFile, readdir, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import test from "node:test";
 
 import {
+  createEncryptedBaileysAuthState,
   deserializeBaileysSessionCredentials,
   BaileysWhatsAppSessionAdapter,
   baileysProviderMessageId,
@@ -10,6 +13,47 @@ import {
   nextBaileysReconnectAttempt,
   serializeBaileysSessionCredentials,
 } from "./baileys-adapter.js";
+
+test("Baileys credential and key material is encrypted on disk and survives restart", async () => {
+  const authDirectory = await mkdtemp(path.join(tmpdir(), "reservation-baileys-auth-"));
+  const encryptionKey = "test-session-encryption-key";
+  const privateCredential = "private-credential-material";
+  const signalKey = "signal-key-material";
+  const serialization = {
+    replacer: (_key: string, value: unknown) => value,
+    reviver: (_key: string, value: unknown) => value,
+  };
+
+  try {
+    const first = await createEncryptedBaileysAuthState(authDirectory, encryptionKey, {
+      initAuthCreds: () => ({ privateCredential, registered: false }),
+      bufferJson: serialization,
+      appStateSyncKeyFromObject: (value) => value,
+    });
+    (first.state.creds as { registered: boolean }).registered = true;
+    await first.saveCreds();
+    await first.state.keys.set({ session: { device_1: { signalKey } } });
+
+    const files = await readdir(authDirectory);
+    assert.ok(files.length >= 2);
+    for (const file of files) {
+      const content = await readFile(path.join(authDirectory, file), "utf8");
+      assert.doesNotMatch(content, new RegExp(`${privateCredential}|${signalKey}`, "u"));
+    }
+
+    const restored = await createEncryptedBaileysAuthState(authDirectory, encryptionKey, {
+      initAuthCreds: () => { throw new Error("restart must restore credentials"); },
+      bufferJson: serialization,
+      appStateSyncKeyFromObject: (value) => value,
+    });
+    assert.deepEqual(restored.state.creds, { privateCredential, registered: true });
+    assert.deepEqual(await restored.state.keys.get("session", ["device_1"]), {
+      device_1: { signalKey },
+    });
+  } finally {
+    await rm(authDirectory, { recursive: true, force: true });
+  }
+});
 
 test("Baileys session credentials stay plaintext when encryption is unset", () => {
   const payload = serializeBaileysSessionCredentials("/tmp/whatsapp/session-1");

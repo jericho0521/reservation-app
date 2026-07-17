@@ -1,10 +1,10 @@
 import { createHash } from "node:crypto";
-import { mkdir } from "node:fs/promises";
+import { mkdir, readFile, readdir, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import type { MetadataRecord } from "@reservation-platform/contract-types";
 
-import { decryptJson, encryptJson } from "./crypto.js";
+import { decryptJson, encryptJson, isEncryptedPayload } from "./crypto.js";
 import type { WhatsAppInboundMessage, WhatsAppOutboundMessage } from "./messages.js";
 import type { WhatsAppSessionAdapter } from "./session.js";
 
@@ -20,6 +20,125 @@ export interface BaileysWhatsAppSessionAdapterOptions {
 
 export interface BaileysSessionCredentials {
   auth_directory: string;
+}
+
+export interface EncryptedBaileysAuthStateDependencies {
+  initAuthCreds(): unknown;
+  bufferJson: {
+    replacer(key: string, value: unknown): unknown;
+    reviver(key: string, value: unknown): unknown;
+  };
+  appStateSyncKeyFromObject(value: unknown): unknown;
+}
+
+export interface BaileysAuthStateLike {
+  creds: unknown;
+  keys: {
+    get(type: string, ids: string[]): Promise<Record<string, unknown>>;
+    set(data: Record<string, Record<string, unknown | null | undefined>>): Promise<void>;
+  };
+}
+
+const authFileLocks = new Map<string, Promise<void>>();
+
+export async function createEncryptedBaileysAuthState(
+  folder: string,
+  encryptionKey: string,
+  dependencies: EncryptedBaileysAuthStateDependencies,
+): Promise<{ state: BaileysAuthStateLike; saveCreds: () => Promise<void> }> {
+  await mkdir(folder, { recursive: true });
+  const fixFileName = (file: string) => file.replace(/\//gu, "__").replace(/:/gu, "-");
+
+  const writeData = async (data: unknown, file: string) => {
+    const filePath = path.join(folder, fixFileName(file));
+    await withAuthFileLock(filePath, async () => {
+      const serialized = JSON.stringify(data, dependencies.bufferJson.replacer);
+      await writeFile(filePath, encryptJson(serialized, encryptionKey), "utf8");
+    });
+  };
+  const readData = async (file: string): Promise<unknown | null> => {
+    const filePath = path.join(folder, fixFileName(file));
+    return withAuthFileLock(filePath, async () => {
+      let payload: string;
+      try {
+        payload = await readFile(filePath, "utf8");
+      } catch (error) {
+        if (isFileNotFound(error)) return null;
+        throw error;
+      }
+      const parsed = JSON.parse(payload) as unknown;
+      if (isEncryptedPayload(parsed)) {
+        const serialized = decryptJson<string>(payload, encryptionKey);
+        return JSON.parse(serialized, dependencies.bufferJson.reviver) as unknown;
+      }
+      const legacy = JSON.parse(payload, dependencies.bufferJson.reviver) as unknown;
+      const serialized = JSON.stringify(legacy, dependencies.bufferJson.replacer);
+      await writeFile(filePath, encryptJson(serialized, encryptionKey), "utf8");
+      return legacy;
+    });
+  };
+  const removeData = async (file: string) => {
+    const filePath = path.join(folder, fixFileName(file));
+    await withAuthFileLock(filePath, async () => {
+      try {
+        await unlink(filePath);
+      } catch (error) {
+        if (!isFileNotFound(error)) throw error;
+      }
+    });
+  };
+
+  const existingFiles = await readdir(folder);
+  await Promise.all(existingFiles.filter((file) => file.endsWith(".json")).map((file) => readData(file)));
+  const creds = await readData("creds.json") ?? dependencies.initAuthCreds();
+  return {
+    state: {
+      creds,
+      keys: {
+        async get(type, ids) {
+          const data: Record<string, unknown> = {};
+          await Promise.all(ids.map(async (id) => {
+            let value = await readData(`${type}-${id}.json`);
+            if (type === "app-state-sync-key" && value) {
+              value = dependencies.appStateSyncKeyFromObject(value);
+            }
+            data[id] = value;
+          }));
+          return data;
+        },
+        async set(data) {
+          const tasks: Array<Promise<void>> = [];
+          for (const [category, values] of Object.entries(data)) {
+            for (const [id, value] of Object.entries(values)) {
+              const file = `${category}-${id}.json`;
+              tasks.push(value ? writeData(value, file) : removeData(file));
+            }
+          }
+          await Promise.all(tasks);
+        },
+      },
+    },
+    saveCreds: () => writeData(creds, "creds.json"),
+  };
+}
+
+async function withAuthFileLock<T>(filePath: string, task: () => Promise<T>): Promise<T> {
+  const previous = authFileLocks.get(filePath) ?? Promise.resolve();
+  let release = () => {};
+  const gate = new Promise<void>((resolve) => { release = resolve; });
+  const current = previous.then(() => gate);
+  authFileLocks.set(filePath, current);
+  await previous;
+  try {
+    return await task();
+  } finally {
+    release();
+    if (authFileLocks.get(filePath) === current) authFileLocks.delete(filePath);
+  }
+}
+
+function isFileNotFound(error: unknown) {
+  return typeof error === "object" && error !== null && "code" in error && error.code === "ENOENT";
 }
 
 export function serializeBaileysSessionCredentials(authDirectory: string, encryptionKey?: string): string {
@@ -73,7 +192,9 @@ export class BaileysWhatsAppSessionAdapter implements WhatsAppSessionAdapter {
 
     const sessionDirectory = path.join(this.authDirectory, input.session_id);
     await mkdir(sessionDirectory, { recursive: true });
-    const { state, saveCreds } = await useMultiFileAuthState(sessionDirectory);
+    const { state, saveCreds } = this.sessionEncryptionKey
+      ? await encryptedAuthState(baileys, sessionDirectory, this.sessionEncryptionKey)
+      : await useMultiFileAuthState(sessionDirectory);
 
     return new Promise<{
       qr_code: string;
@@ -106,7 +227,7 @@ export class BaileysWhatsAppSessionAdapter implements WhatsAppSessionAdapter {
               encrypted_credentials: serializeBaileysSessionCredentials(sessionDirectory, this.sessionEncryptionKey),
               metadata: {
                 adapter: "baileys",
-                session_storage: "multi-file",
+                session_storage: this.sessionEncryptionKey ? "encrypted-multi-file" : "multi-file",
                 ...input.metadata,
               },
             });
@@ -179,7 +300,9 @@ export class BaileysWhatsAppSessionAdapter implements WhatsAppSessionAdapter {
       ? deserializeBaileysSessionCredentials(input.encrypted_credentials, this.sessionEncryptionKey).auth_directory
       : path.join(this.authDirectory, input.session_id);
     await mkdir(sessionDirectory, { recursive: true });
-    const { state, saveCreds } = await useMultiFileAuthState(sessionDirectory);
+    const { state, saveCreds } = this.sessionEncryptionKey
+      ? await encryptedAuthState(baileys, sessionDirectory, this.sessionEncryptionKey)
+      : await useMultiFileAuthState(sessionDirectory);
 
     return new Promise<{
       status: "pending_qr" | "connected" | "disconnected" | "expired";
@@ -193,7 +316,7 @@ export class BaileysWhatsAppSessionAdapter implements WhatsAppSessionAdapter {
           settled = true;
           resolve({
             status: "disconnected",
-            metadata: { adapter: "baileys", session_storage: "multi-file", restore_timeout: true },
+            metadata: { adapter: "baileys", session_storage: this.sessionEncryptionKey ? "encrypted-multi-file" : "multi-file", restore_timeout: true },
           });
         }
       }, this.qrTimeoutMs);
@@ -215,7 +338,7 @@ export class BaileysWhatsAppSessionAdapter implements WhatsAppSessionAdapter {
               status: "pending_qr",
               qr_code: update.qr,
               encrypted_credentials: serializeBaileysSessionCredentials(sessionDirectory, this.sessionEncryptionKey),
-              metadata: { adapter: "baileys", session_storage: "multi-file", ...input.metadata },
+              metadata: { adapter: "baileys", session_storage: this.sessionEncryptionKey ? "encrypted-multi-file" : "multi-file", ...input.metadata },
             });
             return;
           }
@@ -228,7 +351,7 @@ export class BaileysWhatsAppSessionAdapter implements WhatsAppSessionAdapter {
               resolve({
                 status: "connected",
                 encrypted_credentials: serializeBaileysSessionCredentials(sessionDirectory, this.sessionEncryptionKey),
-                metadata: { adapter: "baileys", session_storage: "multi-file", restored: true, ...input.metadata },
+                metadata: { adapter: "baileys", session_storage: this.sessionEncryptionKey ? "encrypted-multi-file" : "multi-file", restored: true, ...input.metadata },
               });
             }
             return;
@@ -243,7 +366,7 @@ export class BaileysWhatsAppSessionAdapter implements WhatsAppSessionAdapter {
                 settled = true;
                 resolve({
                   status: "expired",
-                  metadata: { adapter: "baileys", session_storage: "multi-file", disconnect_status: disconnectStatus },
+                  metadata: { adapter: "baileys", session_storage: this.sessionEncryptionKey ? "encrypted-multi-file" : "multi-file", disconnect_status: disconnectStatus },
                 });
               }
               return;
@@ -267,7 +390,7 @@ export class BaileysWhatsAppSessionAdapter implements WhatsAppSessionAdapter {
                 status: "disconnected",
                 metadata: {
                   adapter: "baileys",
-                  session_storage: "multi-file",
+                  session_storage: this.sessionEncryptionKey ? "encrypted-multi-file" : "multi-file",
                   ...(disconnectStatus === undefined ? {} : { disconnect_status: disconnectStatus }),
                   reconnect_attempts: attempt,
                 },
@@ -320,6 +443,20 @@ export class BaileysWhatsAppSessionAdapter implements WhatsAppSessionAdapter {
       console.error("WhatsApp status change handler failed.", error);
     }
   }
+}
+
+function encryptedAuthState(
+  baileys: typeof import("@whiskeysockets/baileys"),
+  folder: string,
+  encryptionKey: string,
+) {
+  return createEncryptedBaileysAuthState(folder, encryptionKey, {
+    initAuthCreds: () => baileys.initAuthCreds(),
+    bufferJson: baileys.BufferJSON,
+    appStateSyncKeyFromObject: (value) => baileys.proto.Message.AppStateSyncKeyData.fromObject(
+      value as Record<string, unknown>,
+    ),
+  });
 }
 
 export function baileysProviderMessageId(value: unknown): string | undefined {

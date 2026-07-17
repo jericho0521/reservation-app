@@ -152,7 +152,7 @@ test("installation onboarding contracts require a business, timezone, and first 
     locations: [{
       location_id: "11111111-1111-4111-8111-111111111111",
       name: input.location.name,
-      address: input.location.address,
+      address: null,
       timezone: input.timezone,
     }],
   }).success, true);
@@ -481,6 +481,14 @@ test("reservationResponseSchema accepts minimal responses and rejects request-on
     quantity: 1,
     unexpected_request_only_field: true,
   }).success, false);
+  assert.equal(reservationResponseSchema.safeParse({
+    reservation_id: "reservation-1",
+    service_id: "service-1",
+    status: "confirmed",
+    quantity: 1,
+    management_link_status: "unavailable",
+    management_reissue_required: true,
+  }).success, true);
 });
 
 test("platformErrorResponseSchema preserves public error metadata", () => {

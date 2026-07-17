@@ -304,7 +304,7 @@ export const installationLocationPatchSchema = strictObject({
 export const installationLocationResponseSchema = strictObject({
   location_id: z.string().uuid(),
   name: z.string().min(1),
-  address: z.string().optional(),
+  address: z.string().nullable().optional(),
   timezone: z.string().min(1),
 });
 
@@ -782,6 +782,8 @@ export const reservationResponseSchema = strictObject({
   updated_at: z.string().optional(),
   management_token: z.string().min(32).optional(),
   management_expires_at: z.string().optional(),
+  management_link_status: z.enum(["issued", "unavailable"]).optional(),
+  management_reissue_required: z.boolean().optional(),
 });
 
 export const transitionAppointmentInputSchema = strictObject({

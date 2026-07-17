@@ -1598,7 +1598,17 @@ test("resource maintenance repository owns Supabase lifecycle query shapes", asy
       error: null,
     },
     { data: { id: "resource-1", service_id: "service-1", label: "Room A" }, error: null },
-    { data: { total_seats: 1, selection_mode: "assigned_resource" }, error: null },
+    {
+      data: {
+        total_seats: 2,
+        selection_mode: "assigned_resource",
+        resources: [
+          { label: "Room A", status: "available" },
+          { label: "Room B", status: "inactive" },
+        ],
+      },
+      error: null,
+    },
     { data: null, error: createError },
     { data: { id: "maintenance-1", service_id: "service-1", seat_label: "Room A" }, error: null },
   ];
@@ -1671,9 +1681,19 @@ test("resource maintenance repository owns Supabase lifecycle query shapes", asy
   ]);
   assert.deepEqual(resolved, { serviceId: "service-1", label: "Room A" });
   assert.deepEqual(service, {
-    data: { total_seats: 1, selection_mode: "assigned_resource" },
+    data: {
+      total_seats: 2,
+      selection_mode: "assigned_resource",
+      resources: [
+        { label: "Room A", status: "available", is_active: true },
+        { label: "Room B", status: "inactive", is_active: false },
+      ],
+    },
     error: null,
   });
+  assert.match(RESERVATION_SUPABASE_SELECTS.resourceMaintenanceService, /reservable_resources\(label, status\)/u);
+  assert.doesNotMatch(RESERVATION_SUPABASE_SELECTS.availabilityResource, /\bis_active\b/u);
+  assert.doesNotMatch(RESERVATION_SUPABASE_SELECTS.resource, /\bis_active\b/u);
   assert.equal(created.error, createError);
   assert.deepEqual(ended.data, {
     id: "maintenance-1",

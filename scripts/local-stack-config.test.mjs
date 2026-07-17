@@ -19,6 +19,8 @@ test("local stack config is generated once and remains stable", async () => {
   assert.deepEqual(second, first);
   assert.notEqual(first.anonToken, first.serviceRoleToken);
   assert.match(first.apiEnv, /^RESERVATION_SUPABASE_URL=http:\/\/reservation-gateway$/mu);
+  assert.match(first.apiEnv, /^RESERVATION_INSTALLATION_MASTER_KEY=\S+$/mu);
+  assert.equal(first.installationMasterKey.length >= 32, true);
   assert.match(first.consoleEnv, /^RESERVATION_CONSOLE_TENANT_ID=final_demo$/mu);
   assert.match(first.bookingEnv, /^RESERVATION_PLATFORM_PUBLIC_BASE_URL=http:\/\/localhost:4100$/mu);
 
@@ -34,6 +36,20 @@ test("generated PostgREST tokens have valid distinct role claims", async () => {
 
   assertJwt(config.anonToken, config.jwtSecret, "anon");
   assertJwt(config.serviceRoleToken, config.jwtSecret, "service_role");
+});
+
+test("existing local stack config is upgraded with an installation master key", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "reservation-stack-upgrade-"));
+  const initial = await ensureLocalStackConfig(directory);
+  await writeFile(
+    join(directory, "api.env"),
+    initial.apiEnv.replace(/^RESERVATION_INSTALLATION_MASTER_KEY=.*\n/mu, ""),
+    { mode: 0o600 },
+  );
+
+  const upgraded = await ensureLocalStackConfig(directory);
+  assert.equal(upgraded.installationMasterKey.length >= 32, true);
+  assert.match(upgraded.apiEnv, /^RESERVATION_INSTALLATION_MASTER_KEY=\S+$/mu);
 });
 
 test("generated service files expose only the values each service needs", async () => {

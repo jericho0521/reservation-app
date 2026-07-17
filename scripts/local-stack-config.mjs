@@ -30,6 +30,15 @@ export async function ensureLocalStackConfig(
   await mkdir(directory, { recursive: true, mode: 0o700 });
   const existing = await existingConfigFileNames(directory);
   if (existing.length === localStackConfigFileNames.length) {
+    const apiEnvPath = path.join(directory, "api.env");
+    const apiEnv = await readFile(apiEnvPath, "utf8");
+    if (!/^RESERVATION_INSTALLATION_MASTER_KEY=\S+$/mu.test(apiEnv)) {
+      await writePrivateFile(
+        directory,
+        "api.env",
+        `${apiEnv.trimEnd()}\nRESERVATION_INSTALLATION_MASTER_KEY=${randomSecret()}\n`,
+      );
+    }
     if (options.applyContainerOwnership === true) {
       await applyContainerOwnership(directory);
     }
@@ -43,6 +52,7 @@ export async function ensureLocalStackConfig(
   const jwtSecret = randomSecret();
   const serviceApiKey = randomSecret();
   const whatsappEncryptionKey = randomSecret();
+  const installationMasterKey = randomSecret();
   const anonToken = signLocalJwt({ role: "anon", iss: "reservation-local-stack" }, jwtSecret);
   const serviceRoleToken = signLocalJwt({ role: "service_role", iss: "reservation-local-stack" }, jwtSecret);
   const databaseUrl = `postgresql://postgres:${databasePassword}@reservation-db:5432/reservation`;
@@ -63,6 +73,7 @@ export async function ensureLocalStackConfig(
       RESERVATION_SUPABASE_ANON_KEY: anonToken,
       RESERVATION_SUPABASE_SERVICE_ROLE_KEY: serviceRoleToken,
       RESERVATION_PLATFORM_SERVICE_API_KEY: serviceApiKey,
+      RESERVATION_INSTALLATION_MASTER_KEY: installationMasterKey,
       RESERVATION_PLATFORM_CORS_ALLOWED_ORIGINS:
         "http://localhost:4300,http://127.0.0.1:4300,http://localhost:4400,http://127.0.0.1:4400",
       RESERVATION_WHATSAPP_ENABLED: "true",
@@ -101,6 +112,7 @@ export async function ensureLocalStackConfig(
     jwtSecret,
     serviceApiKey,
     whatsappEncryptionKey,
+    installationMasterKey,
     anonToken,
     serviceRoleToken,
     apiEnv: files["api.env"],
@@ -131,6 +143,7 @@ async function readLocalStackConfig(directory) {
     jwtSecret,
     serviceApiKey: readEnvValue(apiEnv, "RESERVATION_PLATFORM_SERVICE_API_KEY"),
     whatsappEncryptionKey: readEnvValue(apiEnv, "RESERVATION_WHATSAPP_SESSION_ENCRYPTION_KEY"),
+    installationMasterKey: readEnvValue(apiEnv, "RESERVATION_INSTALLATION_MASTER_KEY"),
     anonToken: readEnvValue(apiEnv, "RESERVATION_SUPABASE_ANON_KEY"),
     serviceRoleToken: readEnvValue(apiEnv, "RESERVATION_SUPABASE_SERVICE_ROLE_KEY"),
     apiEnv,

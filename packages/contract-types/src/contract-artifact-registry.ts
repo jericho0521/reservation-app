@@ -600,6 +600,8 @@ export const publicJsonSchemaDefinitions: Record<string, JsonSchema> = {
     updated_at: stringSchema,
     management_token: stringSchema,
     management_expires_at: stringSchema,
+    management_link_status: { type: "string", enum: ["issued", "unavailable"] },
+    management_reissue_required: booleanSchema,
   }, ["reservation_id", "status", "service_id", "quantity"]),
   ListReservationsQuery: objectSchema({
     tenant_id: stringSchema,

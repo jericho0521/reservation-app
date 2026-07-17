@@ -164,7 +164,7 @@ export interface InstallationLocationPatch {
 export interface InstallationLocationResponse {
   location_id: string;
   name: string;
-  address?: string;
+  address?: string | null;
   timezone: string;
 }
 
@@ -803,6 +803,8 @@ export interface ReservationResponse {
   updated_at?: string;
   management_token?: string;
   management_expires_at?: string;
+  management_link_status?: "issued" | "unavailable";
+  management_reissue_required?: boolean;
 }
 
 export type AppointmentStatus = "pending" | "confirmed" | "completed" | "cancelled" | "no_show";

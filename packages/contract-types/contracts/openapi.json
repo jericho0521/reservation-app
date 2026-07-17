@@ -3151,6 +3151,16 @@
           "management_expires_at": {
             "type": "string"
           },
+          "management_link_status": {
+            "enum": [
+              "issued",
+              "unavailable"
+            ],
+            "type": "string"
+          },
+          "management_reissue_required": {
+            "type": "boolean"
+          },
           "management_token": {
             "type": "string"
           },

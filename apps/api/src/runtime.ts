@@ -409,7 +409,7 @@ export function createStandaloneSupabaseDependencies(
       releaseVersion: options.releaseVersion?.trim() || "development",
       migrationVersion: options.migrationVersion?.trim() || "000037",
       diskProbe: readRootDiskUsage,
-    }, rateLimitRepository: systemOperationsRepository } : {}),
+    }, rateLimitRepository: systemOperationsRepository, operationalEventSink: systemOperationsRepository } : {}),
     ...(managedConversationOrchestrator ? { conversationOrchestrator: managedConversationOrchestrator } : conversationOrchestrator ? { conversationOrchestrator } : {}),
     ...(integrationCredentialEncryptor ? { integrationCredentialEncryptor } : {}),
     ...(integrationCredentialDecryptor ? { integrationCredentialDecryptor } : {}),

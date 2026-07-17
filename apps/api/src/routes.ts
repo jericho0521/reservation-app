@@ -214,6 +214,14 @@ export interface StandaloneApiDependencies {
   platformJobQueue?: Pick<PlatformJobRepository, "enqueue">;
   appointmentReminderMinutes?: number;
   operatingHoursRepository?: OperatingHoursRepository;
+  operationalEventSink?: {
+    recordEvent(input: {
+      component: string;
+      eventCode: string;
+      level: "info" | "warn" | "error";
+      metadata?: Readonly<Record<string, unknown>>;
+    }): Promise<unknown>;
+  };
   operationsOverviewRepository?: OperationsOverviewRepository;
   reservationCreateRepository?: ReservationCreateRepositoryPort;
   reservationMutationRepository?: ReservationMutationRepositoryPort;
@@ -2333,12 +2341,49 @@ async function handlePublicExperienceReservationCreateRequest(
         ...(response.body as Record<string, unknown>),
         management_token: management.token,
         management_expires_at: management.expiresAt,
+        management_link_status: "issued",
+        management_reissue_required: false,
       });
     } catch {
-      return response;
+      const reservationId = (response.body as Record<string, unknown>).reservation_id as string;
+      await recordManagementLinkIssuanceFailure(dependencies, {
+        tenantId: services.scope.tenantId,
+        venueId: services.scope.venueId,
+        reservationId,
+      });
+      return jsonResponse(201, {
+        ...(response.body as Record<string, unknown>),
+        management_link_status: "unavailable",
+        management_reissue_required: true,
+      });
     }
   }
   return response;
+}
+
+async function recordManagementLinkIssuanceFailure(
+  dependencies: StandaloneApiDependencies,
+  input: { tenantId: string; venueId: string; reservationId: string },
+) {
+  try {
+    await dependencies.operationalEventSink?.recordEvent({
+      component: "api",
+      eventCode: "reservation_management_token_issue_failed",
+      level: "error",
+      metadata: {
+        tenant_id: input.tenantId,
+        venue_id: input.venueId,
+        reservation_id: input.reservationId,
+      },
+    });
+  } catch {
+    console.error(JSON.stringify({
+      level: "error",
+      component: "api",
+      event: "reservation_management_token_issue_audit_failed",
+      errorCode: "reservation_management_token_issue_audit_failed",
+    }));
+  }
 }
 
 async function handlePublicReservationManagementRequest(

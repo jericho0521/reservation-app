@@ -132,9 +132,9 @@ function adaptReservation(value: unknown): ReservationResponse {
 
 function firstRecord(value: unknown) {
   const candidate = Array.isArray(value) ? value[0] : value;
-  return candidate === null || candidate === undefined
-    ? undefined
-    : asRecord(candidate, "conversation proposal");
+  if (candidate === null || candidate === undefined) return undefined;
+  const record = asRecord(candidate, "conversation proposal");
+  return Object.values(record).every((field) => field === null) ? undefined : record;
 }
 
 function asRecord(value: unknown, label: string): Record<string, unknown> {

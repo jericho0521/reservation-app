@@ -1172,6 +1172,56 @@ test("public booking creates only against a published venue service and scopes i
   assert.notEqual((managementIssue as { tokenHash?: string }).tokenHash, body.management_token);
 });
 
+test("public booking reports and audits degraded management-link issuance", async () => {
+  const serviceId = "11111111-1111-4111-8111-111111111111";
+  const events: unknown[] = [];
+  const response = await handleStandaloneApiRequest({
+    method: "POST",
+    path: "/v1/public/experiences/apex-racing/reservations",
+    headers: { "Idempotency-Key": "public_booking_degraded_123" },
+    body: {
+      service_id: serviceId,
+      date: "2026-07-20",
+      start_time: "09:00",
+      end_time: "10:00",
+      quantity: 1,
+      customer: { name: "Alex", email: "alex@example.com" },
+    },
+  }, {
+    experienceStudioRepository: fakeExperienceRepository(),
+    catalogRepository: catalogRepository({
+      async listServices() {
+        return { data: [{ id: serviceId, venue_id: "venue_1", name: "Sprint Session", is_active: true }] };
+      },
+    }),
+    idempotencyRepository: new InMemoryIdempotencyRepository(),
+    reservationCreateRepository: reservationCreateRepository(),
+    reservationManagementRepository: reservationManagementRepository({
+      issue: async () => ({ error: { code: "storage_unavailable" } }),
+    }),
+    operationalEventSink: {
+      async recordEvent(event) {
+        events.push(event);
+        return {};
+      },
+    },
+  });
+
+  assert.equal(response.status, 201);
+  assert.equal((response.body as { management_link_status?: string }).management_link_status, "unavailable");
+  assert.equal((response.body as { management_reissue_required?: boolean }).management_reissue_required, true);
+  assert.deepEqual(events, [{
+    component: "api",
+    eventCode: "reservation_management_token_issue_failed",
+    level: "error",
+    metadata: {
+      tenant_id: "tenant_1",
+      venue_id: "venue_1",
+      reservation_id: serviceId,
+    },
+  }]);
+});
+
 test("public management routes read, reschedule, and replay cancellation without owner auth", async () => {
   const token = "abcdefghijklmnopqrstuvwxyzABCDEFGH123456789";
   const calls: string[] = [];

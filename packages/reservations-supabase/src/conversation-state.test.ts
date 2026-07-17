@@ -83,6 +83,27 @@ test("expired proposals cannot be claimed", async () => {
   assert.equal(calls.length, 1);
 });
 
+test("latest active proposal treats PostgREST null composite rows as empty", async () => {
+  const store = createSupabaseConversationBookingStateStore({
+    async rpc() {
+      return {
+        data: [{
+          tenant_id: null,
+          venue_id: null,
+          conversation_id: null,
+          proposal_id: null,
+          booking: null,
+          status: null,
+          reservation: null,
+        }],
+        error: null,
+      };
+    },
+  });
+
+  assert.equal(await store.loadLatestActive(scope, proposal.conversationId), undefined);
+});
+
 test("adapter maps RPC parameters and hides storage error details", async () => {
   const calls: unknown[] = [];
   const store = createSupabaseConversationBookingStateStore({

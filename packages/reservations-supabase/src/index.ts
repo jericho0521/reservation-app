@@ -84,15 +84,15 @@ export const RESERVATION_SUPABASE_SELECTS = {
     "id, service_id, user_name, user_email, user_phone, booking_date, start_time, end_time, seats_booked, seat_labels, status, interface_type, staff_id",
   reservationCompatibility: "*, services(name)",
   availabilityResource:
-    "id, service_id, label, kind, is_active, capacity, metadata",
+    "id, service_id, label, resource_kind, status, capacity, metadata",
   availabilityLayout: "layout_kind, metadata",
   resource:
-    "id, service_id, label, resource_label, kind, resource_kind, status, is_active, capacity, metadata",
+    "id, service_id, label, resource_kind, status, capacity, metadata",
   layout: "layout_kind, kind, metadata",
   maintenance: "seat_label",
   resourceMaintenanceResource: "id, service_id, label",
   resourceMaintenanceService:
-    "total_seats, selection_mode, reservation_policy, resources:reservable_resources(label, is_active)",
+    "total_seats, selection_mode, reservation_policy, resources:reservable_resources(label, status)",
   resourceMaintenance:
     "id, service_id, seat_label, reason, is_active, updated_at",
   availabilityRule:
@@ -1135,8 +1135,19 @@ export function createSupabaseResourceMaintenanceRepository(
         .select(RESERVATION_SUPABASE_SELECTS.resourceMaintenanceService)
         .eq("id", serviceId);
       if (venueId) query = query.eq("venue_id", venueId);
-      return query
-        .single() as Promise<QueryResult<unknown>>;
+      const result = await query.single() as QueryResult<unknown>;
+      if (result.error || !isRecord(result.data)) return result;
+      return {
+        ...result,
+        data: {
+          ...result.data,
+          resources: Array.isArray(result.data.resources)
+            ? result.data.resources.map((resource) => isRecord(resource)
+                ? { ...resource, is_active: resource.status !== "inactive" }
+                : resource)
+            : result.data.resources,
+        },
+      };
     },
 
     async createMaintenance(row, venueId) {

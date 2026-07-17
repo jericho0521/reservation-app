@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "description": "Frontend-safe TypeScript client for the reservation platform API.",
   "type": "module",
-  "license": "UNLICENSED",
+  "license": "MIT",
   "author": "Project Play maintainers",
   "repository": {
     "type": "git",

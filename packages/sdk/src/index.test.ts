@@ -1056,6 +1056,7 @@ test("SDK package manifest keeps runtime dependencies minimal", async () => {
   ) as {
     dependencies?: Record<string, string>;
     devDependencies?: Record<string, string>;
+    license?: string;
   };
 
   assert.deepEqual(Object.keys(packageJson.dependencies ?? {}).sort(), [
@@ -1063,6 +1064,7 @@ test("SDK package manifest keeps runtime dependencies minimal", async () => {
   ]);
   assert.equal(packageJson.devDependencies?.typescript !== undefined, true);
   assert.equal(packageJson.devDependencies?.tsx !== undefined, true);
+  assert.equal(packageJson.license, "MIT");
 });
 
 async function listSourceFiles(directoryUrl: URL): Promise<URL[]> {

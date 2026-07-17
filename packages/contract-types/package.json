@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "description": "Public DTO and error contracts for the reservation platform API and SDK.",
   "type": "module",
-  "license": "UNLICENSED",
+  "license": "MIT",
   "author": "Project Play maintainers",
   "repository": {
     "type": "git",

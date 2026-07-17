@@ -760,9 +760,11 @@ test("contract-types package manifest keeps runtime dependencies minimal", async
   ) as {
     dependencies?: Record<string, string>;
     devDependencies?: Record<string, string>;
+    license?: string;
   };
 
   assert.deepEqual(Object.keys(packageJson.dependencies ?? {}).sort(), ["zod"]);
   assert.equal(packageJson.devDependencies?.typescript !== undefined, true);
   assert.equal(packageJson.devDependencies?.tsx !== undefined, true);
+  assert.equal(packageJson.license, "MIT");
 });

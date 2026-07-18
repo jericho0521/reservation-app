@@ -1,6 +1,6 @@
 {
   "name": "@reservation-platform/contract-types",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Public DTO and error contracts for the reservation platform API and SDK.",
   "type": "module",
   "license": "MIT",

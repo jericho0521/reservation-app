@@ -257,9 +257,8 @@ function buildInstallCommand(config, packageSpecs = config.packageSpecs) {
   }
 
   return {
-    command: "corepack",
+    command: "pnpm",
     args: [
-      "pnpm",
       "add",
       "--ignore-workspace",
       "--ignore-scripts",
@@ -471,11 +470,14 @@ async function loadDisposableRegistryPackages(packageSpecs) {
 }
 
 async function addLocalZodPackage(packages) {
-  const zodPackageDir = path.join(repoRoot, "node_modules", "zod");
-  const zodPackageJsonPath = path.join(zodPackageDir, "package.json");
-  if (!existsSync(zodPackageJsonPath)) {
+  const zodPackageDir = [
+    path.join(repoRoot, "node_modules", "zod"),
+    path.join(repoRoot, "packages", "contract-types", "node_modules", "zod"),
+  ].find((candidate) => existsSync(path.join(candidate, "package.json")));
+  if (!zodPackageDir) {
     throw new Error("Disposable registry proof requires local node_modules/zod. Run pnpm install first.");
   }
+  const zodPackageJsonPath = path.join(zodPackageDir, "package.json");
 
   const zodPackageJson = JSON.parse(await readFile(zodPackageJsonPath, "utf8"));
   const tempDir = await mkdtemp(path.join(os.tmpdir(), "reservation-sdk-registry-zod-"));

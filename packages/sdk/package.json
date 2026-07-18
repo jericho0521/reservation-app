@@ -1,6 +1,6 @@
 {
   "name": "@reservation-platform/sdk",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Frontend-safe TypeScript client for the reservation platform API.",
   "type": "module",
   "license": "MIT",

@@ -295,6 +295,58 @@ test("standalone Supabase env factory wires manifest-enabled WhatsApp without le
   assert.equal(readiness.simulation_enabled, true);
 });
 
+test("enabled AI without provider credentials degrades to deterministic runtimes", async () => {
+  const whatsappDependencies = createStandaloneSupabaseDependenciesFromEnv({
+    RESERVATION_WHATSAPP_ALLOW_MEMORY_STORE: "true",
+    RESERVATION_WHATSAPP_SIMULATION_ENABLED: "true",
+  }, {
+    platformConfig: racingSimPlatformConfig(),
+    createClient() {
+      throw new Error("createClient should not be called for WhatsApp memory store");
+    },
+  });
+  const whatsappReadiness = await whatsappDependencies.whatsappModule?.readiness() as {
+    provider_ready?: boolean;
+    production_ready?: boolean;
+    ai?: { healthy?: boolean; message?: string };
+  };
+
+  assert.equal(whatsappReadiness.provider_ready, false);
+  assert.equal(whatsappReadiness.production_ready, false);
+  assert.equal(whatsappReadiness.ai?.healthy, false);
+  assert.match(whatsappReadiness.ai?.message ?? "", /configure an AI provider/iu);
+
+  const config = racingSimPlatformConfig();
+  const webDependencies = createStandaloneSupabaseDependenciesFromEnv({
+    RESERVATION_SUPABASE_URL: "https://example.supabase.co",
+    RESERVATION_SUPABASE_ANON_KEY: "anon-key",
+    RESERVATION_SUPABASE_SERVICE_ROLE_KEY: "service-role-key",
+  }, {
+    platformConfig: {
+      ...config,
+      modules: {
+        ...config.modules,
+        whatsapp: {
+          enabled: false,
+          provider: "session_qr",
+          automation: {
+            enabled: false,
+            mode: "booking_assistant",
+            staffTakeover: {
+              enabled: true,
+              autoMessageOnTakeover: false,
+            },
+          },
+        },
+      },
+    },
+    createClient: (_url, key) => fakeSupabaseClient(key),
+    repositoryFactories: recordingRepositoryFactories([]),
+  });
+
+  assert.ok(webDependencies.conversationOrchestrator);
+});
+
 test("standalone Supabase env factory hides staff reply routes when manifest disables staff takeover", () => {
   const dependencies = createStandaloneSupabaseDependenciesFromEnv({
     RESERVATION_WHATSAPP_ALLOW_MEMORY_STORE: "true",

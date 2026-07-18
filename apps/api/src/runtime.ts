@@ -10,7 +10,6 @@ import {
   decryptSecretEnvelope,
   encryptSecretEnvelope,
   loadPlatformRuntimeConfigFromEnv,
-  PlatformRuntimeConfigError,
   platformConfigPathEnvName,
   type PlatformRuntimeConfig,
 } from "@reservation-platform/platform-config";
@@ -532,9 +531,6 @@ export function createStandaloneSupabaseDependenciesFromEnv(
 
   const supabaseDependencies = createStandaloneSupabaseDependencies(config, runtimeOptions);
   const agentRuntime = createWebChatAgentRuntime(env, platformConfig, options.fetch);
-  if (platformConfig?.modules.ai.enabled && !agentRuntime && !supabaseDependencies.aiRuntimeLoader) {
-    throw new PlatformRuntimeConfigError(["modules.ai.enabled requires AI_AGENT_API_KEY plus provider baseUrl and model"]);
-  }
   const conversationOrchestrator = createWebChatOrchestrator(
     supabaseDependencies,
     agentRuntime,
@@ -874,9 +870,6 @@ export function standaloneWhatsAppDependenciesFromEnv(
   const agentRuntime = platformConfig
     ? createWhatsAppAgentRuntimeFromSettings(aiSettings, env, { fetch: options.fetch })
     : createWhatsAppAgentRuntimeFromEnv(env, { fetch: options.fetch });
-  if (platformConfig?.modules.ai.enabled && !agentRuntime) {
-    throw new PlatformRuntimeConfigError(["modules.ai.enabled requires AI_AGENT_API_KEY plus provider baseUrl and model"]);
-  }
   const reservationTools = platformDependencies.catalogRepository &&
       platformDependencies.availabilityRepository &&
       platformDependencies.reservationCreateRepository

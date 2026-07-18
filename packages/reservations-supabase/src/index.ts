@@ -70,7 +70,7 @@ export const RESERVATION_SUPABASE_SELECTS = {
   platformTenant: "id, name, metadata",
   venueContext: "id, tenant_id",
   catalogVenue: "*",
-  catalogVenueWithEquipment: "*, equipment(*)",
+  catalogVenueWithEquipment: "*",
   catalogServiceWithResources: `
   *,
   resources:reservable_resources(id, service_id, label, resource_kind, status, capacity, metadata),
@@ -546,7 +546,7 @@ export function createSupabasePlatformCatalogRepository(
         await fromTable(publicClient, RESERVATION_SUPABASE_TABLES.venues)
           .select(RESERVATION_SUPABASE_SELECTS.catalogVenueWithEquipment)
           .eq("id", id)
-          .single() as QueryResult<unknown>,
+          .maybeSingle() as QueryResult<unknown>,
       );
     },
 

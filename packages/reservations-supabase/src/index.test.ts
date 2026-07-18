@@ -347,7 +347,7 @@ test("catalog repository uses public and admin Supabase clients for query shapes
       select: RESERVATION_SUPABASE_SELECTS.catalogVenueWithEquipment,
       filters: [{ column: "id", value: "venue-1" }],
       orders: [],
-      cardinality: "single",
+      cardinality: "maybeSingle",
     },
     {
       client: "admin",
@@ -365,6 +365,7 @@ test("catalog repository uses public and admin Supabase clients for query shapes
       cardinality: "maybeSingle",
     },
   ]);
+  assert.equal(RESERVATION_SUPABASE_SELECTS.catalogVenueWithEquipment, "*");
 });
 
 test("catalog repository does not create admin client for public catalog reads", async () => {

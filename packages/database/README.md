@@ -58,13 +58,13 @@ database.
 Run the bundle verifier from the repo root:
 
 ```sh
-corepack pnpm run database:verify-migration-bundle
+pnpm run database:verify-migration-bundle
 ```
 
 Run the package-local plan/contract tests from the repo root:
 
 ```sh
-corepack pnpm --filter @reservation-platform/database run test
+pnpm --filter @reservation-platform/database run test
 ```
 
 The verifier first checks `migration-index.json` for deterministic path, order,

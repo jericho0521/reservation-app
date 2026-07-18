@@ -87,8 +87,8 @@ Each demo should document:
 ```powershell
 node --import tsx --test components/form/SeatMap.test.ts
 node --test scripts/dev-platform-config.test.mjs
-corepack pnpm run packages:test
-corepack pnpm run build
+pnpm run packages:test
+pnpm run build
 ```
 
 These commands are safe for verification. They may write normal build/test cache

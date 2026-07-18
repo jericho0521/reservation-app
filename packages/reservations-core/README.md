@@ -73,7 +73,7 @@ Until package names and registry publishing are approved, generate internal
 tarballs from the repository root:
 
 ```powershell
-corepack pnpm run packages:pack
+pnpm run packages:pack
 ```
 
 This is safe to run in the current workspace. It builds package declarations
@@ -84,7 +84,7 @@ Install the core package into a separate consumer app from the generated
 tarball:
 
 ```powershell
-corepack pnpm add C:\path\to\reservation-app\dist-packages\project-play-reservations-core-0.0.0.tgz
+pnpm add C:\path\to\reservation-app\dist-packages\project-play-reservations-core-0.0.0.tgz
 ```
 
 The consumer should import from `@project-play/reservations-core` only, not

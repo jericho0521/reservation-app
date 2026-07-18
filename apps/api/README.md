@@ -120,11 +120,11 @@ configuration and must not be exposed through `NEXT_PUBLIC_*` or browser
 bundles.
 
 The standalone deployment config contract is checked by
-`corepack pnpm run backend-platform:verify-standalone-deployment-config`.
+`pnpm run backend-platform:verify-standalone-deployment-config`.
 The default command is CI-safe: it parses env only, performs no network calls,
 does not deploy, and exits successfully with a `SKIPPED` message when the
 standalone deployment env is absent. The strict variant,
-`corepack pnpm run backend-platform:verify-standalone-deployment-config:strict`,
+`pnpm run backend-platform:verify-standalone-deployment-config:strict`,
 fails closed when required deployment config is absent or malformed. A strict
 standalone deployment config requires complete backend-only Supabase env plus
 at least one auth mechanism: `RESERVATION_PLATFORM_SERVICE_API_KEY` or complete
@@ -164,7 +164,7 @@ provider-backed chat, a live deployment, or a separate repository extraction.
 Run from the repository root:
 
 ```powershell
-corepack pnpm run backend-platform:verify-standalone-api-skeleton
+pnpm run backend-platform:verify-standalone-api-skeleton
 ```
 
 This is safe to run in the current repo. It builds the platform package types
@@ -172,13 +172,13 @@ needed by the skeleton, type-checks this app, runs its route tests, and checks
 the source-boundary assertions.
 
 ```powershell
-corepack pnpm run backend-platform:verify-standalone-deployment-config
+pnpm run backend-platform:verify-standalone-deployment-config
 ```
 
 This is also safe to run in the current repo. It validates the standalone
 backend deployment/runtime env contract only. It performs no network calls,
 does not deploy, and skips when unconfigured. Use
-`corepack pnpm run backend-platform:verify-standalone-deployment-config:strict`
+`pnpm run backend-platform:verify-standalone-deployment-config:strict`
 only in environments where the required standalone backend deployment env is
 expected to be present; it intentionally fails when that config is missing or
 malformed.
@@ -186,7 +186,7 @@ malformed.
 To start the optional local Node server after the package has been built:
 
 ```powershell
-corepack pnpm --filter @reservation-platform/standalone-api-skeleton run build
+pnpm --filter @reservation-platform/standalone-api-skeleton run build
 node apps/api/dist/server.js
 ```
 

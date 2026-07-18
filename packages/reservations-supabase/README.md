@@ -145,7 +145,7 @@ Until package names and registry publishing are approved, generate internal
 tarballs from the repository root:
 
 ```powershell
-corepack pnpm run packages:pack
+pnpm run packages:pack
 ```
 
 This is safe to run in the current workspace. It builds package declarations
@@ -155,7 +155,7 @@ publish packages or touch production data.
 Install the adapter with the matching core tarball in the consumer app:
 
 ```powershell
-corepack pnpm add C:\path\to\reservation-app\dist-packages\project-play-reservations-core-0.0.0.tgz C:\path\to\reservation-app\dist-packages\reservation-platform-api-0.0.0.tgz C:\path\to\reservation-app\dist-packages\project-play-reservations-supabase-0.0.0.tgz @supabase/supabase-js@^2.90.1
+pnpm add C:\path\to\reservation-app\dist-packages\project-play-reservations-core-0.0.0.tgz C:\path\to\reservation-app\dist-packages\reservation-platform-api-0.0.0.tgz C:\path\to\reservation-app\dist-packages\project-play-reservations-supabase-0.0.0.tgz @supabase/supabase-js@^2.90.1
 ```
 
 The adapter declares `@project-play/reservations-core` and

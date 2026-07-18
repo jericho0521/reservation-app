@@ -80,7 +80,7 @@ For legacy internal tarball verification, generate artifacts from the repository
 root:
 
 ```powershell
-corepack pnpm run packages:pack
+pnpm run packages:pack
 ```
 
 This is safe to run in the current workspace. It builds package declarations
@@ -91,7 +91,7 @@ Legacy compatibility fixtures may install this package with the matching
 reservation core tarball:
 
 ```powershell
-corepack pnpm add C:\path\to\reservation-app\dist-packages\project-play-reservation-chat-core-0.0.0.tgz C:\path\to\reservation-app\dist-packages\project-play-reservations-core-0.0.0.tgz
+pnpm add C:\path\to\reservation-app\dist-packages\project-play-reservation-chat-core-0.0.0.tgz C:\path\to\reservation-app\dist-packages\project-play-reservations-core-0.0.0.tgz
 ```
 
 The package declares `@project-play/reservations-core` as a peer dependency, so

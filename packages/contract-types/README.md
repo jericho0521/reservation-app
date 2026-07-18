@@ -17,7 +17,7 @@ tree:
 
 They are generated from `src/contract-artifact-registry.ts`, a package-local
 registry for the public `/v1` DTO and endpoint surface. Run
-`corepack pnpm --filter @reservation-platform/contract-types run contracts:generate`
+`pnpm --filter @reservation-platform/contract-types run contracts:generate`
 after changing the registry, then use
-`corepack pnpm --filter @reservation-platform/contract-types run contracts:check`
+`pnpm --filter @reservation-platform/contract-types run contracts:check`
 to verify committed artifacts are current.

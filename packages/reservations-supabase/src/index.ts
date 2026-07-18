@@ -67,7 +67,7 @@ export const RESERVATION_SUPABASE_TABLES = {
 } as const;
 
 export const RESERVATION_SUPABASE_SELECTS = {
-  platformTenant: "id",
+  platformTenant: "id, name, metadata",
   venueContext: "id, tenant_id",
   catalogVenue: "*",
   catalogVenueWithEquipment: "*, equipment(*)",

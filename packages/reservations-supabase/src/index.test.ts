@@ -1509,7 +1509,7 @@ test("tenant venue repository reads tenant and venue context rows", async () => 
   const client = createContextReadClient(
     {
       [RESERVATION_SUPABASE_TABLES.platformTenants]: {
-        data: { id: "tenant-1" },
+        data: { id: "tenant-1", name: "Reservation Business", metadata: { plan: "starter" } },
         error: null,
       },
       [RESERVATION_SUPABASE_TABLES.venues]: {
@@ -1524,9 +1524,13 @@ test("tenant venue repository reads tenant and venue context rows", async () => 
   const tenant = await repository.getTenant("tenant-1");
   const venue = await repository.getVenue("venue-1");
 
-  assert.deepEqual(tenant, { data: { id: "tenant-1" } });
+  assert.deepEqual(tenant, {
+    data: { id: "tenant-1", name: "Reservation Business", metadata: { plan: "starter" } },
+  });
   assert.deepEqual(venue, { data: { id: "venue-1", tenant_id: "tenant-1" } });
   assert.match(RESERVATION_SUPABASE_SELECTS.venueContext, /\btenant_id\b/);
+  assert.match(RESERVATION_SUPABASE_SELECTS.platformTenant, /\bname\b/u);
+  assert.match(RESERVATION_SUPABASE_SELECTS.platformTenant, /\bmetadata\b/u);
   assert.deepEqual(calls, [
     {
       table: RESERVATION_SUPABASE_TABLES.platformTenants,

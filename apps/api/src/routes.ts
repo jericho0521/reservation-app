@@ -498,6 +498,27 @@ export async function handleStandaloneApiRequest(
     }
   }
 
+  if (method === "GET" && path === "/v1/tenants/current") {
+    const tenantId = getHeader(request.headers, "X-Reservation-Tenant-Id")?.trim();
+    if (!tenantId) return platformError(400, "validation_failed", "Missing tenant context.");
+    if (!dependencies.tenantVenueRepository) {
+      return platformError(503, "internal_error", "Tenant storage is not configured.");
+    }
+    try {
+      const result = await dependencies.tenantVenueRepository.getTenant(tenantId);
+      if (result.error) return platformError(500, "internal_error", "Tenant could not be read.");
+      if (!isPlainRecord(result.data)) return platformError(404, "not_found", "Tenant was not found.");
+      const metadata = toMetadataRecord(result.data.metadata);
+      return jsonResponse(200, {
+        tenant_id: tenantId,
+        ...(typeof result.data.name === "string" ? { name: result.data.name } : {}),
+        ...(metadata ? { metadata } : {}),
+      });
+    } catch {
+      return platformError(500, "internal_error", "Tenant could not be read.");
+    }
+  }
+
   if (path === "/v1/integrations/email" && (method === "GET" || method === "PUT")) {
     const principal = request.authenticatedPrincipal;
     if (!principal) return platformError(401, "unauthorized", "Authentication is required.");
@@ -1737,6 +1758,7 @@ type RouteMatcher = string | RegExp | ((path: string) => boolean);
 
 const protectedRouteMetadata: Readonly<Record<string, readonly RouteMatcher[]>> = {
   GET: [
+    "/v1/tenants/current",
     "/v1/installation/business", "/v1/locations",
     "/v1/integrations/email", "/v1/integrations/ai",
     "/v1/experience/presets", "/v1/experience/workspace", "/v1/experience/validation",
@@ -3906,6 +3928,18 @@ function getStringField(record: Record<string, unknown>, fieldName: string) {
 function readMetadataField(record: Record<string, unknown>): MetadataRecord | undefined {
   const metadata = record.metadata;
   return isPlainRecord(metadata) ? metadata as MetadataRecord : undefined;
+}
+
+function toMetadataRecord(value: unknown): MetadataRecord | undefined {
+  if (!isPlainRecord(value)) return undefined;
+  const entries = Object.entries(value).filter(
+    (entry): entry is [string, string | number | boolean | null] =>
+      entry[1] === null
+      || typeof entry[1] === "string"
+      || typeof entry[1] === "boolean"
+      || (typeof entry[1] === "number" && Number.isFinite(entry[1])),
+  );
+  return entries.length > 0 ? Object.fromEntries(entries) : undefined;
 }
 
 function readWhatsAppConfigPatch(record: Record<string, unknown>):

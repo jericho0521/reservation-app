@@ -53,6 +53,7 @@ import {
   staffInvitationResponseSchema,
   listStaffResponseSchema,
   staffAccessPatchSchema,
+  updateReservationPatchSchema,
 } from "./index.js";
 
 test("analytics response validates bounded appointment operations breakdowns", () => {
@@ -489,6 +490,26 @@ test("reservationResponseSchema accepts minimal responses and rejects request-on
     management_link_status: "unavailable",
     management_reissue_required: true,
   }).success, true);
+});
+
+test("updateReservationPatchSchema exposes only the supported compatibility fields", () => {
+  assert.equal(updateReservationPatchSchema.safeParse({
+    customer: { name: "Alex", email: "alex@example.com" },
+    status: "confirmed",
+  }).success, true);
+
+  for (const unsupported of [
+    { notes: "Window seat" },
+    { metadata: { source: "import" } },
+    { source: "web" },
+    { payment_reference: { provider: "stripe", reference: "pi_123" } },
+    { customer: { phone: "+60123456789" } },
+    { status: "pending" },
+    { status: "no_show" },
+    { status: "invented" },
+  ]) {
+    assert.equal(updateReservationPatchSchema.safeParse(unsupported).success, false);
+  }
 });
 
 test("platformErrorResponseSchema preserves public error metadata", () => {

@@ -3894,6 +3894,43 @@ test("service-token auth leaves metadata route unprotected", async () => {
   assert.equal(metadata.status, 200);
 });
 
+test("GET /v1/tenants/current returns the authenticated installation tenant", async () => {
+  const handler = createStandaloneApiHandler({
+    auth: { serviceApiKey: "platform-service-secret", requireTenant: true },
+    tenantVenueRepository: tenantVenueRepository({
+      async getTenant(id) {
+        return {
+          data: {
+            id,
+            name: "Reservation Business",
+            metadata: {
+              plan: "starter",
+              nested: { should_not: "escape" },
+              tags: ["private"],
+            },
+          },
+        };
+      },
+    }),
+  });
+
+  const response = await handler({
+    method: "GET",
+    path: "/v1/tenants/current",
+    headers: {
+      Authorization: "Bearer platform-service-secret",
+      "X-Reservation-Tenant-Id": "tenant_1",
+    },
+  });
+
+  assert.equal(response.status, 200);
+  assert.deepEqual(response.body, {
+    tenant_id: "tenant_1",
+    name: "Reservation Business",
+    metadata: { plan: "starter" },
+  });
+});
+
 test("service-token auth can require tenant context before repository work", async () => {
   let repositoryCalled = false;
   const handler = createStandaloneApiHandler({

@@ -822,12 +822,11 @@ export const listReservationsResponseSchema = strictObject({
 });
 
 export const updateReservationPatchSchema = strictObject({
-  customer: customerSnapshotSchema.optional(),
-  notes: z.string().optional(),
-  metadata: metadataRecordSchema.optional(),
-  status: z.string().optional(),
-  source: z.string().optional(),
-  payment_reference: paymentReferenceSchema.optional(),
+  customer: strictObject({
+    name: z.string().optional(),
+    email: z.string().email().optional(),
+  }).optional(),
+  status: z.enum(["confirmed", "completed", "cancelled"]).optional(),
 });
 
 export const cancelReservationInputSchema = strictObject({

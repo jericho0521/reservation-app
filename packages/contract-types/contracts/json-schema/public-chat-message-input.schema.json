@@ -3670,21 +3670,23 @@
       "additionalProperties": false,
       "properties": {
         "customer": {
-          "$ref": "#/$defs/CustomerSnapshot"
-        },
-        "metadata": {
-          "$ref": "#/$defs/MetadataRecord"
-        },
-        "notes": {
-          "type": "string"
-        },
-        "payment_reference": {
-          "$ref": "#/$defs/PaymentReference"
-        },
-        "source": {
-          "type": "string"
+          "additionalProperties": false,
+          "properties": {
+            "email": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            }
+          },
+          "type": "object"
         },
         "status": {
+          "enum": [
+            "confirmed",
+            "completed",
+            "cancelled"
+          ],
           "type": "string"
         }
       },

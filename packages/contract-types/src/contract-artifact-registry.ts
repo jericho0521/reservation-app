@@ -622,12 +622,11 @@ export const publicJsonSchemaDefinitions: Record<string, JsonSchema> = {
     summary: ref("ReservationListSummary"),
   }, ["reservations"]),
   UpdateReservationPatch: objectSchema({
-    customer: ref("CustomerSnapshot"),
-    notes: stringSchema,
-    metadata: ref("MetadataRecord"),
-    status: stringSchema,
-    source: stringSchema,
-    payment_reference: ref("PaymentReference"),
+    customer: objectSchema({
+      name: stringSchema,
+      email: stringSchema,
+    }),
+    status: { type: "string", enum: ["confirmed", "completed", "cancelled"] },
   }),
   CancelReservationInput: objectSchema({
     reason: stringSchema,

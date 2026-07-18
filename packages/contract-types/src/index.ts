@@ -852,12 +852,11 @@ export interface ListReservationsResponse {
 }
 
 export interface UpdateReservationPatch {
-  customer?: CustomerSnapshot;
-  notes?: string;
-  metadata?: MetadataRecord;
-  status?: string;
-  source?: string;
-  payment_reference?: PaymentReference;
+  customer?: {
+    name?: string;
+    email?: string;
+  };
+  status?: "confirmed" | "completed" | "cancelled";
 }
 
 export interface CancelReservationInput {

@@ -3705,21 +3705,23 @@
         "additionalProperties": false,
         "properties": {
           "customer": {
-            "$ref": "#/components/schemas/CustomerSnapshot"
-          },
-          "metadata": {
-            "$ref": "#/components/schemas/MetadataRecord"
-          },
-          "notes": {
-            "type": "string"
-          },
-          "payment_reference": {
-            "$ref": "#/components/schemas/PaymentReference"
-          },
-          "source": {
-            "type": "string"
+            "additionalProperties": false,
+            "properties": {
+              "email": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "type": "object"
           },
           "status": {
+            "enum": [
+              "confirmed",
+              "completed",
+              "cancelled"
+            ],
             "type": "string"
           }
         },

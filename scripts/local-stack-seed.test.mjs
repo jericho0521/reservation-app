@@ -35,3 +35,18 @@ test("browser release fixtures persist only hashes of loopback-only capabilities
   }
   assert.match(seed, /local-browser-fixture-disabled-login/u);
 });
+
+test("final demo appointment practitioners have profile, location, service, and resource links", async () => {
+  const seed = await readFile(new URL("../packages/database/seeds/final-demo.sql", import.meta.url), "utf8");
+
+  assert.match(seed, /insert into public\.platform_staff_profiles/u);
+  assert.match(seed, /insert into public\.platform_staff_locations/u);
+  assert.match(seed, /insert into public\.platform_staff_services/u);
+  for (const staffId of [
+    "00000000-0000-4000-8000-000000000801",
+    "00000000-0000-4000-8000-000000000802",
+  ]) {
+    assert.match(seed, new RegExp(`"platform_staff_id":"${staffId}"`, "u"));
+  }
+  assert.match(seed, /'appointment'\);/u);
+});

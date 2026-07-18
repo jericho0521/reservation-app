@@ -83,13 +83,23 @@ export function createSupabaseExperienceStudioRepository(
   }
 
   async function saveDraft(scope: ExperienceScope, input: ExperienceDraftInput) {
+    const existingProfileResult = await client
+      .from(BUSINESS_PROFILES_TABLE)
+      .select("*")
+      .eq("tenant_id", scope.tenantId)
+      .eq("venue_id", scope.venueId)
+      .maybeSingle();
+    assertQuerySucceeded(existingProfileResult, "Failed to read experience business profile.");
+    const existingProfile = existingProfileResult.data
+      ? adaptBusinessProfileRow(existingProfileResult.data)
+      : undefined;
     const profileResult = await client
       .from(BUSINESS_PROFILES_TABLE)
       .upsert({
         tenant_id: scope.tenantId,
         venue_id: scope.venueId,
-        name: input.branding.brand_name,
-        public_slug: toPublicSlug(input.branding.brand_name),
+        name: existingProfile?.name ?? input.branding.brand_name,
+        public_slug: existingProfile?.public_slug ?? toPublicSlug(input.branding.brand_name),
         preset_id: input.preset_id,
       }, { onConflict: "tenant_id,venue_id" })
       .select("*")

@@ -117,6 +117,7 @@ test("save preserves an existing draft version", async () => {
   const calls: Array<[string, unknown]> = [];
   const repository = createSupabaseExperienceStudioRepository(fakeClient(calls, [
     { data: profileRow(), error: null },
+    { data: profileRow(), error: null },
     { data: [configurationRow("draft"), configurationRow("published")], error: null },
     { data: configurationRow("draft"), error: null },
     { data: profileRow(), error: null },
@@ -127,7 +128,7 @@ test("save preserves an existing draft version", async () => {
     { tenantId: "tenant_1", venueId: "venue_1" },
     {
       preset_id: "racing_gaming",
-      branding: { brand_name: "Apex Racing" },
+      branding: { brand_name: "New Marketing Name" },
       terminology: { customer: "Driver", resource: "Simulator", booking: "Session" },
       channels: { web_booking: true, web_chat: false, whatsapp: false },
     },
@@ -137,6 +138,12 @@ test("save preserves an existing draft version", async () => {
     Record<string, unknown>,
     unknown,
   ];
+  const profileUpsert = calls.filter(([name]) => name === "upsert")[0][1] as [
+    Record<string, unknown>,
+    unknown,
+  ];
+  assert.equal(profileUpsert[0].name, "Apex Racing");
+  assert.equal(profileUpsert[0].public_slug, "apex-racing");
   assert.equal(configurationUpsert[0].id, "config_1");
   assert.equal(configurationUpsert[0].version, 2);
 });
@@ -146,6 +153,7 @@ test("save creates a draft after the highest published version", async () => {
   const published = { ...configurationRow("published"), version: 4 };
   const draft = { ...configurationRow("draft"), id: "new_draft", version: 5 };
   const repository = createSupabaseExperienceStudioRepository(fakeClient(calls, [
+    { data: profileRow(), error: null },
     { data: profileRow(), error: null },
     { data: [published], error: null },
     { data: draft, error: null },

@@ -12,4 +12,4 @@ sudo ./install.sh --domain booking.example.com
 
 The wrapper validates the bundle and digest-qualified image evidence before delegating to `scripts/production/install.sh`. It derives the release version from the verified manifest and does not accept an image tag from the operator.
 
-Required bundle entries include `release-manifest.json`, `SHA256SUMS`, `verify-signatures.sh`, the production Compose/Caddy configuration, and the `scripts/production` installer assets.
+Required bundle entries include `release-manifest.json`, `SHA256SUMS`, `verify-signatures.sh`, the production Compose/Caddy configuration, the `scripts/production` installer assets, and matching `@reservation-platform/sdk` and `@reservation-platform/contract-types` tarballs under `packages/`.

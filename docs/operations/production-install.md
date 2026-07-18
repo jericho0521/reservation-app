@@ -12,7 +12,7 @@ Prepare all of the following:
 - Docker Engine running for the root user and Docker Compose v2 available as `docker compose`.
 - A public DNS name whose A record resolves directly to the VPS public IP.
 - Inbound TCP ports 80 and 443, and inbound UDP port 443, allowed by the VPS and provider firewalls.
-- An extracted reservation-platform release bundle for the exact version recorded in its `release-manifest.json` (the current source candidate is `0.1.0`).
+- An extracted reservation-platform release bundle for the exact version recorded in its `release-manifest.json` (the current source candidate is `0.2.0`).
 - Access to the release images in `ghcr.io/jericho0521` when the registry requires authentication.
 
 The installer supports x86-64 only. It rejects a Docker Compose v1 binary, occupied public ports, private or mismatched DNS, and hosts below the minimum memory or disk limits before writing `/opt/reservation-platform`.
@@ -44,7 +44,7 @@ Change to the root of the extracted release bundle, then run:
 ```bash
 sudo ./scripts/production/install.sh \
   --domain book.example.com \
-  --release 0.1.0 \
+  --release 0.2.0 \
   --host-ip 203.0.113.10
 ```
 
@@ -69,7 +69,7 @@ If installation stops after this installation's Caddy container has claimed port
 sudo ./scripts/production/install.sh \
   --resume \
   --domain book.example.com \
-  --release 0.1.0 \
+  --release 0.2.0 \
   --host-ip 203.0.113.10
 ```
 

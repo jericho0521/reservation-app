@@ -18,7 +18,10 @@ test("built standalone console serves the installed admin base path without doub
   timeout: 30_000,
 }, async (t) => {
   const manifest = JSON.parse(await readFile(middlewareManifest, "utf8"));
-  assert.equal(manifest.middleware["/"].matchers[0].originalSource, "/:path*");
+  assert.deepEqual(
+    manifest.middleware["/"].matchers.map(({ originalSource }) => originalSource),
+    ["/", "/((?!_next/static|_next/image|favicon.ico).*)"],
+  );
 
   const port = await availablePort();
   const origin = `http://127.0.0.1:${port}`;

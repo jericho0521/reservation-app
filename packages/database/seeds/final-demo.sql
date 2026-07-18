@@ -1,12 +1,14 @@
 -- Deterministic final demonstration dataset for local/allowlisted databases only.
 begin;
 
+delete from public.platform_installation where tenant_id = 'final_demo';
 delete from public.platform_sessions where user_id in (
   select id from public.platform_users where tenant_id = 'final_demo'
 );
 delete from public.platform_audit_events where tenant_id = 'final_demo';
 delete from public.platform_user_venue_assignments where tenant_id = 'final_demo';
 delete from public.platform_users where tenant_id = 'final_demo';
+delete from public.platform_conversation_booking_proposals where tenant_id = 'final_demo';
 delete from public.bookings where service_id in (
   '00000000-0000-4000-8000-000000000201', '00000000-0000-4000-8000-000000000202', '00000000-0000-4000-8000-000000000203'
 );
@@ -24,6 +26,8 @@ delete from public.venues where tenant_id = 'final_demo';
 delete from public.tenants where id = 'final_demo';
 
 insert into public.tenants (id, name) values ('final_demo', 'Final Demonstration');
+insert into public.platform_installation (id, singleton, tenant_id, domain, setup_completed_at) values
+  ('00000000-0000-4000-8000-000000000901', true, 'final_demo', 'localhost', now());
 insert into public.venues (id, tenant_id, name) values
   ('00000000-0000-4000-8000-000000000101', 'final_demo', 'Apex Racing Lab'),
   ('00000000-0000-4000-8000-000000000102', 'final_demo', 'Harbour Rooms'),

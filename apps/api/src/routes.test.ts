@@ -216,6 +216,56 @@ test("setup and login issue secure cookies without exposing session tokens", asy
   }
 });
 
+test("local login can issue loopback HTTP cookies when explicitly configured", async () => {
+  const response = await handleStandaloneApiRequest({
+    method: "POST", path: "/v1/auth/login", headers: { origin: "http://127.0.0.1:4300" },
+    body: { email: "owner@example.com", password: "correct horse battery staple" },
+  }, {
+    sessionAuth: {
+      repositories: authRepository({
+        readInstallation: async () => ({
+          installationId: "installation-1",
+          tenantId: "tenant-1",
+          domain: "localhost",
+          setupCompleted: true,
+        }),
+      }),
+      allowedOrigins: ["http://127.0.0.1:4300"],
+      secureCookies: false,
+      passwordHasher: { hash: async () => "$argon2id$hash", verify: async () => true },
+      tokenFactory: () => "s".repeat(43),
+      csrfTokenFactory: () => "c".repeat(43),
+    },
+  });
+
+  assert.equal(response.status, 200);
+  assert.deepEqual(response.headers["set-cookie"], [
+    `reservation_session=${"s".repeat(43)}; Path=/; HttpOnly; SameSite=Strict; Max-Age=43200`,
+    `reservation_csrf=${"c".repeat(43)}; Path=/; SameSite=Strict; Max-Age=43200`,
+  ]);
+
+  const logout = await handleStandaloneApiRequest({
+    method: "POST",
+    path: "/v1/auth/logout",
+    headers: {
+      origin: "http://127.0.0.1:4300",
+      cookie: `reservation_session=${"s".repeat(43)}; reservation_csrf=${"c".repeat(43)}`,
+      "x-csrf-token": "c".repeat(43),
+    },
+  }, {
+    sessionAuth: {
+      repositories: authRepository(),
+      allowedOrigins: ["http://127.0.0.1:4300"],
+      secureCookies: false,
+    },
+  });
+  assert.equal(logout.status, 204);
+  assert.deepEqual(logout.headers["set-cookie"], [
+    "reservation_session=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0",
+    "reservation_csrf=; Path=/; SameSite=Strict; Max-Age=0",
+  ]);
+});
+
 test("login returns the same generic 401 for unknown email and wrong password", async () => {
   const bodies = [];
   for (const repositories of [authRepository({ findUserByEmail: async () => undefined }), authRepository()]) {

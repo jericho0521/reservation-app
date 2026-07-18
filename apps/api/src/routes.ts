@@ -241,6 +241,7 @@ export interface StandaloneApiDependencies {
 export interface StandaloneSessionAuthConfig {
   repositories: PlatformSessionRepository & StaffRepository;
   allowedOrigins: readonly string[];
+  secureCookies?: boolean;
   passwordHasher?: PasswordHasher;
   tokenFactory?: () => string;
   csrfTokenFactory?: () => string;
@@ -1237,7 +1238,7 @@ async function handleSessionAuthRoute(
       await logoutSession({ token, repositories: sessionAuth.repositories, now: sessionAuth.now?.() });
       return {
         status: 204,
-        headers: { "set-cookie": clearSessionCookies() },
+        headers: { "set-cookie": clearSessionCookies(sessionAuth.secureCookies !== false) },
         body: undefined,
       };
     }
@@ -1413,7 +1414,7 @@ function sessionCreatedResponse(
     ...jsonResponse(status, authenticatedSessionBody({ ...result.principal, expiresAt: result.expiresAt })),
     headers: {
       "content-type": "application/json; charset=utf-8",
-      "set-cookie": sessionCookies(result.token, csrfToken),
+      "set-cookie": sessionCookies(result.token, csrfToken, sessionAuth.secureCookies !== false),
     },
   };
 }
@@ -1444,17 +1445,19 @@ function staffUserBody(user: Awaited<ReturnType<typeof updateStaffAccess>>) {
   };
 }
 
-function sessionCookies(sessionToken: string, csrfToken: string): string[] {
+function sessionCookies(sessionToken: string, csrfToken: string, secure: boolean): string[] {
+  const secureAttribute = secure ? " Secure;" : "";
   return [
-    `${sessionCookieName}=${sessionToken}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=${sessionMaxAgeSeconds}`,
-    `${csrfCookieName}=${csrfToken}; Path=/; Secure; SameSite=Strict; Max-Age=${sessionMaxAgeSeconds}`,
+    `${sessionCookieName}=${sessionToken}; Path=/; HttpOnly;${secureAttribute} SameSite=Strict; Max-Age=${sessionMaxAgeSeconds}`,
+    `${csrfCookieName}=${csrfToken}; Path=/;${secureAttribute} SameSite=Strict; Max-Age=${sessionMaxAgeSeconds}`,
   ];
 }
 
-function clearSessionCookies(): string[] {
+function clearSessionCookies(secure: boolean): string[] {
+  const secureAttribute = secure ? " Secure;" : "";
   return [
-    `${sessionCookieName}=; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=0`,
-    `${csrfCookieName}=; Path=/; Secure; SameSite=Strict; Max-Age=0`,
+    `${sessionCookieName}=; Path=/; HttpOnly;${secureAttribute} SameSite=Strict; Max-Age=0`,
+    `${csrfCookieName}=; Path=/;${secureAttribute} SameSite=Strict; Max-Age=0`,
   ];
 }
 

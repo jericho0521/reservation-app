@@ -34,6 +34,14 @@ test("browser release fixtures persist only hashes of loopback-only capabilities
     assert.match(seed, new RegExp(createHash("sha256").update(token).digest("hex"), "u"));
   }
   assert.match(seed, /local-browser-fixture-disabled-login/u);
+  assert.match(
+    seed,
+    /insert into public\.platform_installation[\s\S]*'final_demo', 'localhost', now\(\)/u,
+  );
+  assert.ok(
+    seed.indexOf("delete from public.platform_installation") < seed.indexOf("delete from public.tenants"),
+    "the local installation must be deleted before its referenced tenant",
+  );
 });
 
 test("final demo appointment practitioners have profile, location, service, and resource links", async () => {
@@ -46,6 +54,10 @@ test("final demo appointment practitioners have profile, location, service, and 
   assert.ok(
     seed.indexOf("delete from public.bookings") < seed.indexOf("delete from public.platform_staff_profiles"),
     "bookings must be deleted before their referenced staff profiles",
+  );
+  assert.ok(
+    seed.indexOf("delete from public.platform_conversation_booking_proposals") < seed.indexOf("delete from public.bookings"),
+    "confirmed conversation proposals must be deleted before their referenced bookings",
   );
   assert.ok(
     seed.indexOf("delete from public.platform_audit_events") < seed.indexOf("delete from public.platform_users"),

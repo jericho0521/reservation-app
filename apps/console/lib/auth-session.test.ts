@@ -127,11 +127,12 @@ test("middleware derives trusted route headers and compiles relative to the admi
   assert.deepEqual(JSON.parse(probe.stdout), [true, true, true, true, false, false]);
 });
 
-test("browser auth forms use same-origin cookie requests and replace token-bearing history", async () => {
-  const [login, setup, middleware, layout, locationAction, locationPage, onboardingPage] = await Promise.all([
+test("browser auth forms use the same-origin API proxy and replace token-bearing history", async () => {
+  const [login, setup, middleware, nextConfig, layout, locationAction, locationPage, onboardingPage] = await Promise.all([
     readFile(new URL("../components/auth/login-form.tsx", import.meta.url), "utf8"),
     readFile(new URL("../components/auth/setup-owner-form.tsx", import.meta.url), "utf8"),
     readFile(new URL("../middleware.ts", import.meta.url), "utf8"),
+    readFile(new URL("../next.config.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/location/actions.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/location/page.tsx", import.meta.url), "utf8"),
@@ -146,6 +147,10 @@ test("browser auth forms use same-origin cookie requests and replace token-beari
     assert.doesNotMatch(source, /localStorage|sessionStorage|console\./u);
   }
   assert.match(setup, /history\.replaceState\(null, "", "\/admin\/setup"\)/u);
+  assert.match(nextConfig, /process\.env\.RESERVATION_PLATFORM_BASE_URL/u);
+  assert.match(nextConfig, /source: "\/v1\/:path\*"/u);
+  assert.match(nextConfig, /destination: `\$\{platformBaseUrl\}\/v1\/:path\*`/u);
+  assert.match(nextConfig, /basePath: false/u);
   assert.match(middleware, /pathname\.startsWith\("\/admin\/_next\/"\)/u);
   assert.match(middleware, /matcher: \["\/", "\/\(\(\?!_next\/static\|_next\/image\|favicon\.ico\)\.\*\)"\]/u);
   assert.match(layout, /getSession\(\)/u);

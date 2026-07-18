@@ -31,12 +31,18 @@ export async function ensureLocalStackConfig(
   const existing = await existingConfigFileNames(directory);
   if (existing.length === localStackConfigFileNames.length) {
     const apiEnvPath = path.join(directory, "api.env");
-    const apiEnv = await readFile(apiEnvPath, "utf8");
+    let apiEnv = await readFile(apiEnvPath, "utf8");
     if (!/^RESERVATION_INSTALLATION_MASTER_KEY=\S+$/mu.test(apiEnv)) {
+      apiEnv = `${apiEnv.trimEnd()}\nRESERVATION_INSTALLATION_MASTER_KEY=${randomSecret()}\n`;
+    }
+    if (!/^RESERVATION_SESSION_COOKIE_SECURE=\S+$/mu.test(apiEnv)) {
+      apiEnv = `${apiEnv.trimEnd()}\nRESERVATION_SESSION_COOKIE_SECURE=false\n`;
+    }
+    if (apiEnv !== await readFile(apiEnvPath, "utf8")) {
       await writePrivateFile(
         directory,
         "api.env",
-        `${apiEnv.trimEnd()}\nRESERVATION_INSTALLATION_MASTER_KEY=${randomSecret()}\n`,
+        apiEnv,
       );
     }
     if (options.applyContainerOwnership === true) {
@@ -76,6 +82,7 @@ export async function ensureLocalStackConfig(
       RESERVATION_INSTALLATION_MASTER_KEY: installationMasterKey,
       RESERVATION_PLATFORM_CORS_ALLOWED_ORIGINS:
         "http://localhost:4300,http://127.0.0.1:4300,http://localhost:4400,http://127.0.0.1:4400",
+      RESERVATION_SESSION_COOKIE_SECURE: "false",
       RESERVATION_WHATSAPP_ENABLED: "true",
       RESERVATION_WHATSAPP_PROVIDER: "session_qr",
       RESERVATION_WHATSAPP_SESSION_AUTH_DIR: "/app/.reservation-whatsapp-sessions",

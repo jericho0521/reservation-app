@@ -17,13 +17,41 @@ import {
   createStandaloneSupabaseDependencies,
   createStandaloneSupabaseDependenciesFromEnv,
   createConversationBookingTools,
+  readSessionSecureCookiesFromEnv,
   StandaloneSupabaseConfigError,
+  StandaloneSessionCookieConfigError,
   standaloneWhatsAppDependenciesFromEnv,
   type StandaloneSupabaseClient,
   type StandaloneSupabaseClientFactory,
   type StandaloneSupabasePublicAdminClients,
   type StandaloneSupabaseRepositoryFactories,
 } from "./runtime.js";
+
+test("session cookies stay secure unless an all-loopback HTTP configuration opts out", () => {
+  assert.equal(readSessionSecureCookiesFromEnv({}), true);
+  assert.equal(readSessionSecureCookiesFromEnv({
+    RESERVATION_SESSION_COOKIE_SECURE: "true",
+    RESERVATION_PLATFORM_CORS_ALLOWED_ORIGINS: "https://console.example",
+  }), true);
+  assert.equal(readSessionSecureCookiesFromEnv({
+    RESERVATION_SESSION_COOKIE_SECURE: "false",
+    RESERVATION_PLATFORM_CORS_ALLOWED_ORIGINS: "http://localhost:4300,http://127.0.0.1:4400",
+  }), false);
+});
+
+test("insecure session cookies reject invalid values and non-loopback origins", () => {
+  assert.throws(() => readSessionSecureCookiesFromEnv({
+    RESERVATION_SESSION_COOKIE_SECURE: "sometimes",
+  }), StandaloneSessionCookieConfigError);
+  assert.throws(() => readSessionSecureCookiesFromEnv({
+    RESERVATION_SESSION_COOKIE_SECURE: "false",
+    RESERVATION_PLATFORM_CORS_ALLOWED_ORIGINS: "https://console.example",
+  }), /allowed only with loopback HTTP origins/u);
+  assert.throws(() => readSessionSecureCookiesFromEnv({
+    RESERVATION_SESSION_COOKIE_SECURE: "false",
+    RESERVATION_PLATFORM_CORS_ALLOWED_ORIGINS: "http://localhost:4300,https://console.example",
+  }), /allowed only with loopback HTTP origins/u);
+});
 
 test("public chat booking tools keep the published venue through validation, availability, and creation", async () => {
   const serviceId = "123e4567-e89b-42d3-a456-426614174000";

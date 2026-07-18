@@ -116,6 +116,37 @@ pnpm install
 This is safe for local development. It installs workspace dependencies from the
 lockfile and does not publish packages or touch production data.
 
+## Test The Complete Local Docker Product
+
+Start the database, API, worker, owner console, and public booking application:
+
+```bash
+pnpm run stack:up
+pnpm run stack:owner
+```
+
+The second command asks for your owner name, email, password, and password
+confirmation. It hashes the password with the platform's Argon2id
+implementation and updates only the guarded `final_demo` installation. No
+default password is committed or printed.
+
+Open `http://127.0.0.1:4300/admin/login` and sign in with the credentials you
+just created. Use `http://127.0.0.1:4400/apex-racing-demo` for the customer
+booking experience. The local stack permits non-`Secure` session cookies only
+for its explicit loopback HTTP origins; production keeps `Secure` cookies by
+default.
+
+Resetting the deterministic demo removes the chosen owner password and all
+sessions:
+
+```bash
+pnpm run stack:reset
+pnpm run stack:owner
+```
+
+Run `stack:owner` again after every reset. Manual acceptance must use the login
+form; fixture cookies are reserved for automated browser tests.
+
 ## Start The Backend
 
 Start the local Supabase/Postgres database first:

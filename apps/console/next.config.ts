@@ -3,10 +3,21 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
+const platformBaseUrl = process.env.RESERVATION_PLATFORM_BASE_URL?.trim().replace(/\/+$/u, "")
+  || "http://reservation-api:4100";
 
 const nextConfig: NextConfig = {
   output: "standalone",
   basePath: "/admin",
+  async rewrites() {
+    return {
+      beforeFiles: [{
+        source: "/v1/:path*",
+        destination: `${platformBaseUrl}/v1/:path*`,
+        basePath: false,
+      }],
+    };
+  },
   async headers() {
     const privateHeaders = [
       { key: "Referrer-Policy", value: "no-referrer" },

@@ -112,6 +112,7 @@ export const STANDALONE_SUPABASE_ENV_NAMES = {
   authRolesClaim: "RESERVATION_PLATFORM_AUTH_ROLES_CLAIM",
   authScopesClaim: "RESERVATION_PLATFORM_AUTH_SCOPES_CLAIM",
   corsAllowedOrigins: "RESERVATION_PLATFORM_CORS_ALLOWED_ORIGINS",
+  sessionCookieSecure: "RESERVATION_SESSION_COOKIE_SECURE",
   whatsappEnabled: "RESERVATION_WHATSAPP_ENABLED",
   whatsappProvider: "RESERVATION_WHATSAPP_PROVIDER",
   whatsappSessionAuthDir: "RESERVATION_WHATSAPP_SESSION_AUTH_DIR",
@@ -145,6 +146,7 @@ export interface StandaloneSupabaseEnv extends Record<string, string | undefined
   RESERVATION_PLATFORM_AUTH_ROLES_CLAIM?: string;
   RESERVATION_PLATFORM_AUTH_SCOPES_CLAIM?: string;
   RESERVATION_PLATFORM_CORS_ALLOWED_ORIGINS?: string;
+  RESERVATION_SESSION_COOKIE_SECURE?: string;
   RESERVATION_WHATSAPP_ENABLED?: string;
   RESERVATION_WHATSAPP_PROVIDER?: string;
   RESERVATION_WHATSAPP_SESSION_AUTH_DIR?: string;
@@ -229,6 +231,7 @@ export interface StandaloneSupabaseRuntimeOptions {
   loadCoreMigrationPlan?: () => Promise<readonly CoreMigrationLedgerEntry[]>;
   platformConfig?: PlatformRuntimeConfig;
   sessionAllowedOrigins?: readonly string[];
+  sessionSecureCookies?: boolean;
   integrationEncryptionKey?: string;
   whatsappSessionEncryptionKey?: string;
   emailConnectionTester?: EmailConnectionTester;
@@ -250,6 +253,13 @@ export class StandaloneSupabaseConfigError extends Error {
     super(`Missing standalone Supabase runtime config: ${missingConfigKeys.join(", ")}`);
     this.name = "StandaloneSupabaseConfigError";
     this.missingConfigKeys = missingConfigKeys;
+  }
+}
+
+export class StandaloneSessionCookieConfigError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "StandaloneSessionCookieConfigError";
   }
 }
 
@@ -330,6 +340,7 @@ export function createStandaloneSupabaseDependencies(
   const sessionAuth = {
     repositories: repositoryFactories.createSessionRepository(adminClient),
     allowedOrigins: options.sessionAllowedOrigins ?? [],
+    secureCookies: options.sessionSecureCookies ?? true,
   };
   const sessionRepository = sessionAuth.repositories;
   const reservationsEnabled = options.platformConfig ? options.platformConfig.modules.reservations.enabled : true;
@@ -513,6 +524,7 @@ export function createStandaloneSupabaseDependenciesFromEnv(
     ...options,
     platformConfig,
     sessionAllowedOrigins: options.sessionAllowedOrigins ?? createStandaloneCorsOptionsFromEnv(env).allowedOrigins,
+    sessionSecureCookies: options.sessionSecureCookies ?? readSessionSecureCookiesFromEnv(env),
     integrationEncryptionKey: options.integrationEncryptionKey ?? env.RESERVATION_INSTALLATION_MASTER_KEY,
     whatsappSessionEncryptionKey: options.whatsappSessionEncryptionKey ?? env.RESERVATION_WHATSAPP_SESSION_ENCRYPTION_KEY,
     releaseVersion: options.releaseVersion ?? env.RESERVATION_RELEASE_VERSION,
@@ -678,6 +690,39 @@ export function createStandaloneCorsOptionsFromEnv(env: StandaloneSupabaseEnv = 
   return {
     allowedOrigins: splitEnvList(env.RESERVATION_PLATFORM_CORS_ALLOWED_ORIGINS),
   };
+}
+
+export function readSessionSecureCookiesFromEnv(env: StandaloneSupabaseEnv = process.env) {
+  const configured = env.RESERVATION_SESSION_COOKIE_SECURE?.trim().toLowerCase();
+  if (!configured || configured === "true") return true;
+  if (configured !== "false") {
+    throw new StandaloneSessionCookieConfigError(
+      `${STANDALONE_SUPABASE_ENV_NAMES.sessionCookieSecure} must be true or false.`,
+    );
+  }
+
+  const allowedOrigins = createStandaloneCorsOptionsFromEnv(env).allowedOrigins;
+  if (allowedOrigins.length === 0 || allowedOrigins.some((origin) => !isLoopbackHttpOrigin(origin))) {
+    throw new StandaloneSessionCookieConfigError(
+      `${STANDALONE_SUPABASE_ENV_NAMES.sessionCookieSecure}=false is allowed only with loopback HTTP origins.`,
+    );
+  }
+  return false;
+}
+
+function isLoopbackHttpOrigin(origin: string) {
+  try {
+    const url = new URL(origin);
+    return url.protocol === "http:"
+      && (url.hostname === "localhost" || url.hostname === "127.0.0.1" || url.hostname === "[::1]")
+      && url.pathname === "/"
+      && !url.username
+      && !url.password
+      && !url.search
+      && !url.hash;
+  } catch {
+    return false;
+  }
 }
 
 function createWorkerOwnedWhatsAppModule(input: {

@@ -14,6 +14,8 @@ const repoRoot = path.resolve(__dirname, "..");
 export const sdkRegistryProofModeEnvName = "RESERVATION_SDK_REGISTRY_PROOF_MODE";
 export const sdkRegistryPackageSpecsEnvName = "RESERVATION_SDK_REGISTRY_PACKAGE_SPECS";
 export const sdkRegistryAllowInstallEnvName = "RESERVATION_SDK_REGISTRY_ALLOW_INSTALL";
+export const sdkRegistryLiveBaseUrlEnvName = "RESERVATION_SDK_REGISTRY_LIVE_BASE_URL";
+export const sdkRegistryAllowLiveMutationsEnvName = "RESERVATION_SDK_REGISTRY_ALLOW_LIVE_MUTATIONS";
 export const sdkRegistryRequiredPrivateEnvNames = [
   "RESERVATION_SDK_REGISTRY_PRIVATE_URL",
   "RESERVATION_SDK_REGISTRY_PRIVATE_TOKEN",
@@ -111,6 +113,7 @@ function buildConfig(values, packageSpecs, packageManager) {
       ? Number.parseInt(values.RESERVATION_SDK_REGISTRY_DISPOSABLE_PORT, 10)
       : 0,
     keepTemp: values.RESERVATION_SDK_REGISTRY_KEEP_TEMP === "1",
+    liveBaseUrl: values.RESERVATION_SDK_REGISTRY_LIVE_BASE_URL,
   };
 }
 
@@ -132,6 +135,7 @@ export function readSdkRegistryInstallConfig(env, options = {}) {
     RESERVATION_SDK_REGISTRY_PACKAGE_MANAGER: packageManager,
     RESERVATION_SDK_REGISTRY_DISPOSABLE_PORT: trimEnvValue(env, "RESERVATION_SDK_REGISTRY_DISPOSABLE_PORT"),
     RESERVATION_SDK_REGISTRY_KEEP_TEMP: trimEnvValue(env, "RESERVATION_SDK_REGISTRY_KEEP_TEMP"),
+    RESERVATION_SDK_REGISTRY_LIVE_BASE_URL: trimEnvValue(env, sdkRegistryLiveBaseUrlEnvName),
   };
   const errors = [];
 
@@ -168,6 +172,20 @@ export function readSdkRegistryInstallConfig(env, options = {}) {
       }
     }
   }
+  if (values.RESERVATION_SDK_REGISTRY_LIVE_BASE_URL) {
+    try {
+      const url = new URL(values.RESERVATION_SDK_REGISTRY_LIVE_BASE_URL);
+      if (!["http:", "https:"].includes(url.protocol)) {
+        errors.push(`${sdkRegistryLiveBaseUrlEnvName} must use http or https.`);
+      }
+      values.RESERVATION_SDK_REGISTRY_LIVE_BASE_URL = url.toString();
+    } catch {
+      errors.push(`${sdkRegistryLiveBaseUrlEnvName} must be an absolute URL.`);
+    }
+    if (trimEnvValue(env, sdkRegistryAllowLiveMutationsEnvName) !== "1") {
+      errors.push(`${sdkRegistryAllowLiveMutationsEnvName}=1 is required for the live appointment consumer proof.`);
+    }
+  }
 
   const requiredEnvNames = modeRequiredEnvNames(mode);
   const missing = mode ? requiredEnvNames.filter((name) => values[name].length === 0) : [sdkRegistryProofModeEnvName];
@@ -176,9 +194,14 @@ export function readSdkRegistryInstallConfig(env, options = {}) {
     ...sdkRegistryRequiredPrivateEnvNames,
     "RESERVATION_SDK_REGISTRY_PACKAGE_MANAGER",
     "RESERVATION_SDK_REGISTRY_DISPOSABLE_PORT",
+    sdkRegistryLiveBaseUrlEnvName,
+    sdkRegistryAllowLiveMutationsEnvName,
     sdkRegistryAllowInstallEnvName,
   ].filter((name) => {
     if (name === sdkRegistryAllowInstallEnvName) {
+      return trimEnvValue(env, name).length > 0;
+    }
+    if (name === sdkRegistryAllowLiveMutationsEnvName) {
       return trimEnvValue(env, name).length > 0;
     }
     if (name === "RESERVATION_SDK_REGISTRY_PACKAGE_MANAGER") {
@@ -315,7 +338,8 @@ async function writeConsumerFiles(consumerDir, parsed) {
           module: "ESNext",
           moduleResolution: "Bundler",
           strict: true,
-          noEmit: true,
+          noEmit: !parsed.config.liveBaseUrl,
+          ...(parsed.config.liveBaseUrl ? { outDir: "dist" } : {}),
           skipLibCheck: true,
           typeRoots: ["./types"],
         },
@@ -328,21 +352,7 @@ async function writeConsumerFiles(consumerDir, parsed) {
   );
   await writeFile(
     path.join(consumerDir, "src", "smoke.ts"),
-    [
-      'import { createReservationPlatformClient } from "@reservation-platform/sdk";',
-      'import type { ReservationResponse } from "@reservation-platform/contract-types";',
-      "",
-      "const client = createReservationPlatformClient({",
-      '  baseUrl: "https://reservation-platform.example.test",',
-      '  tenantId: "tenant_registry_proof",',
-      '  getAccessToken: () => "registry-proof-token",',
-      "});",
-      "",
-      "const reservation: ReservationResponse | null = null;",
-      "void client;",
-      "void reservation;",
-      "",
-    ].join("\n"),
+    parsed.config.liveBaseUrl ? renderLiveAppointmentConsumer() : renderTypecheckConsumer(),
     "utf8",
   );
 
@@ -405,6 +415,17 @@ async function runInstallProof(parsed) {
       stdio: "inherit",
     });
     console.log("PASS SDK registry install proof imported SDK values and contract types in an external consumer.");
+    if (parsed.config.liveBaseUrl) {
+      await runProcess(process.execPath, ["dist/smoke.js"], {
+        cwd: consumerDir,
+        env: {
+          ...installEnv,
+          RESERVATION_PLATFORM_BASE_URL: parsed.config.liveBaseUrl,
+        },
+        stdio: "inherit",
+      });
+      console.log("PASS external SDK appointment consumer completed book, manage, reschedule, and cancel.");
+    }
   } finally {
     if (parsed.config?.keepTemp) {
       console.log(`Kept SDK registry install proof temp consumer: ${consumerDir}`);
@@ -412,6 +433,71 @@ async function runInstallProof(parsed) {
       await rm(consumerDir, { recursive: true, force: true });
     }
   }
+}
+
+function renderTypecheckConsumer() {
+  return [
+    'import { createReservationPlatformClient } from "@reservation-platform/sdk";',
+    'import type { ReservationResponse } from "@reservation-platform/contract-types";',
+    "",
+    "const client = createReservationPlatformClient({",
+    '  baseUrl: "https://reservation-platform.example.test",',
+    '  tenantId: "tenant_registry_proof",',
+    '  getAccessToken: () => "registry-proof-token",',
+    "});",
+    "",
+    "const reservation: ReservationResponse | null = null;",
+    "void client;",
+    "void reservation;",
+    "",
+  ].join("\n");
+}
+
+function renderLiveAppointmentConsumer() {
+  return [
+    'import { createIdempotencyKey, createReservationPlatformClient } from "@reservation-platform/sdk";',
+    'declare const process: { env: Record<string, string | undefined> };',
+    "",
+    'const baseUrl = process.env.RESERVATION_PLATFORM_BASE_URL;',
+    'if (!baseUrl) throw new Error("RESERVATION_PLATFORM_BASE_URL is required.");',
+    'const slug = "luma-appointments-demo";',
+    'const serviceId = "00000000-0000-4000-8000-000000000203";',
+    'const resourceId = "00000000-0000-4000-8000-000000000306";',
+    'const staffId = "00000000-0000-4000-8000-000000000801";',
+    "const client = createReservationPlatformClient({ baseUrl });",
+    "const experience = await client.getPublicExperience(slug);",
+    "const services = await client.listPublicExperienceServices(slug);",
+    'if (!services.services.some((service) => service.service_id === serviceId)) throw new Error("Appointment service missing.");',
+    "const availability = await client.listPublicExperienceAvailability(slug, {",
+    '  service_id: serviceId, date: "2026-07-30", quantity: 1, resource_ids: [resourceId], staff_id: staffId,',
+    "});",
+    'if (!availability.slots.some((slot) => slot.is_available)) throw new Error("No appointment availability.");',
+    "const created = await client.createPublicExperienceReservation(slug, {",
+    '  service_id: serviceId, date: "2026-07-30", start_time: "10:00", end_time: "10:30", quantity: 1,',
+    "  resource_ids: [resourceId], staff_id: staffId,",
+    '  reservation_items: [{ resource_id: resourceId, resource_label: "Specialist Maya", quantity: 1 }],',
+    '  customer: { name: "SDK Appointment Consumer", email: "sdk-appointment-consumer@example.invalid" },',
+    '  source: "sdk-release-consumer-proof",',
+    '}, { idempotencyKey: createIdempotencyKey("sdk-appointment-create") });',
+    'if (!created.management_token) throw new Error("Management token missing.");',
+    "const managed = await client.getManagedReservation(slug, created.management_token);",
+    "await client.listManagedReservationAvailability(slug, created.management_token, {",
+    '  service_id: serviceId, date: "2026-07-30", quantity: 1, resource_ids: [resourceId], staff_id: staffId,',
+    "});",
+    "const rescheduled = await client.rescheduleManagedReservation(slug, created.management_token, {",
+    '  date: "2026-07-30", start_time: "11:00", staff_id: staffId,',
+    "});",
+    "const cancelled = await client.cancelManagedReservation(slug, created.management_token);",
+    'if (managed.reservation_id !== created.reservation_id) throw new Error("Management read mismatch.");',
+    'if (!rescheduled.start_time?.startsWith("11:00")) throw new Error("Reschedule did not persist.");',
+    'if (cancelled.status !== "cancelled") throw new Error("Cancellation did not persist.");',
+    "console.log(JSON.stringify({",
+    '  package_consumer: "external", experience: experience.profile.public_slug, availability_slots: availability.slots.length,',
+    '  reservation_created: Boolean(created.reservation_id), management_read: true,',
+    "  rescheduled_start_time: rescheduled.start_time, final_status: cancelled.status,",
+    "}));",
+    "",
+  ].join("\n");
 }
 
 function parsePackageSpec(spec) {

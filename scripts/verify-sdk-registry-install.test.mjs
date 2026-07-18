@@ -105,6 +105,27 @@ test("SDK registry install config parses disposable proof mode without registry 
   ]);
 });
 
+test("SDK registry install config enables an explicitly authorized live consumer journey", () => {
+  const parsed = readSdkRegistryInstallConfig(disposableRegistryEnv({
+    RESERVATION_SDK_REGISTRY_ALLOW_INSTALL: "1",
+    RESERVATION_SDK_REGISTRY_LIVE_BASE_URL: "http://127.0.0.1:4100",
+    RESERVATION_SDK_REGISTRY_ALLOW_LIVE_MUTATIONS: "1",
+  }), { argv: ["--strict"] });
+
+  assert.equal(parsed.status, "ready");
+  assert.equal(parsed.config.liveBaseUrl, "http://127.0.0.1:4100/");
+});
+
+test("SDK registry install config rejects a live consumer journey without mutation opt-in", () => {
+  const parsed = readSdkRegistryInstallConfig(disposableRegistryEnv({
+    RESERVATION_SDK_REGISTRY_ALLOW_INSTALL: "1",
+    RESERVATION_SDK_REGISTRY_LIVE_BASE_URL: "http://127.0.0.1:4100",
+  }), { argv: ["--strict"] });
+
+  assert.equal(parsed.status, "fail");
+  assert.match(parsed.message, /RESERVATION_SDK_REGISTRY_ALLOW_LIVE_MUTATIONS=1/);
+});
+
 test("SDK registry install config rejects malformed disposable registry port", () => {
   const parsed = readSdkRegistryInstallConfig(disposableRegistryEnv({
     RESERVATION_SDK_REGISTRY_ALLOW_INSTALL: "1",

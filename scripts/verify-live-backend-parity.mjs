@@ -572,12 +572,20 @@ async function main() {
 
   if (strict && allowMutations) {
     const idempotencyKey = `live-sdk-parity-${Date.now()}`;
+    const resource = await client.getResource(config.resourceId, {
+      correlationId: "live-sdk-parity-sdk",
+    });
     const reservationInput = {
       service_id: config.serviceId,
       start_at: config.startAt,
       end_at: config.endAt,
       quantity: config.quantity,
       resource_ids: [config.resourceId],
+      reservation_items: [{
+        resource_id: config.resourceId,
+        resource_label: resource.label,
+        quantity: config.quantity,
+      }],
       customer: {
         name: "Live SDK Parity",
         email: "live-sdk-parity@example.invalid",

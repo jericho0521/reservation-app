@@ -6,7 +6,12 @@ import type { MetadataRecord } from "@reservation-platform/contract-types";
 
 import { decryptJson, encryptJson, isEncryptedPayload } from "./crypto.js";
 import type { WhatsAppInboundMessage, WhatsAppOutboundMessage } from "./messages.js";
-import type { WhatsAppSessionAdapter } from "./session.js";
+import {
+  WhatsAppPairingTimeoutError,
+  WhatsAppProviderUnavailableError,
+  WhatsAppSessionExpiredError,
+  type WhatsAppSessionAdapter,
+} from "./session.js";
 
 export interface BaileysWhatsAppSessionAdapterOptions {
   authDirectory: string;
@@ -184,7 +189,12 @@ export class BaileysWhatsAppSessionAdapter implements WhatsAppSessionAdapter {
   }
 
   async start(input: { session_id: string; metadata?: MetadataRecord }) {
-    const baileys = await import("@whiskeysockets/baileys");
+    let baileys;
+    try {
+      baileys = await import("@whiskeysockets/baileys");
+    } catch {
+      throw new WhatsAppProviderUnavailableError();
+    }
     const makeWASocket = (baileys.default ?? baileys.makeWASocket) as unknown as (options: Record<string, unknown>) => BaileysSocket;
     const useMultiFileAuthState = baileys.useMultiFileAuthState as unknown as (
       folder: string,
@@ -205,7 +215,7 @@ export class BaileysWhatsAppSessionAdapter implements WhatsAppSessionAdapter {
       const timeout = setTimeout(() => {
         if (!settled) {
           settled = true;
-          reject(new Error("Timed out waiting for WhatsApp QR."));
+          reject(new WhatsAppPairingTimeoutError());
         }
       }, this.qrTimeoutMs);
 
@@ -250,7 +260,7 @@ export class BaileysWhatsAppSessionAdapter implements WhatsAppSessionAdapter {
               if (!settled) {
                 settled = true;
                 clearTimeout(timeout);
-                reject(new Error("WhatsApp session was logged out before QR pairing completed."));
+                reject(new WhatsAppSessionExpiredError());
               }
               return;
             }
@@ -270,7 +280,7 @@ export class BaileysWhatsAppSessionAdapter implements WhatsAppSessionAdapter {
             if (!settled) {
               settled = true;
               clearTimeout(timeout);
-              reject(new Error("WhatsApp session disconnected before QR pairing completed."));
+              reject(new WhatsAppProviderUnavailableError());
             }
           }
         });

@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   InMemoryWhatsAppSessionStore,
   WhatsAppModuleDisabledError,
+  WhatsAppSessionConflictError,
   WhatsAppSessionNotReadyError,
   WhatsAppSessionService,
   normalizeWhatsAppInboundTextMessage,
@@ -43,6 +44,16 @@ test("start returns pending QR and status reuses stored session", async () => {
   const status = await service.status();
   assert.equal(status.session_id, started.session_id);
   assert.equal(status.status, "pending_qr");
+});
+
+test("start rejects a second pairing attempt while a session is active", async () => {
+  const service = new WhatsAppSessionService({
+    enabled: true,
+    store: new InMemoryWhatsAppSessionStore(),
+  });
+
+  await service.start();
+  await assert.rejects(() => service.start(), WhatsAppSessionConflictError);
 });
 
 test("markConnected removes QR and logout clears session", async () => {

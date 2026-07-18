@@ -2769,7 +2769,7 @@ async function handleWhatsAppSessionStartRequest(
   whatsappModule: StandaloneApiWhatsAppModule | undefined,
 ): Promise<StandaloneApiResponse> {
   if (!whatsappModule) {
-    return whatsappModuleDisabled();
+    return whatsappModuleDisabled(503);
   }
 
   const body = readOptionalRecordBody(request.body);
@@ -3713,7 +3713,23 @@ async function invokeWhatsAppModule(
     return jsonResponse(200, result);
   } catch (error) {
     if (isNamedError(error, "WhatsAppModuleDisabledError")) {
-      return whatsappModuleDisabled();
+      return whatsappModuleDisabled(503);
+    }
+
+    if (isNamedError(error, "WhatsAppSessionConflictError")) {
+      return platformError(409, "conflict", "A WhatsApp session is already active or waiting for pairing.");
+    }
+
+    if (isNamedError(error, "WhatsAppPairingTimeoutError")) {
+      return platformError(504, "internal_error", "WhatsApp pairing timed out. Start pairing again.");
+    }
+
+    if (isNamedError(error, "WhatsAppSessionExpiredError")) {
+      return platformError(409, "conflict", "The WhatsApp session expired. Start pairing again.");
+    }
+
+    if (isNamedError(error, "WhatsAppProviderUnavailableError")) {
+      return platformError(503, "internal_error", "WhatsApp pairing is temporarily unavailable. Try again.");
     }
 
     if (isNamedError(error, "WhatsAppSessionNotReadyError")) {
@@ -3733,8 +3749,8 @@ async function invokeWhatsAppModule(
   }
 }
 
-function whatsappModuleDisabled(): StandaloneApiResponse {
-  return platformError(404, "whatsapp_module_disabled", "WhatsApp module is disabled.");
+function whatsappModuleDisabled(status = 404): StandaloneApiResponse {
+  return platformError(status, "whatsapp_module_disabled", "WhatsApp module is disabled.");
 }
 
 function isNamedError(error: unknown, name: string) {

@@ -1929,8 +1929,41 @@ test("disabled WhatsApp session routes return the shared platform error body", a
   for (const route of routes) {
     const response = await handleStandaloneApiRequest(route);
 
-    assert.equal(response.status, 404, route.path);
-    assert.deepEqual(response.body, disabledWhatsAppBody, route.path);
+    const expectedStatus = route.path.endsWith("/start") ? 503 : 404;
+    assert.equal(response.status, expectedStatus, route.path);
+    assert.deepEqual(response.body, {
+      ...disabledWhatsAppBody,
+      error: { ...disabledWhatsAppBody.error, status: expectedStatus },
+    }, route.path);
+  }
+});
+
+test("WhatsApp pairing failures map to actionable stable responses", async () => {
+  const cases = [
+    ["WhatsAppSessionConflictError", 409, "already active"],
+    ["WhatsAppPairingTimeoutError", 504, "timed out"],
+    ["WhatsAppSessionExpiredError", 409, "expired"],
+    ["WhatsAppProviderUnavailableError", 503, "temporarily unavailable"],
+  ] as const;
+
+  for (const [name, status, message] of cases) {
+    const handler = createStandaloneApiHandler({
+      whatsappModule: fakeWhatsAppModule({
+        startSession() {
+          const error = new Error("private provider detail");
+          error.name = name;
+          throw error;
+        },
+      }),
+    });
+    const response = await handler({
+      method: "POST",
+      path: "/v1/channels/whatsapp/session/start",
+    });
+
+    assert.equal(response.status, status, name);
+    assert.match((response.body as PlatformErrorResponse).error.message, new RegExp(message, "iu"), name);
+    assert.doesNotMatch(JSON.stringify(response.body), /private provider detail/u, name);
   }
 });
 

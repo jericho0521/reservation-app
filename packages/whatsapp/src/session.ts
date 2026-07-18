@@ -88,6 +88,34 @@ export class WhatsAppSessionNotReadyError extends Error {
   }
 }
 
+export class WhatsAppSessionConflictError extends Error {
+  constructor() {
+    super("A WhatsApp session is already active or waiting for pairing.");
+    this.name = "WhatsAppSessionConflictError";
+  }
+}
+
+export class WhatsAppPairingTimeoutError extends Error {
+  constructor() {
+    super("Timed out waiting for a WhatsApp pairing code.");
+    this.name = "WhatsAppPairingTimeoutError";
+  }
+}
+
+export class WhatsAppSessionExpiredError extends Error {
+  constructor() {
+    super("The WhatsApp session expired before pairing completed.");
+    this.name = "WhatsAppSessionExpiredError";
+  }
+}
+
+export class WhatsAppProviderUnavailableError extends Error {
+  constructor() {
+    super("The WhatsApp pairing provider is temporarily unavailable.");
+    this.name = "WhatsAppProviderUnavailableError";
+  }
+}
+
 export class InMemoryWhatsAppSessionStore implements WhatsAppSessionStore {
   private record: WhatsAppEncryptedSessionRecord | undefined;
 
@@ -143,6 +171,10 @@ export class WhatsAppSessionService {
     const provider = input.provider ?? this.provider;
     if (provider !== "session_qr") {
       throw new WhatsAppSessionNotReadyError();
+    }
+    const current = await this.store.load();
+    if (current?.status === "pending_qr" || current?.status === "connected") {
+      throw new WhatsAppSessionConflictError();
     }
 
     const sessionId = randomUUID();

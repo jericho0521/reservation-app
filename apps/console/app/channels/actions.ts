@@ -11,9 +11,24 @@ export interface SimulationActionState {
   message?: string;
 }
 
-export async function startWhatsAppSessionAction() {
-  await createConsolePlatformClient().startWhatsAppSession();
-  revalidatePath("/channels");
+export interface SessionActionState {
+  status: "idle" | "success" | "error";
+  message: string;
+}
+
+export async function startWhatsAppSessionAction(
+  _previous: SessionActionState,
+): Promise<SessionActionState> {
+  try {
+    await createConsolePlatformClient().startWhatsAppSession();
+    revalidatePath("/channels");
+    return { status: "success", message: "Pairing started. The QR code will appear when it is ready." };
+  } catch (error) {
+    return {
+      status: "error",
+      message: error instanceof Error ? error.message : "WhatsApp pairing could not be started.",
+    };
+  }
 }
 
 export async function reconnectWhatsAppSessionAction() {

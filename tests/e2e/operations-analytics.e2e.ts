@@ -14,5 +14,5 @@ test("fresh demo data drives operations, maintenance, channel, and analytics pro
 
 test("owner command center links reservations, conversations, maintenance, channels, and analytics", async () => {
   const shell = await readFile("apps/console/components/console-shell.tsx", "utf8");
-  for (const href of ["/reservations", "/conversations", "/resources", "/channels", "/analytics"]) assert.equal(shell.includes(`href="${href}"`), true, href);
+  for (const href of ["/admin/reservations", "/admin/conversations", "/admin/resources", "/admin/channels", "/admin/analytics"]) assert.equal(shell.includes(`href="${href}"`), true, href);
 });

@@ -13,7 +13,8 @@ test("console uses SDK with server-only platform configuration", async () => {
 
   assert.equal(packageJson.dependencies?.["@reservation-platform/sdk"], "workspace:*");
   assert.match(clientSource, /import "server-only"/u);
-  assert.match(configSource, /RESERVATION_PLATFORM_SERVICE_API_KEY/u);
+  assert.match(configSource, /RESERVATION_PLATFORM_BASE_URL/u);
+  assert.doesNotMatch(configSource, /RESERVATION_PLATFORM_SERVICE_API_KEY/u);
   assert.doesNotMatch(`${clientSource}\n${configSource}`, /NEXT_PUBLIC_.*(?:KEY|SECRET|TOKEN)/u);
   assert.doesNotMatch(`${clientSource}\n${configSource}`, /@supabase\/supabase-js/u);
 });

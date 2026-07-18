@@ -12,6 +12,7 @@ const requiredServices = Object.freeze([
   "reservation-rest",
   "reservation-gateway",
   "reservation-api",
+  "reservation-worker",
   "reservation-console",
   "reservation-booking",
   "reservation-reset",
@@ -41,6 +42,8 @@ export function localStackComposeErrors(model) {
   assertDependency(services, "reservation-seed", "reservation-migrate", "service_completed_successfully", errors);
   assertDependency(services, "reservation-api", "reservation-seed", "service_completed_successfully", errors);
   assertDependency(services, "reservation-api", "reservation-gateway", "service_healthy", errors);
+  assertDependency(services, "reservation-worker", "reservation-seed", "service_completed_successfully", errors);
+  assertDependency(services, "reservation-worker", "reservation-gateway", "service_healthy", errors);
   assertDependency(services, "reservation-console", "reservation-api", "service_healthy", errors);
   assertDependency(services, "reservation-booking", "reservation-api", "service_healthy", errors);
 
@@ -50,10 +53,10 @@ export function localStackComposeErrors(model) {
       errors.push(`${name} must publish only 127.0.0.1:${expectedPort}.`);
     }
   }
-  for (const name of ["reservation-db", "reservation-rest", "reservation-gateway"]) {
+  for (const name of ["reservation-db", "reservation-rest", "reservation-gateway", "reservation-worker"]) {
     if ((services[name]?.ports ?? []).length > 0) errors.push(`${name} must not publish a host port.`);
   }
-  for (const name of ["reservation-migrate", "reservation-seed", "reservation-rest", "reservation-api", "reservation-console", "reservation-booking", "reservation-reset"]) {
+  for (const name of ["reservation-migrate", "reservation-seed", "reservation-rest", "reservation-api", "reservation-worker", "reservation-console", "reservation-booking", "reservation-reset"]) {
     const configMount = (services[name]?.volumes ?? []).find((volume) => volume.source === "reservation-stack-config");
     if (!configMount?.read_only) errors.push(`${name} must mount generated config read-only.`);
   }

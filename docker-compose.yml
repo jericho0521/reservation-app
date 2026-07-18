@@ -131,6 +131,33 @@ services:
       start_period: 10s
     restart: unless-stopped
 
+  reservation-worker:
+    build:
+      context: .
+      target: worker-runtime
+    image: reservation-platform-worker:local
+    depends_on:
+      reservation-seed:
+        condition: service_completed_successfully
+      reservation-gateway:
+        condition: service_healthy
+    entrypoint: ["/usr/local/bin/run-with-config", "/run/reservation-stack/api.env"]
+    command: ["node", "apps/worker/dist/server.js"]
+    environment:
+      RESERVATION_RELEASE_VERSION: "development"
+    volumes:
+      - reservation-stack-config:/run/reservation-stack:ro
+      - reservation-whatsapp-sessions:/app/.reservation-whatsapp-sessions
+    networks:
+      - reservation-stack
+    healthcheck:
+      test: ["CMD", "node", "-e", "try { process.kill(1, 0); process.exit(0); } catch { process.exit(1); }"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+
   reservation-console:
     build:
       context: .

@@ -1,6 +1,7 @@
 import {
   PlatformJobProcessingError,
   createAgentConversationResponder,
+  createDeterministicConversationResponder,
   processPersistedConversationInbound,
   type AgentRuntimeLoader,
   type ConversationOrchestratorDependencies,
@@ -30,14 +31,9 @@ export function createAiConversationJobHandler(
     } catch {
       runtime = undefined;
     }
-    const unavailable = {
-      async respond(): Promise<never> {
-        throw new Error("AI runtime is unavailable.");
-      },
-    };
     const responder = runtime
-      ? createAgentConversationResponder(runtime, unavailable)
-      : unavailable;
+      ? createAgentConversationResponder(runtime)
+      : createDeterministicConversationResponder();
     const result = await processPersistedConversationInbound({
       scope,
       conversationId: input.conversationId,

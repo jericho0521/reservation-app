@@ -67,10 +67,16 @@ RUN apk add --no-cache su-exec=0.3-r0 && \
     addgroup -g 1001 -S reservation && \
     adduser -S reservation -u 1001 -G reservation
 
+COPY --from=build --chown=reservation:reservation /app/package.json ./package.json
+COPY --from=build --chown=reservation:reservation /app/pnpm-workspace.yaml ./pnpm-workspace.yaml
+COPY --from=build --chown=reservation:reservation /app/node_modules ./node_modules
 COPY --from=build --chown=reservation:reservation /app/apps/worker/package.json ./apps/worker/package.json
+COPY --from=build --chown=reservation:reservation /app/apps/worker/node_modules ./apps/worker/node_modules
 COPY --from=build --chown=reservation:reservation /app/apps/worker/dist ./apps/worker/dist
+COPY --from=build --chown=reservation:reservation /app/packages ./packages
+COPY --from=build /app/docker/local-stack/run-with-config.sh /usr/local/bin/run-with-config
 COPY --from=build /app/docker/production/run-with-secrets.sh /usr/local/bin/run-with-secrets
-RUN chmod 755 /usr/local/bin/run-with-secrets
+RUN chmod 755 /usr/local/bin/run-with-config /usr/local/bin/run-with-secrets
 
 USER reservation
 

@@ -52,7 +52,7 @@ test("AI jobs persist a proposal without creating a reservation", async () => {
   assert.equal(fixture.appendExternalIds.at(-1), "ai-reply:message_inbound");
 });
 
-test("provider outage appends one staff handoff without a proposal or booking", async () => {
+test("provider outage falls back without exposing provider details or creating a booking", async () => {
   const fixture = createFixture();
   const handler = createAiConversationJobHandler({
     runtimeLoader: {
@@ -67,9 +67,31 @@ test("provider outage appends one staff handoff without a proposal or booking", 
 
   assert.equal(fixture.proposals.length, 0);
   assert.equal(fixture.createCalls, 0);
-  assert.match(fixture.messages.at(-1)?.content ?? "", /staff/u);
+  assert.match(fixture.messages.at(-1)?.content ?? "", /Book <service>/u);
   assert.doesNotMatch(fixture.messages.at(-1)?.content ?? "", /secret|provider response/u);
-  assert.equal(fixture.appendExternalIds.at(-1), "ai-handoff:message_inbound");
+  assert.equal(fixture.appendExternalIds.at(-1), "ai-reply:message_inbound");
+});
+
+test("missing AI configuration uses the deterministic responder for booking proposals", async () => {
+  const fixture = createFixture(
+    "automated",
+    "Book Consultation on 2026-08-10 at 14:00 for 1; Alex; alex@example.com; +60123456789",
+  );
+  const handler = createAiConversationJobHandler({
+    runtimeLoader: {
+      async load() {
+        throw new Error("AI configuration is unavailable.");
+      },
+    },
+    loadDependencies: () => fixture.dependencies,
+  });
+
+  await handler(job());
+
+  assert.equal(fixture.proposals.length, 1);
+  assert.equal(fixture.createCalls, 0);
+  assert.match(fixture.messages.at(-1)?.content ?? "", /confirm/u);
+  assert.equal(fixture.appendExternalIds.at(-1), "ai-reply:message_inbound");
 });
 
 test("manual takeover is rechecked by the worker before invoking the model", async () => {
@@ -103,7 +125,10 @@ function job() {
   };
 }
 
-function createFixture(automationState: "automated" | "manual" = "automated") {
+function createFixture(
+  automationState: "automated" | "manual" = "automated",
+  inboundContent = "Book a consultation",
+) {
   const messages: ConversationMessageResponse[] = [{
     message_id: "message_inbound",
     conversation_id: "conversation_1",
@@ -111,7 +136,7 @@ function createFixture(automationState: "automated" | "manual" = "automated") {
     direction: "inbound",
     sender_type: "customer",
     delivery_state: "delivered",
-    content: "Book a consultation",
+    content: inboundContent,
     created_at: "2026-08-01T00:00:00.000Z",
   }];
   const conversation: ConversationResponse = {

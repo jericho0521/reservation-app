@@ -4,12 +4,13 @@ begin;
 delete from public.platform_sessions where user_id in (
   select id from public.platform_users where tenant_id = 'final_demo'
 );
-delete from public.platform_staff_profiles where tenant_id = 'final_demo';
+delete from public.platform_audit_events where tenant_id = 'final_demo';
 delete from public.platform_user_venue_assignments where tenant_id = 'final_demo';
 delete from public.platform_users where tenant_id = 'final_demo';
 delete from public.bookings where service_id in (
   '00000000-0000-4000-8000-000000000201', '00000000-0000-4000-8000-000000000202', '00000000-0000-4000-8000-000000000203'
 );
+delete from public.platform_staff_profiles where tenant_id = 'final_demo';
 delete from public.platform_conversations where tenant_id = 'final_demo';
 delete from public.service_seat_maintenance where service_id in (
   '00000000-0000-4000-8000-000000000201', '00000000-0000-4000-8000-000000000202', '00000000-0000-4000-8000-000000000203'
@@ -51,10 +52,10 @@ select 'final_demo', venue_id, day, '09:00', '18:00'
 from (values ('00000000-0000-4000-8000-000000000101'::uuid), ('00000000-0000-4000-8000-000000000102'::uuid), ('00000000-0000-4000-8000-000000000103'::uuid)) venues(venue_id)
 cross join generate_series(1, 6) day;
 
-insert into public.services (id, venue_id, name, description, total_seats, resource_kind, selection_mode, reservation_policy, metadata, booking_mode) values
-  ('00000000-0000-4000-8000-000000000201', '00000000-0000-4000-8000-000000000101', 'Apex GT Racing Session', 'One-hour simulator session', 3, 'station', 'assigned_resource', '{"kind":"assigned_resource","selection_mode":"assigned_resource","require_resource_labels":true,"allow_partial_capacity":false}', '{"duration_minutes":60}', 'resource'),
-  ('00000000-0000-4000-8000-000000000202', '00000000-0000-4000-8000-000000000102', 'Harbour Meeting Room', 'Two-hour room reservation', 2, 'room', 'assigned_resource', '{"kind":"assigned_resource","selection_mode":"assigned_resource","require_resource_labels":true,"allow_partial_capacity":false}', '{"duration_minutes":120}', 'resource'),
-  ('00000000-0000-4000-8000-000000000203', '00000000-0000-4000-8000-000000000103', 'Luma Consultation', 'Thirty-minute consultation', 2, 'custom', 'assigned_resource', '{"kind":"assigned_resource","selection_mode":"assigned_resource","require_resource_labels":true,"allow_partial_capacity":false}', '{"duration_minutes":30}', 'appointment');
+insert into public.services (id, venue_id, name, description, total_seats, resource_kind, selection_mode, reservation_policy, metadata, booking_mode, duration_minutes, buffer_before_minutes, buffer_after_minutes) values
+  ('00000000-0000-4000-8000-000000000201', '00000000-0000-4000-8000-000000000101', 'Apex GT Racing Session', 'One-hour simulator session', 3, 'station', 'assigned_resource', '{"kind":"assigned_resource","selection_mode":"assigned_resource","require_resource_labels":true,"allow_partial_capacity":false}', '{"duration_minutes":60}', 'resource', 60, 0, 0),
+  ('00000000-0000-4000-8000-000000000202', '00000000-0000-4000-8000-000000000102', 'Harbour Meeting Room', 'Two-hour room reservation', 2, 'room', 'assigned_resource', '{"kind":"assigned_resource","selection_mode":"assigned_resource","require_resource_labels":true,"allow_partial_capacity":false}', '{"duration_minutes":120}', 'resource', 120, 0, 0),
+  ('00000000-0000-4000-8000-000000000203', '00000000-0000-4000-8000-000000000103', 'Luma Consultation', 'Thirty-minute consultation', 2, 'custom', 'assigned_resource', '{"kind":"assigned_resource","selection_mode":"assigned_resource","require_resource_labels":true,"allow_partial_capacity":false}', '{"duration_minutes":30}', 'appointment', 30, 0, 0);
 insert into public.reservable_resources (id, service_id, label, resource_kind, capacity, sort_order, metadata) values
   ('00000000-0000-4000-8000-000000000301', '00000000-0000-4000-8000-000000000201', 'Simulator A', 'station', 1, 1, '{}'),
   ('00000000-0000-4000-8000-000000000302', '00000000-0000-4000-8000-000000000201', 'Simulator B', 'station', 1, 2, '{}'),

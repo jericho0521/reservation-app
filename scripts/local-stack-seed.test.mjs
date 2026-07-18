@@ -42,11 +42,20 @@ test("final demo appointment practitioners have profile, location, service, and 
   assert.match(seed, /insert into public\.platform_staff_profiles/u);
   assert.match(seed, /insert into public\.platform_staff_locations/u);
   assert.match(seed, /insert into public\.platform_staff_services/u);
+  assert.match(seed, /'Luma Consultation'[\s\S]*'appointment', 30, 0, 0/u);
+  assert.ok(
+    seed.indexOf("delete from public.bookings") < seed.indexOf("delete from public.platform_staff_profiles"),
+    "bookings must be deleted before their referenced staff profiles",
+  );
+  assert.ok(
+    seed.indexOf("delete from public.platform_audit_events") < seed.indexOf("delete from public.platform_users"),
+    "audit events must be deleted before their referenced users",
+  );
   for (const staffId of [
     "00000000-0000-4000-8000-000000000801",
     "00000000-0000-4000-8000-000000000802",
   ]) {
     assert.match(seed, new RegExp(`"platform_staff_id":"${staffId}"`, "u"));
   }
-  assert.match(seed, /'appointment'\);/u);
+  assert.match(seed, /'appointment', 30, 0, 0\);/u);
 });

@@ -30,8 +30,10 @@ export async function bootstrapLocalOwner(
 ) {
   const displayName = normalizeDisplayName(input.displayName);
   const email = normalizeEmail(input.email);
-  if (!displayName || !email || !validatePassword(input.password)) {
-    throw new Error("Enter a valid name, email address, and password of at least 12 characters.");
+  if (!displayName) throw new Error("Enter a valid owner name.");
+  if (!email) throw new Error("Enter a valid owner email address.");
+  if (!validatePassword(input.password)) {
+    throw new Error("Password must contain at least 12 characters.");
   }
   if (input.password !== input.passwordConfirmation) {
     throw new Error("Password confirmation does not match.");
@@ -116,7 +118,7 @@ async function promptForOwner(): Promise<LocalOwnerInput> {
   const displayName = await question(interface_, "Owner name: ");
   const email = await question(interface_, "Owner email: ");
   interface_.close();
-  const password = await hiddenQuestion("Password (at least 12 characters): ");
+  const password = await hiddenQuestion("Password (at least 12 characters; input is masked): ");
   const passwordConfirmation = await hiddenQuestion("Confirm password: ");
   return { displayName, email, password, passwordConfirmation };
 }
@@ -148,9 +150,14 @@ function hiddenQuestion(prompt: string) {
       } else if (key.name === "return" || key.name === "enter") {
         finish();
       } else if (key.name === "backspace") {
-        value = value.slice(0, -1);
+        if (value.length > 0) {
+          value = value.slice(0, -1);
+          stdout.write("\b \b");
+        }
       } else if (!key.ctrl && !key.meta && text && value.length < 128) {
-        value += text;
+        const addition = text.slice(0, 128 - value.length);
+        value += addition;
+        stdout.write("*".repeat(addition.length));
       }
     };
     stdin.on("keypress", onKeypress);

@@ -32,17 +32,41 @@ test("local owner bootstrap hashes the chosen password and targets only the demo
   assert.match(sql, /delete from public\.platform_sessions/u);
 });
 
-test("local owner bootstrap rejects invalid input before hashing or database access", async () => {
+test("local owner bootstrap reports the invalid field before hashing or database access", async () => {
   let calls = 0;
+  const dependencies = {
+    hashPassword: async () => { calls += 1; return "unused"; },
+    runSql: () => { calls += 1; },
+  };
+
+  await assert.rejects(() => bootstrapLocalOwner({
+    displayName: " ",
+    email: "owner@example.com",
+    password: "valid-password",
+    passwordConfirmation: "valid-password",
+  }, dependencies), /valid owner name/u);
+
   await assert.rejects(() => bootstrapLocalOwner({
     displayName: "Owner",
     email: "not-an-email",
+    password: "valid-password",
+    passwordConfirmation: "valid-password",
+  }, dependencies), /valid owner email address/u);
+
+  await assert.rejects(() => bootstrapLocalOwner({
+    displayName: "Owner",
+    email: "owner@example.com",
     password: "short",
-    passwordConfirmation: "different",
-  }, {
-    hashPassword: async () => { calls += 1; return "unused"; },
-    runSql: () => { calls += 1; },
-  }), /valid name, email address, and password/u);
+    passwordConfirmation: "short",
+  }, dependencies), /at least 12 characters/u);
+
+  await assert.rejects(() => bootstrapLocalOwner({
+    displayName: "Owner",
+    email: "owner@example.com",
+    password: "valid-password",
+    passwordConfirmation: "different-password",
+  }, dependencies), /confirmation does not match/u);
+
   assert.equal(calls, 0);
 });
 

@@ -33,6 +33,7 @@ large historical plan trees.
 | --- | --- |
 | Install one production appointment business | [Production first-run tutorial](tutorials/production-first-run.md) |
 | Manually test the local Docker product | [Local Docker acceptance guide](how-to/manual-docker-acceptance.md) |
+| Run only tests that require private accounts or human judgment | [User-only acceptance guide](how-to/user-only-acceptance.md) |
 | Configure and operate the business | [Owner onboarding](how-to/owner-onboarding.md) and [Staff working day](how-to/staff-working-day.md) |
 | Connect optional booking channels | [AI](how-to/connect-ai.md) and [WhatsApp](how-to/connect-whatsapp.md) |
 | Recover or upgrade production | [Recover an installation](how-to/recover-installation.md) and [Release compatibility](reference/release-compatibility.md) |

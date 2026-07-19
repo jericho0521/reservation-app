@@ -4,6 +4,11 @@ Use this guide to test the platform as a business owner, staff member, and
 customer. It is written for the seeded local Docker installation, not a
 production server.
 
+If you only want the tests that require your private accounts, physical phone,
+or human judgment, use
+[Tests that require a real person or private account](user-only-acceptance.md).
+Codex can execute the remaining checks in this comprehensive guide.
+
 Complete the tests in order. Record only synthetic or redacted evidence. Never
 record passwords, session cookies, invitation tokens, reservation-management
 links, API keys, SMTP credentials, WhatsApp QR codes, phone numbers, or real

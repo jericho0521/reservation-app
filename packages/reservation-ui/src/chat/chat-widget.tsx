@@ -27,7 +27,7 @@ export function ChatWidget(props: ChatWidgetProps) {
   return <section className="rp-chat" aria-label={`${props.brandName} booking assistant`}>
     <header className="rp-chat-header">
       <div><span>Booking assistant</span><h1>Chat with {props.brandName}</h1></div>
-      <span className={`rp-chat-status ${props.handoff ? "is-handoff" : ""}`}>{props.handoff ? "Staff joined" : "AI available"}</span>
+      <span className={`rp-chat-status ${props.handoff ? "is-handoff" : ""}`}>{props.handoff ? "Staff joined" : "Booking assistant available"}</span>
     </header>
     <div className="rp-chat-timeline" role="log" aria-live="polite" aria-busy={props.loading || props.restoring}>
       {props.restoring ? <p className="rp-chat-notice">Restoring your conversation…</p> : null}
@@ -42,7 +42,7 @@ export function ChatWidget(props: ChatWidgetProps) {
     {props.proposal && !props.reservation ? <aside className="rp-chat-proposal" aria-label="Booking proposal">
       <span>Ready for confirmation</span>
       <h2>{props.proposal.service_name}</h2>
-      <dl><div><dt>Date</dt><dd>{props.proposal.date}</dd></div><div><dt>Time</dt><dd>{props.proposal.start_time}–{props.proposal.end_time}</dd></div><div><dt>Quantity</dt><dd>{props.proposal.quantity}</dd></div></dl>
+      <dl><div><dt>Date</dt><dd>{props.proposal.date}</dd></div><div><dt>Time</dt><dd>{props.proposal.start_time}–{props.proposal.end_time}</dd></div>{props.proposal.practitioner_name ? <div><dt>Practitioner</dt><dd>{props.proposal.practitioner_name}</dd></div> : null}<div><dt>Quantity</dt><dd>{props.proposal.quantity}</dd></div></dl>
       <button type="button" disabled={props.loading || props.handoff} onClick={props.onConfirm}>Confirm booking</button>
       <small>No reservation is created until you press confirm.</small>
     </aside> : null}

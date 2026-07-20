@@ -11,8 +11,8 @@ function text(node: unknown): string {
 
 test("chat widget renders proposal confirmation, retry, typing, and handoff states", () => {
   const base = { brandName: "Apex", messages: [], draft: "", onDraftChange() {}, onSend() {}, onConfirm() {}, onRetry() {} };
-  const proposal = ChatWidget({ ...base, proposal: { proposal_id: "p1", service_id: "s1", service_name: "Sprint", date: "2026-08-10", start_time: "14:00", end_time: "15:00", quantity: 1 } });
-  assert.match(text(proposal), /Ready for confirmation.*Confirm booking.*No reservation is created/u);
+  const proposal = ChatWidget({ ...base, proposal: { proposal_id: "p1", service_id: "s1", service_name: "Sprint", staff_id: "11111111-1111-4111-8111-111111111111", practitioner_name: "Alex", date: "2026-08-10", start_time: "14:00", end_time: "15:00", quantity: 1 } });
+  assert.match(text(proposal), /Booking assistant available.*Ready for confirmation.*PractitionerAlex.*Confirm booking.*No reservation is created/u);
   const loading = ChatWidget({ ...base, loading: true });
   assert.match(text(loading), /Assistant is checking/u);
   const failed = ChatWidget({ ...base, error: "Offline", canRetry: true });

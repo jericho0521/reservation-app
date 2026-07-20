@@ -447,6 +447,7 @@ test("catalog mutations preserve scoped service rows and archive instead of dele
       venue_id: "venue_1",
       name: "Simulator Session",
       description: "Timed session",
+      duration_minutes: 60,
       total_seats: 8,
       resource_kind: "station",
       selection_mode: "assigned_resource",
@@ -509,6 +510,68 @@ test("appointment practitioner resource creation uses the atomic profile RPC", a
     p_service_id: "service-1",
     p_display_name: "Ada",
   }]]);
+});
+
+test("appointment practitioner updates and deactivation use the synchronized lifecycle RPC", async () => {
+  const calls: Array<[string, Record<string, unknown> | undefined]> = [];
+  const client = {
+    from(table: string) {
+      const result = table === RESERVATION_SUPABASE_TABLES.reservableResources
+        ? {
+            data: {
+              id: "resource-1",
+              service_id: "service-1",
+              label: "Ada",
+              resource_kind: "custom",
+              capacity: 1,
+              metadata: { platform_staff_id: "11111111-1111-4111-8111-111111111111" },
+            },
+            error: null,
+          }
+        : { data: { id: "service-1", booking_mode: "appointment" }, error: null };
+      return {
+        select() { return this; },
+        eq() { return this; },
+        async single() { return result; },
+      };
+    },
+    async rpc(name: string, params?: Record<string, unknown>) {
+      calls.push([name, params]);
+      return { data: { id: "resource-1", service_id: "service-1", label: params?.p_display_name }, error: null };
+    },
+  };
+  const repository = createSupabasePlatformCatalogRepository(client as never);
+  const scope = { tenantId: "tenant-1", venueId: "venue-1" };
+
+  await repository.updateResource!(scope, "resource-1", {
+    service_id: "service-1",
+    label: "Ada Lovelace",
+    kind: "custom",
+    capacity: 1,
+    is_active: true,
+  });
+  await repository.archiveResource!(scope, "resource-1", { reason: "Leave" });
+
+  assert.deepEqual(calls, [
+    ["platform_update_appointment_practitioner_resource", {
+      p_tenant_id: "tenant-1",
+      p_venue_id: "venue-1",
+      p_resource_id: "resource-1",
+      p_service_id: "service-1",
+      p_display_name: "Ada Lovelace",
+      p_active: true,
+      p_archive_reason: null,
+    }],
+    ["platform_update_appointment_practitioner_resource", {
+      p_tenant_id: "tenant-1",
+      p_venue_id: "venue-1",
+      p_resource_id: "resource-1",
+      p_service_id: "service-1",
+      p_display_name: "Ada",
+      p_active: false,
+      p_archive_reason: "Leave",
+    }],
+  ]);
 });
 
 test("catalog repository preserves strict service query errors without fallback reads", async () => {
@@ -2274,6 +2337,7 @@ const atomicErrorCodes = [
   "missing_resource_labels",
   "maintenance_conflict",
   "resource_conflict",
+  "outside_availability",
   "not_enough_capacity",
 ] as const satisfies readonly SupabaseAtomicReservationErrorCode[];
 

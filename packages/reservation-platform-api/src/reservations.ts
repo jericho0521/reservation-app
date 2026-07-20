@@ -86,6 +86,7 @@ export type ReservationCreateAtomicErrorCode =
   | "missing_resource_labels"
   | "maintenance_conflict"
   | "resource_conflict"
+  | "outside_availability"
   | "not_enough_capacity";
 
 export type ReservationCreateAtomicValidation = {
@@ -625,6 +626,17 @@ function platformAtomicCreateErrorBody(
     return {
       status: 400,
       body: platformErrorBody("validation_failed", "Invalid reservation data", 400),
+    };
+  }
+
+  if (error === "outside_availability") {
+    return {
+      status: 409,
+      body: platformErrorBody(
+        "conflict",
+        "Selected time is outside current availability",
+        409,
+      ),
     };
   }
 

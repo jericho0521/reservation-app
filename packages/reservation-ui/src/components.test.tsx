@@ -69,8 +69,27 @@ test("AvailabilityTimeline explains unavailable slots", () => {
     onSelect: () => undefined,
   });
 
-  assert.match(flattenText(element), /Sold Out/);
+  assert.match(flattenText(element), /Only 1 left/);
   assert.equal(collectProps(element, (props) => props.disabled === true ? true : undefined).length, 1);
+});
+
+test("AvailabilityTimeline distinguishes fully booked from a closed date", () => {
+  const fullyBooked = AvailabilityTimeline({
+    label: "Time",
+    slots: [{ start_time: "09:00", end_time: "10:00", available_quantity: 0, is_available: false }],
+    quantity: 1,
+    onSelect: () => undefined,
+  });
+  const closed = AvailabilityTimeline({
+    label: "Time",
+    slots: [],
+    quantity: 1,
+    onSelect: () => undefined,
+  });
+
+  assert.match(flattenText(fullyBooked), /Fully booked/);
+  assert.match(flattenText(closed), /business may be closed/);
+  assert.match(flattenText(closed), /Choose another date/);
 });
 
 test("DatePicker associates its visible caption with the date input", () => {

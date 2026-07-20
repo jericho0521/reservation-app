@@ -87,6 +87,68 @@ test("assigned-resource proposals bind real available resources before confirmat
   ]);
 });
 
+test("appointment proposals deterministically bind an available practitioner", async () => {
+  const fixture = createFixture({ responder: { content: "Please confirm the 2pm slot.", supported: true, booking: preparedBooking } });
+  const alexStaffId = "11111111-1111-4111-8111-111111111111";
+  const zoeStaffId = "22222222-2222-4222-8222-222222222222";
+  fixture.dependencies.tools.getService = async () => ({
+    service_id: "service_1",
+    name: "Simulator Session",
+    booking_mode: "appointment",
+    resource_kind: "custom",
+    resource_strategy: "assigned_resource",
+  });
+  fixture.dependencies.tools.checkAvailability = async (_scope, input) => ({
+    slots: [{
+      start_time: "14:00",
+      end_time: "15:00",
+      available_quantity: 1,
+      is_available: true,
+      ...(input.staffId ? { staff_id: input.staffId } : {}),
+    }],
+    resources: [
+      { resource_id: "resource_zoe", service_id: "service_1", label: "Zoe", kind: "custom", is_active: true, capacity: 1, metadata: { platform_staff_id: zoeStaffId } },
+      { resource_id: "resource_alex", service_id: "service_1", label: "Alex", kind: "custom", is_active: true, capacity: 1, metadata: { platform_staff_id: alexStaffId } },
+    ],
+  });
+
+  const proposed = await inbound(fixture.dependencies);
+  const proposal = "proposal" in proposed.body ? proposed.body.proposal : undefined;
+  assert.equal(proposal?.booking.staff_id, alexStaffId);
+  assert.equal(proposal?.booking.practitioner_name, "Alex");
+  const confirmed = await confirmConversationBooking({
+    scope,
+    conversationId: "conversation_1",
+    proposalId: proposal?.proposalId ?? "",
+    dependencies: fixture.dependencies,
+  });
+  assert.equal(confirmed.status, 200);
+  assert.equal((fixture.createCalls[0]?.input as { staff_id?: string }).staff_id, alexStaffId);
+  assert.deepEqual((fixture.createCalls[0]?.input as { resource_ids?: string[] }).resource_ids, ["resource_alex"]);
+});
+
+test("appointment proposals exclude inactive or unmapped practitioners", async () => {
+  const fixture = createFixture({ responder: { content: "Please confirm the 2pm slot.", supported: true, booking: preparedBooking } });
+  fixture.dependencies.tools.getService = async () => ({
+    service_id: "service_1",
+    name: "Simulator Session",
+    booking_mode: "appointment",
+    resource_kind: "custom",
+    resource_strategy: "assigned_resource",
+  });
+  fixture.dependencies.tools.checkAvailability = async () => ({
+    slots: [{ start_time: "14:00", end_time: "15:00", available_quantity: 1, is_available: true }],
+    resources: [
+      { resource_id: "resource_inactive", service_id: "service_1", label: "Inactive", kind: "custom", is_active: false, capacity: 1, metadata: { platform_staff_id: "11111111-1111-4111-8111-111111111111" } },
+      { resource_id: "resource_unmapped", service_id: "service_1", label: "Unmapped", kind: "custom", is_active: true, capacity: 1 },
+    ],
+  });
+
+  const proposed = await inbound(fixture.dependencies);
+  assert.equal("proposal" in proposed.body, false);
+  assert.equal(fixture.createCalls.length, 0);
+});
+
 test("stale availability blocks confirmation before reservation creation", async () => {
   const fixture = createFixture({ responder: { content: "Please confirm.", supported: true, booking: preparedBooking } });
   const proposed = await inbound(fixture.dependencies);
@@ -95,6 +157,23 @@ test("stale availability blocks confirmation before reservation creation", async
   const result = await confirmConversationBooking({ scope, conversationId: "conversation_1", proposalId: proposalId!, dependencies: fixture.dependencies });
   assert.equal(result.status, 409);
   assert.equal(fixture.createCalls.length, 0);
+});
+
+test("reservation conflicts remain actionable instead of becoming storage failures", async () => {
+  const fixture = createFixture({ responder: { content: "Please confirm.", supported: true, booking: preparedBooking } });
+  const proposed = await inbound(fixture.dependencies);
+  const proposalId = "proposal" in proposed.body ? proposed.body.proposal?.proposalId : undefined;
+  fixture.dependencies.tools.createReservation = async () => {
+    throw Object.assign(new Error("slot occupied"), { status: 409, code: "conflict" });
+  };
+  const result = await confirmConversationBooking({
+    scope,
+    conversationId: "conversation_1",
+    proposalId: proposalId!,
+    dependencies: fixture.dependencies,
+  });
+  assert.equal(result.status, 409);
+  assert.match("error" in result.body ? result.body.error.message : "", /another time/u);
 });
 
 test("manual takeover suppresses the responder and all automated replies", async () => {

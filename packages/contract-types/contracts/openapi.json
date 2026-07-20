@@ -898,6 +898,9 @@
           "end_time": {
             "type": "string"
           },
+          "practitioner_name": {
+            "type": "string"
+          },
           "proposal_id": {
             "type": "string"
           },
@@ -909,6 +912,10 @@
             "type": "string"
           },
           "service_name": {
+            "type": "string"
+          },
+          "staff_id": {
+            "format": "uuid",
             "type": "string"
           },
           "start_time": {
@@ -1877,6 +1884,9 @@
             "maximum": 10000,
             "minimum": 1,
             "type": "integer"
+          },
+          "is_active": {
+            "type": "boolean"
           },
           "kind": {
             "$ref": "#/components/schemas/ResourceKind"
@@ -3375,6 +3385,13 @@
       "ServiceResponse": {
         "additionalProperties": false,
         "properties": {
+          "booking_mode": {
+            "enum": [
+              "resource",
+              "appointment"
+            ],
+            "type": "string"
+          },
           "description": {
             "type": "string"
           },

@@ -1269,9 +1269,6 @@ async function handleSessionAuthRoute(
         referenceId: result.user.userId,
         token: result.invitationToken,
       });
-      if (emailDelivery === "failed") {
-        return platformError(503, "internal_error", "Invitation email could not be queued. No invitation link was exposed.");
-      }
       const emailed = emailDelivery === "queued";
       return jsonResponse(201, {
         user_id: result.user.userId,
@@ -1397,6 +1394,13 @@ async function enqueueAccountEmail(
     });
     return "queued" as const;
   } catch {
+    console.warn(JSON.stringify({
+      level: "warn",
+      component: "api",
+      event: "account_email_queue_failed",
+      errorCode: "account_email_queue_failed",
+      kind: input.kind,
+    }));
     return "failed" as const;
   }
 }
@@ -2267,6 +2271,8 @@ function toPublicChatProposal(
     proposal_id: proposal.proposalId,
     service_id: proposal.booking.service_id,
     service_name: proposal.booking.service_name,
+    ...(proposal.booking.staff_id ? { staff_id: proposal.booking.staff_id } : {}),
+    ...(proposal.booking.practitioner_name ? { practitioner_name: proposal.booking.practitioner_name } : {}),
     date: proposal.booking.date,
     start_time: proposal.booking.start_time,
     end_time: proposal.booking.end_time,

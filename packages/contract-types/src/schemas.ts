@@ -388,6 +388,7 @@ export const serviceResponseSchema = strictObject({
   service_id: z.string(),
   venue_id: z.string().optional(),
   name: z.string(),
+  booking_mode: z.enum(["resource", "appointment"]).optional(),
   is_active: z.boolean().optional(),
   description: z.string().optional(),
   duration_minutes: z.number().int().positive().optional(),
@@ -414,6 +415,7 @@ export const experienceResourceInputSchema = strictObject({
   label: z.string().trim().min(1).max(120),
   kind: resourceKindSchema,
   capacity: z.number().int().positive().max(10000),
+  is_active: z.boolean().optional(),
 });
 
 export const archiveCatalogItemInputSchema = strictObject({
@@ -643,6 +645,8 @@ export const conversationBookingProposalResponseSchema = strictObject({
   proposal_id: z.string().min(1),
   service_id: z.string().min(1),
   service_name: z.string().min(1),
+  staff_id: z.string().uuid().optional(),
+  practitioner_name: z.string().min(1).optional(),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   start_time: z.string().min(1),
   end_time: z.string().min(1),

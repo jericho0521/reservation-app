@@ -58,6 +58,7 @@ export async function saveResourceAction(_previous: StudioActionState, formData:
       label: requiredField(formData, "label"),
       kind: requiredField(formData, "kind") as "seat" | "station" | "room" | "court" | "screening" | "capacity_bucket" | "custom",
       capacity: positiveInteger(formData, "capacity"),
+      is_active: formData.has("is_active"),
     };
     if (resourceId) await client.updateExperienceResource(resourceId, value);
     else await client.createExperienceResource(value);

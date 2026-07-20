@@ -83,9 +83,9 @@ test("database live proof config rejects unsafe Docker container command text", 
 test("database live proof plan selects backend-owned core migrations by default", async () => {
   const plan = await loadMigrationProofPlan();
 
-  assert.equal(plan.migrations.length, 11);
+  assert.equal(plan.migrations.length, 39);
   assert.equal(plan.seeds.length, 0);
-  assert.equal(plan.entries.length, 11);
+  assert.equal(plan.entries.length, 39);
   assert.ok(plan.entries.every((entry) => entry.path.startsWith("packages/database/migrations/supabase/")));
   assert.equal(plan.entries.some((entry) => entry.path.includes("/optional/")), false);
 });
@@ -96,9 +96,9 @@ test("database live proof plan can include optional AI retrieval migrations and 
     includeDevelopmentSeeds: true,
   });
 
-  assert.equal(plan.migrations.length, 14);
+  assert.equal(plan.migrations.length, 42);
   assert.equal(plan.seeds.length, 1);
-  assert.equal(plan.entries.length, 15);
+  assert.equal(plan.entries.length, 43);
   assert.ok(
     plan.entries.some(
       (entry) =>
@@ -192,9 +192,14 @@ test("database live proof behavior SQL covers RLS and idempotency checks", () =>
   const sql = buildDatabaseBehaviorProofSql();
 
   assert.match(sql, /bookings RLS is not enabled/);
+  assert.match(sql, /insert into public\.tenants \(id, name\)/i);
+  assert.match(sql, /insert into public\.venues \(id, tenant_id, name\)/i);
+  assert.match(sql, /insert into public\.services \(\s*id,\s*venue_id,/i);
+  assert.match(sql, /delete from public\.platform_idempotency_records/i);
   assert.match(sql, /set role anon/i);
   assert.match(sql, /set role authenticated/i);
   assert.match(sql, /set role service_role/i);
   assert.match(sql, /platform_claim_idempotency_record/);
   assert.match(sql, /platform_store_idempotency_record/);
+  assert.match(sql, /on conflict \(id\) do update set/i);
 });

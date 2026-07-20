@@ -474,7 +474,7 @@ export function AvailabilityTimeline({
         </div>
       ) : slots.length === 0 ? (
         <div className="rp-empty-state border border-dashed border-neutral-300 dark:border-neutral-700 p-6 text-center text-xs font-mono text-neutral-500 rounded-none">
-          No slots available for the selected date.
+          No bookable times are offered on this date. The business may be closed or the date may be outside its booking window. Choose another date.
         </div>
       ) : (
         <div className="rp-slot-grid grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -499,7 +499,13 @@ export function AvailabilityTimeline({
               >
                 <span className="rp-slot-time text-sm font-bold tracking-tight">{start}</span>
                 <span className="rp-slot-meta text-[9px] uppercase tracking-wider opacity-60 mt-1">
-                  {disabled ? "Sold Out" : `${slot.available_quantity} left`}
+                  {!slot.is_available && slot.available_quantity > 0
+                    ? "Unavailable"
+                    : slot.available_quantity === 0
+                      ? "Fully booked"
+                      : slot.available_quantity < quantity
+                        ? `Only ${slot.available_quantity} left`
+                        : `${slot.available_quantity} left`}
                 </span>
               </button>
             );

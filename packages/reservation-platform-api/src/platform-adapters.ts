@@ -93,6 +93,14 @@ function legacyServiceNameFrom(row: UnknownRecord) {
   return stringValue(asRecord(services).name);
 }
 
+function legacyServiceVenueIdFrom(row: UnknownRecord) {
+  const services = row.services;
+  if (Array.isArray(services)) {
+    return stringValue(asRecord(services[0]).venue_id);
+  }
+  return stringValue(asRecord(services).venue_id);
+}
+
 function resourceKindFrom(value: unknown): ResourceResponse["kind"] {
   const kind = stringValue(value);
   return kind === "seat" ||
@@ -204,8 +212,11 @@ export function toPlatformService(row: unknown): ServiceResponse {
 
   return {
     service_id: stringValue(record.id) ?? stringValue(record.service_id) ?? "",
-    venue_id: stringValue(record.venue_id),
+    venue_id: stringValue(record.venue_id) ?? legacyServiceVenueIdFrom(record),
     name: stringValue(record.name) ?? "Untitled service",
+    ...(record.booking_mode === "appointment" || record.booking_mode === "resource"
+      ? { booking_mode: record.booking_mode }
+      : {}),
     is_active: record.is_active === false || asRecord(record.metadata).is_active === false ? false : true,
     description: stringValue(record.description),
     duration_minutes: numberValue(record.duration_minutes) ?? numberValue(asRecord(record.metadata).duration_minutes),
@@ -323,6 +334,13 @@ export function toPlatformAvailabilityResponse(legacy: unknown): AvailabilityRes
 export function toLegacyBookingCreateInput(input: CreateReservationInput) {
   const resourceLabels = resourceLabelsFromInput(input);
   const reservationItems = legacyReservationItemsFromInput(input);
+  const channel: "web_booking" | "web_chat" | "whatsapp" | "staff" | "simulation" | undefined = input.source === "web_booking"
+    || input.source === "web_chat"
+    || input.source === "whatsapp"
+    || input.source === "staff"
+    || input.source === "simulation"
+    ? input.source
+    : undefined;
   return {
     service_id: input.service_id,
     user_name: input.customer.name ?? input.customer.external_customer_id ?? input.customer.customer_id ?? "Guest",
@@ -334,8 +352,10 @@ export function toLegacyBookingCreateInput(input: CreateReservationInput) {
     seats_booked: input.quantity,
     seat_labels: resourceLabels,
     reservation_items: reservationItems,
-    interface_type: "form" as const,
-    ...(input.source === "staff" ? { channel: "staff" as const } : {}),
+    interface_type: channel === "web_chat" || channel === "whatsapp" || channel === "simulation"
+      ? "chat" as const
+      : "form" as const,
+    ...(channel ? { channel } : {}),
     ...(input.staff_id ? { staff_id: input.staff_id } : {}),
   };
 }
@@ -385,7 +405,7 @@ export function toPlatformReservation(row: unknown): ReservationResponse {
     reservation_id: stringValue(record.id) ?? stringValue(record.reservation_id) ?? "",
     status: appointmentStatusValue(record.status),
     tenant_id: stringValue(record.tenant_id),
-    venue_id: stringValue(record.venue_id),
+    venue_id: stringValue(record.venue_id) ?? legacyServiceVenueIdFrom(record),
     service_id: stringValue(record.service_id) ?? "",
     ...(stringValue(record.staff_id) ? { staff_id: stringValue(record.staff_id) } : {}),
     date: stringValue(record.booking_date) ?? stringValue(record.date),

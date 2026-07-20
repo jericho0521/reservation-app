@@ -210,8 +210,8 @@ export function staffIdFromResource(resource: ResourceResponse | undefined) {
 
 export function bookingErrorMessage(error: unknown) {
   if (isPlatformError(error)) {
-    if (error.body.code === "conflict" || error.body.code === "validation_failed") {
-      return "That option is no longer available. Refresh availability and choose another time.";
+    if (error.body.code === "conflict") {
+      return `${error.body.message}. Availability has been refreshed; choose another option.`;
     }
     return error.body.message;
   }

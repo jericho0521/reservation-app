@@ -202,12 +202,12 @@ test("platform reservation adapter maps legacy booking customer and resources", 
     seat_labels: ["A1", "A2"],
     status: "confirmed",
     interface_type: "chat",
-    services: { name: "Simulator" },
+    services: { name: "Simulator", venue_id: "venue_123" },
   }), {
     reservation_id: "booking_123",
     status: "confirmed",
     tenant_id: undefined,
-    venue_id: undefined,
+    venue_id: "venue_123",
     service_id: "svc_123",
     date: "2026-01-02",
     start_time: "12:00",
@@ -271,6 +271,21 @@ test("platform appointment create adapter preserves the selected practitioner", 
   });
 
   assert.equal(adapted.staff_id, staffId);
+});
+
+test("platform reservation create adapter preserves conversational channel origin", () => {
+  const adapted = toLegacyBookingCreateInput({
+    service_id: "svc_123",
+    date: "2026-01-02",
+    start_time: "12:00",
+    end_time: "13:00",
+    quantity: 1,
+    customer: { name: "Ada", email: "ada@example.com" },
+    source: "web_chat",
+  });
+
+  assert.equal(adapted.interface_type, "chat");
+  assert.equal(adapted.channel, "web_chat");
 });
 
 test("platform reservation create adapter bridges resource ids for legacy assigned-resource routes", () => {

@@ -68,7 +68,11 @@ async function invitationUrl(token: string) {
   if (!host || !/^[a-z0-9.-]+(?::\d+)?$/iu.test(host) || (protocol !== "https" && protocol !== "http")) {
     throw new Error("The invitation origin is unavailable.");
   }
-  if (process.env.NODE_ENV === "production" && protocol !== "https") {
+  const hostname = host.replace(/:\d+$/u, "").toLowerCase();
+  const isLoopbackHost = hostname === "127.0.0.1"
+    || hostname === "localhost"
+    || hostname.endsWith(".localhost");
+  if (process.env.NODE_ENV === "production" && protocol !== "https" && !isLoopbackHost) {
     throw new Error("Production invitation links require HTTPS.");
   }
   return `${protocol}://${host}/admin/invite/${encodeURIComponent(token)}`;

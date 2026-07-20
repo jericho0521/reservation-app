@@ -419,6 +419,28 @@
       ]
     },
     {
+      "kind": "core-migration",
+      "order": 38,
+      "targetPath": "packages/database/migrations/supabase/000038_strict_reservation_availability.sql",
+      "sourceAssets": [
+        {
+          "path": "packages/database/migrations/supabase/000038_strict_reservation_availability.sql",
+          "section": "Atomic duration and published-availability enforcement for every reservation booking mode"
+        }
+      ]
+    },
+    {
+      "kind": "core-migration",
+      "order": 39,
+      "targetPath": "packages/database/migrations/supabase/000039_appointment_practitioner_lifecycle.sql",
+      "sourceAssets": [
+        {
+          "path": "packages/database/migrations/supabase/000039_appointment_practitioner_lifecycle.sql",
+          "section": "Atomic appointment practitioner profile, resource, service, location, and active-status lifecycle"
+        }
+      ]
+    },
+    {
       "kind": "optional-ai-retrieval",
       "targetPath": "packages/database/migrations/supabase/optional/ai-retrieval/000001_knowledge_chunks.sql",
       "sourceAssets": [

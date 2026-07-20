@@ -11,6 +11,8 @@ test("staff invitation link is an ephemeral server-action result", async () => {
   assert.match(action, /invitation_token/u);
   assert.match(action, /Copy this link now; it cannot be shown again/u);
   assert.doesNotMatch(action, /console\.|localStorage|sessionStorage/u);
+  assert.match(action, /hostname === "127\.0\.0\.1"/u);
+  assert.match(action, /hostname\.endsWith\("\.localhost"\)/u);
   assert.match(form, /state\.invitationUrl/u);
   assert.match(form, /Transfer it privately/u);
 });

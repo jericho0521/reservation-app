@@ -5,6 +5,7 @@ import {
   type AvailabilitySlot,
   type ReservationResponse,
 } from "@reservation-platform/sdk";
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import {
   loadManagedRescheduleAvailability,
@@ -22,6 +23,7 @@ export function ManagedRescheduleForm({
   token: string;
   reservation: Pick<ReservationResponse, "service_id" | "staff_id" | "quantity" | "date" | "start_at">;
 }) {
+  const router = useRouter();
   const client = useMemo(() => createReservationPlatformClient({ baseUrl }), [baseUrl]);
   const [date, setDate] = useState(reservation.date ?? reservation.start_at?.slice(0, 10) ?? "");
   const [slots, setSlots] = useState<AvailabilitySlot[]>([]);
@@ -71,6 +73,7 @@ export function ManagedRescheduleForm({
       }
       setNotice({ kind: "success", message: "Your appointment was rescheduled." });
       await refreshAvailability(date);
+      router.refresh();
     } catch {
       setNotice({ kind: "error", message: "The appointment could not be rescheduled. Please try again." });
     } finally {

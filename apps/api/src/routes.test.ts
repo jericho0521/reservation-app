@@ -999,23 +999,34 @@ test("enabled email queues an encrypted invitation and never returns the raw cap
   assert.equal(JSON.stringify(queued).includes(token), false);
   assert.equal(queued[0].payload.encryptedAction.ciphertext, "encrypted-capability");
 
-  const failed = await handleStandaloneApiRequest({
-    method: "POST",
-    path: "/v1/auth/staff/invitations",
-    headers: {
-      origin: authOrigin,
-      cookie: `reservation_session=${"s".repeat(43)}; reservation_csrf=${"c".repeat(43)}`,
-      "x-csrf-token": "c".repeat(43),
-    },
-    body: { email: "new@example.com", display_name: "New Staff", venue_ids: ["123e4567-e89b-42d3-a456-426614174000"] },
-  }, {
-    sessionAuth: { repositories: authRepository(), allowedOrigins: [authOrigin], tokenFactory: () => token },
-    integrationSettingsRepository: integrationRepositoryFixture(),
-    integrationCredentialEncryptor: () => ({ v: 1, alg: "aes-256-gcm", iv: "iv", tag: "tag", ciphertext: "encrypted-capability" }),
-    notificationJobQueue: { async enqueue() { throw new Error("queue unavailable"); } },
-  });
-  assert.equal(failed.status, 503);
-  assert.equal(JSON.stringify(failed.body).includes(token), false);
+  const warnings: string[] = [];
+  const originalWarn = console.warn;
+  console.warn = (...values) => { warnings.push(values.join(" ")); };
+  let failed;
+  try {
+    failed = await handleStandaloneApiRequest({
+      method: "POST",
+      path: "/v1/auth/staff/invitations",
+      headers: {
+        origin: authOrigin,
+        cookie: `reservation_session=${"s".repeat(43)}; reservation_csrf=${"c".repeat(43)}`,
+        "x-csrf-token": "c".repeat(43),
+      },
+      body: { email: "new@example.com", display_name: "New Staff", venue_ids: ["123e4567-e89b-42d3-a456-426614174000"] },
+    }, {
+      sessionAuth: { repositories: authRepository(), allowedOrigins: [authOrigin], tokenFactory: () => token },
+      integrationSettingsRepository: integrationRepositoryFixture(),
+      integrationCredentialEncryptor: () => ({ v: 1, alg: "aes-256-gcm", iv: "iv", tag: "tag", ciphertext: "encrypted-capability" }),
+      notificationJobQueue: { async enqueue() { throw new Error("queue unavailable"); } },
+    });
+  } finally {
+    console.warn = originalWarn;
+  }
+  assert.equal(failed.status, 201);
+  assert.equal((failed.body as { delivery: string }).delivery, "manual");
+  assert.equal((failed.body as { invitation_token: string }).invitation_token, token);
+  assert.match(warnings.join("\n"), /account_email_queue_failed/u);
+  assert.equal(warnings.join("\n").includes(token), false);
 });
 
 test("owner lists staff, disables accounts, and replaces venue assignments while staff is denied", async () => {

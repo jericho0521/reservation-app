@@ -16,6 +16,7 @@ const appointments: ReservationResponse[] = [
   { reservation_id: "a-early", venue_id: "venue-a", service_id: "service-a", staff_id: "staff-a", status: "pending", date: "2026-07-15", start_time: "09:00", end_time: "09:30", quantity: 1 },
   { reservation_id: "b-private", venue_id: "venue-b", service_id: "service-a", staff_id: "staff-a", status: "confirmed", date: "2026-07-15", start_time: "10:00", end_time: "10:30", quantity: 1 },
   { reservation_id: "a-tomorrow", venue_id: "venue-a", service_id: "service-a", staff_id: "staff-a", status: "confirmed", date: "2026-07-16", start_time: "09:00", end_time: "09:30", quantity: 1 },
+  { reservation_id: "scoped-legacy", service_id: "service-a", status: "confirmed", date: "2026-07-15", start_time: "12:00", end_time: "12:30", quantity: 1 },
 ];
 
 test("appointment transitions are explicit and terminal states stay terminal", () => {
@@ -55,8 +56,9 @@ test("daily filters never include appointments outside authorized locations", ()
 test("daily appointments are ordered by start time and date navigation is timezone-neutral", () => {
   assert.deepEqual(filterAppointments(appointments, {
     date: "2026-07-15",
+    venueId: "venue-a",
     authorizedVenueIds: ["venue-a"],
-  }).map((appointment) => appointment.reservation_id), ["a-early", "a-late"]);
+  }).map((appointment) => appointment.reservation_id), ["a-early", "a-late", "scoped-legacy"]);
   assert.equal(nextAppointmentDate("2026-07-15", -1), "2026-07-14");
   assert.equal(nextAppointmentDate("2026-07-15", 1), "2026-07-16");
 });

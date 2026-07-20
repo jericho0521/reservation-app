@@ -52,7 +52,7 @@ export function filterAppointments(reservations: readonly ReservationResponse[],
   const search = filters.search?.trim().toLocaleLowerCase();
   return reservations.filter((reservation) => {
     if (reservation.venue_id && !authorized.has(reservation.venue_id)) return false;
-    if (filters.venueId && reservation.venue_id !== filters.venueId) return false;
+    if (filters.venueId && reservation.venue_id && reservation.venue_id !== filters.venueId) return false;
     if (reservation.date !== filters.date) return false;
     if (filters.practitionerId && reservation.staff_id !== filters.practitionerId) return false;
     if (filters.status && reservation.status !== filters.status) return false;

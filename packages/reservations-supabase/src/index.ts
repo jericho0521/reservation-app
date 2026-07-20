@@ -174,6 +174,7 @@ export type SupabaseAtomicReservationErrorCode =
   | "missing_resource_labels"
   | "maintenance_conflict"
   | "resource_conflict"
+  | "outside_availability"
   | "not_enough_capacity";
 
 export interface CreateReservationAtomicInput {
@@ -686,8 +687,31 @@ export function createSupabasePlatformCatalogRepository(
 
     async updateResource(scope, id, value) {
       const client = adminClient();
-      const service = await readScopedService(client, scope.venueId, value.service_id);
+      const current = await fromTable(client, RESERVATION_SUPABASE_TABLES.reservableResources)
+        .select("id, service_id, label, resource_kind, capacity, metadata")
+        .eq("id", id)
+        .single() as QueryResult<unknown>;
+      if (current.error || !isRecord(current.data)) return toCatalogReadResult(current);
+      const service = await readScopedServiceMode(client, scope.venueId, value.service_id);
       if (service.error || !service.data) return toCatalogReadResult(service);
+      const appointmentResource = isRecord(current.data.metadata)
+        && typeof current.data.metadata.platform_staff_id === "string";
+      const appointmentService = isRecord(service.data) && service.data.booking_mode === "appointment";
+      if (appointmentResource || appointmentService) {
+        if (!client.rpc) throw new Error("Supabase client does not support RPC calls");
+        return toCatalogReadResult(await client.rpc(
+          "platform_update_appointment_practitioner_resource",
+          {
+            p_tenant_id: scope.tenantId,
+            p_venue_id: scope.venueId,
+            p_resource_id: id,
+            p_service_id: value.service_id,
+            p_display_name: value.label,
+            p_active: value.is_active !== false,
+            p_archive_reason: null,
+          },
+        ));
+      }
       return toCatalogReadResult(await fromTable(client, RESERVATION_SUPABASE_TABLES.reservableResources)
         .update(resourceMutationRow(value))
         .eq("id", id)
@@ -699,14 +723,32 @@ export function createSupabasePlatformCatalogRepository(
     async archiveResource(scope, id, value) {
       const client = adminClient();
       const resource = await fromTable(client, RESERVATION_SUPABASE_TABLES.reservableResources)
-        .select("id, service_id, metadata")
+        .select("id, service_id, label, resource_kind, capacity, metadata")
         .eq("id", id)
         .single() as QueryResult<unknown>;
       if (resource.error || !isRecord(resource.data) || typeof resource.data.service_id !== "string") {
         return toCatalogReadResult(resource);
       }
-      const service = await readScopedService(client, scope.venueId, resource.data.service_id);
+      const service = await readScopedServiceMode(client, scope.venueId, resource.data.service_id);
       if (service.error || !service.data) return toCatalogReadResult(service);
+      if (
+        isRecord(resource.data.metadata)
+        && typeof resource.data.metadata.platform_staff_id === "string"
+      ) {
+        if (!client.rpc) throw new Error("Supabase client does not support RPC calls");
+        return toCatalogReadResult(await client.rpc(
+          "platform_update_appointment_practitioner_resource",
+          {
+            p_tenant_id: scope.tenantId,
+            p_venue_id: scope.venueId,
+            p_resource_id: id,
+            p_service_id: resource.data.service_id,
+            p_display_name: resource.data.label,
+            p_active: false,
+            p_archive_reason: value.reason ?? null,
+          },
+        ));
+      }
       const metadata = isRecord(resource.data.metadata) ? resource.data.metadata : {};
       return toCatalogReadResult(await fromTable(client, RESERVATION_SUPABASE_TABLES.reservableResources)
         .update({ status: "inactive", metadata: { ...metadata, archive_reason: value.reason ?? null } })
@@ -722,6 +764,7 @@ function serviceMutationRow(venueId: string, value: ExperienceServiceInput) {
     venue_id: venueId,
     name: value.name,
     description: value.description ?? null,
+    duration_minutes: value.duration_minutes,
     total_seats: value.total_quantity,
     resource_kind: value.resource_kind,
     selection_mode: value.resource_strategy,
@@ -741,7 +784,7 @@ function resourceMutationRow(value: ExperienceResourceInput) {
     label: value.label,
     resource_kind: value.kind,
     capacity: value.capacity,
-    status: "available",
+    status: value.is_active === false ? "inactive" : "available",
   };
 }
 
@@ -1412,6 +1455,7 @@ function atomicErrorCodeFromUnknown(
     case "missing_resource_labels":
     case "maintenance_conflict":
     case "resource_conflict":
+    case "outside_availability":
     case "not_enough_capacity":
       return value;
     default:
@@ -1431,7 +1475,11 @@ function atomicValidationFromRpc(
 
   return {
     ok: false,
-    error: error === "invalid_service" || error === "invalid_staff" || error === "invalid_reservation" || error === "invalid_resource_labels"
+    error: error === "invalid_service"
+      || error === "invalid_staff"
+      || error === "invalid_reservation"
+      || error === "invalid_resource_labels"
+      || error === "outside_availability"
       ? undefined
       : error,
     available_quantity: availableQuantity,

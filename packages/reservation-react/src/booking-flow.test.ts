@@ -264,9 +264,14 @@ test("appointment journey requires a practitioner before date selection and forw
 test("booking journey maps stale API validation to a recovery instruction", () => {
   assert.equal(bookingErrorMessage(new PlatformError({
     code: "conflict",
-    message: "resource_conflict",
+    message: "Simulator A is no longer available",
     status: 409,
-  })), "That option is no longer available. Refresh availability and choose another time.");
+  })), "Simulator A is no longer available. Availability has been refreshed; choose another option.");
+  assert.equal(bookingErrorMessage(new PlatformError({
+    code: "validation_failed",
+    message: "Customer email is invalid",
+    status: 400,
+  })), "Customer email is invalid");
 });
 
 test("duplicate confirmation shares one in-flight reservation mutation", async () => {

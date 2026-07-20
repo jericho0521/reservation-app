@@ -326,6 +326,7 @@ export interface ServiceResponse {
   service_id: string;
   venue_id?: string;
   name: string;
+  booking_mode?: "resource" | "appointment";
   is_active?: boolean;
   description?: string;
   duration_minutes?: number;
@@ -352,6 +353,7 @@ export interface ExperienceResourceInput {
   label: string;
   kind: ResourceKind;
   capacity: number;
+  is_active?: boolean;
 }
 
 export interface ArchiveCatalogItemInput {
@@ -630,6 +632,8 @@ export interface ConversationBookingProposalResponse {
   proposal_id: string;
   service_id: string;
   service_name: string;
+  staff_id?: string;
+  practitioner_name?: string;
   date: string;
   start_time: string;
   end_time: string;

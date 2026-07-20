@@ -976,6 +976,12 @@ test("reservation create public atomic errors use reservation/resource language 
       validation: { ok: false, conflicting_resource_labels: ["RS2"] },
       details: { resource_labels: ["RS2"], seat_labels: ["RS2"] },
     },
+    {
+      error: "outside_availability" as const,
+      status: 409,
+      message: "Selected time is outside current availability",
+      validation: { ok: false },
+    },
   ];
 
   for (const testCase of cases) {

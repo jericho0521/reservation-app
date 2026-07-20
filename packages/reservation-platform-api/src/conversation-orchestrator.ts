@@ -51,7 +51,7 @@ export interface ConversationResponder {
 
 export interface ConversationBookingTools {
   getService(scope: ExperienceScope, serviceId: string): Promise<ServiceResponse | undefined>;
-  checkAvailability(scope: ExperienceScope, input: { serviceId: string; date: string }): Promise<AvailabilityResponse>;
+  checkAvailability(scope: ExperienceScope, input: { serviceId: string; date: string; staffId?: string }): Promise<AvailabilityResponse>;
   createReservation(scope: ExperienceScope, input: CreateReservationInput, idempotencyKey: string): Promise<ReservationResponse>;
 }
 
@@ -64,6 +64,8 @@ export interface ConversationBookingProposal {
 }
 
 type ConversationBoundBooking = BoundPreparedBooking & {
+  staff_id?: string;
+  practitioner_name?: string;
   resource_ids?: string[];
   reservation_items?: ReservationItemInput[];
 };
@@ -361,6 +363,15 @@ export async function confirmConversationBooking(input: {
       return { status: 200, body: { conversation, message: message.data, proposal: { ...proposal, status: "confirmed", reservation }, reservation } };
     } catch (error) {
       await input.dependencies.state.release(scope, proposal.proposalId);
+      if (isReservationConflict(error)) {
+        await safeAudit(input.dependencies.audit, {
+          type: "conversation.workflow.failed",
+          scope,
+          conversationId: conversation.conversation_id,
+          data: { proposal_id: proposal.proposalId, reason: "reservation_conflict" },
+        });
+        return failure(409, "conflict", "That appointment time is no longer available. Please choose another time.");
+      }
       throw error;
     }
   } catch {
@@ -400,7 +411,61 @@ async function revalidateProposal(scope: ExperienceScope, booking: PrepareBookin
     })),
   });
   if (!bound) return undefined;
+  if (service.booking_mode === "appointment") {
+    return bindAppointmentPractitioner(scope, service, availability, bound, tools);
+  }
   return bindRequiredResources(service, availability, bound);
+}
+
+async function bindAppointmentPractitioner(
+  scope: ExperienceScope,
+  service: ServiceResponse,
+  availability: AvailabilityResponse,
+  booking: BoundPreparedBooking,
+  tools: ConversationBookingTools,
+): Promise<ConversationBoundBooking | undefined> {
+  if (booking.seats !== 1) return undefined;
+  const resources = (availability.resources ?? service.resources ?? [])
+    .flatMap((resource) => {
+      const staffId = metadataString(resource.metadata, "platform_staff_id");
+      return resource.is_active !== false && staffId
+        ? [{ resource, staffId }]
+        : [];
+    })
+    .sort((left, right) => (
+      left.resource.label.localeCompare(right.resource.label)
+      || left.staffId.localeCompare(right.staffId)
+    ));
+
+  for (const { resource, staffId } of resources) {
+    const staffAvailability = await tools.checkAvailability(scope, {
+      serviceId: service.service_id,
+      date: booking.date,
+      staffId,
+    });
+    const slot = staffAvailability.slots.find((candidate) => (
+      candidate.is_available
+      && candidate.staff_id === staffId
+      && (candidate.start_time ?? candidate.start_at) === booking.start_time
+      && (candidate.end_time ?? candidate.end_at) === booking.end_time
+      && candidate.available_quantity >= booking.seats
+      && !(candidate.taken_resource_labels ?? []).includes(resource.label)
+      && !(candidate.maintenance_resource_labels ?? []).includes(resource.label)
+    ));
+    if (!slot) continue;
+    return {
+      ...booking,
+      staff_id: staffId,
+      practitioner_name: resource.label,
+      resource_ids: [resource.resource_id],
+      reservation_items: [{
+        resource_id: resource.resource_id,
+        resource_label: resource.label,
+        quantity: 1,
+      }],
+    };
+  }
+  return undefined;
 }
 
 function bindRequiredResources(
@@ -450,12 +515,24 @@ function reservationInput(booking: ConversationBoundBooking, channel: Conversati
     start_time: booking.start_time,
     end_time: booking.end_time,
     quantity: booking.seats,
+    ...(booking.staff_id ? { staff_id: booking.staff_id } : {}),
     ...(booking.resource_ids ? { resource_ids: booking.resource_ids } : {}),
     ...(booking.reservation_items ? { reservation_items: booking.reservation_items } : {}),
     customer: { name: booking.user_name, email: booking.user_email, phone: booking.user_phone },
     source: channel,
     metadata: { conversational_booking: true },
   };
+}
+
+function metadataString(metadata: ServiceResponse["metadata"], key: string) {
+  const value = metadata?.[key];
+  return typeof value === "string" && value.trim() ? value.trim() : undefined;
+}
+
+function isReservationConflict(error: unknown) {
+  if (!error || typeof error !== "object") return false;
+  const candidate = error as { status?: unknown; code?: unknown };
+  return candidate.status === 409 || candidate.code === "conflict";
 }
 
 function createProposalId(factory?: () => string) {

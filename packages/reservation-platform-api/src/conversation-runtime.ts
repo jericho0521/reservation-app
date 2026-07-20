@@ -21,14 +21,18 @@ export function createConversationBookingTools(input: {
         ? result.body.services.find((service) => service.service_id === serviceId)
         : undefined;
     },
-    async checkAvailability(scope, { serviceId, date }) {
+    async checkAvailability(scope, { serviceId, date, staffId }) {
       const services = await listPlatformServices(input.catalogRepository, { venueId: scope.venueId });
       if (!("services" in services.body) || !services.body.services.some((service) => service.service_id === serviceId)) {
         throw new Error("Service is outside the published experience.");
       }
       const result = await listAvailability({
         repository: input.availabilityRepository,
-        query: new URLSearchParams({ service_id: serviceId, date }),
+        query: new URLSearchParams({
+          service_id: serviceId,
+          date,
+          ...(staffId ? { staff_id: staffId } : {}),
+        }),
         venueId: scope.venueId,
       });
       if (!("slots" in result.body)) throw new Error(result.body.error.message);
@@ -41,7 +45,12 @@ export function createConversationBookingTools(input: {
         legacyInput: legacy.legacyInput,
         venueId: scope.venueId,
       });
-      if (!("reservation_id" in result.body)) throw new Error(result.body.error.message);
+      if (!("reservation_id" in result.body)) {
+        throw Object.assign(new Error(result.body.error.message), {
+          status: result.status,
+          code: result.body.error.code,
+        });
+      }
       return result.body;
     },
   };

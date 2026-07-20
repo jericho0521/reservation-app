@@ -387,6 +387,26 @@
       "notes": [
         "Append-only compatibility replacement for the operations overview RPC after bookings gained a channel column."
       ]
+    },
+    {
+      "path": "packages/database/migrations/supabase/000038_strict_reservation_availability.sql",
+      "classification": "core-platform",
+      "intendedBackendDestination": [
+        "packages/database/migrations/supabase/000038_strict_reservation_availability.sql"
+      ],
+      "notes": [
+        "Backend-owned atomic validation that prevents every booking channel from persisting times outside the published schedule, notice period, horizon, or service duration."
+      ]
+    },
+    {
+      "path": "packages/database/migrations/supabase/000039_appointment_practitioner_lifecycle.sql",
+      "classification": "core-platform",
+      "intendedBackendDestination": [
+        "packages/database/migrations/supabase/000039_appointment_practitioner_lifecycle.sql"
+      ],
+      "notes": [
+        "Backend-owned transactional practitioner resource, profile, service, location, and active-status lifecycle."
+      ]
     }
   ]
 }

@@ -157,6 +157,11 @@ export async function runPsqlPlan(config, plan) {
 
 export function buildDatabaseBehaviorProofSql() {
   return `
+delete from public.bookings
+where id = '20000000-0000-4000-8000-000000000001';
+delete from public.platform_idempotency_records
+where tenant_id = 'tenant-proof' and key = 'database-live-proof-key';
+
 insert into auth.users (id, email)
 values
   ('00000000-0000-4000-8000-000000000001', 'admin-proof@example.invalid'),
@@ -167,8 +172,23 @@ insert into public.admin_users (user_id)
 values ('00000000-0000-4000-8000-000000000001')
 on conflict (user_id) do nothing;
 
+insert into public.tenants (id, name)
+values ('database_live_proof', 'Database Live Proof')
+on conflict (id) do update set name = excluded.name;
+
+insert into public.venues (id, tenant_id, name)
+values (
+  '30000000-0000-4000-8000-000000000001',
+  'database_live_proof',
+  'Database Live Proof Venue'
+)
+on conflict (id) do update set
+  tenant_id = excluded.tenant_id,
+  name = excluded.name;
+
 insert into public.services (
   id,
+  venue_id,
   name,
   total_seats,
   resource_kind,
@@ -177,13 +197,20 @@ insert into public.services (
 )
 values (
   '10000000-0000-4000-8000-000000000001',
+  '30000000-0000-4000-8000-000000000001',
   'Database Live Proof Service',
   4,
   'capacity_bucket',
   'quantity',
   '{"kind":"capacity","selection_mode":"quantity","require_resource_labels":false,"allow_partial_capacity":true}'::jsonb
 )
-on conflict (id) do nothing;
+on conflict (id) do update set
+  venue_id = excluded.venue_id,
+  name = excluded.name,
+  total_seats = excluded.total_seats,
+  resource_kind = excluded.resource_kind,
+  selection_mode = excluded.selection_mode,
+  reservation_policy = excluded.reservation_policy;
 
 do $$
 begin
@@ -474,7 +501,9 @@ async function main() {
   );
   await runPsqlPlan(config, plan);
   await runDatabaseBehaviorProof(config);
-  console.log("PASS database live migration proof applied package-owned migration plan and verified RLS/idempotency behavior.");
+  console.log("REPEAT disposable database behavior proof to verify deterministic fixture cleanup");
+  await runDatabaseBehaviorProof(config);
+  console.log("PASS database live migration proof applied package-owned migration plan and twice verified RLS/idempotency behavior.");
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {

@@ -92,6 +92,7 @@ import {
   type WhatsAppSessionSnapshot,
 } from "@reservation-platform/whatsapp";
 
+import { createSmtpEmailConnectionTester } from "./email.js";
 import { createStandaloneJwtJwksBearerTokenVerifier } from "./jwt-verifier.js";
 import type { StandaloneApiDependencies } from "./routes.js";
 
@@ -417,7 +418,7 @@ export function createStandaloneSupabaseDependencies(
     ...(systemOperationsRepository ? { systemStatus: {
       repository: systemOperationsRepository,
       releaseVersion: options.releaseVersion?.trim() || "development",
-      migrationVersion: options.migrationVersion?.trim() || "000037",
+      migrationVersion: options.migrationVersion?.trim() || "000039",
       diskProbe: readRootDiskUsage,
     }, rateLimitRepository: systemOperationsRepository, operationalEventSink: systemOperationsRepository } : {}),
     ...(managedConversationOrchestrator ? { conversationOrchestrator: managedConversationOrchestrator } : conversationOrchestrator ? { conversationOrchestrator } : {}),
@@ -426,7 +427,7 @@ export function createStandaloneSupabaseDependencies(
     ...(aiRuntimeLoader ? { aiRuntimeLoader } : {}),
     whatsappModule: workerOwnedWhatsAppModule,
     aiConnectionTester: options.aiConnectionTester ?? createAiSdkConnectionTester(),
-    ...(options.emailConnectionTester ? { emailConnectionTester: options.emailConnectionTester } : {}),
+    emailConnectionTester: options.emailConnectionTester ?? createSmtpEmailConnectionTester(),
     emailTestRecipientResolver: async (principal) => (
       (await sessionRepository.findUserById?.(principal.tenantId, principal.userId))?.email
     ),
@@ -629,6 +630,7 @@ function createAiSdkConnectionTester(): AiConnectionTester {
         apiKey: input.apiKey,
         ...(input.baseUrl ? { baseUrl: input.baseUrl } : {}),
         timeoutMs: input.timeoutMs,
+        maxOutputTokens: 16,
       });
       await runtime.run({
         scope: { tenant_id: "connection-test", venue_id: "connection-test" },
@@ -651,14 +653,18 @@ export function createConversationBookingTools(input: {
         ? result.body.services.find((service) => service.service_id === serviceId)
         : undefined;
     },
-    async checkAvailability(scope: ExperienceScope, { serviceId, date }) {
+    async checkAvailability(scope: ExperienceScope, { serviceId, date, staffId }) {
       const services = await listPlatformServices(input.catalogRepository, { venueId: scope.venueId });
       if (!("services" in services.body) || !services.body.services.some((service) => service.service_id === serviceId)) {
         throw new Error("Service is outside the published experience.");
       }
       const result = await listAvailability({
         repository: input.availabilityRepository,
-        query: new URLSearchParams({ service_id: serviceId, date }),
+        query: new URLSearchParams({
+          service_id: serviceId,
+          date,
+          ...(staffId ? { staff_id: staffId } : {}),
+        }),
         venueId: scope.venueId,
       });
       if (!("slots" in result.body)) throw new Error(result.body.error.message);
@@ -671,7 +677,12 @@ export function createConversationBookingTools(input: {
         legacyInput: legacy.legacyInput,
         venueId: scope.venueId,
       });
-      if (!("reservation_id" in result.body)) throw new Error(result.body.error.message);
+      if (!("reservation_id" in result.body)) {
+        throw Object.assign(new Error(result.body.error.message), {
+          status: result.status,
+          code: result.body.error.code,
+        });
+      }
       return result.body;
     },
   };
@@ -872,7 +883,7 @@ export function standaloneWhatsAppDependenciesFromEnv(
   env: StandaloneSupabaseEnv = process.env,
   options: StandaloneSupabaseRuntimeOptions = {},
   config?: Required<StandaloneSupabaseConfig>,
-  platformDependencies: Pick<StandaloneApiDependencies, "availabilityRepository" | "catalogRepository" | "reservationCreateRepository" | "conversationOrchestrator"> = {},
+  platformDependencies: Pick<StandaloneApiDependencies, "availabilityRepository" | "catalogRepository" | "reservationCreateRepository" | "conversationOrchestrator" | "aiRuntimeLoader"> = {},
 ): Pick<StandaloneApiDependencies, "whatsappModule"> {
   const platformConfig = options.platformConfig;
   const whatsappConfig = platformConfig?.modules.whatsapp;
@@ -915,6 +926,40 @@ export function standaloneWhatsAppDependenciesFromEnv(
   const agentRuntime = platformConfig
     ? createWhatsAppAgentRuntimeFromSettings(aiSettings, env, { fetch: options.fetch })
     : createWhatsAppAgentRuntimeFromEnv(env, { fetch: options.fetch });
+  const resolveAgentRuntime = async () => {
+    if (agentRuntime) return agentRuntime;
+    if (!platformDependencies.aiRuntimeLoader) return undefined;
+    const session = await service.sessionStatus().catch(() => undefined);
+    const tenantId = session?.metadata?.tenant_id;
+    const venueId = session?.metadata?.venue_id;
+    if (
+      typeof tenantId !== "string"
+      || !tenantId.trim()
+      || typeof venueId !== "string"
+      || !venueId.trim()
+    ) return undefined;
+    const runtime = await platformDependencies.aiRuntimeLoader.load(tenantId.trim());
+    return runtime ? {
+      async run(input: Parameters<NonNullable<ReturnType<typeof createWhatsAppAgentRuntimeFromEnv>>["run"]>[0]) {
+        const result = await runtime.run({
+          ...input,
+          scope: {
+            tenant_id: input.scope.tenant_id,
+            venue_id: input.scope.venue_id ?? venueId.trim(),
+          },
+          messages: input.messages.flatMap((message) => (
+            message.role === "system" || message.role === "user" || message.role === "assistant"
+              ? [{ role: message.role, content: message.content }]
+              : []
+          )),
+        });
+        return {
+          ...result,
+          message: { role: "assistant" as const, content: result.message.content },
+        };
+      },
+    } : undefined;
+  };
   const reservationTools = platformDependencies.catalogRepository &&
       platformDependencies.availabilityRepository &&
       platformDependencies.reservationCreateRepository
@@ -936,7 +981,7 @@ export function standaloneWhatsAppDependenciesFromEnv(
     RESERVATION_WHATSAPP_PROVIDER: provider,
   }, {
     responder: createWhatsAppBookingAutomationResponder({
-      agentRuntime,
+      agentRuntime: agentRuntime ?? (platformDependencies.aiRuntimeLoader ? resolveAgentRuntime : undefined),
       reservationTools,
       readiness: {
         databaseReady: Boolean(config),
@@ -984,13 +1029,16 @@ export function standaloneWhatsAppDependenciesFromEnv(
         const session = await service.sessionStatus().catch(() => undefined);
         const businessConfig = await service.getConfig().catch(() => undefined);
         const databaseReady = Boolean(config);
-        const providerReady = Boolean(agentRuntime);
+        const providerReady = Boolean(await resolveAgentRuntime().catch(() => undefined));
         const reservationToolsReady = Boolean(reservationTools);
         const businessConfigValid = Boolean(
           businessConfig?.business_name?.trim() &&
             businessConfig?.fallback_message?.trim(),
         );
-        const defaultServiceConfigured = Boolean(businessConfig?.default_service_id?.trim());
+        const defaultServiceConfigured = Boolean(
+          businessConfig?.default_service_id?.trim()
+          || (reservationTools && (await reservationTools.listServices().catch(() => [])).length > 0),
+        );
         const whatsappConnected = session?.status === "connected";
         const aiHealthy = providerReady && reservationToolsReady;
         const missingRequirements = [

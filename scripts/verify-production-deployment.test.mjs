@@ -80,6 +80,8 @@ test("production assigns encrypted Baileys session ownership only to the worker"
   assert.match(worker, /RESERVATION_WHATSAPP_SESSION_AUTH_DIR: \/app\/\.reservation-whatsapp-sessions/u);
   assert.match(worker, /reservation-whatsapp-sessions:\/app\/\.reservation-whatsapp-sessions/u);
   assert.match(worker, /worker-secret-allowlist/u);
+  assert.match(worker, /- reservation-egress/u);
+  assert.doesNotMatch(worker, /ports:/u);
 });
 
 test("Caddy preserves the required route order and security headers", async () => {

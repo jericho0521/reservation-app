@@ -103,6 +103,37 @@ test("maps provider rate limits to a retryable platform error", async () => {
   });
 });
 
+test("bounds generated output tokens and supports a smaller connection-test limit", async () => {
+  const generatedLimits: unknown[] = [];
+  const generate = async (options: Record<string, unknown>) => {
+    generatedLimits.push(options.maxOutputTokens);
+    return {
+      text: "OK",
+      toolCalls: [],
+      response: { modelId: "test-model" },
+      finishReason: "stop",
+    };
+  };
+  const defaultRuntime = createAiSdkAgentRuntime({
+    provider: "openai",
+    model: "test-model",
+    apiKey: "test-key",
+    generate,
+  });
+  const connectionTestRuntime = createAiSdkAgentRuntime({
+    provider: "openai",
+    model: "test-model",
+    apiKey: "test-key",
+    maxOutputTokens: 16,
+    generate,
+  });
+
+  await defaultRuntime.run(agentInput());
+  await connectionTestRuntime.run(agentInput());
+
+  assert.deepEqual(generatedLimits, [1_024, 16]);
+});
+
 test("bounds provider calls with a timeout", async () => {
   const runtime = createAiSdkAgentRuntime({
     provider: "openai",

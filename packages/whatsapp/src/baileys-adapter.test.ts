@@ -6,6 +6,7 @@ import test from "node:test";
 
 import {
   createEncryptedBaileysAuthState,
+  createSilentBaileysLogger,
   deserializeBaileysSessionCredentials,
   BaileysWhatsAppSessionAdapter,
   baileysProviderMessageId,
@@ -76,6 +77,10 @@ test("Baileys adapter never renders or logs QR pairing payloads", async () => {
   const source = await readFile(new URL("./baileys-adapter.ts", import.meta.url), "utf8");
   assert.doesNotMatch(source, /qrcode-terminal|printTerminalQr/u);
   assert.doesNotMatch(source, /console\.(?:log|info|warn)\([^\n]*\bqr\b/iu);
+  assert.equal(source.match(/logger: silentBaileysLogger/gu)?.length, 2);
+  const logger = createSilentBaileysLogger();
+  assert.equal(logger.level, "silent");
+  assert.equal(logger.child(), logger);
 });
 
 test("Baileys reconnect policy retries bounded transient closes and stops after logout", () => {

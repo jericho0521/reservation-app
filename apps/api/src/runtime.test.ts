@@ -244,6 +244,41 @@ test("standalone Supabase env factory wires WhatsApp memory store only with expl
   ]);
 });
 
+test("WhatsApp readiness and automation can load an owner-configured AI runtime", async () => {
+  const loadedTenantIds: string[] = [];
+  const dependencies = standaloneWhatsAppDependenciesFromEnv({
+    RESERVATION_WHATSAPP_ENABLED: "true",
+    RESERVATION_WHATSAPP_PROVIDER: "meta_cloud",
+    RESERVATION_WHATSAPP_ALLOW_MEMORY_STORE: "true",
+  }, {}, undefined, {
+    aiRuntimeLoader: {
+      async load(tenantId) {
+        loadedTenantIds.push(tenantId);
+        return {
+          async run() {
+            return { message: { role: "assistant", content: "Ready." } };
+          },
+        };
+      },
+      invalidate() {},
+    },
+  });
+
+  await dependencies.whatsappModule?.startSession({
+    provider: "session_qr",
+    tenant_id: "tenant_1",
+    venue_id: "venue_1",
+  });
+  const readiness = await dependencies.whatsappModule?.readiness() as {
+    provider_ready?: boolean;
+    missing_requirements?: string[];
+  };
+
+  assert.equal(readiness.provider_ready, true);
+  assert.equal(readiness.missing_requirements?.includes("ai_provider"), false);
+  assert.deepEqual(loadedTenantIds, ["tenant_1"]);
+});
+
 test("WhatsApp runtime bridge routes scoped inbound messages through unified conversations", async () => {
   const observed: unknown[] = [];
   const conversation = {
@@ -588,6 +623,7 @@ test("standalone Supabase runtime wires public and admin clients to repository f
   assert.equal(Boolean(dependencies.operatingHoursRepository), true);
   assert.equal(Boolean(dependencies.operationsOverviewRepository), true);
   assert.equal(Boolean(dependencies.integrationSettingsRepository), true);
+  assert.equal(Boolean(dependencies.emailConnectionTester), true);
   assert.equal(Boolean(dependencies.tenantVenueRepository), true);
   assert.deepEqual(dependencies.sessionAuth?.allowedOrigins, ["https://console.example"]);
 });

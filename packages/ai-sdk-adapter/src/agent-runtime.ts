@@ -19,6 +19,7 @@ import {
 } from "ai";
 
 const DEFAULT_TIMEOUT_MS = 10_000;
+const DEFAULT_MAX_OUTPUT_TOKENS = 1_024;
 
 export interface AiSdkGenerationResult {
   text: string;
@@ -44,6 +45,7 @@ export interface AiSdkAgentRuntimeOptions {
   apiKey: string;
   baseUrl?: string;
   timeoutMs?: number;
+  maxOutputTokens?: number;
   generate?: AiSdkGenerate;
 }
 
@@ -52,11 +54,13 @@ export class AiSdkAgentRuntime implements AgentRuntime {
   private readonly modelId: string;
   private readonly model: ReturnType<ReturnType<typeof createOpenAI>>;
   private readonly timeoutMs: number;
+  private readonly maxOutputTokens: number;
   private readonly generate: AiSdkGenerate;
 
   constructor(options: AiSdkAgentRuntimeOptions) {
     this.modelId = normalizeRequired(options.model, "AI model");
     this.timeoutMs = normalizeTimeout(options.timeoutMs);
+    this.maxOutputTokens = normalizeMaxOutputTokens(options.maxOutputTokens);
     this.generate = options.generate ?? defaultGenerate;
 
     const provider = createOpenAI({
@@ -80,6 +84,7 @@ export class AiSdkAgentRuntime implements AgentRuntime {
         messages: buildMessages(input),
         tools: buildTools(input),
         output: buildOutput(input),
+        maxOutputTokens: this.maxOutputTokens,
         abortSignal: controller.signal,
       });
 
@@ -321,6 +326,14 @@ function normalizeTimeout(value: number | undefined): number {
     throw new Error("AI provider timeout must be greater than zero.");
   }
   return timeoutMs;
+}
+
+function normalizeMaxOutputTokens(value: number | undefined): number {
+  const maxOutputTokens = value ?? DEFAULT_MAX_OUTPUT_TOKENS;
+  if (!Number.isSafeInteger(maxOutputTokens) || maxOutputTokens <= 0) {
+    throw new Error("AI maximum output tokens must be a positive integer.");
+  }
+  return maxOutputTokens;
 }
 
 function compactMetadata(input: Record<string, string | undefined>): MetadataRecord {

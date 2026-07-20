@@ -99,6 +99,13 @@ export async function verifyProductionDeployment(options = {}) {
     "Database and application networks must stay internal.",
     errors,
   );
+  expect(
+    /reservation-egress:\s*(?:\n|$)/u.test(compose)
+      && /- reservation-egress/u.test(serviceBlocks.get("reservation-api") ?? "")
+      && /- reservation-egress/u.test(serviceBlocks.get("reservation-worker") ?? ""),
+    "Only API and worker runtimes that call external integrations must receive outbound egress.",
+    errors,
+  );
 
   const protectedConfigurationServices = new Set(["reservation-config", "reservation-operations"]);
   const backupRecoveryKeyMountedToOrdinaryService = [...serviceBlocks.entries()]

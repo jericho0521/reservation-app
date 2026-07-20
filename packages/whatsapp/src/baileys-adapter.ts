@@ -45,6 +45,21 @@ export interface BaileysAuthStateLike {
 }
 
 const authFileLocks = new Map<string, Promise<void>>();
+const silentBaileysLogger = createSilentBaileysLogger();
+
+export function createSilentBaileysLogger() {
+  const logger = {
+    level: "silent",
+    child: () => logger,
+    trace: () => {},
+    debug: () => {},
+    info: () => {},
+    warn: () => {},
+    error: () => {},
+    fatal: () => {},
+  };
+  return logger;
+}
 
 export async function createEncryptedBaileysAuthState(
   folder: string,
@@ -223,6 +238,7 @@ export class BaileysWhatsAppSessionAdapter implements WhatsAppSessionAdapter {
         const socket = makeWASocket({
           auth: state,
           browser: ["Reservation Platform", "Chrome", "1.0.0"],
+          logger: silentBaileysLogger,
         });
         this.socket = socket;
 
@@ -335,6 +351,7 @@ export class BaileysWhatsAppSessionAdapter implements WhatsAppSessionAdapter {
         const socket = makeWASocket({
           auth: state,
           browser: ["Reservation Platform", "Chrome", "1.0.0"],
+          logger: silentBaileysLogger,
         });
         this.socket = socket;
 

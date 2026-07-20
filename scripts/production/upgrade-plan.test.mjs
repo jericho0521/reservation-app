@@ -82,14 +82,14 @@ test("rejects an irreversible migration without a restore declaration", () => {
   ]);
 });
 
-test("rejects missing rollback metadata and migrations newer than 000037", () => {
+test("rejects missing rollback metadata and migrations newer than 000039", () => {
   const result = validateUpgradePlan(baseInput({
-    targetManifest: manifest({ rollbackCompatible: undefined, requiredMigration: "000038" }),
+    targetManifest: manifest({ rollbackCompatible: undefined, requiredMigration: "000040" }),
   }));
 
   assert.deepEqual(result.errors, [
     "rollback compatibility declaration is required",
-    "required migration 000038 is newer than supported migration 000037",
+    "required migration 000040 is newer than supported migration 000039",
   ]);
 });
 
@@ -121,7 +121,7 @@ function manifest(overrides = {}) {
   return {
     version: "0.2.0",
     images: imagesFor("0.2.0"),
-    requiredMigration: "000037",
+    requiredMigration: "000039",
     minimumFromVersion: "0.1.0",
     rollbackCompatible: true,
     ...overrides,

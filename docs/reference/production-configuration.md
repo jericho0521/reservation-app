@@ -24,7 +24,7 @@ Do not maintain a hand-written production `.env`. `/opt/reservation-platform/rel
 - `--host-ip <public-ip>` — public address to compare with DNS when host discovery is insufficient;
 - `--resume` — repeat the same interrupted installation without rotating retained secrets.
 
-The supported installation directory is `/opt/reservation-platform`. A release is identified by a signed manifest, digest-pinned API, worker, console, booking, and tools images, and required migration `000037` for the 0.2.0 candidate.
+The supported installation directory is `/opt/reservation-platform`. A release is identified by a signed manifest, digest-pinned API, worker, console, booking, and tools images, and required migration `000039` for the 0.2.0 candidate.
 
 ## Public routes
 

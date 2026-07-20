@@ -25,7 +25,7 @@ test("published release manifest requires one digest-pinned image per production
     schemaVersion: 1,
     version: "0.2.0",
     commit: "a".repeat(40),
-    requiredMigration: "000037",
+    requiredMigration: "000039",
     minimumFromVersion: "0.1.0",
     rollbackCompatible: true,
     downgradeCompatible: false,
@@ -44,7 +44,7 @@ test("published release validation rejects mutable metadata, malformed digests, 
   manifest.images.worker = { ...manifest.images.api };
   const result = validateReleaseManifest(manifest);
   assert.equal(result.errors.includes("version must be an exact semantic version"), true);
-  assert.equal(result.errors.includes("required migration must match 000037"), true);
+  assert.equal(result.errors.includes("required migration must match 000039"), true);
   assert.equal(result.errors.includes("rollback compatibility declaration is required"), true);
   assert.equal(result.errors.includes("invalid image digest: api"), true);
   assert.equal(result.errors.some((error) => error.startsWith("duplicate image reference:")), true);
@@ -55,7 +55,7 @@ test("published manifest binds observed digests, compatibility, commit, and rele
   const assetPaths = ["asset.txt", "nested/asset.txt"];
   const manifest = await buildPublishedReleaseManifest({
     root, version: "0.2.0", commit: "b".repeat(40), imageDigests: digests(), assetPaths,
-    requiredMigration: "000037", minimumFromVersion: "0.1.0", rollbackCompatible: true,
+    requiredMigration: "000039", minimumFromVersion: "0.1.0", rollbackCompatible: true,
   });
   assert.equal(manifest.images.tools.image, "ghcr.io/jericho0521/reservation-app-tools:0.2.0");
   assert.equal(manifest.images.tools.digest, `sha256:${"e".repeat(64)}`);
@@ -93,7 +93,7 @@ function publishedManifest() {
   const version = "0.2.0";
   const imageNames = { api: "reservation-app-api", worker: "reservation-app-worker", console: "reservation-app-console", booking: "reservation-app-booking", tools: "reservation-app-tools" };
   return {
-    schemaVersion: 1, version, commit: "a".repeat(40), requiredMigration: "000037", minimumFromVersion: "0.1.0",
+    schemaVersion: 1, version, commit: "a".repeat(40), requiredMigration: "000039", minimumFromVersion: "0.1.0",
     rollbackCompatible: true, downgradeCompatible: false,
     images: Object.fromEntries(Object.entries(imageNames).map(([component, name], index) => [component, { image: `ghcr.io/jericho0521/${name}:${version}`, digest: Object.values(digests())[index] }])),
     assets: [],

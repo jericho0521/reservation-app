@@ -192,8 +192,8 @@ jobs:
           cp "sdk-release-artifacts/reservation-platform-sdk-$version.tgz" "$bundle/packages/"
           chmod 0755 "$bundle/install.sh" "$bundle/verify-signatures.sh" "$bundle/scripts/production/install.sh" "$bundle/scripts/production/preflight.sh" "$bundle/scripts/production/support-bundle.sh"
           node -e 'const fs=require("node:fs");const out={};for(const file of fs.readdirSync("observed-digests")){const match=/^digest-(api|worker|console|booking|tools)\.txt$/.exec(file);if(match)out[match[1]]=fs.readFileSync(`observed-digests/${file}`,"utf8").trim()}fs.writeFileSync("observed-digests.json",JSON.stringify(out))'
-          node scripts/production/release-manifest.mjs --generate-published --root "$bundle" --manifest "$bundle/release-manifest.json" --release "$version" --digests observed-digests.json --commit "$GITHUB_SHA" --required-migration 000037 --minimum-from-version 0.1.0 --rollback-compatible true --downgrade-compatible false
-          node scripts/production/release-manifest.mjs --check-published --root "$bundle" --manifest "$bundle/release-manifest.json" --required-migration 000037
+          node scripts/production/release-manifest.mjs --generate-published --root "$bundle" --manifest "$bundle/release-manifest.json" --release "$version" --digests observed-digests.json --commit "$GITHUB_SHA" --required-migration 000039 --minimum-from-version 0.1.0 --rollback-compatible true --downgrade-compatible false
+          node scripts/production/release-manifest.mjs --check-published --root "$bundle" --manifest "$bundle/release-manifest.json" --required-migration 000039
           (cd "$bundle" && find . -type f ! -name SHA256SUMS -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS)
           tar -C "$(dirname "$bundle")" -czf "reservation-platform-$version.tar.gz" "$(basename "$bundle")"
           sha256sum "reservation-platform-$version.tar.gz" > "reservation-platform-$version.tar.gz.sha256"

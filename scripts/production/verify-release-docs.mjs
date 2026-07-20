@@ -55,7 +55,7 @@ export function validateReleaseDocs(root = process.cwd()) {
     ? readFileSync(resolve(root, "docs/reference/release-compatibility.md"), "utf8")
     : "";
   if (!reference.includes("0.2.0")) errors.push("release compatibility: missing release 0.2.0");
-  if (!reference.includes("000037")) errors.push("release compatibility: missing migration 000037");
+  if (!reference.includes("000039")) errors.push("release compatibility: missing migration 000039");
 
   return errors;
 }

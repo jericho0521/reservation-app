@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 const semverPattern = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[0-9A-Za-z.-]+)?$/u;
 const digestPattern = /^sha256:[a-f0-9]{64}$/u;
 const components = Object.freeze(["api", "worker", "console", "booking", "tools"]);
-export const SUPPORTED_MIGRATION_VERSION = "000037";
+export const SUPPORTED_MIGRATION_VERSION = "000039";
 
 export function validateUpgradePlan(input) {
   const errors = [];

@@ -15,6 +15,7 @@ export const sdkRegistryProofModeEnvName = "RESERVATION_SDK_REGISTRY_PROOF_MODE"
 export const sdkRegistryPackageSpecsEnvName = "RESERVATION_SDK_REGISTRY_PACKAGE_SPECS";
 export const sdkRegistryAllowInstallEnvName = "RESERVATION_SDK_REGISTRY_ALLOW_INSTALL";
 export const sdkRegistryLiveBaseUrlEnvName = "RESERVATION_SDK_REGISTRY_LIVE_BASE_URL";
+export const sdkRegistryLiveSlugEnvName = "RESERVATION_SDK_REGISTRY_LIVE_SLUG";
 export const sdkRegistryAllowLiveMutationsEnvName = "RESERVATION_SDK_REGISTRY_ALLOW_LIVE_MUTATIONS";
 export const sdkRegistryRequiredPrivateEnvNames = [
   "RESERVATION_SDK_REGISTRY_PRIVATE_URL",
@@ -114,6 +115,7 @@ function buildConfig(values, packageSpecs, packageManager) {
       : 0,
     keepTemp: values.RESERVATION_SDK_REGISTRY_KEEP_TEMP === "1",
     liveBaseUrl: values.RESERVATION_SDK_REGISTRY_LIVE_BASE_URL,
+    liveSlug: values.RESERVATION_SDK_REGISTRY_LIVE_SLUG,
   };
 }
 
@@ -136,6 +138,7 @@ export function readSdkRegistryInstallConfig(env, options = {}) {
     RESERVATION_SDK_REGISTRY_DISPOSABLE_PORT: trimEnvValue(env, "RESERVATION_SDK_REGISTRY_DISPOSABLE_PORT"),
     RESERVATION_SDK_REGISTRY_KEEP_TEMP: trimEnvValue(env, "RESERVATION_SDK_REGISTRY_KEEP_TEMP"),
     RESERVATION_SDK_REGISTRY_LIVE_BASE_URL: trimEnvValue(env, sdkRegistryLiveBaseUrlEnvName),
+    RESERVATION_SDK_REGISTRY_LIVE_SLUG: trimEnvValue(env, sdkRegistryLiveSlugEnvName),
   };
   const errors = [];
 
@@ -185,6 +188,9 @@ export function readSdkRegistryInstallConfig(env, options = {}) {
     if (trimEnvValue(env, sdkRegistryAllowLiveMutationsEnvName) !== "1") {
       errors.push(`${sdkRegistryAllowLiveMutationsEnvName}=1 is required for the live appointment consumer proof.`);
     }
+    if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/u.test(values.RESERVATION_SDK_REGISTRY_LIVE_SLUG)) {
+      errors.push(`${sdkRegistryLiveSlugEnvName} must be a configured public experience slug.`);
+    }
   }
 
   const requiredEnvNames = modeRequiredEnvNames(mode);
@@ -195,6 +201,7 @@ export function readSdkRegistryInstallConfig(env, options = {}) {
     "RESERVATION_SDK_REGISTRY_PACKAGE_MANAGER",
     "RESERVATION_SDK_REGISTRY_DISPOSABLE_PORT",
     sdkRegistryLiveBaseUrlEnvName,
+    sdkRegistryLiveSlugEnvName,
     sdkRegistryAllowLiveMutationsEnvName,
     sdkRegistryAllowInstallEnvName,
   ].filter((name) => {
@@ -421,6 +428,7 @@ async function runInstallProof(parsed) {
         env: {
           ...installEnv,
           RESERVATION_PLATFORM_BASE_URL: parsed.config.liveBaseUrl,
+          RESERVATION_PLATFORM_SLUG: parsed.config.liveSlug,
         },
         stdio: "inherit",
       });
@@ -460,39 +468,53 @@ function renderLiveAppointmentConsumer() {
     "",
     'const baseUrl = process.env.RESERVATION_PLATFORM_BASE_URL;',
     'if (!baseUrl) throw new Error("RESERVATION_PLATFORM_BASE_URL is required.");',
-    'const slug = "luma-appointments-demo";',
-    'const serviceId = "00000000-0000-4000-8000-000000000203";',
-    'const resourceId = "00000000-0000-4000-8000-000000000306";',
-    'const staffId = "00000000-0000-4000-8000-000000000801";',
+    'const slug = process.env.RESERVATION_PLATFORM_SLUG;',
+    'if (!slug) throw new Error("RESERVATION_PLATFORM_SLUG is required.");',
     "const client = createReservationPlatformClient({ baseUrl });",
     "const experience = await client.getPublicExperience(slug);",
     "const services = await client.listPublicExperienceServices(slug);",
-    'if (!services.services.some((service) => service.service_id === serviceId)) throw new Error("Appointment service missing.");',
-    "const availability = await client.listPublicExperienceAvailability(slug, {",
-    '  service_id: serviceId, date: "2026-07-30", quantity: 1, resource_ids: [resourceId], staff_id: staffId,',
-    "});",
-    'if (!availability.slots.some((slot) => slot.is_available)) throw new Error("No appointment availability.");',
+    "const service = services.services.find((candidate) => candidate.is_active && candidate.resources?.some((resource) => resource.is_active && typeof resource.metadata?.platform_staff_id === \"string\"));",
+    'if (!service) throw new Error("Appointment service missing.");',
+    "const resource = service.resources?.find((candidate) => candidate.is_active && typeof candidate.metadata?.platform_staff_id === \"string\");",
+    'const staffId = typeof resource?.metadata?.platform_staff_id === "string" ? resource.metadata.platform_staff_id : undefined;',
+    'if (!resource || !staffId) throw new Error("Appointment practitioner mapping missing.");',
+    "let selected;",
+    "for (let offset = 1; offset <= 60 && !selected; offset += 1) {",
+    "  const date = new Date(Date.now() + offset * 86_400_000).toISOString().slice(0, 10);",
+    "  const availability = await client.listPublicExperienceAvailability(slug, {",
+    "    service_id: service.service_id, date, quantity: 1, resource_ids: [resource.resource_id], staff_id: staffId,",
+    "  });",
+    "  const slots = availability.slots.filter((slot) => slot.is_available && (slot.start_time || slot.start_at));",
+    "  if (slots.length >= 2) selected = { date, slots };",
+    "}",
+    'if (!selected) throw new Error("No appointment availability.");',
+    "const firstSlot = selected.slots[0];",
+    "const secondSlot = selected.slots[1];",
+    "const startTime = firstSlot?.start_time ?? (firstSlot?.start_at ? new Date(firstSlot.start_at).toISOString().slice(11, 16) : undefined);",
+    "const endTime = firstSlot?.end_time ?? (firstSlot?.end_at ? new Date(firstSlot.end_at).toISOString().slice(11, 16) : undefined);",
+    "const rescheduleTime = secondSlot?.start_time ?? (secondSlot?.start_at ? new Date(secondSlot.start_at).toISOString().slice(11, 16) : undefined);",
+    'if (!startTime || !endTime || !rescheduleTime) throw new Error("Appointment slot times missing.");',
     "const created = await client.createPublicExperienceReservation(slug, {",
-    '  service_id: serviceId, date: "2026-07-30", start_time: "10:00", end_time: "10:30", quantity: 1,',
-    "  resource_ids: [resourceId], staff_id: staffId,",
-    '  reservation_items: [{ resource_id: resourceId, resource_label: "Specialist Maya", quantity: 1 }],',
-    '  customer: { name: "SDK Appointment Consumer", email: "sdk-appointment-consumer@example.invalid" },',
+    "  service_id: service.service_id, date: selected.date, start_time: startTime, end_time: endTime, quantity: 1,",
+    "  resource_ids: [resource.resource_id], staff_id: staffId,",
+    "  reservation_items: [{ resource_id: resource.resource_id, resource_label: resource.label, quantity: 1 }],",
+    '  customer: { name: "SDK Appointment Consumer" },',
     '  source: "sdk-release-consumer-proof",',
     '}, { idempotencyKey: createIdempotencyKey("sdk-appointment-create") });',
     'if (!created.management_token) throw new Error("Management token missing.");',
     "const managed = await client.getManagedReservation(slug, created.management_token);",
     "await client.listManagedReservationAvailability(slug, created.management_token, {",
-    '  service_id: serviceId, date: "2026-07-30", quantity: 1, resource_ids: [resourceId], staff_id: staffId,',
+    "  service_id: service.service_id, date: selected.date, quantity: 1, resource_ids: [resource.resource_id], staff_id: staffId,",
     "});",
     "const rescheduled = await client.rescheduleManagedReservation(slug, created.management_token, {",
-    '  date: "2026-07-30", start_time: "11:00", staff_id: staffId,',
+    "  date: selected.date, start_time: rescheduleTime, staff_id: staffId,",
     "});",
     "const cancelled = await client.cancelManagedReservation(slug, created.management_token);",
     'if (managed.reservation_id !== created.reservation_id) throw new Error("Management read mismatch.");',
-    'if (!rescheduled.start_time?.startsWith("11:00")) throw new Error("Reschedule did not persist.");',
+    "if (!rescheduled.start_time?.startsWith(rescheduleTime)) throw new Error(\"Reschedule did not persist.\");",
     'if (cancelled.status !== "cancelled") throw new Error("Cancellation did not persist.");',
     "console.log(JSON.stringify({",
-    '  package_consumer: "external", experience: experience.profile.public_slug, availability_slots: availability.slots.length,',
+    '  package_consumer: "external", experience: experience.profile.public_slug, availability_slots: selected.slots.length,',
     '  reservation_created: Boolean(created.reservation_id), management_read: true,',
     "  rescheduled_start_time: rescheduled.start_time, final_status: cancelled.status,",
     "}));",

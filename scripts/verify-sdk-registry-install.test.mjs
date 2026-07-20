@@ -109,6 +109,7 @@ test("SDK registry install config enables an explicitly authorized live consumer
   const parsed = readSdkRegistryInstallConfig(disposableRegistryEnv({
     RESERVATION_SDK_REGISTRY_ALLOW_INSTALL: "1",
     RESERVATION_SDK_REGISTRY_LIVE_BASE_URL: "http://127.0.0.1:4100",
+    RESERVATION_SDK_REGISTRY_LIVE_SLUG: "test-studio",
     RESERVATION_SDK_REGISTRY_ALLOW_LIVE_MUTATIONS: "1",
   }), { argv: ["--strict"] });
 
@@ -120,6 +121,7 @@ test("SDK registry install config rejects a live consumer journey without mutati
   const parsed = readSdkRegistryInstallConfig(disposableRegistryEnv({
     RESERVATION_SDK_REGISTRY_ALLOW_INSTALL: "1",
     RESERVATION_SDK_REGISTRY_LIVE_BASE_URL: "http://127.0.0.1:4100",
+    RESERVATION_SDK_REGISTRY_LIVE_SLUG: "test-studio",
   }), { argv: ["--strict"] });
 
   assert.equal(parsed.status, "fail");

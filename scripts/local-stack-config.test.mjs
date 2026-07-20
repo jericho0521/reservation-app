@@ -1,13 +1,14 @@
 import assert from "node:assert/strict";
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { spawnSync } from "node:child_process";
-import { mkdtemp, readFile, stat, writeFile } from "node:fs/promises";
+import { chmod, mkdtemp, readFile, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 
 import {
   ensureLocalStackConfig,
+  ensureLocalWhatsAppSessionDirectory,
   localStackConfigFileNames,
 } from "./local-stack-config.mjs";
 
@@ -21,14 +22,50 @@ test("local stack config is generated once and remains stable", async () => {
   assert.match(first.apiEnv, /^RESERVATION_SUPABASE_URL=http:\/\/reservation-gateway$/mu);
   assert.match(first.apiEnv, /^RESERVATION_INSTALLATION_MASTER_KEY=\S+$/mu);
   assert.match(first.apiEnv, /^RESERVATION_SESSION_COOKIE_SECURE=false$/mu);
+  assert.match(first.apiEnv, /^RESERVATION_WHATSAPP_SIMULATION_ENABLED=false$/mu);
   assert.equal(first.installationMasterKey.length >= 32, true);
-  assert.match(first.consoleEnv, /^RESERVATION_CONSOLE_TENANT_ID=final_demo$/mu);
+  assert.match(first.installationId, /^[a-f0-9-]{36}$/u);
+  assert.match(first.setupToken, /^[A-Za-z0-9_-]{43}$/u);
+  assert.equal(first.mode, "product");
+  assert.doesNotMatch(first.consoleEnv, /final_demo|RESERVATION_CONSOLE_(?:TENANT|VENUE)_ID/u);
   assert.match(first.bookingEnv, /^RESERVATION_PLATFORM_PUBLIC_BASE_URL=http:\/\/localhost:4100$/mu);
 
   for (const fileName of localStackConfigFileNames) {
     const file = await stat(join(directory, fileName));
     assert.equal(file.mode & 0o777, 0o600, `${fileName} must be private`);
   }
+});
+
+test("demo config is explicit and retains fixture-only identifiers and simulation", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "reservation-stack-demo-config-"));
+  const config = await ensureLocalStackConfig(directory, { mode: "demo" });
+
+  assert.equal(config.mode, "demo");
+  assert.match(config.consoleEnv, /^RESERVATION_CONSOLE_TENANT_ID=final_demo$/mu);
+  assert.match(config.consoleEnv, /^RESERVATION_CONSOLE_VENUE_ID=00000000-0000-4000-8000-000000000101$/mu);
+  assert.match(config.apiEnv, /^RESERVATION_WHATSAPP_SIMULATION_ENABLED=true$/mu);
+});
+
+test("local stack initialization makes the WhatsApp session volume private and worker-writable", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "reservation-stack-whatsapp-session-"));
+  await chmod(directory, 0o755);
+
+  await ensureLocalWhatsAppSessionDirectory(directory, {
+    userId: process.getuid?.() ?? 1001,
+    groupId: process.getgid?.() ?? 1001,
+  });
+
+  const entry = await stat(directory);
+  assert.equal(entry.mode & 0o777, 0o700);
+});
+
+test("an existing config volume cannot be reused by the other stack mode", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "reservation-stack-mode-"));
+  await ensureLocalStackConfig(directory, { mode: "demo" });
+  await assert.rejects(
+    () => ensureLocalStackConfig(directory, { mode: "product" }),
+    /belongs to demo mode.*destroy.*product mode/u,
+  );
 });
 
 test("generated PostgREST tokens have valid distinct role claims", async () => {

@@ -96,9 +96,12 @@ $reservation_local_owner$;
 }
 
 function runLocalDockerSql(sql: string) {
+  const composeFiles = process.argv.includes("--demo")
+    ? ["-f", "docker-compose.yml", "-f", "docker-compose.demo.yml"]
+    : [];
   const result = spawnSync(
     "docker",
-    ["compose", "exec", "-T", "reservation-db", "psql", "-X", "-v", "ON_ERROR_STOP=1", "-U", "postgres", "-d", "reservation"],
+    ["compose", ...composeFiles, "exec", "-T", "reservation-db", "psql", "-X", "-v", "ON_ERROR_STOP=1", "-U", "postgres", "-d", "reservation"],
     { encoding: "utf8", input: sql, stdio: ["pipe", "ignore", "pipe"] },
   );
   if (result.error || result.status !== 0) {
@@ -165,6 +168,9 @@ function hiddenQuestion(prompt: string) {
 }
 
 async function main() {
+  if (!process.argv.includes("--demo")) {
+    throw new Error("The CLI owner helper is demo-only. Use pnpm run stack:setup-url for product onboarding.");
+  }
   const owner = await bootstrapLocalOwner(await promptForOwner());
   stdout.write(`Local owner ${owner.email} is ready. Sign in at http://127.0.0.1:4300/admin/login.\n`);
 }

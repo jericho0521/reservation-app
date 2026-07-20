@@ -1,8 +1,8 @@
 # Manually test the local Docker product
 
 Use this guide to test the platform as a business owner, staff member, and
-customer. It is written for the seeded local Docker installation, not a
-production server.
+customer. It is written for the blank, single-business local Docker product,
+not a production server or the separate seeded demo stack.
 
 If you only want the tests that require your private accounts, physical phone,
 or human judgment, use
@@ -52,8 +52,8 @@ Use these meanings consistently:
 - Use an inbox and phone number controlled by you only when delivery must be
   tested.
 - Choose a password of at least 12 characters.
-- For Apex Racing Lab, choose a Monday–Saturday within the next 60 days.
-- Do not use Sunday for Apex. The seeded business is closed on Sunday.
+- Choose a date inside the booking horizon and an interval configured during
+  onboarding.
 - Do not reuse a reservation when testing terminal outcomes. Completion,
   no-show, and cancellation should use separate reservations.
 
@@ -75,16 +75,17 @@ pnpm run stack:verify:live
 
 Open these URLs:
 
+- First-owner setup URL: print it with `pnpm run stack:setup-url`
 - Owner console: <http://127.0.0.1:4300/admin/login>
-- Apex public experience: <http://127.0.0.1:4400/apex-racing-demo>
-- Luma public experience: <http://127.0.0.1:4400/luma-appointments-demo>
+- Public booking root: <http://127.0.0.1:4400>
 - API health: <http://127.0.0.1:4100/v1/health>
 
 Expected result:
 
 - Compose services are running or have completed successfully.
 - The health endpoint reports a healthy API.
-- The console and both public experiences load without an error page.
+- The console and empty public booking root load without an error page.
+- No business, service, practitioner, or reservation exists before onboarding.
 - No secret value appears in the terminal or browser.
 
 Checklist:
@@ -96,23 +97,34 @@ Checklist:
 - Evidence filename:
 - Defect or follow-up:
 
-## 2. Create the local owner and sign in
+## 2. Create the first owner and configure the business
 
-Create or replace the seeded local owner:
+Print the protected one-time setup URL:
 
 ```bash
-pnpm run stack:owner
+pnpm run stack:setup-url
 ```
 
-Enter your chosen owner name and email. Enter a password containing at least 12
-characters. The command should display one `*` for each captured password
-character.
+Open the URL without recording it. Create an owner with a synthetic name,
+email, and password containing at least 12 characters. Continue through the
+browser wizard and configure:
 
-Sign in at <http://127.0.0.1:4300/admin/login> with the same email and password.
+1. One appointment business and public slug.
+2. One location.
+3. One appointment service.
+4. At least one practitioner resource.
+5. Operating hours covering a future test date.
+6. Web booking and web chat.
+7. Review, validation, and publication.
+
+Sign out, then sign in at <http://127.0.0.1:4300/admin/login> with the same
+email and password.
 
 Expected result:
 
-- The command reports that the local owner is ready.
+- Owner creation happens through the normal product browser flow.
+- The one-time token cannot create another owner.
+- The wizard publishes exactly one business without source or environment edits.
 - Normal email/password login succeeds.
 - The owner reaches the operations command center.
 - Refreshing the page keeps the authenticated session.
@@ -156,17 +168,17 @@ Checklist:
 - Evidence filename:
 - Defect or follow-up:
 
-## 4. Complete an Apex customer booking
+## 4. Complete a customer appointment booking
 
 Use a separate browser tab or private window:
 
-1. Open <http://127.0.0.1:4400/apex-racing-demo/book>.
-2. Select **Apex GT Racing Session**.
-3. Select a Monday–Saturday within the next 60 days.
-4. Select an available time between 09:00 and 17:00.
-5. Select an available simulator.
+1. Open `http://127.0.0.1:4400/<your-public-slug>/book`.
+2. Select the service created during onboarding.
+3. Select a date inside the configured booking horizon and operating hours.
+4. Select a live available time.
+5. Select an available practitioner.
 6. Enter fictional customer details.
-7. Review the service, date, time, simulator, quantity, and customer details.
+7. Review the service, date, time, practitioner, quantity, and customer details.
 8. Press **Confirm reservation** once.
 9. Keep the displayed management link open for the next test, but do not copy
    it into this document or a screenshot.
@@ -174,14 +186,15 @@ Use a separate browser tab or private window:
 Expected result:
 
 - The availability screen shows live slots for an open day.
-- Simulator C may be unavailable because the seed places it in maintenance.
+- Only configured, active practitioners are selectable.
 - A confirmation appears after one submission.
 - The confirmation contains a reservation identifier and management action.
 - Repeated clicking does not create duplicate reservations.
 
-If the page reports no slots, press **Back** and confirm that the selected date
-is not Sunday. The seeded API should normally provide 17 one-hour starts from
-09:00 through 17:00 on an open, conflict-free day.
+If the page reports no slots, press **Back** and compare the date with the
+operating hours, notice period, booking horizon, maintenance, and existing
+reservations configured for this installation. Treat an unexplained mismatch
+as a defect; do not work around it by editing the database.
 
 Checklist:
 
@@ -190,7 +203,7 @@ Checklist:
 - [ ] Blocked
 - Reservation reference, redacted:
 - Selected date and time:
-- Selected simulator:
+- Selected practitioner:
 - Notes:
 - Evidence filename:
 - Defect or follow-up:
@@ -228,21 +241,19 @@ Checklist:
 - Evidence filename:
 - Defect or follow-up:
 
-## 6. Complete a practitioner appointment booking
+## 6. Verify conflicts and practitioner capacity
 
-Open <http://127.0.0.1:4400/luma-appointments-demo/book>.
+Open `http://127.0.0.1:4400/<your-public-slug>/book`.
 
-1. Select **Luma Consultation**.
-2. Select a visible practitioner.
-3. Choose a Monday–Saturday within the booking horizon.
-4. Select an available 30-minute slot.
-5. Enter fictional customer details.
-6. Review and confirm the appointment.
+1. Select the same service and practitioner used in step 4.
+2. Choose the same date and time while the first reservation is active.
+3. Confirm that the occupied slot is absent or rejected with a stable conflict.
+4. Select a different available slot and complete a second fictional booking.
 
 Expected result:
 
-- Specialist Maya and Specialist Noah are available as practitioner choices.
-- Time slots load only after a practitioner is selected.
+- The occupied capacity cannot be double-booked.
+- Time slots reflect the selected practitioner.
 - The review identifies the selected practitioner.
 - The confirmed appointment retains its practitioner assignment.
 
@@ -263,7 +274,7 @@ Checklist:
 Return to the owner console and open
 <http://127.0.0.1:4300/admin/reservations>.
 
-1. Find the Apex and Luma reservations created during this run.
+1. Find both reservations created during this run.
 2. Verify service, customer, date, time, channel, resource or practitioner, and
    status.
 3. Open each reservation detail page.
@@ -325,11 +336,11 @@ Checklist:
 
 Open <http://127.0.0.1:4300/admin/resources>.
 
-1. Confirm Simulator C is shown in maintenance.
-2. Verify any future reservation warning before changing a resource.
-3. Start maintenance on an otherwise available test resource with a fictional
+1. Select a practitioner resource configured during onboarding.
+2. Verify any future reservation warning before changing it.
+3. Start maintenance on that resource with a fictional
    reason.
-4. Open the public Apex availability flow and verify that resource is no longer
+4. Open public availability and verify that resource is no longer
    selectable.
 5. End the maintenance event with a resolution note.
 6. Reload public availability and verify the resource becomes selectable again.
@@ -389,29 +400,22 @@ Checklist:
 - Evidence filename:
 - Defect or follow-up:
 
-## 11. Test WhatsApp simulation and staff takeover
+## 11. Confirm product/demo channel separation
 
-Simulation is the required credential-free test. It is not proof of live
-WhatsApp delivery.
+The product stack must not present simulated WhatsApp delivery as a real
+integration.
 
 1. Open <http://127.0.0.1:4300/admin/channels>.
-2. Find **Simulate a WhatsApp customer**.
-3. Use a fictional customer and send a booking-related message.
-4. Open the resulting unified conversation.
-5. Press **Take over conversation**.
-6. Confirm the page says **You are in control**.
-7. Send a fictional staff reply.
-8. Confirm no automated fallback reply is added while takeover is active.
-9. Press **Resume AI automation**.
-10. Send another simulated customer message and confirm automation can respond.
+2. Confirm product mode reports real Baileys readiness and does not enable the
+   simulated inbound-message action.
+3. Run `pnpm run stack:demo:verify` separately when credential-free channel
+   simulation regression coverage is required.
 
 Expected result:
 
-- The simulated inbound message, automation reply, and staff reply share one
-  timeline.
-- Manual takeover suppresses automation.
-- Staff cannot send before taking over.
-- Resuming automation changes the conversation state without losing history.
+- Product mode does not claim simulated delivery.
+- Demo verification remains isolated from product volumes.
+- Live takeover is tested only after real QR pairing in step 17.
 
 Checklist:
 
@@ -425,7 +429,7 @@ Checklist:
 
 ## 12. Test public web chat and deterministic fallback
 
-Open <http://127.0.0.1:4400/apex-racing-demo/chat>.
+Open `http://127.0.0.1:4400/<your-public-slug>/chat`.
 
 1. Send a fictional booking question.
 2. Wait for the response to appear.
@@ -567,7 +571,7 @@ Then:
 
 1. Sign in again if required.
 2. Find the reservation created earlier.
-3. Find the simulated conversation and staff reply.
+3. Find the web-chat conversation and replies.
 4. Confirm the published Studio version remains live.
 5. Open public availability and verify slots still load.
 
@@ -661,6 +665,7 @@ Manual observations do not replace automated checks. Run:
 
 ```bash
 pnpm run local-stack:test
+pnpm run stack:verify:onboarding
 pnpm run stack:verify:smoke
 pnpm run stack:verify:persistence
 pnpm run test:browser
@@ -671,6 +676,7 @@ Record the result without pasting credentials or excessive logs:
 | Command | Pass | Fail | Skipped | Notes |
 | --- | --- | --- | --- | --- |
 | `pnpm run local-stack:test` | [ ] | [ ] | [ ] | |
+| `pnpm run stack:verify:onboarding` | [ ] | [ ] | [ ] | |
 | `pnpm run stack:verify:smoke` | [ ] | [ ] | [ ] | |
 | `pnpm run stack:verify:persistence` | [ ] | [ ] | [ ] | |
 | `pnpm run test:browser` | [ ] | [ ] | [ ] | |

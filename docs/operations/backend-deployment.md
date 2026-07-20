@@ -23,18 +23,27 @@ Open:
 
 - API health: `http://localhost:4100/v1/health`
 - Owner console: `http://localhost:4300`
-- Public booking: `http://localhost:4400/apex-racing-demo`
+- Public booking: `http://localhost:4400/<your-public-slug>` after publication
 
 The initial startup:
 
-1. Generates random local database, JWT, service API, and WhatsApp encryption values.
+1. Generates random local database, JWT, service API, installation, setup, and WhatsApp encryption values.
 2. Starts PostgreSQL 16.
 3. Applies the complete package-owned core migration index in order.
 4. Records each migration filename and SHA-256 in a local ledger.
-5. Seeds the deterministic `final_demo` dataset when its marker is absent.
+5. Creates one setup-pending installation tenant without business data.
 6. Starts PostgREST, the narrow `/rest/v1` gateway, API, console, and booking app.
 
 Generated credentials live in the private `reservation-stack-config` volume. They are not written to a host `.env` file or printed in logs.
+
+Print the protected browser setup URL only when you are ready to create the
+first owner:
+
+```bash
+docker compose --profile operations run --rm reservation-setup-url
+```
+
+Complete owner creation and the appointment-business wizard in the browser.
 
 ## Inspect and Troubleshoot the Local Stack
 
@@ -47,7 +56,7 @@ Inspect a failed layer without exposing every service log:
 
 ```bash
 docker compose logs reservation-config
-docker compose logs reservation-db reservation-migrate reservation-seed
+docker compose logs reservation-db reservation-migrate reservation-bootstrap
 docker compose logs reservation-rest reservation-gateway reservation-api
 docker compose logs reservation-console reservation-booking
 ```
@@ -73,15 +82,23 @@ Stop containers while preserving all named volumes:
 docker compose down
 ```
 
-Restarting later reuses the same credentials, database, migration ledger, demo marker, and WhatsApp session data.
+Restarting later reuses the same credentials, installation identity, database,
+migration ledger, business data, and WhatsApp session data.
 
-Replace only deterministic final-demo records:
+Run the isolated deterministic demo when showcase fixtures are required:
 
 ```bash
-docker compose run --rm reservation-reset
+docker compose down
+docker compose -f docker-compose.yml -f docker-compose.demo.yml up --build -d
 ```
 
-Reset accepts only the fixed Compose-managed database identity. It does not accept an arbitrary database URL.
+The demo uses the `reservation-platform-demo` Compose project and separate named
+volumes. It cannot run alongside product mode because both publish the same
+loopback ports. Reset only demo records with:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.demo.yml run --rm reservation-reset
+```
 
 Destroy all three Compose-managed local data sets:
 
@@ -101,10 +118,20 @@ pnpm run local-stack:test
 pnpm run stack:verify
 ```
 
-With the stack running, verify the three applications, seeded database, and authenticated owner API path:
+With the product stack running, verify the three applications and the
+single-installation database boundary:
 
 ```bash
 pnpm run stack:verify:live
+```
+
+Run the browser proof against a disposable product Compose project to verify
+first-owner setup, appointment onboarding, publication, booking visibility,
+conflict handling, and restart persistence. Evidence is written only under
+`tmp/product-onboarding-proof/`:
+
+```bash
+pnpm run stack:verify:onboarding
 ```
 
 The persistence proof intentionally performs `docker compose down` followed by `docker compose up -d` and confirms a database marker survives:
@@ -125,7 +152,10 @@ The local stack provides PostgreSQL, PostgREST, and the REST compatibility path 
 - Supabase analytics infrastructure
 - TLS termination, production backups, monitoring, or incident controls
 
-WhatsApp simulation is enabled by default so evaluators do not need a phone credential. Live Baileys linked-device mode remains opt-in. QR pairing payloads are returned only through the authorized API/store path and must never appear in logs.
+Product mode disables WhatsApp simulation and uses the Baileys linked-device
+adapter with encrypted session storage. Simulation remains available only in
+the explicit demo stack. QR pairing payloads are returned only through the
+authorized API/store path and must never appear in logs.
 
 For production incident handling, use [System Status](system-status.md) to interpret safe health checks and [Production Troubleshooting](troubleshooting.md) for channel recovery, credential rotation, low disk, and sanitized support-bundle generation. Do not use unfiltered `docker inspect` or attach raw application logs to a support request because container environment and customer content may be exposed.
 

@@ -11,9 +11,12 @@ COPY package.json ./package.json
 COPY --chown=1001:1001 packages/database/migrations/supabase ./packages/database/migrations/supabase
 COPY packages/database/seeds/final-demo.sql ./packages/database/seeds/final-demo.sql
 COPY scripts/local-stack-config.mjs ./scripts/local-stack-config.mjs
+COPY scripts/local-stack-bootstrap.mjs ./scripts/local-stack-bootstrap.mjs
 COPY scripts/local-stack-migrate.mjs ./scripts/local-stack-migrate.mjs
 COPY scripts/local-stack-seed.mjs ./scripts/local-stack-seed.mjs
+COPY scripts/local-stack-setup-url.mjs ./scripts/local-stack-setup-url.mjs
 COPY scripts/local-stack-destroy.mjs ./scripts/local-stack-destroy.mjs
+COPY scripts/production/bootstrap-installation.mjs ./scripts/production/bootstrap-installation.mjs
 COPY scripts/reset-final-demo.mjs ./scripts/reset-final-demo.mjs
 COPY scripts/verify-final-demo-readiness.mjs ./scripts/verify-final-demo-readiness.mjs
 COPY docker/local-stack/run-with-config.sh /usr/local/bin/run-with-config

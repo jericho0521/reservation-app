@@ -11,15 +11,28 @@ test("Compose model defines the complete private local stack", () => {
     ["compose", "--profile", "operations", "config", "--format", "json"],
     { encoding: "utf8" },
   ));
-  assert.deepEqual(localStackComposeErrors(model), []);
+  assert.equal(model.name, "reservation-platform-product");
+  assert.deepEqual(localStackComposeErrors(model, { mode: "product" }), []);
+});
+
+test("demo Compose override is isolated and retains explicit seed operations", () => {
+  const model = JSON.parse(execFileSync(
+    "docker",
+    ["compose", "-f", "docker-compose.yml", "-f", "docker-compose.demo.yml", "--profile", "operations", "config", "--format", "json"],
+    { encoding: "utf8" },
+  ));
+  assert.equal(model.name, "reservation-platform-demo");
+  assert.deepEqual(localStackComposeErrors(model, { mode: "demo" }), []);
 });
 
 test("tracked stack sources contain no usable generated credential literals", async () => {
   const sources = await Promise.all([
     "../docker-compose.yml",
+    "../docker-compose.demo.yml",
     "../Dockerfile.local-stack",
     "../Dockerfile.web",
     "./local-stack-config.mjs",
+    "./local-stack-bootstrap.mjs",
   ].map(async (relativePath) => ({
     path: relativePath,
     text: await readFile(new URL(relativePath, import.meta.url), "utf8"),

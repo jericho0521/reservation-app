@@ -122,30 +122,42 @@ Start the database, API, worker, owner console, and public booking application:
 
 ```bash
 pnpm run stack:up
-pnpm run stack:owner
+pnpm run stack:setup-url
 ```
 
-The second command asks for your owner name, email, password, and password
-confirmation. It hashes the password with the platform's Argon2id
-implementation and updates only the guarded `final_demo` installation. No
-default password is committed or printed.
+Open the one-time URL printed by the second command. Create the first owner in
+the browser, then complete the appointment-business wizard and publish the
+booking experience. The default stack starts blank: it does not create a
+default password, fixture owner, venue, service, or finished demo.
 
-Open `http://127.0.0.1:4300/admin/login` and sign in with the credentials you
-just created. Use `http://127.0.0.1:4400/apex-racing-demo` for the customer
-booking experience. The local stack permits non-`Secure` session cookies only
+After publication, use `http://127.0.0.1:4400/<your-public-slug>` for the
+customer experience. The local stack permits non-`Secure` session cookies only
 for its explicit loopback HTTP origins; production keeps `Secure` cookies by
 default.
 
-Resetting the deterministic demo removes the chosen owner password and all
-sessions:
+The three deterministic showcase businesses remain available in an isolated
+demo stack:
 
 ```bash
-pnpm run stack:reset
-pnpm run stack:owner
+pnpm run stack:down
+pnpm run stack:demo:up
+pnpm run stack:demo:owner
 ```
 
-Run `stack:owner` again after every reset. Manual acceptance must use the login
-form; fixture cookies are reserved for automated browser tests.
+Product and demo stacks use separate Compose projects and volumes but share the
+same loopback ports, so stop one before starting the other. Manual product
+acceptance must use the browser setup and login forms; fixture cookies are
+reserved for automated browser tests.
+
+For a disposable automated proof of the same blank-install, browser-onboarding,
+booking, conflict, owner-console, and restart journey, run:
+
+```bash
+pnpm run stack:verify:onboarding
+```
+
+The proof writes sanitized screenshots, a recording, and result JSON under
+`tmp/product-onboarding-proof/`.
 
 ## Start The Backend
 

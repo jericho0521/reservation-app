@@ -1,3 +1,5 @@
+name: reservation-platform-product
+
 services:
   reservation-config:
     build:
@@ -7,8 +9,11 @@ services:
     command: ["node", "scripts/local-stack-config.mjs"]
     environment:
       RESERVATION_STACK_CONFIG_DIR: /run/reservation-stack
+      RESERVATION_STACK_MODE: product
+      RESERVATION_STACK_WHATSAPP_SESSION_DIR: /run/reservation-whatsapp-sessions
     volumes:
       - reservation-stack-config:/run/reservation-stack
+      - reservation-whatsapp-sessions:/run/reservation-whatsapp-sessions
     networks:
       - reservation-stack
     restart: "no"
@@ -53,16 +58,14 @@ services:
       - reservation-stack
     restart: "no"
 
-  reservation-seed:
+  reservation-bootstrap:
     image: reservation-platform-stack-tools:local
     pull_policy: never
     depends_on:
       reservation-migrate:
         condition: service_completed_successfully
     entrypoint: ["/usr/local/bin/run-with-config", "/run/reservation-stack/stack.env"]
-    command: ["node", "scripts/local-stack-seed.mjs"]
-    environment:
-      RESERVATION_STACK_SEED_MODE: first-run
+    command: ["node", "scripts/local-stack-bootstrap.mjs"]
     user: "1001:1001"
     volumes:
       - reservation-stack-config:/run/reservation-stack:ro
@@ -107,7 +110,7 @@ services:
       target: runtime
     image: reservation-platform-backend:local
     depends_on:
-      reservation-seed:
+      reservation-bootstrap:
         condition: service_completed_successfully
       reservation-gateway:
         condition: service_healthy
@@ -137,7 +140,9 @@ services:
       target: worker-runtime
     image: reservation-platform-worker:local
     depends_on:
-      reservation-seed:
+      reservation-config:
+        condition: service_completed_successfully
+      reservation-bootstrap:
         condition: service_completed_successfully
       reservation-gateway:
         condition: service_healthy
@@ -150,6 +155,7 @@ services:
       - reservation-whatsapp-sessions:/app/.reservation-whatsapp-sessions
     networks:
       - reservation-stack
+      - reservation-edge
     healthcheck:
       test: ["CMD", "node", "-e", "try { process.kill(1, 0); process.exit(0); } catch { process.exit(1); }"]
       interval: 30s
@@ -203,29 +209,25 @@ services:
       - reservation-stack
       - reservation-edge
     healthcheck:
-      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4400/apex-racing-demo').then((response) => process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4400/').then((response) => process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1))"]
       interval: 5s
       timeout: 5s
       retries: 20
       start_period: 10s
     restart: unless-stopped
 
-  reservation-reset:
+  reservation-setup-url:
     profiles: ["operations"]
     image: reservation-platform-stack-tools:local
     pull_policy: never
     depends_on:
-      reservation-migrate:
+      reservation-bootstrap:
         condition: service_completed_successfully
-    entrypoint: ["/usr/local/bin/run-with-config", "/run/reservation-stack/stack.env"]
-    command: ["node", "scripts/local-stack-seed.mjs"]
-    environment:
-      RESERVATION_STACK_SEED_MODE: reset
+    command: ["node", "scripts/local-stack-setup-url.mjs"]
     user: "1001:1001"
     volumes:
       - reservation-stack-config:/run/reservation-stack:ro
-    networks:
-      - reservation-stack
+    network_mode: none
     restart: "no"
 
   reservation-destroy:

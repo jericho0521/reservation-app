@@ -1,0 +1,29 @@
+name: reservation-platform-demo
+
+services:
+  reservation-config:
+    environment:
+      RESERVATION_STACK_MODE: demo
+
+  reservation-bootstrap:
+    command: ["node", "scripts/local-stack-seed.mjs"]
+    environment:
+      RESERVATION_STACK_SEED_MODE: first-run
+
+  reservation-reset:
+    profiles: ["operations"]
+    image: reservation-platform-stack-tools:local
+    pull_policy: never
+    depends_on:
+      reservation-migrate:
+        condition: service_completed_successfully
+    entrypoint: ["/usr/local/bin/run-with-config", "/run/reservation-stack/stack.env"]
+    command: ["node", "scripts/local-stack-seed.mjs"]
+    environment:
+      RESERVATION_STACK_SEED_MODE: reset
+    user: "1001:1001"
+    volumes:
+      - reservation-stack-config:/run/reservation-stack:ro
+    networks:
+      - reservation-stack
+    restart: "no"

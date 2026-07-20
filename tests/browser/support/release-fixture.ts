@@ -2,7 +2,9 @@ import type { APIRequestContext, Page } from "@playwright/test";
 
 export const consoleOrigin = process.env.RESERVATION_BROWSER_CONSOLE_URL?.trim() || "http://127.0.0.1:4300";
 export const bookingOrigin = process.env.RESERVATION_BROWSER_BOOKING_URL?.trim() || "http://127.0.0.1:4400";
-export const localBrowserFixtureAvailable = isLoopbackOrigin(consoleOrigin) && isLoopbackOrigin(bookingOrigin);
+export const localBrowserFixtureAvailable = process.env.RESERVATION_BROWSER_DISABLE_LOCAL_FIXTURE !== "true"
+  && isLoopbackOrigin(consoleOrigin)
+  && isLoopbackOrigin(bookingOrigin);
 export const localBrowserPublicSlug = "apex-racing-demo";
 export const localBrowserConversationId = "00000000-0000-4000-8000-000000000602";
 export const localBrowserManagementToken = "browser-fixture-management-token-0000000001";

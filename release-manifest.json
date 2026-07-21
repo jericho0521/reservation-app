@@ -11,7 +11,7 @@
   "assets": [
     {
       "path": "package.json",
-      "sha256": "a7505dd90b22132174a869f09cc0d4f47c65ea9e3fb0954f74f3fb13dc01fad1"
+      "sha256": "3e068e5c08a79f27b7cd066c527ae977af9b9daa97ba3e11ae873247f6beff0f"
     },
     {
       "path": "compose.production.yml",
@@ -47,7 +47,7 @@
     },
     {
       "path": "scripts/production/release-manifest.mjs",
-      "sha256": "962a8a41d9d69af2b2eba286a0fced3238cd6add0ea40a2562aa41a719123552"
+      "sha256": "a0987687ffe41576fc5b2ce17e289bd837e4316d12bc321364fdba1ce6d88491"
     },
     {
       "path": "scripts/production/smoke.mjs",

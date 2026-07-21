@@ -8,7 +8,7 @@ Status: **Pending independent operator run.** This file is deliberately not rele
   "evidence_status": "pending",
   "release_version": "0.2.0",
   "commit_sha": "pending",
-  "migration_version": "000039",
+  "migration_version": "000040",
   "image_digests": { "api": "pending", "worker": "pending", "console": "pending", "booking": "pending", "tools": "pending" },
   "operator": { "role": "pending", "background": "pending", "independent": false, "signature": "pending", "signed_at": null },
   "started_at": null,

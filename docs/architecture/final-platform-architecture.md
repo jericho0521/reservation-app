@@ -2,7 +2,12 @@
 
 ## Purpose
 
-The Reservation Experience Platform separates reusable reservation rules from presentation and channel adapters. A venue can publish one configuration and offer it through visual web booking, AI chat, and WhatsApp while every confirmed booking uses the same availability and atomic reservation path.
+The Reservation Experience Platform is a Docker-first, single-business
+appointment product built from reusable reservation modules. One installation
+publishes one business through visual web booking, AI-assisted chat, and
+WhatsApp while every confirmed booking uses the same availability and atomic
+reservation path. Tenant and venue scoping remain enforced internally so the
+modules and data model stay safe and reusable.
 
 ## System view
 
@@ -16,31 +21,40 @@ flowchart LR
   PublicWeb --> Frontend["React hooks and reusable UI"]
   Frontend --> SDK["Type-safe SDK"]
   Chat --> API["Standalone /v1 API"]
-  WhatsApp --> Channel["WhatsApp channel adapter"]
+  WhatsApp --> Worker["Background worker"]
   Console --> SDK
   SDK --> API
-  Channel --> Orchestrator["Shared conversational booking orchestrator"]
-  API --> Orchestrator
+  Worker --> Orchestrator["Shared conversational booking orchestrator"]
+  API --> Jobs["Durable job queue"]
+  Jobs --> Worker
+  Worker --> Retrieval["Hybrid lexical and vector retrieval"]
+  Retrieval --> DB
+  Worker --> Orchestrator
   API --> Domain["Reservation domain and platform modules"]
   Orchestrator --> Domain
   Domain --> Adapter["Supabase repository adapter"]
   Adapter --> DB[("Postgres / Supabase")]
-  API --> AI["Optional AI provider"]
+  Worker --> AI["Optional BYOK AI provider"]
 ```
 
-The browser receives only published configuration and public reservation data. Owner operations require authenticated tenant and venue context. Database credentials, AI keys, WhatsApp session material, and service keys remain in backend runtime configuration.
+The browser receives only published configuration and public reservation data.
+Owner operations require authenticated tenant and venue context. Database
+credentials and installation secrets remain in generated server configuration;
+AI, email, and WhatsApp credentials are entered through owner settings, stored
+encrypted, and used only by backend containers.
 
 ## Package responsibilities
 
 | Layer | Responsibility |
 | --- | --- |
 | `apps/api` | Runtime composition, environment validation, HTTP server, provider wiring |
+| `apps/worker` | Durable jobs, knowledge indexing, local embeddings, retrieval, notifications, conversation processing, and WhatsApp work |
 | `apps/console` | Server-authenticated Studio, unified inbox, operations, reservations, resources, analytics |
 | `apps/booking` and `apps/examples/*` | Public booking shells using browser-safe configuration |
 | `packages/reservations-core` | Availability, capacity, resource assignment, overlap, and reservation rules |
 | `packages/reservation-platform-api` | Framework-neutral route handling, authorization, idempotency, public/owner mapping |
 | `packages/reservations-supabase` | Tenant-scoped persistence and atomic Postgres operations |
-| `packages/database` | Ordered migrations, indexes, and deterministic seeds |
+| `packages/database` | Ordered migrations through `000040`, indexes, and guarded deterministic seeds |
 | `packages/contract-types` | DTOs, validation schemas, and generated OpenAPI contract |
 | `packages/sdk` | Typed client for public and authenticated platform routes |
 | `packages/reservation-react` / `reservation-ui` | Headless state and reusable public booking components |
@@ -103,29 +117,40 @@ The published version is isolated from subsequent draft edits. Public routes res
 flowchart TB
   Browser["Customer or owner browser"] -->|"HTTPS"| Web["Booking apps and owner console"]
   Web -->|"HTTPS /v1"| API["Standalone Node API container"]
-  Provider["Optional AI provider"] <-->|"Backend-only HTTPS"| API
-  WA["WhatsApp linked-device session"] <-->|"Backend-only session"| API
-  API -->|"TLS + scoped queries / RPC"| Supabase["Supabase Postgres"]
-  Secrets["Deployment secret store"] --> API
-  Migrations["Versioned migration bundle"] --> Supabase
-  Seed["Guarded final-demo reset"] -.->|"Disposable demo only"| Supabase
+  API --> Queue["Durable jobs"]
+  Queue --> Worker["Background worker container"]
+  Provider["Optional BYOK AI provider"] <-->|"Backend-only HTTPS"| Worker
+  WA["Baileys linked-device session"] <-->|"Encrypted session"| Worker
+  API -->|"Private scoped queries / RPC"| Postgres["Postgres + pgvector"]
+  Worker -->|"Private scoped queries / RPC"| Postgres
+  Model["Bundled multilingual embedding model"] --> Worker
+  Secrets["Generated installation configuration"] --> API
+  Secrets --> Worker
+  Migrations["Indexed migrations 000001-000040"] --> Postgres
+  Seed["Explicit demo override"] -.->|"Separate demo volumes"| Postgres
 ```
 
-The API can run in memory for local smoke work, but the final multi-tenant feature set requires migrated Postgres. Deployments must run `pnpm deploy:verify`, apply the indexed migration bundle in order, configure CORS and owner authentication, and keep all secret-bearing values out of frontend environments.
+The default Compose stack starts a blank product installation and creates its
+first owner through browser setup. The explicit demo override uses separate
+Compose state and guarded seeds. Production uses the same one-business model,
+applies the indexed migration bundle in order, and keeps database and integration
+credentials off the browser and ordinary logs. In-memory mode remains a
+development-only smoke harness.
 
 ## Live integrations and deterministic simulation
 
 | Capability | Live mode | Deterministic demonstration mode |
 | --- | --- | --- |
-| Database | Supabase/Postgres with migrations `000001`–`000020` | Same schema with guarded `final_demo` seed; validation-only without a URL |
-| AI | OpenAI-compatible provider configured in backend env | Rule-driven structured booking responses |
+| Database | PostgreSQL/pgvector with migrations `000001`–`000040` | Same schema with explicit, isolated demo seed |
+| AI and retrieval | Owner-configured BYOK generation plus local hybrid retrieval over indexed FAQs, text, and PDFs | Deterministic FAQ and structured booking fallback without provider credentials |
 | WhatsApp | Baileys linked-device session with encrypted credential payload when a key is set | Credential-free channel adapter using the same orchestrator and persistence |
-| Realtime | Polling/read refresh against owner API | Same behavior over seeded data |
+| Email | Owner-configured SMTP with encrypted credentials and durable delivery jobs | Manual invitation fallback when SMTP is absent |
+| Realtime | Polling/read refresh against owner API | Same behavior over isolated demo data |
 
 ## Deliberate non-goals and limitations
 
-- This is a broad platform demonstration, not a production marketplace, payment processor, or enterprise workforce scheduler.
-- Only racing simulators, rooms, and appointments receive domain-specific visual polish. The other five presets prove the shared model.
+- This is a self-hosted appointment platform, not a marketplace, payment processor, native mobile application, or enterprise workforce scheduler.
+- Industry presets configure booking semantics and terminology. Selectable visual design presets are a separate future extension.
 - Baileys is an unofficial WhatsApp Web integration and may change upstream; simulation is the guaranteed presentation path.
 - Analytics are operational aggregates, not a general business-intelligence warehouse.
 - Final production assurance still requires deployed accessibility review, database RLS proof, load testing, monitoring, backups, and incident procedures in the target environment.

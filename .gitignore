@@ -17,6 +17,7 @@
 /playwright-report/
 /test-results/
 /tmp/
+/.superpowers/
 
 # next.js
 /.next/

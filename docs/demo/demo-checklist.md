@@ -59,7 +59,7 @@ Do not mark a rehearsal complete unless the full script and fallback transition 
 - Content: command center, eight-preset Studio, maintenance-aware racing selection, simulated staff takeover, analytics, rooms, and appointments.
 - Safety proof: viewport-only captures were visually inspected; OCR found no email, phone, API key, bearer token, management token, QR payload, WhatsApp identifier, localhost URL, or loopback address.
 - Playback proof: `ffmpeg` decoded every frame without an error; SHA-256 is `e82db0350f4c8614a7a6f6b8dc5b4a29070347d942d3e36f3e4a3d39079d631c`.
-- Stored recording: `docs/demo/recordings/reservation-platform-fallback.mp4`.
+- Historical recording: removed from the tracked tree; record current evidence under `tmp/`.
 - Reviewer: project owner.
 - Approval date: 2026-07-13.
 - Status: approved for the deterministic presentation fallback. Source frames remain outside `docs/demo/assets/` because screenshot approval is tracked separately.
@@ -68,5 +68,5 @@ Do not mark a rehearsal complete unless the full script and fallback transition 
 
 - [ ] If live WhatsApp fails, switch to simulation within 20 seconds.
 - [ ] If hosted services fail, switch to the verified local stack.
-- [ ] If the stack fails, use the approved recording and show automated evidence.
+- [ ] If the stack fails, use the current candidate recording from `tmp/` and show automated evidence.
 - [ ] Never debug secrets or scan a QR while screen sharing.

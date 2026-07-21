@@ -1,4 +1,11 @@
-# Supabase Docs
+# Archived Supabase and Project Play References
+
+> **Historical reference:** these documents predate the supported Docker-first
+> product installation and may contain Project Play routes, source SQL, or
+> deployment assumptions that are no longer valid. Do not use them to install
+> the current product. Start with the
+> [production first-run tutorial](../tutorials/production-first-run.md) or the
+> [local Docker acceptance guide](../how-to/manual-docker-acceptance.md).
 
 Supabase setup, self-hosting, local development, and troubleshooting references.
 
@@ -14,6 +21,6 @@ Supabase setup, self-hosting, local development, and troubleshooting references.
 | [Server Supabase Hosting Guide](server-supabase-hosting-guide.md) | General server Supabase hosting notes. |
 | [Ubuntu Server Supabase Hosting Guide](ubuntu-server-supabase-hosting-guide.md) | Ubuntu-specific Supabase hosting notes. |
 
-These docs may mention the original Project Play deployment setup. Treat those
-details as environment-specific reference unless the current backend branch
-README or deployment docs say otherwise.
+The ordered migration bundle under `packages/database` and the current Docker
+documentation are authoritative. These files are retained only for provenance
+and troubleshooting older installations.

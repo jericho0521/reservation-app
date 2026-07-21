@@ -1,5 +1,8 @@
 # Fix Handoff — Reservation Platform (branch `platform/backend-modules`)
 
+> **Archived:** this work order refers to an earlier candidate and is retained
+> for provenance. It must not be used as the current defect list.
+
 Date: 2026-07-17
 Reviewed commit: `f8d4acbd95065cfeb47e3b1793a1807cb4df689d`
 Author: Claude (reviewing agent). Executor: Codex.

@@ -1,6 +1,9 @@
-# Approved backup recording
+# Historical backup recording record
 
-`reservation-platform-fallback.mp4` is the approved deterministic local fallback walkthrough for release candidate `d3f3d3e6d934dd8f282b83c56463a5bcebddbc8c`.
+The deterministic fallback walkthrough for release candidate
+`d3f3d3e6d934dd8f282b83c56463a5bcebddbc8c` was approved on 2026-07-13. The
+binary is no longer stored in the repository because current recordings and
+acceptance evidence belong under ignored `tmp/`.
 
 ## Verified properties
 
@@ -13,4 +16,6 @@
 
 ## Approval status
 
-The project owner approved the recording on 2026-07-13. It may be used as the presentation fallback. Its source frames are not approved standalone screenshots and must not be copied into `docs/demo/assets/` without separate review.
+The checksum and inspection record are retained for historical provenance only.
+A release-candidate fallback must be recorded again under `tmp/`, inspected,
+and tied to the exact candidate commit.

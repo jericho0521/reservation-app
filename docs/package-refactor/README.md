@@ -1,12 +1,17 @@
 # Modular Backend Platform Refactor
 
+> **Archived programme record:** this tree preserves the decisions and proofs
+> used to establish the current backend, SDK, and package boundaries. It is not
+> the current installation guide or release checklist. Start from
+> [the documentation index](../README.md) for supported workflows.
+
 This directory now tracks the backend-platform architecture direction.
 
 The current product goal is not a frontend plugin and not direct installation of
 internal reservation/database packages into another app. The goal is a reusable
 backend platform, with an optional TypeScript SDK, that any frontend can call.
 
-## Canonical Plan
+## Historical Canonical Plan
 
 - [Backend Platform Extraction Plan](backend-platform-extraction/README.md)
 - [SDK Readiness Plan](backend-platform-extraction/sdk-readiness/README.md)

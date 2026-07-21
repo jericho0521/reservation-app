@@ -3,6 +3,7 @@
   "version": "0.2.0",
   "description": "Headless React provider and hooks for the reservation platform.",
   "type": "module",
+  "engines": { "node": ">=24 <25" },
   "license": "MIT",
   "author": "Project Play maintainers",
   "files": [

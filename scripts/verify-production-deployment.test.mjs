@@ -108,11 +108,11 @@ test("production image targets stay non-root after protected secret loading", as
     readFile(".dockerignore", "utf8"),
   ]);
 
-  assert.match(apiDockerfile, /^FROM node:24-alpine AS worker-runtime$/mu);
+  assert.match(apiDockerfile, /^FROM node:24-bookworm-slim@sha256:[a-f0-9]{64} AS worker-runtime$/mu);
   assert.match(apiDockerfile, /RESERVATION_RUN_AS_UID=1001/u);
   assert.match(apiDockerfile, /USER reservation/u);
-  assert.match(webDockerfile, /^FROM node:24-alpine AS console-runtime$/mu);
-  assert.match(webDockerfile, /^FROM node:24-alpine AS booking-runtime$/mu);
+  assert.match(webDockerfile, /^FROM node:24-alpine3\.22@sha256:[a-f0-9]{64} AS console-runtime$/mu);
+  assert.match(webDockerfile, /^FROM node:24-alpine3\.22@sha256:[a-f0-9]{64} AS booking-runtime$/mu);
   assert.doesNotMatch(webDockerfile, /COPY --from=.*\/src(?:\s|$)/mu);
   assert.match(toolsDockerfile, /COPY --chown=1001:1001 packages\/database\/migrations\/supabase/u);
   assert.match(dockerignore, /^\*\*\/node_modules$/mu);

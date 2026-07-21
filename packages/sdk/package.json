@@ -3,6 +3,7 @@
   "version": "0.2.0",
   "description": "Frontend-safe TypeScript client for the reservation platform API.",
   "type": "module",
+  "engines": { "node": ">=24 <25" },
   "license": "MIT",
   "author": "Project Play maintainers",
   "repository": {

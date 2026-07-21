@@ -4,6 +4,7 @@
   "description": "Framework-neutral reservation domain logic, validation, availability, and repository contracts.",
   "private": true,
   "type": "module",
+  "engines": { "node": ">=24 <25" },
   "license": "UNLICENSED",
   "author": "Project Play maintainers",
   "repository": {

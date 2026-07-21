@@ -427,7 +427,7 @@ test("the tools image and Docker context pin production inputs and exclude every
   const dockerfile = await readFile(path.resolve("Dockerfile.production-tools"), "utf8");
   assert.match(
     dockerfile,
-    /^FROM node:20\.19\.4-alpine3\.22@sha256:[a-f0-9]{64}$/mu,
+    /^FROM node:24-alpine3\.22@sha256:[a-f0-9]{64}$/mu,
   );
   assert.match(dockerfile, /postgresql16-client=16\.14-r0/u);
   assert.match(dockerfile, /su-exec=0\.2-r3/u);

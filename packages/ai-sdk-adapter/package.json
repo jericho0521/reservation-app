@@ -4,6 +4,7 @@
   "description": "Backend-only Vercel AI SDK adapter for reservation platform agent runtimes.",
   "private": true,
   "type": "module",
+  "engines": { "node": ">=24 <25" },
   "license": "UNLICENSED",
   "author": "Reservation Platform maintainers",
   "repository": {

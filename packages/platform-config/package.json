@@ -4,6 +4,7 @@
   "description": "Runtime module manifest parsing and validation for reservation platform deployments.",
   "private": true,
   "type": "module",
+  "engines": { "node": ">=24 <25" },
   "license": "UNLICENSED",
   "files": [
     "dist",
@@ -25,7 +26,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "devDependencies": {
-    "@types/node": "^20",
+    "@types/node": "^24",
     "tsx": "^4.21.0",
     "typescript": "^5"
   }

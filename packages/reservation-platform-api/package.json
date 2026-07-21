@@ -4,6 +4,7 @@
   "description": "Framework-neutral reservation platform API adapters and compatibility services.",
   "private": true,
   "type": "module",
+  "engines": { "node": ">=24 <25" },
   "license": "UNLICENSED",
   "author": "Project Play maintainers",
   "repository": {

@@ -4,6 +4,7 @@
   "private": true,
   "description": "Backend-owned reservation platform database migration bundle scaffold.",
   "type": "module",
+  "engines": { "node": ">=24 <25" },
   "files": [
     "dist",
     "migrations",

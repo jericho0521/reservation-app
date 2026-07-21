@@ -4,6 +4,7 @@
   "private": true,
   "description": "Backend-only standalone API skeleton proving reservation platform packages can be hosted outside the Next frontend.",
   "type": "module",
+  "engines": { "node": ">=24 <25" },
   "scripts": {
     "dev": "tsx src/server.ts",
     "build": "tsc -p tsconfig.json",
@@ -24,7 +25,7 @@
   },
   "devDependencies": {
     "@project-play/reservations-core": "workspace:*",
-    "@types/node": "^20",
+    "@types/node": "^24",
     "@types/nodemailer": "^8.0.1",
     "tsx": "^4.21.0",
     "typescript": "^5"

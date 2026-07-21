@@ -4,6 +4,7 @@
   "description": "Supabase repository adapter and SQL setup assets for Project Play reservation packages.",
   "private": true,
   "type": "module",
+  "engines": { "node": ">=24 <25" },
   "license": "UNLICENSED",
   "author": "Project Play maintainers",
   "repository": {

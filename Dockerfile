@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7
 
-FROM node:24-bookworm-slim AS base
+FROM node:24-bookworm-slim@sha256:6f7b03f7c2c8e2e784dcf9295400527b9b1270fd37b7e9a7285cf83b6951452d AS base
 WORKDIR /app
 ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0
 RUN corepack enable
@@ -28,7 +28,7 @@ RUN --mount=type=cache,target=/app/.embedding-model-cache \
 RUN pnpm run build
 RUN node scripts/verify-embedding-retrieval.mjs /app/.embedding-model reservation-multilingual-minilm
 
-FROM node:24-bookworm-slim AS runtime
+FROM node:24-bookworm-slim@sha256:6f7b03f7c2c8e2e784dcf9295400527b9b1270fd37b7e9a7285cf83b6951452d AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=4100
@@ -63,7 +63,7 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
 
 CMD ["node", "apps/api/dist/server.js"]
 
-FROM node:24-bookworm-slim AS worker-runtime
+FROM node:24-bookworm-slim@sha256:6f7b03f7c2c8e2e784dcf9295400527b9b1270fd37b7e9a7285cf83b6951452d AS worker-runtime
 WORKDIR /app
 ENV NODE_ENV=production
 ENV RESERVATION_RUN_AS_UID=1001

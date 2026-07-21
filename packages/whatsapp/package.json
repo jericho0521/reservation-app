@@ -4,6 +4,7 @@
   "description": "Backend-only WhatsApp channel integration contracts and self-hosted QR session lifecycle for the reservation platform.",
   "private": true,
   "type": "module",
+  "engines": { "node": ">=24 <25" },
   "license": "UNLICENSED",
   "author": "Reservation Platform maintainers",
   "repository": {

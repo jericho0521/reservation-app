@@ -18,8 +18,8 @@ importers:
         specifier: ^1.61.1
         version: 1.61.1
       '@types/node':
-        specifier: ^20
-        version: 20.19.28
+        specifier: ^24
+        version: 24.13.3
       dotenv:
         specifier: ^17.2.3
         version: 17.2.3
@@ -67,8 +67,8 @@ importers:
         specifier: workspace:*
         version: link:../../packages/reservations-core
       '@types/node':
-        specifier: ^20
-        version: 20.19.28
+        specifier: ^24
+        version: 24.13.3
       '@types/nodemailer':
         specifier: ^8.0.1
         version: 8.0.1
@@ -101,8 +101,8 @@ importers:
         version: 0.0.1
     devDependencies:
       '@types/node':
-        specifier: ^20
-        version: 20.19.28
+        specifier: ^24
+        version: 24.13.3
       '@types/react':
         specifier: ^19
         version: 19.2.17
@@ -141,8 +141,8 @@ importers:
         version: 0.0.1
     devDependencies:
       '@types/node':
-        specifier: ^20
-        version: 20.19.28
+        specifier: ^24
+        version: 24.13.3
       '@types/qrcode':
         specifier: ^1.5.6
         version: 1.5.6
@@ -178,8 +178,8 @@ importers:
         version: 19.2.7(react@19.2.7)
     devDependencies:
       '@types/node':
-        specifier: ^20
-        version: 20.19.28
+        specifier: ^24
+        version: 24.13.3
       '@types/react':
         specifier: ^19
         version: 19.2.17
@@ -212,8 +212,8 @@ importers:
         version: 19.2.7(react@19.2.7)
     devDependencies:
       '@types/node':
-        specifier: ^20
-        version: 20.19.28
+        specifier: ^24
+        version: 24.13.3
       '@types/react':
         specifier: ^19
         version: 19.2.17
@@ -246,8 +246,8 @@ importers:
         version: 19.2.7(react@19.2.7)
     devDependencies:
       '@types/node':
-        specifier: ^20
-        version: 20.19.28
+        specifier: ^24
+        version: 24.13.3
       '@types/react':
         specifier: ^19
         version: 19.2.17
@@ -280,8 +280,8 @@ importers:
         version: 19.2.7(react@19.2.7)
     devDependencies:
       '@types/node':
-        specifier: ^20
-        version: 20.19.28
+        specifier: ^24
+        version: 24.13.3
       '@types/react':
         specifier: ^19
         version: 19.2.17
@@ -326,8 +326,8 @@ importers:
         version: 9.0.3
     devDependencies:
       '@types/node':
-        specifier: ^20
-        version: 20.19.28
+        specifier: ^24
+        version: 24.13.3
       '@types/nodemailer':
         specifier: ^8.0.1
         version: 8.0.1
@@ -398,8 +398,8 @@ importers:
   packages/platform-config:
     devDependencies:
       '@types/node':
-        specifier: ^20
-        version: 20.19.28
+        specifier: ^24
+        version: 24.13.3
       tsx:
         specifier: ^4.21.0
         version: 4.21.0
@@ -1236,8 +1236,8 @@ packages:
   '@tybys/wasm-util@0.10.3':
     resolution: {integrity: sha512-F3fo1MYrRJYL3zER0OUOmkutjr1Vp23m7OsSgp7nq4SP6OqX6C/56XFIPAl5bt3zaBRjmW7SGz3u/6LwFpYcOg==}
 
-  '@types/node@20.19.28':
-    resolution: {integrity: sha512-VyKBr25BuFDzBFCK5sUM6ZXiWfqgCTwTAOK8qzGV/m9FCirXYDlmczJ+d5dXBAQALGCdRRdbteKYfJ84NGEusw==}
+  '@types/node@24.13.3':
+    resolution: {integrity: sha512-Dh8vAsV36ig5wa9OX4pXvMc9D3Veibfw2wix0CUwYODLD8nkj9UsLjASr49nPg+2eKzxhBV+v7L8pXvT4e639Q==}
 
   '@types/nodemailer@8.0.1':
     resolution: {integrity: sha512-PxpaInm8V1JQDd4j0ds5HfvWQk8JupS1C0Picb96QJsrrRDjBH+DlK7L4ZdNSqNULhiZRQHc40nLVShaGxXAMw==}
@@ -1793,8 +1793,8 @@ packages:
     resolution: {integrity: sha512-rvKSBiC5zqCCiDZ9kAOszZcDvdAHwwIKJG33Ykj43OKcWsnmcBRL09YTU4nOeHZ8Y2a7l1MgTd08SBe9A8Qj6A==}
     engines: {node: '>=18'}
 
-  undici-types@6.21.0:
-    resolution: {integrity: sha512-iwDZqg0QAGrg9Rav5H4n0M64c3mkR59cJ6wQp+7C4nI0gsmExaedaYLNO44eT4AtBBwjbTiGPMlt2Md0T9H9JQ==}
+  undici-types@7.18.2:
+    resolution: {integrity: sha512-AsuCzffGHJybSaRrmr5eHr81mwJU3kjw6M+uprWvCXiNeN9SOGwQ3Jn8jb8m3Z6izVgknn1R0FTCEAP2QrLY/w==}
 
   whatsapp-rust-bridge@0.5.4:
     resolution: {integrity: sha512-yYO1qSs0Fe7tGtnxOFHomocUD6IZtoAgmA4oDFyGIRZ67D3QZk3w7swA6XXFXNQngiyrg2k7tul6IrM3eUFh7A==}
@@ -2334,19 +2334,19 @@ snapshots:
       tslib: 2.8.1
     optional: true
 
-  '@types/node@20.19.28':
+  '@types/node@24.13.3':
     dependencies:
-      undici-types: 6.21.0
+      undici-types: 7.18.2
 
   '@types/nodemailer@8.0.1':
     dependencies:
-      '@types/node': 20.19.28
+      '@types/node': 24.13.3
 
   '@types/phoenix@1.6.7': {}
 
   '@types/qrcode@1.5.6':
     dependencies:
-      '@types/node': 20.19.28
+      '@types/node': 24.13.3
 
   '@types/react-dom@19.2.3(@types/react@19.2.17)':
     dependencies:
@@ -2358,7 +2358,7 @@ snapshots:
 
   '@types/ws@8.18.1':
     dependencies:
-      '@types/node': 20.19.28
+      '@types/node': 24.13.3
 
   '@vercel/oidc@3.2.0': {}
 
@@ -2753,7 +2753,7 @@ snapshots:
       '@protobufjs/path': 1.1.2
       '@protobufjs/pool': 1.1.0
       '@protobufjs/utf8': 1.1.1
-      '@types/node': 20.19.28
+      '@types/node': 24.13.3
       long: 5.3.2
 
   qified@0.10.1:
@@ -2903,7 +2903,7 @@ snapshots:
 
   uint8array-extras@1.5.0: {}
 
-  undici-types@6.21.0: {}
+  undici-types@7.18.2: {}
 
   whatsapp-rust-bridge@0.5.4: {}
 

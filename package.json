@@ -2,6 +2,9 @@
   "name": "reservation-platform",
   "version": "0.2.0",
   "private": true,
+  "engines": {
+    "node": ">=24 <25"
+  },
   "packageManager": "pnpm@10.33.2",
   "description": "Backend modules, API host, SDK, React hooks, UI components, and examples for a modular booking platform.",
   "type": "module",
@@ -17,11 +20,11 @@
     "worker:build": "pnpm --filter @reservation-platform/worker run build",
     "worker:test": "pnpm --filter @reservation-platform/worker run test",
     "build": "pnpm run packages:build && pnpm --filter @reservation-platform/standalone-api-skeleton run build",
-    "packages:build": "pnpm --filter @project-play/reservations-core run build && pnpm --filter @project-play/reservation-chat-core run build && pnpm --filter @reservation-platform/contract-types run build && pnpm --filter @reservation-platform/platform-config run build && pnpm --filter @reservation-platform/ai-chat run build && pnpm --filter @reservation-platform/ai-sdk-adapter run build && pnpm --filter @reservation-platform/whatsapp run build && pnpm --filter @reservation-platform/api run build && pnpm --filter @project-play/reservations-supabase run build && pnpm --filter @reservation-platform/database run build && pnpm --filter @reservation-platform/sdk run build && pnpm --filter @reservation-platform/react run build && pnpm --filter @reservation-platform/ui run build && pnpm run worker:build",
-    "packages:test": "pnpm --filter @project-play/reservations-core run test && pnpm --filter @project-play/reservation-chat-core run test && pnpm --filter @reservation-platform/contract-types run test && pnpm --filter @reservation-platform/platform-config run test && pnpm --filter @reservation-platform/ai-chat run test && pnpm --filter @reservation-platform/ai-sdk-adapter run test && pnpm --filter @reservation-platform/whatsapp run test && pnpm --filter @reservation-platform/api run test && pnpm --filter @project-play/reservations-supabase run test && pnpm --filter @reservation-platform/database run test && pnpm --filter @reservation-platform/sdk run test && pnpm --filter @reservation-platform/react run test && pnpm --filter @reservation-platform/ui run test && pnpm run worker:test",
+    "packages:build": "pnpm -r --workspace-concurrency=1 --filter './packages/**' --filter @reservation-platform/worker run build",
+    "packages:test": "pnpm -r --workspace-concurrency=1 --filter './packages/**' --filter @reservation-platform/worker run test",
     "packages:pack": "pnpm --filter @project-play/reservations-core pack --pack-destination dist-packages && pnpm --filter @project-play/reservation-chat-core pack --pack-destination dist-packages && pnpm --filter @reservation-platform/ai-chat pack --pack-destination dist-packages && pnpm --filter @reservation-platform/ai-sdk-adapter pack --pack-destination dist-packages && pnpm --filter @reservation-platform/whatsapp pack --pack-destination dist-packages && pnpm --filter @reservation-platform/contract-types pack --pack-destination dist-packages && pnpm --filter @reservation-platform/platform-config pack --pack-destination dist-packages && pnpm --filter @reservation-platform/api pack --pack-destination dist-packages && pnpm --filter @project-play/reservations-supabase pack --pack-destination dist-packages && pnpm --filter @reservation-platform/database pack --pack-destination dist-packages && pnpm --filter @reservation-platform/sdk pack --pack-destination dist-packages && pnpm --filter @reservation-platform/react pack --pack-destination dist-packages && pnpm --filter @reservation-platform/ui pack --pack-destination dist-packages",
     "packages:verify-boundaries": "pnpm run packages:pack && node scripts/verify-sdk-package-boundary.mjs && node scripts/verify-frontend-package-boundary.mjs && node scripts/verify-booking-app-boundary.mjs && node scripts/verify-ai-chat-boundary.mjs",
-    "ci:verify-scripts": "node scripts/verify-workflow-scripts.mjs && pnpm run repository:hygiene",
+    "ci:verify-scripts": "node scripts/verify-workflow-scripts.mjs && node --test scripts/verify-node-runtime-policy.test.mjs && node scripts/verify-node-runtime-policy.mjs && pnpm run repository:hygiene",
     "repository:hygiene": "node --test scripts/verify-repository-hygiene.test.mjs && node scripts/verify-repository-hygiene.mjs",
     "database:migration-index:generate": "node scripts/generate-database-migration-index.mjs",
     "database:migration-index:check": "node scripts/generate-database-migration-index.mjs --check",
@@ -61,6 +64,10 @@
     "stack:demo:down": "docker compose -f docker-compose.yml -f docker-compose.demo.yml down",
     "stack:demo:destroy": "docker compose -f docker-compose.yml -f docker-compose.demo.yml run --rm reservation-destroy",
     "local-stack:test": "node --import tsx --test scripts/local-stack-*.test.mjs scripts/local-stack-*.test.ts scripts/verify-local-stack.test.mjs",
+    "apps:test": "pnpm -r --workspace-concurrency=1 --filter @reservation-platform/console --filter @reservation-platform/booking run test",
+    "apps:typecheck": "pnpm -r --workspace-concurrency=1 --filter @reservation-platform/console --filter @reservation-platform/booking run typecheck",
+    "examples:typecheck": "pnpm -r --workspace-concurrency=1 --filter './apps/examples/**' run typecheck",
+    "examples:build": "pnpm -r --workspace-concurrency=1 --filter './apps/examples/**' run build",
     "stack:verify": "node scripts/verify-local-stack.mjs",
     "stack:verify:live": "node scripts/verify-local-stack.mjs --live",
     "stack:verify:persistence": "RESERVATION_STACK_LIVE_TESTS=true node --test tests/docker/local-stack-persistence.test.mjs",
@@ -105,12 +112,13 @@
     "demo:reset": "node scripts/reset-final-demo.mjs",
     "demo:verify": "node scripts/verify-final-demo-readiness.mjs",
     "test": "pnpm run packages:test && pnpm run backend-platform:verify-standalone-api-skeleton && pnpm run database:verify-migration-bundle",
-    "ci:verify": "pnpm run ci:verify-scripts && pnpm test && pnpm run sdk:release-gate && pnpm build && pnpm run deploy:verify && pnpm run production:installer:test && pnpm run production:release:test && pnpm run production:proof:test && pnpm run production:docs:test && pnpm run local-stack:test"
+    "verify:source": "pnpm run ci:verify-scripts && pnpm test && pnpm run apps:test && pnpm run apps:typecheck && pnpm run examples:typecheck && pnpm run test:e2e",
+    "ci:verify": "pnpm run verify:source && pnpm run sdk:release-gate && pnpm build && pnpm run examples:build && pnpm run deploy:verify && pnpm run production:installer:test && pnpm run production:release:test && pnpm run production:proof:test && pnpm run production:docs:test && pnpm run local-stack:test"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.12.1",
     "@playwright/test": "^1.61.1",
-    "@types/node": "^20",
+    "@types/node": "^24",
     "dotenv": "^17.2.3",
     "tsx": "^4.21.0",
     "typescript": "^5"

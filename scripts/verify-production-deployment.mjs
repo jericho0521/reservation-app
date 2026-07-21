@@ -187,15 +187,15 @@ export async function verifyProductionDeployment(options = {}) {
     errors,
   );
 
-  expect(/^FROM node:24-alpine AS worker-runtime$/mu.test(dockerfile), "Dockerfile must include worker-runtime.", errors);
+  expect(/^FROM node:24-bookworm-slim@sha256:[a-f0-9]{64} AS worker-runtime$/mu.test(dockerfile), "Dockerfile must include a digest-pinned worker-runtime.", errors);
   expect(/USER reservation/u.test(dockerfile), "API and worker images must default to non-root.", errors);
-  expect(/^FROM node:24-alpine AS console-runtime$/mu.test(webDockerfile), "Dockerfile.web must include console-runtime.", errors);
-  expect(/^FROM node:24-alpine AS booking-runtime$/mu.test(webDockerfile), "Dockerfile.web must include booking-runtime.", errors);
+  expect(/^FROM node:24-alpine3\.22@sha256:[a-f0-9]{64} AS console-runtime$/mu.test(webDockerfile), "Dockerfile.web must include a digest-pinned console-runtime.", errors);
+  expect(/^FROM node:24-alpine3\.22@sha256:[a-f0-9]{64} AS booking-runtime$/mu.test(webDockerfile), "Dockerfile.web must include a digest-pinned booking-runtime.", errors);
   expect((webDockerfile.match(/USER reservation/gu) ?? []).length >= 2, "Both web images must run as non-root.", errors);
   expect(/output:\s*"standalone"/u.test(consoleConfig), "Console must use standalone output.", errors);
   expect(/basePath:\s*"\/admin"/u.test(consoleConfig), "Console must preserve the /admin base path.", errors);
   expect(
-    /^FROM node:20\.19\.4-alpine3\.22@sha256:[a-f0-9]{64}$/mu.test(toolsDockerfile),
+    /^FROM node:24-alpine3\.22@sha256:[a-f0-9]{64}$/mu.test(toolsDockerfile),
     "Production tools must use the digest-pinned Alpine base.",
     errors,
   );

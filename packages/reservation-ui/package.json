@@ -4,6 +4,7 @@
   "description": "Reusable Tailwind booking UI components for the Reservation Platform.",
   "license": "MIT",
   "type": "module",
+  "engines": { "node": ">=24 <25" },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {

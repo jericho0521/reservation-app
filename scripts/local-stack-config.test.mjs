@@ -123,6 +123,20 @@ test("service config wrapper rejects invalid variable names without echoing valu
   assert.doesNotMatch(invalidResult.stderr, /private-value/u);
 });
 
+test("Windows checkouts preserve Linux container entrypoints", async () => {
+  const [attributes, localDockerfile, apiDockerfile, webDockerfile] = await Promise.all([
+    readFile(new URL("../.gitattributes", import.meta.url), "utf8"),
+    readFile(new URL("../Dockerfile.local-stack", import.meta.url), "utf8"),
+    readFile(new URL("../Dockerfile", import.meta.url), "utf8"),
+    readFile(new URL("../Dockerfile.web", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(attributes, /^\*\.sh text eol=lf$/mu);
+  for (const dockerfile of [localDockerfile, apiDockerfile, webDockerfile]) {
+    assert.equal(dockerfile.includes("sed -i 's/\\r$//'"), true);
+  }
+});
+
 function assertJwt(token, secret, expectedRole) {
   const segments = token.split(".");
   assert.equal(segments.length, 3);

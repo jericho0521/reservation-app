@@ -32,7 +32,8 @@ RUN apt-get update && \
 
 COPY --from=build /app/docker/local-stack/run-with-config.sh /usr/local/bin/run-with-config
 COPY --from=build /app/docker/production/run-with-secrets.sh /usr/local/bin/run-with-secrets
-RUN chmod 755 /usr/local/bin/run-with-config /usr/local/bin/run-with-secrets
+RUN sed -i 's/\r$//' /usr/local/bin/run-with-config /usr/local/bin/run-with-secrets && \
+    chmod 755 /usr/local/bin/run-with-config /usr/local/bin/run-with-secrets
 
 FROM runtime-base AS runtime
 ENV PORT=4100

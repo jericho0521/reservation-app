@@ -24,7 +24,8 @@ COPY packages/reservation-ui packages/reservation-ui
 COPY packages/sdk packages/sdk
 COPY docker/local-stack/run-with-config.sh /usr/local/bin/run-with-config
 COPY docker/production/run-with-secrets.sh /app/docker/production/run-with-secrets.sh
-RUN chmod 755 /usr/local/bin/run-with-config && \
+RUN sed -i 's/\r$//' /usr/local/bin/run-with-config /app/docker/production/run-with-secrets.sh && \
+    chmod 755 /usr/local/bin/run-with-config && \
     pnpm --filter @reservation-platform/contract-types run build && \
     pnpm --filter @reservation-platform/sdk run build && \
     pnpm --filter @reservation-platform/react run build && \

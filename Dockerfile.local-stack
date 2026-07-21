@@ -20,6 +20,7 @@ COPY scripts/production/bootstrap-installation.mjs ./scripts/production/bootstra
 COPY scripts/reset-final-demo.mjs ./scripts/reset-final-demo.mjs
 COPY scripts/verify-final-demo-readiness.mjs ./scripts/verify-final-demo-readiness.mjs
 COPY docker/local-stack/run-with-config.sh /usr/local/bin/run-with-config
-RUN chmod 755 /usr/local/bin/run-with-config
+RUN sed -i 's/\r$//' /usr/local/bin/run-with-config && \
+    chmod 755 /usr/local/bin/run-with-config
 
 CMD ["node", "scripts/local-stack-config.mjs"]

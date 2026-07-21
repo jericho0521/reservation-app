@@ -9,6 +9,7 @@ RUN apk add --no-cache curl postgresql-client && \
 
 COPY package.json ./package.json
 COPY --chown=1001:1001 packages/database/migrations/supabase ./packages/database/migrations/supabase
+RUN find packages/database/migrations/supabase -type f -name '*.sql' -exec sed -i 's/\r$//' {} \;
 COPY packages/database/seeds/final-demo.sql ./packages/database/seeds/final-demo.sql
 COPY scripts/local-stack-config.mjs ./scripts/local-stack-config.mjs
 COPY scripts/local-stack-bootstrap.mjs ./scripts/local-stack-bootstrap.mjs

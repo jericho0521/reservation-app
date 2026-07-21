@@ -2,5 +2,6 @@
 
 # Linux containers must receive executable shell scripts with POSIX line endings.
 *.sh text eol=lf
+*.sql text eol=lf
 Dockerfile text eol=lf
 Dockerfile.* text eol=lf

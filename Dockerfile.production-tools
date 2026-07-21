@@ -31,7 +31,8 @@ COPY scripts/production/support-bundle-sanitize.mjs ./scripts/production/support
 COPY scripts/production/smoke.mjs ./scripts/production/smoke.mjs
 COPY scripts/production/release-manifest.mjs ./release-manifest.mjs
 COPY --chown=1001:1001 packages/database/migrations/supabase ./packages/database/migrations/supabase
-RUN sed -i 's/\r$//' \
+RUN find packages/database/migrations/supabase -type f -name '*.sql' -exec sed -i 's/\r$//' {} \; && \
+    sed -i 's/\r$//' \
     /usr/local/bin/run-with-secrets \
     /usr/local/bin/configure-production \
     ./scripts/production/*.sh

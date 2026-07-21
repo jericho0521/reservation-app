@@ -46,6 +46,24 @@ export function Page() {
 Tailwind is optional for consumers. The CSS file provides the baseline packaged
 UI styles, while `theme` class overrides can still be used by Tailwind apps.
 
+## Visual presets
+
+Industry presets configure booking rules and terminology. Visual presets are a
+separate UI concern. The current design is exported as `editorial` and remains
+the default when `visualPreset` is omitted:
+
+```ts
+const config = createBookingFlowConfig({
+  apiBaseUrl: "https://booking.example.com",
+  serviceId: "service-id",
+  visualPreset: "editorial",
+});
+```
+
+Theme class overrides are applied after the selected visual preset. Additional
+visual designs can be added to the typed registry without changing reservation
+or industry-preset contracts.
+
 `BookingFlow` renders a setup error when the backend URL or service id is
 missing. If you wrap components in your own `ReservationProvider`, pass
 `useExistingProvider`.

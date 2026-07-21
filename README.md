@@ -434,7 +434,7 @@ For a final-year-project submission, the clean story is:
 - Backend packages build and test locally.
 - Standalone API skeleton is present under `apps/api`.
 - Database migration package and migration metadata are present.
-- SDK and contract packages are present for external consumers.
+- Matching SDK, contract-types, React, and UI packages are present for external consumers.
 - React hooks and reusable UI packages are present for frontend consumers.
 - Forkable frontend examples are present under `apps/examples`.
 - Experience Studio, owner operations, unified conversations, channel simulation,

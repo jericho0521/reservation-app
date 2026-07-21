@@ -10,6 +10,12 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, "..");
+const publicReleasePackageSpecs = [
+  "@reservation-platform/contract-types@0.2.0",
+  "@reservation-platform/sdk@0.2.0",
+  "@reservation-platform/react@0.2.0",
+  "@reservation-platform/ui@0.2.0",
+];
 
 export const sdkRegistryProofModeEnvName = "RESERVATION_SDK_REGISTRY_PROOF_MODE";
 export const sdkRegistryPackageSpecsEnvName = "RESERVATION_SDK_REGISTRY_PACKAGE_SPECS";
@@ -68,6 +74,12 @@ function validatePackageSpecs(specs) {
   if (!specs.some((spec) => spec.startsWith("@reservation-platform/contract-types@"))) {
     errors.push(`${sdkRegistryPackageSpecsEnvName} must include @reservation-platform/contract-types at an exact version.`);
   }
+  if (!specs.some((spec) => spec.startsWith("@reservation-platform/react@"))) {
+    errors.push(`${sdkRegistryPackageSpecsEnvName} must include @reservation-platform/react at an exact version.`);
+  }
+  if (!specs.some((spec) => spec.startsWith("@reservation-platform/ui@"))) {
+    errors.push(`${sdkRegistryPackageSpecsEnvName} must include @reservation-platform/ui at an exact version.`);
+  }
 
   for (const spec of specs) {
     if (
@@ -121,19 +133,23 @@ function buildConfig(values, packageSpecs, packageManager) {
 
 export function readSdkRegistryInstallConfig(env, options = {}) {
   const argv = options.argv ?? [];
+  const disposableRequested = argv.includes("--disposable");
   const strict =
     argv.includes("--strict") ||
     trimEnvValue(env, "RESERVATION_SDK_REGISTRY_STRICT") === "1";
-  const mode = trimEnvValue(env, sdkRegistryProofModeEnvName);
-  const allowInstall = trimEnvValue(env, sdkRegistryAllowInstallEnvName) === "1";
-  const packageSpecs = splitPackageSpecs(trimEnvValue(env, sdkRegistryPackageSpecsEnvName));
+  const mode = trimEnvValue(env, sdkRegistryProofModeEnvName) || (disposableRequested ? "disposable" : "");
+  const allowInstall = trimEnvValue(env, sdkRegistryAllowInstallEnvName) === "1" || disposableRequested;
+  const configuredPackageSpecs = trimEnvValue(env, sdkRegistryPackageSpecsEnvName);
+  const packageSpecs = splitPackageSpecs(
+    configuredPackageSpecs || (disposableRequested ? publicReleasePackageSpecs.join(" ") : ""),
+  );
   const rawPackageManager = trimEnvValue(env, "RESERVATION_SDK_REGISTRY_PACKAGE_MANAGER");
   const { packageManager, error: packageManagerError } = parsePackageManager(rawPackageManager);
   const values = {
     RESERVATION_SDK_REGISTRY_PROOF_MODE: mode,
     RESERVATION_SDK_REGISTRY_PRIVATE_URL: trimEnvValue(env, "RESERVATION_SDK_REGISTRY_PRIVATE_URL"),
     RESERVATION_SDK_REGISTRY_PRIVATE_TOKEN: trimEnvValue(env, "RESERVATION_SDK_REGISTRY_PRIVATE_TOKEN"),
-    RESERVATION_SDK_REGISTRY_PACKAGE_SPECS: trimEnvValue(env, sdkRegistryPackageSpecsEnvName),
+    RESERVATION_SDK_REGISTRY_PACKAGE_SPECS: configuredPackageSpecs || (disposableRequested ? publicReleasePackageSpecs.join(" ") : ""),
     RESERVATION_SDK_REGISTRY_PACKAGE_MANAGER: packageManager,
     RESERVATION_SDK_REGISTRY_DISPOSABLE_PORT: trimEnvValue(env, "RESERVATION_SDK_REGISTRY_DISPOSABLE_PORT"),
     RESERVATION_SDK_REGISTRY_KEEP_TEMP: trimEnvValue(env, "RESERVATION_SDK_REGISTRY_KEEP_TEMP"),
@@ -446,6 +462,8 @@ async function runInstallProof(parsed) {
 function renderTypecheckConsumer() {
   return [
     'import { createReservationPlatformClient } from "@reservation-platform/sdk";',
+    'import { createBookingFlowConfig, resolveBookingVisualPreset } from "@reservation-platform/ui";',
+    'import type { ReservationProviderProps } from "@reservation-platform/react";',
     'import type { ReservationResponse } from "@reservation-platform/contract-types";',
     "",
     "const client = createReservationPlatformClient({",
@@ -455,8 +473,13 @@ function renderTypecheckConsumer() {
     "});",
     "",
     "const reservation: ReservationResponse | null = null;",
+    'const booking = createBookingFlowConfig({ apiBaseUrl: "https://reservation-platform.example.test", serviceId: "service_1", visualPreset: "editorial" });',
+    "const visualPreset = resolveBookingVisualPreset(booking.visualPreset);",
+    "const providerProps: ReservationProviderProps | null = null;",
     "void client;",
     "void reservation;",
+    "void visualPreset;",
+    "void providerProps;",
     "",
   ].join("\n");
 }
@@ -614,6 +637,41 @@ async function addLocalZodPackage(packages) {
   });
 }
 
+async function addLocalReactPackage(packages) {
+  const reactPackageDir = [
+    path.join(repoRoot, "node_modules", "react"),
+    path.join(repoRoot, "packages", "reservation-ui", "node_modules", "react"),
+  ].find((candidate) => existsSync(path.join(candidate, "package.json")));
+  if (!reactPackageDir) {
+    throw new Error("Disposable registry proof requires local node_modules/react. Run pnpm install first.");
+  }
+  const reactPackageJson = JSON.parse(await readFile(path.join(reactPackageDir, "package.json"), "utf8"));
+  const tempDir = await mkdtemp(path.join(os.tmpdir(), "reservation-sdk-registry-react-"));
+  await runProcess("npm", ["pack", reactPackageDir, "--pack-destination", tempDir, "--ignore-scripts"], {
+    cwd: repoRoot,
+    env: {
+      ...process.env,
+      npm_config_audit: "false",
+      npm_config_fund: "false",
+      npm_config_cache: path.join(tempDir, ".npm-cache"),
+    },
+    stdio: "ignore",
+  });
+  const tarballFileName = (await readdir(tempDir)).find((fileName) => fileName.endsWith(".tgz"));
+  if (!tarballFileName) {
+    await rm(tempDir, { recursive: true, force: true });
+    throw new Error("Disposable registry proof could not pack local react dependency.");
+  }
+
+  packages.set("react", {
+    name: "react",
+    version: reactPackageJson.version,
+    tarball: await readFile(path.join(tempDir, tarballFileName)),
+    tarballFileName,
+    tempDir,
+  });
+}
+
 function sendJson(response, status, body) {
   const payload = JSON.stringify(body);
   response.writeHead(status, {
@@ -636,6 +694,7 @@ function sendTarball(response, tarball) {
 async function startDisposableRegistry(config) {
   const packages = await loadDisposableRegistryPackages(config.packageSpecs);
   await addLocalZodPackage(packages);
+  await addLocalReactPackage(packages);
   const server = createServer((request, response) => {
     if (request.method !== "GET") {
       sendJson(response, 405, { error: "method_not_allowed" });

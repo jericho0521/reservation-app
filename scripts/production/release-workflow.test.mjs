@@ -6,7 +6,7 @@ test("release workflow builds, attests, signs, and packages all immutable compon
   const workflow = await readFile(new URL("../../.github/workflows/release.yml", import.meta.url), "utf8");
   for (const component of ["api", "worker", "console", "booking", "tools"]) assert.match(workflow, new RegExp(`component: ${component}\\b`, "u"));
   for (const required of ["platforms: linux/amd64", "provenance: mode=max", "sbom: true", "cosign sign --yes", "--generate-published", "softprops/action-gh-release", "name: production-release"]) assert.equal(workflow.includes(required), true, required);
-  for (const packageName of ["reservation-platform-sdk", "reservation-platform-contract-types"]) assert.match(workflow, new RegExp(`${packageName}-`, "u"));
+  for (const packageName of ["reservation-platform-sdk", "reservation-platform-contract-types", "reservation-platform-react", "reservation-platform-ui"]) assert.match(workflow, new RegExp(`${packageName}-`, "u"));
   assert.doesNotMatch(workflow, /image:\s*[^\n]*:latest|tags:\s*[^\n]*:latest/u);
   assert.match(workflow, /git cat-file -t/u);
   assert.match(workflow, /package\.json[\s\S]*= "\$version"/u);

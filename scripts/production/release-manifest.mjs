@@ -39,6 +39,8 @@ export const PUBLISHED_RELEASE_ASSETS = Object.freeze([
   "verify-signatures.sh",
   "packages/reservation-platform-contract-types-0.2.0.tgz",
   "packages/reservation-platform-sdk-0.2.0.tgz",
+  "packages/reservation-platform-react-0.2.0.tgz",
+  "packages/reservation-platform-ui-0.2.0.tgz",
 ]);
 
 const manifestName = "release-manifest.json";

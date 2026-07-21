@@ -35,6 +35,8 @@ jobs:
           test "$(node -p 'require("./package.json").version')" = "$version"
           test "$(node -p 'require("./packages/sdk/package.json").version')" = "$version"
           test "$(node -p 'require("./packages/contract-types/package.json").version')" = "$version"
+          test "$(node -p 'require("./packages/reservation-react/package.json").version')" = "$version"
+          test "$(node -p 'require("./packages/reservation-ui/package.json").version')" = "$version"
 
       - name: Set up pnpm
         uses: pnpm/action-setup@v4
@@ -61,6 +63,8 @@ jobs:
           path: |
             dist-packages/reservation-platform-contract-types-*.tgz
             dist-packages/reservation-platform-sdk-*.tgz
+            dist-packages/reservation-platform-react-*.tgz
+            dist-packages/reservation-platform-ui-*.tgz
           if-no-files-found: error
           retention-days: 7
 
@@ -191,6 +195,8 @@ jobs:
           cp docker/production/Caddyfile "$bundle/Caddyfile"
           cp "sdk-release-artifacts/reservation-platform-contract-types-$version.tgz" "$bundle/packages/"
           cp "sdk-release-artifacts/reservation-platform-sdk-$version.tgz" "$bundle/packages/"
+          cp "sdk-release-artifacts/reservation-platform-react-$version.tgz" "$bundle/packages/"
+          cp "sdk-release-artifacts/reservation-platform-ui-$version.tgz" "$bundle/packages/"
           chmod 0755 "$bundle/install.sh" "$bundle/verify-signatures.sh" "$bundle/scripts/production/install.sh" "$bundle/scripts/production/preflight.sh" "$bundle/scripts/production/support-bundle.sh"
           node -e 'const fs=require("node:fs");const out={};for(const file of fs.readdirSync("observed-digests")){const match=/^digest-(api|worker|console|booking|tools)\.txt$/.exec(file);if(match)out[match[1]]=fs.readFileSync(`observed-digests/${file}`,"utf8").trim()}fs.writeFileSync("observed-digests.json",JSON.stringify(out))'
           node scripts/production/release-manifest.mjs --generate-published --root "$bundle" --manifest "$bundle/release-manifest.json" --release "$version" --digests observed-digests.json --commit "$GITHUB_SHA" --required-migration 000040 --minimum-from-version 0.1.0 --rollback-compatible false --downgrade-compatible false

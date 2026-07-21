@@ -7,7 +7,7 @@ function publicRegistryEnv(overrides = {}) {
   return {
     RESERVATION_SDK_REGISTRY_PROOF_MODE: "public",
     RESERVATION_SDK_REGISTRY_PACKAGE_SPECS:
-      "@reservation-platform/sdk@1.2.3 @reservation-platform/contract-types@1.2.3",
+      "@reservation-platform/sdk@1.2.3 @reservation-platform/contract-types@1.2.3 @reservation-platform/react@1.2.3 @reservation-platform/ui@1.2.3",
     ...overrides,
   };
 }
@@ -18,7 +18,7 @@ function privateRegistryEnv(overrides = {}) {
     RESERVATION_SDK_REGISTRY_PRIVATE_URL: "https://npm.private.example.test/repository/npm/",
     RESERVATION_SDK_REGISTRY_PRIVATE_TOKEN: "private-token",
     RESERVATION_SDK_REGISTRY_PACKAGE_SPECS:
-      "@reservation-platform/sdk@1.2.3,@reservation-platform/contract-types@1.2.3",
+      "@reservation-platform/sdk@1.2.3,@reservation-platform/contract-types@1.2.3,@reservation-platform/react@1.2.3,@reservation-platform/ui@1.2.3",
     ...overrides,
   };
 }
@@ -27,7 +27,7 @@ function disposableRegistryEnv(overrides = {}) {
   return {
     RESERVATION_SDK_REGISTRY_PROOF_MODE: "disposable",
     RESERVATION_SDK_REGISTRY_PACKAGE_SPECS:
-      "@reservation-platform/sdk@0.0.0 @reservation-platform/contract-types@0.0.0",
+      "@reservation-platform/sdk@0.0.0 @reservation-platform/contract-types@0.0.0 @reservation-platform/react@0.0.0 @reservation-platform/ui@0.0.0",
     ...overrides,
   };
 }
@@ -54,6 +54,19 @@ test("SDK registry install config fails strict runs when required env is missing
   assert.equal(parsed.ready, false);
   assert.equal(parsed.installReady, false);
   assert.match(parsed.message, /RESERVATION_SDK_REGISTRY_PROOF_MODE/);
+});
+
+test("strict disposable proof defaults to all four matching release packages", () => {
+  const parsed = readSdkRegistryInstallConfig({}, { argv: ["--strict", "--disposable"] });
+
+  assert.equal(parsed.status, "ready");
+  assert.equal(parsed.installReady, true);
+  assert.deepEqual(parsed.packageSpecs, [
+    "@reservation-platform/contract-types@0.2.0",
+    "@reservation-platform/sdk@0.2.0",
+    "@reservation-platform/react@0.2.0",
+    "@reservation-platform/ui@0.2.0",
+  ]);
 });
 
 test("SDK registry install config skips invalid mode by default", () => {
@@ -102,6 +115,8 @@ test("SDK registry install config parses disposable proof mode without registry 
   assert.deepEqual(parsed.config.packageSpecs, [
     "@reservation-platform/sdk@0.0.0",
     "@reservation-platform/contract-types@0.0.0",
+    "@reservation-platform/react@0.0.0",
+    "@reservation-platform/ui@0.0.0",
   ]);
 });
 
@@ -151,6 +166,8 @@ test("SDK registry install config parses configured public proof without install
   assert.deepEqual(parsed.packageSpecs, [
     "@reservation-platform/sdk@1.2.3",
     "@reservation-platform/contract-types@1.2.3",
+    "@reservation-platform/react@1.2.3",
+    "@reservation-platform/ui@1.2.3",
   ]);
   assert.match(parsed.message, /RESERVATION_SDK_REGISTRY_ALLOW_INSTALL=1/);
 });
@@ -172,6 +189,8 @@ test("SDK registry install config parses configured private proof without instal
   assert.deepEqual(parsed.config.packageSpecs, [
     "@reservation-platform/sdk@1.2.3",
     "@reservation-platform/contract-types@1.2.3",
+    "@reservation-platform/react@1.2.3",
+    "@reservation-platform/ui@1.2.3",
   ]);
 });
 
@@ -245,7 +264,7 @@ test("SDK registry install config allows unscoped npm names with exact versions"
   const parsed = readSdkRegistryInstallConfig(
     publicRegistryEnv({
       RESERVATION_SDK_REGISTRY_PACKAGE_SPECS:
-        "@reservation-platform/sdk@1.2.3 @reservation-platform/contract-types@1.2.3 left-pad@1.2.3",
+        "@reservation-platform/sdk@1.2.3 @reservation-platform/contract-types@1.2.3 @reservation-platform/react@1.2.3 @reservation-platform/ui@1.2.3 left-pad@1.2.3",
       RESERVATION_SDK_REGISTRY_ALLOW_INSTALL: "1",
     }),
     { argv: ["--strict"] },
@@ -256,6 +275,8 @@ test("SDK registry install config allows unscoped npm names with exact versions"
   assert.deepEqual(parsed.packageSpecs, [
     "@reservation-platform/sdk@1.2.3",
     "@reservation-platform/contract-types@1.2.3",
+    "@reservation-platform/react@1.2.3",
+    "@reservation-platform/ui@1.2.3",
     "left-pad@1.2.3",
   ]);
 });

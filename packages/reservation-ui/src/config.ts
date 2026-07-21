@@ -2,12 +2,14 @@ import type { BookingFlowProps } from "./components.js";
 import type { ExperiencePreviewProps } from "./components.js";
 import type { ExperienceDraftInput, ServiceResponse } from "@reservation-platform/contract-types";
 import type { BookingLabels, ThemeClasses } from "./types.js";
+import type { BookingVisualPresetId } from "./presets.js";
 
 export interface BookingFlowConfigInput {
   apiBaseUrl?: string;
   serviceId?: string;
   labels?: Partial<BookingLabels>;
   theme?: ThemeClasses;
+  visualPreset?: BookingVisualPresetId;
   initialQuantity?: number;
   useExistingProvider?: boolean;
 }
@@ -15,6 +17,7 @@ export interface BookingFlowConfigInput {
 export interface BookingFlowConfig {
   apiBaseUrl?: string;
   serviceId?: string;
+  visualPreset?: BookingVisualPresetId;
   booking: BookingFlowProps;
 }
 
@@ -22,11 +25,13 @@ export function createBookingFlowConfig(input: BookingFlowConfigInput): BookingF
   return {
     apiBaseUrl: normalizeOptionalString(input.apiBaseUrl),
     serviceId: normalizeOptionalString(input.serviceId),
+    visualPreset: input.visualPreset,
     booking: {
       baseUrl: normalizeOptionalString(input.apiBaseUrl),
       serviceId: normalizeOptionalString(input.serviceId),
       labels: input.labels,
       theme: input.theme,
+      visualPreset: input.visualPreset,
       initialQuantity: input.initialQuantity,
       useExistingProvider: input.useExistingProvider,
     },

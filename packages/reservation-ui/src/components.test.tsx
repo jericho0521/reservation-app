@@ -18,7 +18,12 @@ import {
 } from "./components.js";
 import { BookingStepActions, BookingStepProgress } from "./booking/journey.js";
 import { createBookingFlowConfig, createExperiencePreviewConfig } from "./config.js";
-import { defaultThemeClasses } from "./types.js";
+import {
+  bookingVisualPresets,
+  defaultBookingVisualPresetId,
+  defaultThemeClasses,
+  resolveBookingVisualPreset,
+} from "./presets.js";
 
 function childrenOf(node: unknown): unknown[] {
   if (!node || typeof node !== "object" || !("props" in node)) {
@@ -162,6 +167,22 @@ test("BookingFlow renders setup guidance when config is incomplete", () => {
   }).booking);
 
   assert.equal((element as { type?: unknown }).type, BookingSetupError);
+});
+
+test("editorial visual preset preserves the current default theme", () => {
+  assert.equal(defaultBookingVisualPresetId, "editorial");
+  assert.equal(resolveBookingVisualPreset(), bookingVisualPresets.editorial);
+  assert.deepEqual(resolveBookingVisualPreset("editorial").theme, defaultThemeClasses);
+
+  const implicit = createBookingFlowConfig({ apiBaseUrl: "https://example.test", serviceId: "service_1" });
+  const explicit = createBookingFlowConfig({
+    apiBaseUrl: "https://example.test",
+    serviceId: "service_1",
+    visualPreset: "editorial",
+  });
+  assert.equal(implicit.visualPreset, undefined);
+  assert.equal(explicit.visualPreset, "editorial");
+  assert.equal(explicit.booking.visualPreset, "editorial");
 });
 
 test("BookingSetupError explains missing backend configuration", () => {

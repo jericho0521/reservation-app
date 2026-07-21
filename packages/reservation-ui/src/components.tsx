@@ -27,10 +27,13 @@ import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import { cn } from "./class-names.js";
 import {
   defaultBookingLabels,
-  defaultThemeClasses,
   type BookingLabels,
   type ThemeClasses,
 } from "./types.js";
+import {
+  resolveBookingVisualPreset,
+  type BookingVisualPresetId,
+} from "./presets.js";
 import { BookingStepActions, BookingStepPanel, BookingStepProgress } from "./booking/journey.js";
 
 export interface BookingFlowProps {
@@ -38,6 +41,7 @@ export interface BookingFlowProps {
   baseUrl?: string;
   labels?: Partial<BookingLabels>;
   theme?: ThemeClasses;
+  visualPreset?: BookingVisualPresetId;
   className?: string;
   initialDate?: string;
   initialQuantity?: number;
@@ -107,18 +111,22 @@ function mergeLabels(labels?: Partial<BookingLabels>): BookingLabels {
   return { ...defaultBookingLabels, ...labels };
 }
 
-function mergeTheme(theme?: ThemeClasses): Required<ThemeClasses> {
+function mergeTheme(
+  visualPreset: BookingVisualPresetId | undefined,
+  theme?: ThemeClasses,
+): Required<ThemeClasses> {
+  const presetTheme = resolveBookingVisualPreset(visualPreset).theme;
   return {
-    brandName: theme?.brandName ?? defaultThemeClasses.brandName,
-    shell: cn(defaultThemeClasses.shell, theme?.shell),
-    panel: cn(defaultThemeClasses.panel, theme?.panel),
-    button: cn(defaultThemeClasses.button, theme?.button),
-    buttonDisabled: cn(defaultThemeClasses.buttonDisabled, theme?.buttonDisabled),
-    input: cn(defaultThemeClasses.input, theme?.input),
-    selected: cn(defaultThemeClasses.selected, theme?.selected),
-    muted: cn(defaultThemeClasses.muted, theme?.muted),
-    error: cn(defaultThemeClasses.error, theme?.error),
-    success: cn(defaultThemeClasses.success, theme?.success),
+    brandName: theme?.brandName ?? presetTheme.brandName,
+    shell: cn(presetTheme.shell, theme?.shell),
+    panel: cn(presetTheme.panel, theme?.panel),
+    button: cn(presetTheme.button, theme?.button),
+    buttonDisabled: cn(presetTheme.buttonDisabled, theme?.buttonDisabled),
+    input: cn(presetTheme.input, theme?.input),
+    selected: cn(presetTheme.selected, theme?.selected),
+    muted: cn(presetTheme.muted, theme?.muted),
+    error: cn(presetTheme.error, theme?.error),
+    success: cn(presetTheme.success, theme?.success),
   };
 }
 
@@ -139,6 +147,7 @@ export function BookingFlow({
   serviceId,
   labels,
   theme,
+  visualPreset,
   className,
   initialDate,
   initialQuantity,
@@ -162,6 +171,7 @@ export function BookingFlow({
       serviceId={serviceId}
       labels={labels}
       theme={theme}
+      visualPreset={visualPreset}
       className={className}
       initialDate={initialDate}
       initialQuantity={initialQuantity}
@@ -177,27 +187,31 @@ export function PublicBookingJourney({
   slug,
   labels,
   theme,
+  visualPreset,
   className,
 }: {
   baseUrl: string;
   slug: string;
   labels?: Partial<BookingLabels>;
   theme?: ThemeClasses;
+  visualPreset?: BookingVisualPresetId;
   className?: string;
 }) {
   return <PublicExperienceReservationProvider baseUrl={baseUrl} slug={slug}>
-    <PublicBookingJourneyInner labels={labels} theme={theme} className={className} managementBasePath={`/${slug}/manage`} />
+    <PublicBookingJourneyInner labels={labels} theme={theme} visualPreset={visualPreset} className={className} managementBasePath={`/${slug}/manage`} />
   </PublicExperienceReservationProvider>;
 }
 
 function PublicBookingJourneyInner({
   labels,
   theme,
+  visualPreset,
   className,
   managementBasePath,
 }: {
   labels?: Partial<BookingLabels>;
   theme?: ThemeClasses;
+  visualPreset?: BookingVisualPresetId;
   className?: string;
   managementBasePath: string;
 }) {
@@ -213,6 +227,7 @@ function PublicBookingJourneyInner({
     serviceId={serviceId}
     labels={labels}
     theme={theme}
+    visualPreset={visualPreset}
     className={className}
     useExistingProvider
     managementBasePath={managementBasePath}
@@ -240,13 +255,14 @@ function BookingFlowInner({
   serviceId,
   labels,
   theme,
+  visualPreset,
   className,
   initialDate,
   initialQuantity,
   managementBasePath,
 }: Omit<BookingFlowProps, "baseUrl" | "serviceId"> & { serviceId: string }) {
   const mergedLabels = mergeLabels(labels);
-  const mergedTheme = mergeTheme(theme);
+  const mergedTheme = mergeTheme(visualPreset, theme);
   const flow = useBookingFlow({ serviceId, initialDate, initialQuantity });
   const [step, setStep] = useState<BookingJourneyStep>("practitioner");
   const [submitError, setSubmitError] = useState<string>();

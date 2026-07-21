@@ -1,9 +1,9 @@
 {
   "name": "@reservation-platform/react",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Headless React provider and hooks for the reservation platform.",
   "type": "module",
-  "license": "UNLICENSED",
+  "license": "MIT",
   "author": "Project Play maintainers",
   "files": [
     "dist",

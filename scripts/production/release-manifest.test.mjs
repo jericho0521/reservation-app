@@ -5,6 +5,7 @@ import path from "node:path";
 import test from "node:test";
 
 import {
+  PUBLISHED_RELEASE_ASSETS,
   PRODUCTION_RELEASE_ASSETS,
   buildReleaseManifest,
   buildPublishedReleaseManifest,
@@ -116,6 +117,12 @@ test("production manifest covers every installer-consumed bundle asset", () => {
     "scripts/production/support-bundle.sh",
     "scripts/production/support-bundle-sanitize.mjs",
   ]);
+});
+
+test("published bundle ships the complete public frontend toolkit", () => {
+  for (const packageName of ["contract-types", "sdk", "react", "ui"]) {
+    assert.ok(PUBLISHED_RELEASE_ASSETS.includes(`packages/reservation-platform-${packageName}-0.2.0.tgz`));
+  }
 });
 
 test("release verification rejects release drift, asset drift, and unexpected fields", async () => {

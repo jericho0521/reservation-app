@@ -43,7 +43,7 @@ ENV HOSTNAME=0.0.0.0
 ENV PORT=4300
 ENV RESERVATION_RUN_AS_UID=1001
 ENV RESERVATION_RUN_AS_GID=1001
-RUN apk add --no-cache su-exec=0.3-r0 && addgroup -g 1001 -S reservation && adduser -S reservation -u 1001 -G reservation
+RUN apk add --no-cache su-exec=0.2-r3 && addgroup -g 1001 -S reservation && adduser -S reservation -u 1001 -G reservation
 COPY --from=console-build --chown=reservation:reservation /app/apps/console/.next/standalone ./
 COPY --from=console-build --chown=reservation:reservation /app/apps/console/.next/static ./apps/console/.next/static
 COPY --from=console-build /usr/local/bin/run-with-config /usr/local/bin/run-with-config

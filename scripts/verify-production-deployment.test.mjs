@@ -115,6 +115,7 @@ test("production image targets stay non-root after protected secret loading", as
   assert.match(apiDockerfile, /USER reservation/u);
   assert.match(webDockerfile, /^FROM node:24-alpine3\.22@sha256:[a-f0-9]{64} AS console-runtime$/mu);
   assert.match(webDockerfile, /^FROM node:24-alpine3\.22@sha256:[a-f0-9]{64} AS booking-runtime$/mu);
+  assert.match(webDockerfile, /apk add --no-cache su-exec=0\.2-r3/u);
   assert.doesNotMatch(webDockerfile, /COPY --from=.*\/src(?:\s|$)/mu);
   assert.match(toolsDockerfile, /COPY --chown=1001:1001 packages\/database\/migrations\/supabase/u);
   assert.match(dockerignore, /^\*\*\/node_modules$/mu);

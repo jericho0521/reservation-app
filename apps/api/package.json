@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@project-play/reservations-supabase": "workspace:*",
+    "@project-play/reservations-core": "workspace:*",
     "@reservation-platform/ai-sdk-adapter": "workspace:*",
     "@reservation-platform/api": "workspace:*",
     "@reservation-platform/contract-types": "workspace:*",
@@ -24,7 +25,6 @@
     "pdfjs-dist": "5.4.149"
   },
   "devDependencies": {
-    "@project-play/reservations-core": "workspace:*",
     "@types/node": "^24",
     "@types/nodemailer": "^8.0.1",
     "tsx": "^4.21.0",

@@ -46,7 +46,7 @@
   "peerDependencies": {
     "@project-play/reservations-core": "0.0.0",
     "@reservation-platform/api": "0.0.0",
-    "@reservation-platform/contract-types": "0.1.0"
+    "@reservation-platform/contract-types": ">=0.1.0 <1"
   },
   "devDependencies": {
     "@project-play/reservations-core": "workspace:*",

@@ -69,13 +69,19 @@ function verifyDockerDeploymentFiles() {
   );
   assertIncludes(dockerfile, manifest.healthPath, "Dockerfile healthcheck must call the configured health path.", errors);
   assertIncludes(dockerfile, "USER reservation", "Dockerfile runtime image must run as the non-root reservation user.", errors);
-  assertMatches(dockerfile, /^FROM node:24-bookworm-slim@sha256:[a-f0-9]{64} AS runtime$/mu, "Dockerfile must include the digest-pinned native-runtime-compatible slim stage.", errors);
-  assertMatches(dockerfile, /^FROM node:24-bookworm-slim@sha256:[a-f0-9]{64} AS worker-runtime$/mu, "Dockerfile worker must use the digest-pinned ONNX-compatible runtime.", errors);
+  assertMatches(dockerfile, /^FROM node:24-bookworm-slim@sha256:[a-f0-9]{64} AS runtime-base$/mu, "Dockerfile must include a shared digest-pinned native-runtime-compatible slim stage.", errors);
+  assertMatches(dockerfile, /^FROM runtime-base AS runtime$/mu, "Dockerfile API must use the shared slim runtime stage.", errors);
+  assertMatches(dockerfile, /^FROM runtime-base AS worker-runtime$/mu, "Dockerfile worker must use the shared ONNX-compatible runtime stage.", errors);
+  assertMatches(dockerfile, /pnpm --filter @reservation-platform\/standalone-api-skeleton deploy --prod/u, "Dockerfile must create a pruned API production deployment.", errors);
+  assertMatches(dockerfile, /pnpm --filter @reservation-platform\/worker deploy --prod/u, "Dockerfile must create a pruned worker production deployment.", errors);
+  if ((dockerfile.match(/RUN pnpm install --frozen-lockfile/gu) ?? []).length !== 1) {
+    errors.push("Dockerfile must install the workspace exactly once before building.");
+  }
   assertIncludes(dockerfile, "pnpm run build", "Dockerfile build stage must compile backend packages and apps/api.", errors);
   assertIncludes(
     dockerfile,
-    "/app/apps/api/node_modules ./apps/api/node_modules",
-    "Dockerfile runtime image must copy apps/api/node_modules so workspace package imports resolve.",
+    "/app/deploy/api ./apps/api",
+    "Dockerfile runtime image must copy the self-contained API production deployment.",
     errors,
   );
 

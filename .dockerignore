@@ -34,6 +34,12 @@ data/whatsapp-sessions
 **/backup-recovery-key
 **/setup-token
 tmp
+tests
+docs/*
+!docs/THIRD_PARTY_NOTICES.md
+**/*.test.ts
+**/*.test.tsx
+**/*.test.mjs
 **/.next
 **/.turbo
 **/database-data

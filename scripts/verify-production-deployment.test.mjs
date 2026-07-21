@@ -108,7 +108,9 @@ test("production image targets stay non-root after protected secret loading", as
     readFile(".dockerignore", "utf8"),
   ]);
 
-  assert.match(apiDockerfile, /^FROM node:24-bookworm-slim@sha256:[a-f0-9]{64} AS worker-runtime$/mu);
+  assert.match(apiDockerfile, /^FROM node:24-bookworm-slim@sha256:[a-f0-9]{64} AS runtime-base$/mu);
+  assert.match(apiDockerfile, /^FROM runtime-base AS worker-runtime$/mu);
+  assert.match(apiDockerfile, /pnpm --filter @reservation-platform\/worker deploy --prod/u);
   assert.match(apiDockerfile, /RESERVATION_RUN_AS_UID=1001/u);
   assert.match(apiDockerfile, /USER reservation/u);
   assert.match(webDockerfile, /^FROM node:24-alpine3\.22@sha256:[a-f0-9]{64} AS console-runtime$/mu);

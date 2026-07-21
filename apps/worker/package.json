@@ -18,6 +18,7 @@
   },
   "dependencies": {
     "@huggingface/transformers": "3.8.1",
+    "@project-play/reservations-core": "workspace:*",
     "@project-play/reservations-supabase": "workspace:*",
     "@reservation-platform/ai-sdk-adapter": "workspace:*",
     "@reservation-platform/api": "workspace:*",

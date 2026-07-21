@@ -3,6 +3,7 @@ lockfileVersion: '9.0'
 settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
+  injectWorkspacePackages: true
 
 overrides:
   zod: ^3.24.0
@@ -32,27 +33,30 @@ importers:
 
   apps/api:
     dependencies:
+      '@project-play/reservations-core':
+        specifier: workspace:*
+        version: file:packages/reservations-core
       '@project-play/reservations-supabase':
         specifier: workspace:*
-        version: link:../../packages/reservations-supabase
+        version: file:packages/reservations-supabase(@project-play/reservations-core@file:packages/reservations-core)(@reservation-platform/api@file:packages/reservation-platform-api)(@reservation-platform/contract-types@file:packages/contract-types)
       '@reservation-platform/ai-sdk-adapter':
         specifier: workspace:*
-        version: link:../../packages/ai-sdk-adapter
+        version: file:packages/ai-sdk-adapter(zod@3.25.76)
       '@reservation-platform/api':
         specifier: workspace:*
-        version: link:../../packages/reservation-platform-api
+        version: file:packages/reservation-platform-api
       '@reservation-platform/contract-types':
         specifier: workspace:*
-        version: link:../../packages/contract-types
+        version: file:packages/contract-types
       '@reservation-platform/database':
         specifier: workspace:*
-        version: link:../../packages/database
+        version: file:packages/database
       '@reservation-platform/platform-config':
         specifier: workspace:*
-        version: link:../../packages/platform-config
+        version: file:packages/platform-config
       '@reservation-platform/whatsapp':
         specifier: workspace:*
-        version: link:../../packages/whatsapp
+        version: file:packages/whatsapp(sharp@0.34.5)
       '@supabase/supabase-js':
         specifier: ^2.90.1
         version: 2.90.1
@@ -63,9 +67,6 @@ importers:
         specifier: 5.4.149
         version: 5.4.149
     devDependencies:
-      '@project-play/reservations-core':
-        specifier: workspace:*
-        version: link:../../packages/reservations-core
       '@types/node':
         specifier: ^24
         version: 24.13.3
@@ -83,10 +84,10 @@ importers:
     dependencies:
       '@reservation-platform/sdk':
         specifier: workspace:*
-        version: link:../../packages/sdk
+        version: file:packages/sdk
       '@reservation-platform/ui':
         specifier: workspace:*
-        version: link:../../packages/reservation-ui
+        version: file:packages/reservation-ui(react@19.2.7)
       next:
         specifier: ^16.1.1
         version: 16.2.9(@playwright/test@1.61.1)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
@@ -120,10 +121,10 @@ importers:
     dependencies:
       '@reservation-platform/sdk':
         specifier: workspace:*
-        version: link:../../packages/sdk
+        version: file:packages/sdk
       '@reservation-platform/ui':
         specifier: workspace:*
-        version: link:../../packages/reservation-ui
+        version: file:packages/reservation-ui(react@19.2.7)
       next:
         specifier: ^16.1.1
         version: 16.2.9(@playwright/test@1.61.1)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
@@ -163,10 +164,10 @@ importers:
     dependencies:
       '@reservation-platform/react':
         specifier: workspace:*
-        version: link:../../../packages/reservation-react
+        version: file:packages/reservation-react(react@19.2.7)
       '@reservation-platform/ui':
         specifier: workspace:*
-        version: link:../../../packages/reservation-ui
+        version: file:packages/reservation-ui(react@19.2.7)
       next:
         specifier: ^16.1.1
         version: 16.2.9(@playwright/test@1.61.1)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
@@ -197,10 +198,10 @@ importers:
     dependencies:
       '@reservation-platform/react':
         specifier: workspace:*
-        version: link:../../../packages/reservation-react
+        version: file:packages/reservation-react(react@19.2.7)
       '@reservation-platform/ui':
         specifier: workspace:*
-        version: link:../../../packages/reservation-ui
+        version: file:packages/reservation-ui(react@19.2.7)
       next:
         specifier: ^16.1.1
         version: 16.2.9(@playwright/test@1.61.1)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
@@ -231,10 +232,10 @@ importers:
     dependencies:
       '@reservation-platform/react':
         specifier: workspace:*
-        version: link:../../../packages/reservation-react
+        version: file:packages/reservation-react(react@19.2.7)
       '@reservation-platform/ui':
         specifier: workspace:*
-        version: link:../../../packages/reservation-ui
+        version: file:packages/reservation-ui(react@19.2.7)
       next:
         specifier: ^16.1.1
         version: 16.2.9(@playwright/test@1.61.1)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
@@ -265,10 +266,10 @@ importers:
     dependencies:
       '@reservation-platform/react':
         specifier: workspace:*
-        version: link:../../../packages/reservation-react
+        version: file:packages/reservation-react(react@19.2.7)
       '@reservation-platform/ui':
         specifier: workspace:*
-        version: link:../../../packages/reservation-ui
+        version: file:packages/reservation-ui(react@19.2.7)
       next:
         specifier: ^16.1.1
         version: 16.2.9(@playwright/test@1.61.1)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
@@ -300,24 +301,27 @@ importers:
       '@huggingface/transformers':
         specifier: 3.8.1
         version: 3.8.1
+      '@project-play/reservations-core':
+        specifier: workspace:*
+        version: file:packages/reservations-core
       '@project-play/reservations-supabase':
         specifier: workspace:*
-        version: link:../../packages/reservations-supabase
+        version: file:packages/reservations-supabase(@project-play/reservations-core@file:packages/reservations-core)(@reservation-platform/api@file:packages/reservation-platform-api)(@reservation-platform/contract-types@file:packages/contract-types)
       '@reservation-platform/ai-sdk-adapter':
         specifier: workspace:*
-        version: link:../../packages/ai-sdk-adapter
+        version: file:packages/ai-sdk-adapter(zod@3.25.76)
       '@reservation-platform/api':
         specifier: workspace:*
-        version: link:../../packages/reservation-platform-api
+        version: file:packages/reservation-platform-api
       '@reservation-platform/contract-types':
         specifier: workspace:*
-        version: link:../../packages/contract-types
+        version: file:packages/contract-types
       '@reservation-platform/platform-config':
         specifier: workspace:*
-        version: link:../../packages/platform-config
+        version: file:packages/platform-config
       '@reservation-platform/whatsapp':
         specifier: workspace:*
-        version: link:../../packages/whatsapp
+        version: file:packages/whatsapp(sharp@0.34.5)
       '@supabase/supabase-js':
         specifier: ^2.90.1
         version: 2.90.1
@@ -342,7 +346,7 @@ importers:
     dependencies:
       '@reservation-platform/contract-types':
         specifier: workspace:*
-        version: link:../contract-types
+        version: file:packages/contract-types
     devDependencies:
       tsx:
         specifier: ^4.21.0
@@ -358,10 +362,10 @@ importers:
         version: 4.0.14(zod@3.25.76)
       '@reservation-platform/ai-chat':
         specifier: workspace:*
-        version: link:../ai-chat
+        version: file:packages/ai-chat
       '@reservation-platform/contract-types':
         specifier: workspace:*
-        version: link:../contract-types
+        version: file:packages/contract-types
       ai:
         specifier: ^7.0.28
         version: 7.0.28(zod@3.25.76)
@@ -411,7 +415,7 @@ importers:
     devDependencies:
       '@project-play/reservations-core':
         specifier: workspace:*
-        version: link:../reservations-core
+        version: file:packages/reservations-core
       tsx:
         specifier: ^4.21.0
         version: 4.21.0
@@ -426,13 +430,13 @@ importers:
         version: 2.0.2
       '@project-play/reservation-chat-core':
         specifier: workspace:*
-        version: link:../reservation-chat-core
+        version: file:packages/reservation-chat-core(@project-play/reservations-core@file:packages/reservations-core)
       '@project-play/reservations-core':
         specifier: workspace:*
-        version: link:../reservations-core
+        version: file:packages/reservations-core
       '@reservation-platform/contract-types':
         specifier: workspace:*
-        version: link:../contract-types
+        version: file:packages/contract-types
       zod:
         specifier: ^3.24.0
         version: 3.25.76
@@ -448,10 +452,10 @@ importers:
     dependencies:
       '@reservation-platform/contract-types':
         specifier: workspace:^
-        version: link:../contract-types
+        version: file:packages/contract-types
       '@reservation-platform/sdk':
         specifier: workspace:^
-        version: link:../sdk
+        version: file:packages/sdk
     devDependencies:
       '@types/react':
         specifier: ^19
@@ -470,10 +474,10 @@ importers:
     dependencies:
       '@reservation-platform/contract-types':
         specifier: workspace:^
-        version: link:../contract-types
+        version: file:packages/contract-types
       '@reservation-platform/react':
         specifier: workspace:^
-        version: link:../reservation-react
+        version: file:packages/reservation-react(react@19.2.7)
     devDependencies:
       '@types/react':
         specifier: ^19
@@ -505,13 +509,13 @@ importers:
     devDependencies:
       '@project-play/reservations-core':
         specifier: workspace:*
-        version: link:../reservations-core
+        version: file:packages/reservations-core
       '@reservation-platform/api':
         specifier: workspace:*
-        version: link:../reservation-platform-api
+        version: file:packages/reservation-platform-api
       '@reservation-platform/contract-types':
         specifier: workspace:*
-        version: link:../contract-types
+        version: file:packages/contract-types
       tsx:
         specifier: ^4.21.0
         version: 4.21.0
@@ -523,7 +527,7 @@ importers:
     dependencies:
       '@reservation-platform/contract-types':
         specifier: workspace:^
-        version: link:../contract-types
+        version: file:packages/contract-types
     devDependencies:
       tsx:
         specifier: ^4.21.0
@@ -536,10 +540,10 @@ importers:
     dependencies:
       '@reservation-platform/ai-chat':
         specifier: workspace:*
-        version: link:../ai-chat
+        version: file:packages/ai-chat
       '@reservation-platform/contract-types':
         specifier: workspace:*
-        version: link:../contract-types
+        version: file:packages/contract-types
       '@whiskeysockets/baileys':
         specifier: 7.0.0-rc13
         version: 7.0.0-rc13(sharp@0.34.5)
@@ -1169,6 +1173,24 @@ packages:
     engines: {node: '>=18'}
     hasBin: true
 
+  '@project-play/reservation-chat-core@file:packages/reservation-chat-core':
+    resolution: {directory: packages/reservation-chat-core, type: directory}
+    engines: {node: '>=24 <25'}
+    peerDependencies:
+      '@project-play/reservations-core': 0.0.0
+
+  '@project-play/reservations-core@file:packages/reservations-core':
+    resolution: {directory: packages/reservations-core, type: directory}
+    engines: {node: '>=24 <25'}
+
+  '@project-play/reservations-supabase@file:packages/reservations-supabase':
+    resolution: {directory: packages/reservations-supabase, type: directory}
+    engines: {node: '>=24 <25'}
+    peerDependencies:
+      '@project-play/reservations-core': 0.0.0
+      '@reservation-platform/api': 0.0.0
+      '@reservation-platform/contract-types': 0.1.0
+
   '@protobufjs/aspromise@1.1.2':
     resolution: {integrity: sha512-j+gKExEuLmKwvz3OgROXtrJ2UG2x8Ch2YZUxahh+s1F2HZ+wAceUNLkvy6zKCPVRkU++ZWQrdxsUeQXmcg4uoQ==}
 
@@ -1195,6 +1217,50 @@ packages:
 
   '@protobufjs/utf8@1.1.1':
     resolution: {integrity: sha512-oOAWABowe8EAbMyWKM0tYDKi8Yaox52D+HWZhAIJqQXbqe0xI/GV7FhLWqlEKreMkfDjshR5FKgi3mnle0h6Eg==}
+
+  '@reservation-platform/ai-chat@file:packages/ai-chat':
+    resolution: {directory: packages/ai-chat, type: directory}
+    engines: {node: '>=24 <25'}
+
+  '@reservation-platform/ai-sdk-adapter@file:packages/ai-sdk-adapter':
+    resolution: {directory: packages/ai-sdk-adapter, type: directory}
+    engines: {node: '>=24 <25'}
+
+  '@reservation-platform/api@file:packages/reservation-platform-api':
+    resolution: {directory: packages/reservation-platform-api, type: directory}
+    engines: {node: '>=24 <25'}
+
+  '@reservation-platform/contract-types@file:packages/contract-types':
+    resolution: {directory: packages/contract-types, type: directory}
+    engines: {node: '>=24 <25'}
+
+  '@reservation-platform/database@file:packages/database':
+    resolution: {directory: packages/database, type: directory}
+    engines: {node: '>=24 <25'}
+
+  '@reservation-platform/platform-config@file:packages/platform-config':
+    resolution: {directory: packages/platform-config, type: directory}
+    engines: {node: '>=24 <25'}
+
+  '@reservation-platform/react@file:packages/reservation-react':
+    resolution: {directory: packages/reservation-react, type: directory}
+    engines: {node: '>=24 <25'}
+    peerDependencies:
+      react: '>=18'
+
+  '@reservation-platform/sdk@file:packages/sdk':
+    resolution: {directory: packages/sdk, type: directory}
+    engines: {node: '>=24 <25'}
+
+  '@reservation-platform/ui@file:packages/reservation-ui':
+    resolution: {directory: packages/reservation-ui, type: directory}
+    engines: {node: '>=24 <25'}
+    peerDependencies:
+      react: '>=18'
+
+  '@reservation-platform/whatsapp@file:packages/whatsapp':
+    resolution: {directory: packages/whatsapp, type: directory}
+    engines: {node: '>=24 <25'}
 
   '@standard-schema/spec@1.1.0':
     resolution: {integrity: sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w==}
@@ -2256,6 +2322,22 @@ snapshots:
     dependencies:
       playwright: 1.61.1
 
+  '@project-play/reservation-chat-core@file:packages/reservation-chat-core(@project-play/reservations-core@file:packages/reservations-core)':
+    dependencies:
+      '@project-play/reservations-core': file:packages/reservations-core
+
+  '@project-play/reservations-core@file:packages/reservations-core': {}
+
+  '@project-play/reservations-supabase@file:packages/reservations-supabase(@project-play/reservations-core@file:packages/reservations-core)(@reservation-platform/api@file:packages/reservation-platform-api)(@reservation-platform/contract-types@file:packages/contract-types)':
+    dependencies:
+      '@project-play/reservations-core': file:packages/reservations-core
+      '@reservation-platform/api': file:packages/reservation-platform-api
+      '@reservation-platform/contract-types': file:packages/contract-types
+      '@supabase/supabase-js': 2.90.1
+    transitivePeerDependencies:
+      - bufferutil
+      - utf-8-validate
+
   '@protobufjs/aspromise@1.1.2': {}
 
   '@protobufjs/base64@1.1.2': {}
@@ -2275,6 +2357,65 @@ snapshots:
   '@protobufjs/pool@1.1.0': {}
 
   '@protobufjs/utf8@1.1.1': {}
+
+  '@reservation-platform/ai-chat@file:packages/ai-chat':
+    dependencies:
+      '@reservation-platform/contract-types': file:packages/contract-types
+
+  '@reservation-platform/ai-sdk-adapter@file:packages/ai-sdk-adapter(zod@3.25.76)':
+    dependencies:
+      '@ai-sdk/openai': 4.0.14(zod@3.25.76)
+      '@reservation-platform/ai-chat': file:packages/ai-chat
+      '@reservation-platform/contract-types': file:packages/contract-types
+      ai: 7.0.28(zod@3.25.76)
+    transitivePeerDependencies:
+      - zod
+
+  '@reservation-platform/api@file:packages/reservation-platform-api':
+    dependencies:
+      '@node-rs/argon2': 2.0.2
+      '@project-play/reservation-chat-core': file:packages/reservation-chat-core(@project-play/reservations-core@file:packages/reservations-core)
+      '@project-play/reservations-core': file:packages/reservations-core
+      '@reservation-platform/contract-types': file:packages/contract-types
+      zod: 3.25.76
+
+  '@reservation-platform/contract-types@file:packages/contract-types':
+    dependencies:
+      zod: 3.25.76
+
+  '@reservation-platform/database@file:packages/database': {}
+
+  '@reservation-platform/platform-config@file:packages/platform-config': {}
+
+  '@reservation-platform/react@file:packages/reservation-react(react@19.2.7)':
+    dependencies:
+      '@reservation-platform/contract-types': file:packages/contract-types
+      '@reservation-platform/sdk': file:packages/sdk
+      react: 19.2.7
+
+  '@reservation-platform/sdk@file:packages/sdk':
+    dependencies:
+      '@reservation-platform/contract-types': file:packages/contract-types
+
+  '@reservation-platform/ui@file:packages/reservation-ui(react@19.2.7)':
+    dependencies:
+      '@reservation-platform/contract-types': file:packages/contract-types
+      '@reservation-platform/react': file:packages/reservation-react(react@19.2.7)
+      react: 19.2.7
+
+  '@reservation-platform/whatsapp@file:packages/whatsapp(sharp@0.34.5)':
+    dependencies:
+      '@reservation-platform/ai-chat': file:packages/ai-chat
+      '@reservation-platform/contract-types': file:packages/contract-types
+      '@whiskeysockets/baileys': 7.0.0-rc13(sharp@0.34.5)
+    transitivePeerDependencies:
+      - audio-decode
+      - bufferutil
+      - jimp
+      - link-preview-js
+      - sharp
+      - supports-color
+      - utf-8-validate
 
   '@standard-schema/spec@1.1.0': {}
 

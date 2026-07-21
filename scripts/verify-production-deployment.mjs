@@ -187,7 +187,9 @@ export async function verifyProductionDeployment(options = {}) {
     errors,
   );
 
-  expect(/^FROM node:24-bookworm-slim@sha256:[a-f0-9]{64} AS worker-runtime$/mu.test(dockerfile), "Dockerfile must include a digest-pinned worker-runtime.", errors);
+  expect(/^FROM node:24-bookworm-slim@sha256:[a-f0-9]{64} AS runtime-base$/mu.test(dockerfile), "Dockerfile must include a shared digest-pinned runtime base.", errors);
+  expect(/^FROM runtime-base AS worker-runtime$/mu.test(dockerfile), "Dockerfile worker must use the shared runtime base.", errors);
+  expect(/pnpm --filter @reservation-platform\/worker deploy --prod/u.test(dockerfile), "Dockerfile must create a pruned worker production deployment.", errors);
   expect(/USER reservation/u.test(dockerfile), "API and worker images must default to non-root.", errors);
   expect(/^FROM node:24-alpine3\.22@sha256:[a-f0-9]{64} AS console-runtime$/mu.test(webDockerfile), "Dockerfile.web must include a digest-pinned console-runtime.", errors);
   expect(/^FROM node:24-alpine3\.22@sha256:[a-f0-9]{64} AS booking-runtime$/mu.test(webDockerfile), "Dockerfile.web must include a digest-pinned booking-runtime.", errors);

@@ -3,6 +3,10 @@ packages:
   - apps/*
   - apps/examples/*
   - packages/*
+injectWorkspacePackages: true
+dedupeInjectedDeps: false
+syncInjectedDepsAfterScripts:
+  - build
 overrides:
   zod: ^3.24.0
 ignoredBuiltDependencies:

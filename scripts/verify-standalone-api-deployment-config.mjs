@@ -88,6 +88,7 @@ const runtimeEnvMemberAccessPattern =
 
 const scriptDirectory = dirname(fileURLToPath(import.meta.url));
 const defaultRuntimeSourcePath = resolve(scriptDirectory, "../apps/api/src/runtime.ts");
+const defaultRuntimeEnvSourcePath = resolve(scriptDirectory, "../apps/api/src/runtime-env.ts");
 const defaultDeploymentManifestPath = resolve(scriptDirectory, "../apps/api/deployment.config.json");
 const defaultStandaloneApiPackageJsonPath = resolve(scriptDirectory, "../apps/api/package.json");
 
@@ -386,7 +387,11 @@ export function verifyStandaloneDeploymentManifest(options = {}) {
 
 export function verifyStandaloneRuntimeEnvNameContract(options = {}) {
   const runtimeSource = options.runtimeSource
-    ?? readFileSync(options.runtimeSourcePath ?? defaultRuntimeSourcePath, "utf8");
+    ?? (options.runtimeSourcePath
+      ? readFileSync(options.runtimeSourcePath, "utf8")
+      : [defaultRuntimeSourcePath, defaultRuntimeEnvSourcePath]
+          .map((sourcePath) => readFileSync(sourcePath, "utf8"))
+          .join("\n"));
   const runtimeEnvNames = options.runtimeEnvNames
     ? sortedUnique(options.runtimeEnvNames)
     : extractRuntimeEnvNamesFromSource(runtimeSource);
@@ -412,7 +417,7 @@ export function verifyStandaloneRuntimeEnvNameContract(options = {}) {
   }
   if (verifierMissingFromRuntime.length > 0) {
     errors.push(
-      `Standalone deployment verifier runtime-required env names are absent from apps/api/src/runtime.ts: ${verifierMissingFromRuntime.join(", ")}.`,
+      `Standalone deployment verifier runtime-required env names are absent from apps/api/src/runtime.ts and runtime-env.ts: ${verifierMissingFromRuntime.join(", ")}.`,
     );
   }
 

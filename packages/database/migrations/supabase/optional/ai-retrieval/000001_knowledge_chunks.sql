@@ -1,4 +1,5 @@
--- Optional AI retrieval database bundle artifact.
+-- Obsolete AI retrieval compatibility artifact. Active hybrid retrieval is
+-- implemented by core migration 000040_ai_knowledge_retrieval.sql.
 -- Source: supabase/knowledge.sql
 -- Section: knowledge_chunks, vector index, match_knowledge, and read policies.
--- Status: scaffolded optional migration target; not part of core bootstrap.
+-- Status: retained for historical bundle compatibility; never applied.

@@ -178,6 +178,15 @@ function adaptConversation(value: unknown): ConversationResponse {
 
 function adaptMessage(value: unknown): ConversationMessageResponse {
   const row = asRecord(value);
+  const metadata = asRecord(row.metadata);
+  const sources = Array.isArray(metadata.sources)
+    ? metadata.sources.flatMap((value) => {
+        const source = asRecord(value);
+        const sourceId = stringValue(source.source_id);
+        const label = stringValue(source.label);
+        return sourceId && label ? [{ source_id: sourceId, label }] : [];
+      }).slice(0, 3)
+    : [];
   return {
     message_id: String(row.id),
     conversation_id: String(row.conversation_id),
@@ -187,6 +196,7 @@ function adaptMessage(value: unknown): ConversationMessageResponse {
     delivery_state: parseDelivery(row.delivery_state),
     content: String(row.content),
     ...(stringValue(row.reservation_id) ? { reservation_id: stringValue(row.reservation_id) } : {}),
+    ...(sources.length ? { sources } : {}),
     created_at: String(row.created_at),
   };
 }

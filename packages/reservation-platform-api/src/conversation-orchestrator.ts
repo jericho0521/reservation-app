@@ -10,6 +10,7 @@ import type {
   ConversationResponse,
   CreateReservationInput,
   JsonValue,
+  KnowledgeCitationResponse,
   PlatformErrorCode,
   PlatformErrorResponse,
   ReservationItemInput,
@@ -30,7 +31,7 @@ export interface NormalizedConversationInbound {
 
 export interface ConversationExperienceContext {
   businessName: string;
-  knowledge: Array<{ question: string; answer: string }>;
+  knowledge: Array<{ question: string; answer: string; sourceId?: string; sourceLabel?: string }>;
   services: Array<{ serviceId: string; name: string }>;
 }
 
@@ -38,6 +39,22 @@ export interface ConversationResponderResult {
   content: string;
   supported: boolean;
   booking?: PrepareBookingInput;
+  sources?: KnowledgeCitationResponse[];
+}
+
+export interface ConversationKnowledgeMatch {
+  chunkId: string;
+  sourceId: string;
+  sourceLabel: string;
+  content: string;
+  score?: number;
+  semanticSimilarity?: number;
+  semanticRank?: number;
+  lexicalRank?: number;
+}
+
+export interface ConversationKnowledgeRetriever {
+  search(input: { scope: ExperienceScope; query: string; limit?: number }): Promise<ConversationKnowledgeMatch[]>;
 }
 
 export interface ConversationResponder {
@@ -262,9 +279,12 @@ async function processConversationMessage(input: {
     if (response.booking) {
       proposal = await prepareProposal(scope, conversation, response.booking, input.dependencies);
     }
-    const replyContent = response.booking && !proposal
+    const baseReplyContent = response.booking && !proposal
       ? "I could not verify that service and time against current availability. Please choose one of the available options."
       : response.content.trim() || (response.supported ? "Please confirm the proposed booking." : "Please wait while staff checks this for you.");
+    const replyContent = conversation.channel === "whatsapp" && response.sources?.length
+      ? `${baseReplyContent}\n\nSources: ${response.sources.slice(0, 3).map((source) => source.label).join(", ")}`
+      : baseReplyContent;
     const appendReply = conversation.channel === "whatsapp" && input.dependencies.conversations.appendAutomationReplyWithOutbox
       ? input.dependencies.conversations.appendAutomationReplyWithOutbox.bind(input.dependencies.conversations)
       : input.dependencies.conversations.append.bind(input.dependencies.conversations);
@@ -275,7 +295,10 @@ async function processConversationMessage(input: {
       deliveryState: conversation.channel === "whatsapp" ? "pending" : "sent",
       externalMessageId: `ai-reply:${input.inbound.message_id}`,
       content: replyContent,
-      metadata: proposal ? { event: "booking.proposed", proposal_id: proposal.proposalId } : { event: response.supported ? "assistant.reply" : "assistant.unsupported" },
+      metadata: {
+        ...(proposal ? { event: "booking.proposed", proposal_id: proposal.proposalId } : { event: response.supported ? "assistant.reply" : "assistant.unsupported" }),
+        ...(response.sources?.length ? { sources: response.sources.slice(0, 3) } : {}),
+      },
     });
     if (outbound.error || !outbound.data) throw outbound.error ?? new Error("reply unavailable");
     return { status: 200, body: { conversation, message: outbound.data, ...(proposal ? { proposal } : {}) } };

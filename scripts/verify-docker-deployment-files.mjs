@@ -69,7 +69,8 @@ function verifyDockerDeploymentFiles() {
   );
   assertIncludes(dockerfile, manifest.healthPath, "Dockerfile healthcheck must call the configured health path.", errors);
   assertIncludes(dockerfile, "USER reservation", "Dockerfile runtime image must run as the non-root reservation user.", errors);
-  assertIncludes(dockerfile, "FROM node:24-alpine AS runtime", "Dockerfile must include a small runtime stage.", errors);
+  assertIncludes(dockerfile, "FROM node:24-bookworm-slim AS runtime", "Dockerfile must include the native-runtime-compatible slim stage.", errors);
+  assertIncludes(dockerfile, "FROM node:24-bookworm-slim AS worker-runtime", "Dockerfile worker must support the bundled ONNX runtime.", errors);
   assertIncludes(dockerfile, "pnpm run build", "Dockerfile build stage must compile backend packages and apps/api.", errors);
   assertIncludes(
     dockerfile,

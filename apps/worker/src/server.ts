@@ -39,6 +39,12 @@ import {
 } from "./email.js";
 import { createAiConversationJobHandler } from "./ai-conversation.js";
 import { createProductionWhatsAppRuntime } from "./whatsapp.js";
+import {
+  createKnowledgeIndexJobHandler,
+  createKnowledgeSearchTestJobHandler,
+  createLocalKnowledgeEmbedder,
+  createSupabaseConversationKnowledgeRetriever,
+} from "./knowledge.js";
 
 const pollIntervalMs = 1_000;
 const heartbeatIntervalMs = 15_000;
@@ -82,7 +88,7 @@ async function runDirectWorker(): Promise<void> {
       workerId,
       repository,
       handlers: {
-        ...productionJobHandlers(client, requiredEnvironment("RESERVATION_INSTALLATION_MASTER_KEY")),
+        ...productionJobHandlers(client, requiredEnvironment("RESERVATION_INSTALLATION_MASTER_KEY"), { preloadKnowledge: true }),
         ...(whatsapp?.handlers ?? {}),
       },
       outcomeReporter: createNotificationOutcomeReporter(client),
@@ -127,7 +133,19 @@ export function startWorkerHeartbeat(
 export function productionJobHandlers(
   client: unknown,
   installationKey: string,
+  options: { preloadKnowledge?: boolean } = {},
 ): Readonly<Record<string, PlatformJobHandler | undefined>> {
+  const knowledgeEmbedder = createLocalKnowledgeEmbedder({
+    modelPath: process.env.RESERVATION_EMBEDDING_MODEL_PATH?.trim() || "/app/models",
+    modelId: process.env.RESERVATION_EMBEDDING_MODEL_ID?.trim() || "reservation-multilingual-minilm",
+  });
+  const knowledgeClient = client as unknown as Parameters<typeof createKnowledgeIndexJobHandler>[0]["client"];
+  if (options.preloadKnowledge) {
+    void knowledgeEmbedder.embed(["reservation knowledge warmup"]).catch(() => {
+      // Retrieval health is reported by failed knowledge jobs; other job kinds
+      // must continue even when the local model cannot be preloaded.
+    });
+  }
   const integrations = createSupabaseIntegrationSettingsRepository(client as unknown as IntegrationSupabaseClient);
   const reservations = createSupabaseReservationReadRepository(
     client as unknown as Parameters<typeof createSupabaseReservationReadRepository>[0],
@@ -177,10 +195,22 @@ export function productionJobHandlers(
   const aiHandler = createAiConversationJobHandler({
     runtimeLoader: aiRuntimeLoader,
     loadDependencies: () => conversationDependencies,
+    retriever: createSupabaseConversationKnowledgeRetriever({
+      client: knowledgeClient,
+      embedder: knowledgeEmbedder,
+    }),
   });
   return {
     "notification.email": (job) => handler(job as unknown as EmailJob),
     "conversation.process_ai": aiHandler,
+    "knowledge.index_source": createKnowledgeIndexJobHandler({
+      client: knowledgeClient,
+      embedder: knowledgeEmbedder,
+    }),
+    "knowledge.test_search": createKnowledgeSearchTestJobHandler({
+      client: knowledgeClient,
+      embedder: knowledgeEmbedder,
+    }),
   };
 }
 

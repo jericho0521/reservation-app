@@ -35,6 +35,9 @@ export function ChatWidget(props: ChatWidgetProps) {
       {props.messages.map((message) => <article key={message.message_id} className={`rp-chat-message is-${message.sender_type}`}>
         <span>{message.sender_type === "customer" ? "You" : message.sender_type === "staff" ? "Staff" : props.brandName}</span>
         <p>{message.content}</p>
+        {message.sources?.length ? <ul className="rp-chat-sources" aria-label="Sources">
+          {message.sources.map((source) => <li key={source.source_id}>{source.label}</li>)}
+        </ul> : null}
       </article>)}
       {props.loading ? <p className="rp-chat-notice">Assistant is checking…</p> : null}
       {props.handoff ? <p className="rp-chat-handoff">A staff member is handling this conversation. Automated replies are paused.</p> : null}

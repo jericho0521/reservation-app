@@ -120,7 +120,16 @@ export function createStandaloneNodeServer(
         }
       }
 
-      const rawBody = await readRawBody(request, maxBodyBytes);
+      const requestPath = safeRequestPath(requestTarget);
+      const isKnowledgePdfUpload = (
+        method.toUpperCase() === "POST"
+        && requestPath === "/v1/experience/knowledge-sources/pdf"
+      ) || (
+        method.toUpperCase() === "PUT"
+        && /^\/v1\/experience\/knowledge-sources\/[^/]+$/u.test(requestPath)
+        && request.headers["content-type"]?.toLowerCase().startsWith("multipart/form-data;")
+      );
+      const rawBody = await readRawBody(request, isKnowledgePdfUpload ? 6 * 1024 * 1024 : maxBodyBytes);
       if (rawBody.tooLarge) {
         writeStandaloneResponse(
           response,
@@ -131,7 +140,9 @@ export function createStandaloneNodeServer(
         return;
       }
 
-      const bodyResult = parseJsonBody(rawBody.body);
+      const bodyResult = isKnowledgePdfUpload
+        ? await parseKnowledgePdfMultipart(rawBody.body, request.headers["content-type"])
+        : parseJsonBody(rawBody.body);
       if (bodyResult.error) {
         writeStandaloneResponse(response, bodyResult.error, headers, options.cors);
         return;
@@ -255,7 +266,7 @@ type JsonBodyReadResult = {
 };
 
 type RawBodyReadResult = {
-  body?: string;
+  body?: Buffer;
   tooLarge: boolean;
 };
 
@@ -294,7 +305,7 @@ function readRawBody(
         resolve({ tooLarge: false });
         return;
       }
-      const rawBody = Buffer.concat(chunks).toString("utf8").trim();
+      const rawBody = Buffer.concat(chunks);
       resolve(rawBody.length === 0
         ? { tooLarge: false }
         : { body: rawBody, tooLarge: false });
@@ -329,17 +340,48 @@ function drainRequestInBackground(request: IncomingMessage) {
   request.resume();
 }
 
-function parseJsonBody(rawBody: string | undefined): JsonBodyReadResult {
+function parseJsonBody(rawBody: Buffer | undefined): JsonBodyReadResult {
   if (rawBody === undefined) {
     return {};
   }
 
   try {
-    return { body: JSON.parse(rawBody) as unknown };
+    return { body: JSON.parse(rawBody.toString("utf8")) as unknown };
   } catch {
     return {
       error: platformError(400, "validation_failed", "Invalid JSON body."),
     };
+  }
+}
+
+async function parseKnowledgePdfMultipart(
+  rawBody: Buffer | undefined,
+  contentType: string | undefined,
+): Promise<JsonBodyReadResult> {
+  if (!rawBody || !contentType?.toLowerCase().startsWith("multipart/form-data;")) {
+    return { error: platformError(400, "validation_failed", "PDF upload must use multipart form data.") };
+  }
+  try {
+    const form = await new Request("http://localhost/upload", {
+      method: "POST",
+      headers: { "content-type": contentType },
+      body: rawBody,
+    }).formData();
+    const file = form.get("file");
+    const title = form.get("title");
+    const sourceLabel = form.get("source_label");
+    if (!(file instanceof Blob) || typeof title !== "string" || typeof sourceLabel !== "string") {
+      return { error: platformError(400, "validation_failed", "PDF upload fields are invalid.") };
+    }
+    return {
+      body: {
+        title,
+        source_label: sourceLabel,
+        pdf_bytes: Buffer.from(await file.arrayBuffer()).toString("base64"),
+      },
+    };
+  } catch {
+    return { error: platformError(400, "validation_failed", "PDF upload could not be parsed.") };
   }
 }
 

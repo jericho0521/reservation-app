@@ -10,6 +10,7 @@ export interface ContractOperation {
   successStatus?: "200" | "201" | "202" | "204";
   querySchema?: string;
   requestBodySchema?: string;
+  requestContentType?: "application/json" | "multipart/form-data";
   pathParameters?: string[];
   idempotencyRequired?: boolean;
   moduleGated?: "chat";
@@ -352,6 +353,51 @@ export const publicJsonSchemaDefinitions: Record<string, JsonSchema> = {
   ListExperienceKnowledgeResponse: objectSchema({
     entries: { type: "array", items: ref("ExperienceKnowledgeEntryResponse") },
   }, ["entries"]),
+  KnowledgeCitationResponse: objectSchema({
+    source_id: stringSchema,
+    label: { type: "string", minLength: 1, maxLength: 160 },
+  }, ["source_id", "label"]),
+  KnowledgeTextSourceInput: objectSchema({
+    title: { type: "string", minLength: 1, maxLength: 160 },
+    source_label: { type: "string", minLength: 1, maxLength: 160 },
+    content: { type: "string", minLength: 1, maxLength: 100000 },
+  }, ["title", "source_label", "content"]),
+  KnowledgePdfSourceInput: objectSchema({
+    title: { type: "string", minLength: 1, maxLength: 160 },
+    source_label: { type: "string", minLength: 1, maxLength: 160 },
+    file: { type: "string", format: "binary" },
+  }, ["title", "source_label", "file"]),
+  KnowledgeSourceResponse: objectSchema({
+    source_id: stringSchema,
+    kind: { type: "string", enum: ["faq", "text", "pdf"] },
+    title: { type: "string", minLength: 1, maxLength: 160 },
+    source_label: { type: "string", minLength: 1, maxLength: 160 },
+    status: { type: "string", enum: ["pending", "indexing", "ready", "failed", "archived"] },
+    chunk_count: { type: "integer", minimum: 0 },
+    indexed_at: stringSchema,
+    failure_code: stringSchema,
+    created_at: stringSchema,
+    updated_at: stringSchema,
+  }, ["source_id", "kind", "title", "source_label", "status", "chunk_count", "created_at", "updated_at"]),
+  ListKnowledgeSourcesResponse: objectSchema({
+    sources: { type: "array", items: ref("KnowledgeSourceResponse") },
+  }, ["sources"]),
+  KnowledgeSearchTestInput: objectSchema({
+    query: { type: "string", minLength: 1, maxLength: 4000 },
+  }, ["query"]),
+  KnowledgeSearchMatchResponse: objectSchema({
+    chunk_id: stringSchema,
+    source_id: stringSchema,
+    source_label: { type: "string", minLength: 1, maxLength: 160 },
+    excerpt: stringSchema,
+    semantic_similarity: { type: "number" },
+    semantic_rank: { type: "integer", minimum: 1 },
+    lexical_rank: { type: "integer", minimum: 1 },
+    combined_score: { type: "number" },
+  }, ["chunk_id", "source_id", "source_label", "excerpt", "combined_score"]),
+  KnowledgeSearchTestResponse: objectSchema({
+    matches: { type: "array", items: ref("KnowledgeSearchMatchResponse"), maxItems: 20 },
+  }, ["matches"]),
   ExperienceChannelReadiness: objectSchema({
     desired_enabled: booleanSchema,
     configured: booleanSchema,
@@ -457,6 +503,7 @@ export const publicJsonSchemaDefinitions: Record<string, JsonSchema> = {
     delivery_state: ref("ConversationDeliveryState"),
     content: stringSchema,
     reservation_id: stringSchema,
+    sources: { type: "array", maxItems: 3, items: ref("KnowledgeCitationResponse") },
     created_at: stringSchema,
   }, ["message_id", "conversation_id", "channel", "direction", "sender_type", "delivery_state", "content", "created_at"]),
   ListConversationsQuery: objectSchema({
@@ -1188,6 +1235,74 @@ export const publicContractOperations: ContractOperation[] = [
     requestBodySchema: "ExperienceKnowledgeInput",
     responseSchema: "ExperienceKnowledgeEntryResponse",
     successStatus: "201",
+  },
+  {
+    method: "get",
+    path: "/v1/experience/knowledge-sources",
+    operationId: "listKnowledgeSources",
+    summary: "List owner-managed indexed knowledge sources",
+    tags: ["experience"],
+    responseSchema: "ListKnowledgeSourcesResponse",
+  },
+  {
+    method: "post",
+    path: "/v1/experience/knowledge-sources/text",
+    operationId: "createKnowledgeTextSource",
+    summary: "Create a pasted-text knowledge source",
+    tags: ["experience"],
+    requestBodySchema: "KnowledgeTextSourceInput",
+    responseSchema: "KnowledgeSourceResponse",
+    successStatus: "201",
+  },
+  {
+    method: "post",
+    path: "/v1/experience/knowledge-sources/pdf",
+    operationId: "uploadKnowledgePdf",
+    summary: "Upload a PDF knowledge source",
+    tags: ["experience"],
+    requestBodySchema: "KnowledgePdfSourceInput",
+    requestContentType: "multipart/form-data",
+    responseSchema: "KnowledgeSourceResponse",
+    successStatus: "201",
+  },
+  {
+    method: "post",
+    path: "/v1/experience/knowledge-sources/{source_id}/reindex",
+    operationId: "reindexKnowledgeSource",
+    summary: "Retry local indexing for a knowledge source",
+    tags: ["experience"],
+    pathParameters: ["source_id"],
+    responseSchema: "KnowledgeSourceResponse",
+    successStatus: "202",
+  },
+  {
+    method: "post",
+    path: "/v1/experience/knowledge-sources/{source_id}/archive",
+    operationId: "archiveKnowledgeSource",
+    summary: "Archive an indexed knowledge source",
+    tags: ["experience"],
+    pathParameters: ["source_id"],
+    responseSchema: "KnowledgeSourceResponse",
+  },
+  {
+    method: "post",
+    path: "/v1/experience/knowledge-search/test",
+    operationId: "testKnowledgeSearch",
+    summary: "Test scoped hybrid retrieval without invoking an AI provider",
+    tags: ["experience"],
+    requestBodySchema: "KnowledgeSearchTestInput",
+    responseSchema: "KnowledgeSearchTestResponse",
+  },
+  {
+    method: "put",
+    path: "/v1/experience/knowledge-sources/{source_id}",
+    operationId: "replaceKnowledgeTextSource",
+    summary: "Replace an indexed text knowledge source and queue a new version",
+    tags: ["experience"],
+    pathParameters: ["source_id"],
+    requestBodySchema: "KnowledgeTextSourceInput",
+    responseSchema: "KnowledgeSourceResponse",
+    successStatus: "202",
   },
   {
     method: "put",

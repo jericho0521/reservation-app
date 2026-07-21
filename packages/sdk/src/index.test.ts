@@ -598,6 +598,12 @@ test("experience knowledge and channel SDK methods preserve owner paths", async 
   await client.createExperienceKnowledge(knowledge);
   await client.updateExperienceKnowledge("knowledge/1", knowledge);
   await client.archiveExperienceKnowledge("knowledge/1");
+  await client.listKnowledgeSources(true);
+  await client.createKnowledgeTextSource({ title: "Policy", source_label: "Policy", content: "Approved policy." });
+  await client.replaceKnowledgeTextSource("source/1", { title: "Policy", source_label: "Policy", content: "Updated policy." });
+  await client.reindexKnowledgeSource("source/1");
+  await client.archiveKnowledgeSource("source/1");
+  await client.testKnowledgeSearch({ query: "What is the policy?" });
   await client.getExperienceChannelSettings();
   await client.updateExperienceChannelSettings(channels);
 
@@ -606,11 +612,18 @@ test("experience knowledge and channel SDK methods preserve owner paths", async 
     ["/v1/experience/knowledge", "POST"],
     ["/v1/experience/knowledge/knowledge%2F1", "PUT"],
     ["/v1/experience/knowledge/knowledge%2F1/archive", "POST"],
+    ["/v1/experience/knowledge-sources?include_archived=true", "GET"],
+    ["/v1/experience/knowledge-sources/text", "POST"],
+    ["/v1/experience/knowledge-sources/source%2F1", "PUT"],
+    ["/v1/experience/knowledge-sources/source%2F1/reindex", "POST"],
+    ["/v1/experience/knowledge-sources/source%2F1/archive", "POST"],
+    ["/v1/experience/knowledge-search/test", "POST"],
     ["/v1/experience/channels", "GET"],
     ["/v1/experience/channels", "PUT"],
   ]);
   assert.deepEqual(JSON.parse(String(requests[1]!.init?.body)), knowledge);
-  assert.deepEqual(JSON.parse(String(requests[5]!.init?.body)), channels);
+  assert.deepEqual(JSON.parse(String(requests[9]!.init?.body)), { query: "What is the policy?" });
+  assert.deepEqual(JSON.parse(String(requests[11]!.init?.body)), channels);
 });
 
 test("SDK maps createReservation to POST /v1/reservations with context headers", async () => {

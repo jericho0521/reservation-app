@@ -16,6 +16,7 @@ export interface AiConversationJobHandlerOptions {
     tenantId: string;
     venueId: string;
   }): Promise<AiConversationProcessingDependencies> | AiConversationProcessingDependencies;
+  retriever?: import("@reservation-platform/api").ConversationKnowledgeRetriever;
 }
 
 export function createAiConversationJobHandler(
@@ -32,7 +33,7 @@ export function createAiConversationJobHandler(
       runtime = undefined;
     }
     const responder = runtime
-      ? createAgentConversationResponder(runtime)
+      ? createAgentConversationResponder(runtime, createDeterministicConversationResponder(), options.retriever)
       : createDeterministicConversationResponder();
     const result = await processPersistedConversationInbound({
       scope,

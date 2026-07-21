@@ -191,7 +191,7 @@ function buildOpenApiOperation(operation: ContractOperation) {
       requestBody: {
         required: true,
         content: {
-          "application/json": {
+          [operation.requestContentType ?? "application/json"]: {
             schema: componentRef(operation.requestBodySchema),
           },
         },

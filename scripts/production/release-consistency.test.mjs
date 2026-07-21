@@ -9,8 +9,8 @@ const validSources = {
     release: "0.2.0",
     images: { api: "ghcr.io/example/api:0.2.0" },
   }),
-  compose: 'RESERVATION_REQUIRED_MIGRATION_VERSION: "000039"',
-  workflow: "--required-migration 000039",
+  compose: 'RESERVATION_REQUIRED_MIGRATION_VERSION: "000040"',
+  workflow: "--required-migration 000040",
   docs: "current source candidate is `0.2.0`\n--release 0.2.0",
 };
 

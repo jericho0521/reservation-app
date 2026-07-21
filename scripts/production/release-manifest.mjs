@@ -8,7 +8,7 @@ import { fileURLToPath } from "node:url";
 export const RELEASE_MANIFEST_SCHEMA_VERSION = 1;
 export const PUBLISHED_RELEASE_MANIFEST_SCHEMA_VERSION = 1;
 export const SUPPORTED_RELEASE_VERSION = "0.2.0";
-export const SUPPORTED_RELEASE_MIGRATION_VERSION = "000039";
+export const SUPPORTED_RELEASE_MIGRATION_VERSION = "000040";
 export const RELEASE_IMAGE_REGISTRY = "ghcr.io/jericho0521";
 export const RELEASE_IMAGE_NAMES = Object.freeze({
   api: "reservation-app-api",

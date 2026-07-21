@@ -407,6 +407,16 @@
       "notes": [
         "Backend-owned transactional practitioner resource, profile, service, location, and active-status lifecycle."
       ]
+    },
+    {
+      "path": "packages/database/migrations/supabase/000040_ai_knowledge_retrieval.sql",
+      "classification": "core-platform",
+      "intendedBackendDestination": [
+        "packages/database/migrations/supabase/000040_ai_knowledge_retrieval.sql"
+      ],
+      "notes": [
+        "Backend-owned tenant- and venue-scoped hybrid FAQ, text, and PDF retrieval with pgvector and durable indexing."
+      ]
     }
   ]
 }

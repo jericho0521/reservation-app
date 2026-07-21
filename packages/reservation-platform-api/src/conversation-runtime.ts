@@ -79,7 +79,12 @@ export function createConversationProcessingDependencies(input: {
       }
       return {
         businessName: workspace.profile.name,
-        knowledge: knowledgeResult.body.entries.map((entry) => ({ question: entry.question, answer: entry.answer })),
+        knowledge: knowledgeResult.body.entries.map((entry) => ({
+          question: entry.question,
+          answer: entry.answer,
+          sourceId: entry.knowledge_id,
+          sourceLabel: entry.source ?? entry.question,
+        })),
         services: servicesResult.body.services.map((service) => ({ serviceId: service.service_id, name: service.name })),
       };
     },

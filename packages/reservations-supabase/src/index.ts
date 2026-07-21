@@ -39,6 +39,7 @@ import { experienceOperatingHoursResponseSchema } from "@reservation-platform/co
 
 export * from "./experience-studio.js";
 export * from "./experience-knowledge.js";
+export * from "./knowledge-sources.js";
 export * from "./operating-hours.js";
 export * from "./reservation-management.js";
 export * from "./conversations.js";

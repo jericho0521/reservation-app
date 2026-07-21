@@ -15,6 +15,12 @@ import {
   createPlatformResource,
   createPlatformService,
   createExperienceKnowledge,
+  createKnowledgeTextSource,
+  archiveKnowledgeSource,
+  reindexKnowledgeSource,
+  replaceKnowledgeSource,
+  testKnowledgeSearch,
+  listKnowledgeSources,
   createReservation,
   issueReservationManagement,
   createResourceMaintenance,
@@ -84,6 +90,7 @@ import {
   type IdempotencyRepository,
   type ExperienceStudioRepository,
   type ExperienceKnowledgeRepository,
+  type KnowledgeSourceRepository,
   type ExperienceChannelRuntimeReadiness,
   type ExperienceValidationDependencies,
   type ConversationRepository,
@@ -189,6 +196,7 @@ import { createWhatsAppSimulationMessage } from "@reservation-platform/whatsapp"
 
 import { jsonResponse, platformError, type StandaloneApiRequest, type StandaloneApiResponse } from "./http.js";
 import { applyRateLimit, isWhatsAppPairingRateLimitPath, type PersistentRateLimitRepository } from "./rate-limit.js";
+import { extractKnowledgePdf, KnowledgePdfError } from "./pdf-knowledge.js";
 
 export interface StandaloneApiDependencies {
   auth?: StandaloneApiAuthConfig;
@@ -203,6 +211,7 @@ export interface StandaloneApiDependencies {
   installationLocationsRepository?: InstallationLocationsRepository;
   experienceStudioRepository?: ExperienceStudioRepository;
   experienceKnowledgeRepository?: ExperienceKnowledgeRepository;
+  knowledgeSourceRepository?: KnowledgeSourceRepository;
   integrationSettingsRepository?: IntegrationSettingsRepository;
   integrationCredentialEncryptor?: IntegrationCredentialEncryptor;
   integrationCredentialDecryptor?: IntegrationCredentialDecryptor;
@@ -411,6 +420,9 @@ const experienceResourcePattern = /^\/v1\/experience\/resources\/([^/]+)$/;
 const experienceResourceArchivePattern = /^\/v1\/experience\/resources\/([^/]+)\/archive$/;
 const experienceKnowledgePattern = /^\/v1\/experience\/knowledge\/([^/]+)$/;
 const experienceKnowledgeArchivePattern = /^\/v1\/experience\/knowledge\/([^/]+)\/archive$/;
+const knowledgeSourceArchivePattern = /^\/v1\/experience\/knowledge-sources\/([^/]+)\/archive$/;
+const knowledgeSourceReindexPattern = /^\/v1\/experience\/knowledge-sources\/([^/]+)\/reindex$/;
+const knowledgeSourcePattern = /^\/v1\/experience\/knowledge-sources\/([^/]+)$/;
 const reservationIdPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const standaloneHealthBody = {
   status: "ok",
@@ -739,7 +751,124 @@ export async function handleStandaloneApiRequest(
     });
     return jsonResponse(result.status, result.body);
   }
+  if (method === "GET" && path === "/v1/experience/knowledge-sources") {
+    const scoped = readExperienceScope(request);
+    if (!scoped.ok) return scoped.response;
+    if (!dependencies.knowledgeSourceRepository) return platformError(503, "bad_request", "Knowledge source repository is not configured.");
+    const result = await listKnowledgeSources({
+      scope: scoped.scope,
+      repository: dependencies.knowledgeSourceRepository,
+      includeArchived: url.searchParams.get("include_archived") === "true",
+    });
+    return jsonResponse(result.status, result.body);
+  }
+  if (method === "POST" && path === "/v1/experience/knowledge-sources/text") {
+    const scoped = readExperienceScope(request);
+    if (!scoped.ok) return scoped.response;
+    if (!dependencies.knowledgeSourceRepository) return platformError(503, "bad_request", "Knowledge source repository is not configured.");
+    const result = await createKnowledgeTextSource({
+      scope: scoped.scope,
+      value: request.body,
+      repository: dependencies.knowledgeSourceRepository,
+    });
+    return jsonResponse(result.status, result.body);
+  }
+  if (method === "POST" && path === "/v1/experience/knowledge-sources/pdf") {
+    const scoped = readExperienceScope(request);
+    if (!scoped.ok) return scoped.response;
+    if (!dependencies.knowledgeSourceRepository) return platformError(503, "bad_request", "Knowledge source repository is not configured.");
+    const body = request.body && typeof request.body === "object" && !Array.isArray(request.body)
+      ? request.body as Record<string, unknown>
+      : {};
+    if (typeof body.title !== "string" || typeof body.source_label !== "string" || typeof body.pdf_bytes !== "string") {
+      return platformError(400, "validation_failed", "PDF knowledge source is invalid.");
+    }
+    try {
+      const content = await extractKnowledgePdf(Buffer.from(body.pdf_bytes, "base64"));
+      const result = await createKnowledgeTextSource({
+        scope: scoped.scope,
+        value: { title: body.title, source_label: body.source_label, content },
+        repository: dependencies.knowledgeSourceRepository,
+        kind: "pdf",
+      });
+      return jsonResponse(result.status, result.body);
+    } catch (error) {
+      return error instanceof KnowledgePdfError
+        ? platformError(422, "validation_failed", "PDF could not be converted into usable knowledge.")
+        : platformError(500, "internal_error", "PDF knowledge source could not be created.");
+    }
+  }
+  if (method === "POST" && path === "/v1/experience/knowledge-search/test") {
+    const scoped = readExperienceScope(request);
+    if (!scoped.ok) return scoped.response;
+    if (!dependencies.knowledgeSourceRepository) return platformError(503, "bad_request", "Knowledge source repository is not configured.");
+    const result = await testKnowledgeSearch({
+      scope: scoped.scope,
+      value: request.body,
+      repository: dependencies.knowledgeSourceRepository,
+    });
+    return jsonResponse(result.status, result.body);
+  }
+  if (method === "POST") {
+    const sourceId = knowledgeSourceArchivePattern.exec(path)?.[1];
+    if (sourceId) {
+      const scoped = readExperienceScope(request);
+      if (!scoped.ok) return scoped.response;
+      if (!dependencies.knowledgeSourceRepository) return platformError(503, "bad_request", "Knowledge source repository is not configured.");
+      const result = await archiveKnowledgeSource({
+        scope: scoped.scope,
+        sourceId: decodeURIComponent(sourceId),
+        repository: dependencies.knowledgeSourceRepository,
+      });
+      return jsonResponse(result.status, result.body);
+    }
+    const reindexSourceId = knowledgeSourceReindexPattern.exec(path)?.[1];
+    if (reindexSourceId) {
+      const scoped = readExperienceScope(request);
+      if (!scoped.ok) return scoped.response;
+      if (!dependencies.knowledgeSourceRepository) return platformError(503, "bad_request", "Knowledge source repository is not configured.");
+      const result = await reindexKnowledgeSource({
+        scope: scoped.scope,
+        sourceId: decodeURIComponent(reindexSourceId),
+        repository: dependencies.knowledgeSourceRepository,
+      });
+      return jsonResponse(result.status, result.body);
+    }
+  }
   if (method === "PUT") {
+    const sourceId = knowledgeSourcePattern.exec(path)?.[1];
+    if (sourceId) {
+      const scoped = readExperienceScope(request);
+      if (!scoped.ok) return scoped.response;
+      if (!dependencies.knowledgeSourceRepository) return platformError(503, "bad_request", "Knowledge source repository is not configured.");
+      const body = request.body && typeof request.body === "object" && !Array.isArray(request.body)
+        ? request.body as Record<string, unknown>
+        : {};
+      let value: unknown = body;
+      let kind: "text" | "pdf" = "text";
+      if (typeof body.pdf_bytes === "string") {
+        try {
+          value = {
+            title: body.title,
+            source_label: body.source_label,
+            content: await extractKnowledgePdf(Buffer.from(body.pdf_bytes, "base64")),
+          };
+          kind = "pdf";
+        } catch (error) {
+          return error instanceof KnowledgePdfError
+            ? platformError(422, "validation_failed", "PDF could not be converted into usable knowledge.")
+            : platformError(500, "internal_error", "PDF knowledge source could not be replaced.");
+        }
+      }
+      const result = await replaceKnowledgeSource({
+        scope: scoped.scope,
+        sourceId: decodeURIComponent(sourceId),
+        value,
+        repository: dependencies.knowledgeSourceRepository,
+        kind,
+      });
+      return jsonResponse(result.status, result.body);
+    }
     const knowledgeId = experienceKnowledgePattern.exec(path)?.[1];
     if (knowledgeId) {
       const scoped = readExperienceScope(request);
@@ -1770,7 +1899,7 @@ const protectedRouteMetadata: Readonly<Record<string, readonly RouteMatcher[]>> 
     "/v1/integrations/email", "/v1/integrations/ai",
     "/v1/experience/presets", "/v1/experience/workspace", "/v1/experience/validation",
     "/v1/experience/services", "/v1/experience/resources", "/v1/experience/operating-hours",
-    "/v1/experience/knowledge", "/v1/experience/channels",
+    "/v1/experience/knowledge", "/v1/experience/knowledge-sources", "/v1/experience/channels",
     "/v1/operations/overview",
     "/v1/system/status",
     "/v1/analytics",
@@ -1785,8 +1914,11 @@ const protectedRouteMetadata: Readonly<Record<string, readonly RouteMatcher[]>> 
     "/v1/integrations/email/test", "/v1/integrations/ai/test",
     "/v1/experience/publish",
     "/v1/experience/services", "/v1/experience/resources", "/v1/experience/knowledge",
+    "/v1/experience/knowledge-sources/text", "/v1/experience/knowledge-sources/pdf",
+    "/v1/experience/knowledge-search/test",
     experienceServiceArchivePattern, experienceResourceArchivePattern,
     experienceKnowledgeArchivePattern,
+    knowledgeSourceArchivePattern, knowledgeSourceReindexPattern,
     "/v1/reservations", "/v1/reservations/staff", reservationCancelPattern, reservationReschedulePattern,
     appointmentTransitionPattern, appointmentStaffReschedulePattern,
     "/v1/resource-maintenance", resourceMaintenanceEndPattern,
@@ -1794,7 +1926,7 @@ const protectedRouteMetadata: Readonly<Record<string, readonly RouteMatcher[]>> 
     isChatReservationSessionRoute, isWhatsAppOwnerRoute,
   ],
   PATCH: ["/v1/experience/identity", installationLocationPattern, reservationPattern, isWhatsAppOwnerRoute],
-  PUT: ["/v1/installation/business", "/v1/integrations/email", "/v1/integrations/ai", "/v1/experience/draft", "/v1/experience/operating-hours", "/v1/experience/channels", experienceServicePattern, experienceResourcePattern, experienceKnowledgePattern, conversationAutomationPattern],
+  PUT: ["/v1/installation/business", "/v1/integrations/email", "/v1/integrations/ai", "/v1/experience/draft", "/v1/experience/operating-hours", "/v1/experience/channels", experienceServicePattern, experienceResourcePattern, experienceKnowledgePattern, knowledgeSourcePattern, conversationAutomationPattern],
   DELETE: ["/v1/integrations/ai", isWhatsAppOwnerRoute],
 };
 

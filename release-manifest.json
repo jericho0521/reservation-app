@@ -15,7 +15,7 @@
     },
     {
       "path": "compose.production.yml",
-      "sha256": "645f928c3256de895acfac2cbe412fa8e2f243550e01a3e6c4bb0a39854d96cd"
+      "sha256": "d0c82087b576a37f5b25b7f431ea69a1823af6b5ecf24bede6f0457db9b0613e"
     },
     {
       "path": "docker/production/Caddyfile",
@@ -47,7 +47,7 @@
     },
     {
       "path": "scripts/production/release-manifest.mjs",
-      "sha256": "e0ff4a67f234e159c13d7dfcd5b2b868362566782d21e0d75a25438326c90f03"
+      "sha256": "962a8a41d9d69af2b2eba286a0fced3238cd6add0ea40a2562aa41a719123552"
     },
     {
       "path": "scripts/production/smoke.mjs",

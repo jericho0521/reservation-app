@@ -13,7 +13,7 @@ import {
 
 const indexPath = new URL("../migrations/supabase/migration-index.json", import.meta.url);
 
-test("core plan includes exactly 000001 through 000039 in order", async () => {
+test("core plan includes exactly 000001 through 000040 in order", async () => {
   const index = await readActualIndex();
   const plan = buildSupabaseMigrationPlan(index);
 
@@ -59,10 +59,34 @@ test("core plan includes exactly 000001 through 000039 in order", async () => {
       "000037_operations_overview_channel_compatibility.sql",
       "000038_strict_reservation_availability.sql",
       "000039_appointment_practitioner_lifecycle.sql",
+      "000040_ai_knowledge_retrieval.sql",
     ],
   );
-  assert.equal(plan.migrations.length, 39);
+  assert.equal(plan.migrations.length, 40);
   assert.equal(plan.seeds.length, 0);
+});
+
+test("hybrid knowledge retrieval is scoped, exact, restart-safe, and service-role only", async () => {
+  const sql = (await readFile(new URL("../migrations/supabase/000040_ai_knowledge_retrieval.sql", import.meta.url), "utf8")).toLowerCase();
+  assert.match(sql, /create extension if not exists vector/);
+  assert.match(sql, /create table public\.platform_knowledge_sources/);
+  assert.match(sql, /create table public\.platform_knowledge_chunks/);
+  assert.match(sql, /embedding vector\(384\) not null/);
+  assert.match(sql, /to_tsvector\('simple', content\)/);
+  assert.match(sql, /platform_match_knowledge[\s\S]*chunk\.tenant_id = p_tenant_id[\s\S]*chunk\.venue_id = p_venue_id/);
+  assert.match(sql, /1 - \(chunk\.embedding <=> p_query_embedding\) >= 0\.45/);
+  assert.match(sql, /0\.7 \/ \(60 \+ semantic\.rank\)[\s\S]*0\.3 \/ \(60 \+ lexical\.rank\)/);
+  assert.doesNotMatch(sql, /using hnsw|using ivfflat/);
+  assert.match(sql, /platform_knowledge_chunk_id/);
+  assert.match(sql, /knowledge\.index_source/);
+  assert.match(sql, /knowledge\.test_search/);
+  assert.match(sql, /content_version = p_expected_version/);
+  assert.match(sql, /source\.status = 'ready'/);
+  assert.match(sql, /platform_archive_knowledge_source[\s\S]*delete from public\.platform_knowledge_chunks/);
+  assert.match(sql, /platform_reindex_knowledge_source[\s\S]*platform_enqueue_knowledge_index/);
+  assert.match(sql, /revoke all on table public\.platform_knowledge_sources from public, anon, authenticated/);
+  assert.match(sql, /revoke all on table public\.platform_knowledge_chunks from public, anon, authenticated/);
+  assert.match(sql, /grant execute on function public\.platform_match_knowledge[^;]+to service_role/);
 });
 
 test("system operations persist atomic abuse limits and guarded release state", async () => {
@@ -324,7 +348,7 @@ test("bundled core migration loader follows an extended validated index", async 
   const rawIndex = await readActualRawIndex();
   rawIndex.coreMigrations.push({
     order: rawIndex.coreMigrations.length + 1,
-    path: "packages/database/migrations/supabase/000040_runtime_readiness_test.sql",
+    path: "packages/database/migrations/supabase/000041_runtime_readiness_test.sql",
     module: "core",
     scope: "reservation-platform",
     sha256: "a".repeat(64),
@@ -337,9 +361,9 @@ test("bundled core migration loader follows an extended validated index", async 
 
   const plan = await loadBundledCoreMigrationPlan(pathToFileURL(extendedIndexPath));
 
-  assert.equal(plan.length, 40);
+  assert.equal(plan.length, 41);
   assert.deepEqual(plan.at(-1), {
-    path: "packages/database/migrations/supabase/000040_runtime_readiness_test.sql",
+    path: "packages/database/migrations/supabase/000041_runtime_readiness_test.sql",
     sha256: "a".repeat(64),
   });
 });
@@ -516,18 +540,11 @@ test("default plan excludes optional AI retrieval and development seed entries",
   assert.equal(plan.entries.some((entry) => entry.module === "development-seed"), false);
 });
 
-test("AI retrieval option appends optional AI retrieval migrations after core migrations", async () => {
+test("legacy AI retrieval option is a compatibility no-op after retrieval became core", async () => {
   const index = await readActualIndex();
   const plan = buildSupabaseMigrationPlan(index, { includeAiRetrieval: true });
 
-  assert.deepEqual(
-    plan.migrations.slice(index.coreMigrations.length).map((entry) => entry.path),
-    [
-      "packages/database/migrations/supabase/optional/ai-retrieval/000001_knowledge_chunks.sql",
-      "packages/database/migrations/supabase/optional/ai-retrieval/000002_langchain_checkpoints.sql",
-      "packages/database/migrations/supabase/optional/ai-retrieval/000003_match_knowledge_security.sql",
-    ],
-  );
+  assert.deepEqual(plan.migrations, index.coreMigrations);
   assert.equal(plan.seeds.length, 0);
 });
 

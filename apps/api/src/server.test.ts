@@ -88,6 +88,36 @@ test("accepts a multibyte JSON body exactly at the configured byte limit", async
   });
 });
 
+test("grants the larger multipart limit only to the authenticated knowledge PDF routes", async () => {
+  let receivedBody: Record<string, unknown> | undefined;
+  const server = createStandaloneNodeServer(async (request) => {
+    receivedBody = request.body as Record<string, unknown>;
+    return jsonResponse(200, { ok: true });
+  });
+  const fileBytes = Buffer.alloc(70 * 1024, "p");
+
+  await withListeningServer(server, async (baseUrl) => {
+    const form = new FormData();
+    form.set("title", "Handbook");
+    form.set("source_label", "Customer handbook");
+    form.set("file", new Blob([fileBytes], { type: "application/pdf" }), "handbook.pdf");
+    const upload = await fetch(`${baseUrl}/v1/experience/knowledge-sources/pdf`, {
+      method: "POST",
+      body: form,
+    });
+    assert.equal(upload.status, 200);
+    assert.equal(receivedBody?.title, "Handbook");
+    assert.equal(Buffer.from(String(receivedBody?.pdf_bytes), "base64").byteLength, fileBytes.byteLength);
+
+    const ordinary = await fetch(`${baseUrl}/v1/test`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ content: "x".repeat(70 * 1024) }),
+    });
+    assert.equal(ordinary.status, 413);
+  });
+});
+
 test("returns and safely logs one validated correlation id", async () => {
   const entries: StructuredLogEntry[] = [];
   let handlerCorrelationId: string | string[] | undefined;

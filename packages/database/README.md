@@ -7,7 +7,9 @@ This package makes the Phase 5 migration bundle concrete inside the workspace:
 - `src/` exports a DB-client-neutral migration index reader, plan builder, and
   future runner contract for package consumers.
 - Core Supabase migration targets live under `migrations/supabase/`.
-- Optional AI retrieval migrations live under `migrations/supabase/optional/ai-retrieval/`.
+- Obsolete optional AI retrieval artifacts remain under
+  `migrations/supabase/optional/ai-retrieval/` for bundle compatibility only.
+  Active hybrid retrieval is part of core migration `000040`.
 - Development compatibility seed data lives under `seeds/development/`.
 - `migrations/supabase/migration-index.json` is a generated apply-plan and
   checksum index for future standalone migration runners.
@@ -37,12 +39,12 @@ This package makes the Phase 5 migration bundle concrete inside the workspace:
   `packages/reservations-supabase/sql/platform-idempotency.sql`.
 
 The TypeScript API is intentionally DB-client-neutral. It validates the
-generated Supabase migration index shape, normalizes core, optional AI
-retrieval, and development seed entries, and builds deterministic plans:
+generated Supabase migration index shape, normalizes core, legacy optional AI
+retrieval artifacts, and development seed entries, and builds deterministic plans:
 
 - core migrations are always included in index order;
-- optional AI retrieval migrations are appended after core migrations only when
-  requested;
+- the legacy `includeAiRetrieval` option is a compatibility no-op because
+  retrieval is now core;
 - development seed files are returned as seed entries after migrations only
   when requested;
 - `MigrationExecutor` receives SQL text and ordered plan entries from a future

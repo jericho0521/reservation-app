@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7
 
-FROM node:24-alpine AS base
+FROM node:24-bookworm-slim AS base
 WORKDIR /app
 ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0
 RUN corepack enable
@@ -23,9 +23,12 @@ RUN pnpm install --frozen-lockfile
 FROM deps AS build
 COPY . .
 RUN pnpm install --frozen-lockfile
+RUN --mount=type=cache,target=/app/.embedding-model-cache \
+    node scripts/fetch-embedding-model.mjs /app/.embedding-model/reservation-multilingual-minilm
 RUN pnpm run build
+RUN node scripts/verify-embedding-retrieval.mjs /app/.embedding-model reservation-multilingual-minilm
 
-FROM node:24-alpine AS runtime
+FROM node:24-bookworm-slim AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=4100
@@ -33,9 +36,12 @@ ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0
 ENV RESERVATION_RUN_AS_UID=1001
 ENV RESERVATION_RUN_AS_GID=1001
 
-RUN apk add --no-cache su-exec=0.3-r0 && \
-    addgroup -g 1001 -S reservation && \
-    adduser -S reservation -u 1001 -G reservation
+RUN apt-get update && \
+    apt-get install --no-install-recommends -y gosu && \
+    rm -rf /var/lib/apt/lists/* && \
+    ln -s /usr/sbin/gosu /sbin/su-exec && \
+    groupadd --gid 1001 reservation && \
+    useradd --uid 1001 --gid reservation --create-home --shell /usr/sbin/nologin reservation
 
 COPY --from=build --chown=reservation:reservation /app/package.json ./package.json
 COPY --from=build --chown=reservation:reservation /app/pnpm-workspace.yaml ./pnpm-workspace.yaml
@@ -57,15 +63,18 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
 
 CMD ["node", "apps/api/dist/server.js"]
 
-FROM node:24-alpine AS worker-runtime
+FROM node:24-bookworm-slim AS worker-runtime
 WORKDIR /app
 ENV NODE_ENV=production
 ENV RESERVATION_RUN_AS_UID=1001
 ENV RESERVATION_RUN_AS_GID=1001
 
-RUN apk add --no-cache su-exec=0.3-r0 && \
-    addgroup -g 1001 -S reservation && \
-    adduser -S reservation -u 1001 -G reservation
+RUN apt-get update && \
+    apt-get install --no-install-recommends -y gosu && \
+    rm -rf /var/lib/apt/lists/* && \
+    ln -s /usr/sbin/gosu /sbin/su-exec && \
+    groupadd --gid 1001 reservation && \
+    useradd --uid 1001 --gid reservation --create-home --shell /usr/sbin/nologin reservation
 
 COPY --from=build --chown=reservation:reservation /app/package.json ./package.json
 COPY --from=build --chown=reservation:reservation /app/pnpm-workspace.yaml ./pnpm-workspace.yaml
@@ -74,6 +83,8 @@ COPY --from=build --chown=reservation:reservation /app/apps/worker/package.json 
 COPY --from=build --chown=reservation:reservation /app/apps/worker/node_modules ./apps/worker/node_modules
 COPY --from=build --chown=reservation:reservation /app/apps/worker/dist ./apps/worker/dist
 COPY --from=build --chown=reservation:reservation /app/packages ./packages
+COPY --from=build --chown=reservation:reservation /app/.embedding-model ./models
+COPY --from=build --chown=reservation:reservation /app/docs/THIRD_PARTY_NOTICES.md ./THIRD_PARTY_NOTICES.md
 COPY --from=build /app/docker/local-stack/run-with-config.sh /usr/local/bin/run-with-config
 COPY --from=build /app/docker/production/run-with-secrets.sh /usr/local/bin/run-with-secrets
 RUN chmod 755 /usr/local/bin/run-with-config /usr/local/bin/run-with-secrets

@@ -317,6 +317,14 @@
       "scope": "reservation-platform",
       "sha256": "5dbe71b5cfaaa0e979ee9fa1d6613ec632e21c06c96f22c65c6c21211ab948fc",
       "bytes": 3737
+    },
+    {
+      "order": 40,
+      "path": "packages/database/migrations/supabase/000040_ai_knowledge_retrieval.sql",
+      "module": "core",
+      "scope": "reservation-platform",
+      "sha256": "2c2fffe29bdf68aa52f5c957934205ef450eadeb51ebf23fd0f4a1a1c2fca225",
+      "bytes": 28928
     }
   ],
   "optionalMigrations": [
@@ -324,22 +332,22 @@
       "path": "packages/database/migrations/supabase/optional/ai-retrieval/000001_knowledge_chunks.sql",
       "module": "ai-retrieval",
       "scope": "optional-ai-retrieval",
-      "sha256": "9799e98b9abe187b5ba9ff4a1c577ddea5ce22a895baf83e6f5e872005decd71",
-      "bytes": 242
+      "sha256": "3a8efb9ba8aca746a71d76a679a0b27c854f034b2d743ca8090cbaa9b3897565",
+      "bytes": 330
     },
     {
       "path": "packages/database/migrations/supabase/optional/ai-retrieval/000002_langchain_checkpoints.sql",
       "module": "ai-retrieval",
       "scope": "optional-ai-retrieval",
-      "sha256": "d3d2f59aa7f5e4a983931d1191866acf0452c250a9178caed7fb089296719c3b",
-      "bytes": 228
+      "sha256": "bd09c78d04b2ad2b9ce615893c10506b66b89df7ab06d06c31aba985aed93285",
+      "bytes": 316
     },
     {
       "path": "packages/database/migrations/supabase/optional/ai-retrieval/000003_match_knowledge_security.sql",
       "module": "ai-retrieval",
       "scope": "optional-ai-retrieval",
-      "sha256": "1691305a06e2f19f28ef49597bc116155ae2b3ae012094bb603ca92afaa28360",
-      "bytes": 219
+      "sha256": "a4b6d5b000df0cfdac9848fb88a2aab972a26cd4038479c7596ef3887ba777fb",
+      "bytes": 307
     }
   ],
   "developmentSeeds": [

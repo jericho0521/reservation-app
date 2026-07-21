@@ -105,7 +105,6 @@ export function buildSupabaseMigrationPlan(
 ): MigrationPlanResult {
   const migrations = Object.freeze([
     ...index.coreMigrations,
-    ...(options.includeAiRetrieval ? index.optionalMigrations : []),
   ]);
   const seeds = Object.freeze(options.includeDevelopmentSeeds ? [...index.developmentSeeds] : []);
 

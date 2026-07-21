@@ -11,6 +11,7 @@ export * from "./experience-validation.js";
 export * from "./idempotency.js";
 export * from "./integrations.js";
 export * from "./jobs.js";
+export * from "./knowledge-sources.js";
 export * from "./notifications.js";
 export * from "./metadata.js";
 export * from "./operating-hours.js";

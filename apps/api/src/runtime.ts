@@ -45,6 +45,7 @@ import {
   createSupabaseConversationBookingStateStore,
   createSupabaseExperienceStudioRepository,
   createSupabaseExperienceKnowledgeRepository,
+  createSupabaseKnowledgeSourceRepository,
   createSupabaseIdempotencyRepository,
   createSupabaseIntegrationSettingsRepository,
   createSupabaseInstallationBusinessRepository,
@@ -64,6 +65,7 @@ import {
   createSupabaseWhatsAppChannelRuntime,
   type ExperienceSupabaseLikeClient,
   type ExperienceKnowledgeSupabaseClient,
+  type KnowledgeSourcesSupabaseClient,
   type ReservationManagementSupabaseClient,
   type ConversationSupabaseClient,
   type ConversationStateSupabaseClient,
@@ -217,6 +219,7 @@ export interface StandaloneSupabaseRepositoryFactories {
   createInstallationLocationsRepository(client: StandaloneSupabaseClient): NonNullable<StandaloneApiDependencies["installationLocationsRepository"]>;
   createExperienceStudioRepository(client: StandaloneSupabaseClient): NonNullable<StandaloneApiDependencies["experienceStudioRepository"]>;
   createExperienceKnowledgeRepository(client: StandaloneSupabaseClient): NonNullable<StandaloneApiDependencies["experienceKnowledgeRepository"]>;
+  createKnowledgeSourceRepository?(client: StandaloneSupabaseClient): NonNullable<StandaloneApiDependencies["knowledgeSourceRepository"]>;
   createOperatingHoursRepository(client: StandaloneSupabaseClient): NonNullable<StandaloneApiDependencies["operatingHoursRepository"]>;
   createOperationsOverviewRepository(client: StandaloneSupabaseClient): NonNullable<StandaloneApiDependencies["operationsOverviewRepository"]>;
   createIntegrationSettingsRepository(client: StandaloneSupabaseClient): NonNullable<StandaloneApiDependencies["integrationSettingsRepository"]>;
@@ -299,6 +302,9 @@ const defaultRepositoryFactories: StandaloneSupabaseRepositoryFactories = {
   createExperienceKnowledgeRepository: (client) => createSupabaseExperienceKnowledgeRepository(
     client as unknown as ExperienceKnowledgeSupabaseClient,
   ),
+  createKnowledgeSourceRepository: (client) => createSupabaseKnowledgeSourceRepository(
+    client as unknown as KnowledgeSourcesSupabaseClient,
+  ),
   createOperatingHoursRepository: (client) => {
     if (!client.rpc) throw new Error("Supabase client does not support RPC calls");
     return createSupabaseOperatingHoursRepository({ rpc: client.rpc.bind(client) });
@@ -361,6 +367,7 @@ export function createStandaloneSupabaseDependencies(
         installationLocationsRepository: repositoryFactories.createInstallationLocationsRepository(adminClient),
         experienceStudioRepository: repositoryFactories.createExperienceStudioRepository(adminClient),
         experienceKnowledgeRepository: repositoryFactories.createExperienceKnowledgeRepository(adminClient),
+        knowledgeSourceRepository: repositoryFactories.createKnowledgeSourceRepository?.(adminClient),
         operatingHoursRepository: repositoryFactories.createOperatingHoursRepository(adminClient),
         operationsOverviewRepository: repositoryFactories.createOperationsOverviewRepository(adminClient),
         integrationSettingsRepository: repositoryFactories.createIntegrationSettingsRepository(adminClient),
@@ -418,7 +425,7 @@ export function createStandaloneSupabaseDependencies(
     ...(systemOperationsRepository ? { systemStatus: {
       repository: systemOperationsRepository,
       releaseVersion: options.releaseVersion?.trim() || "development",
-      migrationVersion: options.migrationVersion?.trim() || "000039",
+      migrationVersion: options.migrationVersion?.trim() || "000040",
       diskProbe: readRootDiskUsage,
     }, rateLimitRepository: systemOperationsRepository, operationalEventSink: systemOperationsRepository } : {}),
     ...(managedConversationOrchestrator ? { conversationOrchestrator: managedConversationOrchestrator } : conversationOrchestrator ? { conversationOrchestrator } : {}),
@@ -613,7 +620,12 @@ function createWebChatOrchestrator(
       if (!workspace || !("entries" in knowledgeResult.body) || !("services" in servicesResult.body)) throw new Error("Experience context unavailable.");
       return {
         businessName: workspace.profile.name,
-        knowledge: knowledgeResult.body.entries.map((entry) => ({ question: entry.question, answer: entry.answer })),
+        knowledge: knowledgeResult.body.entries.map((entry) => ({
+          question: entry.question,
+          answer: entry.answer,
+          sourceId: entry.knowledge_id,
+          sourceLabel: entry.source ?? entry.question,
+        })),
         services: servicesResult.body.services.map((service) => ({ serviceId: service.service_id, name: service.name })),
       };
     },

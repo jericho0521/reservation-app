@@ -2,6 +2,8 @@
 
 Production backups are one-business installation backups. Each archive contains the PostgreSQL custom dump, protected installation identity, installation/WhatsApp encryption keys, the internal service key required by restored services, and the persistent WhatsApp session directory. It deliberately excludes the independent backup recovery key, logs, temporary QR payloads, and Caddy certificate state.
 
+The PostgreSQL dump includes knowledge sources, locally generated embeddings, and `pgvector` columns introduced by migration `000040`. Restore with the supported release database image so the `vector` extension is available before the dump is loaded. The embedding model itself is immutable image content and is not copied into each backup.
+
 ## Recovery-key responsibility
 
 Before relying on backups, copy `/run/reservation-config/backup-recovery-key` from the protected configuration volume to an offline password manager or encrypted removable medium. Keep it separate from both the server and every `.tar.age` archive. Loss of this key makes encrypted archives unrecoverable; storing it beside an archive defeats the separation this design provides.

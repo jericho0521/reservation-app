@@ -6,6 +6,8 @@ export const PLATFORM_JOB_KINDS = [
   "whatsapp.process_inbound",
   "whatsapp.deliver_outbound",
   "conversation.process_ai",
+  "knowledge.index_source",
+  "knowledge.test_search",
 ] as const;
 
 export type PlatformJobKind = typeof PLATFORM_JOB_KINDS[number];

@@ -954,6 +954,13 @@
             "system"
           ],
           "type": "string"
+        },
+        "sources": {
+          "items": {
+            "$ref": "#/$defs/KnowledgeCitationResponse"
+          },
+          "maxItems": 3,
+          "type": "array"
         }
       },
       "required": [
@@ -2182,6 +2189,209 @@
         }
       ]
     },
+    "KnowledgeCitationResponse": {
+      "additionalProperties": false,
+      "properties": {
+        "label": {
+          "maxLength": 160,
+          "minLength": 1,
+          "type": "string"
+        },
+        "source_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "source_id",
+        "label"
+      ],
+      "type": "object"
+    },
+    "KnowledgePdfSourceInput": {
+      "additionalProperties": false,
+      "properties": {
+        "file": {
+          "format": "binary",
+          "type": "string"
+        },
+        "source_label": {
+          "maxLength": 160,
+          "minLength": 1,
+          "type": "string"
+        },
+        "title": {
+          "maxLength": 160,
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "title",
+        "source_label",
+        "file"
+      ],
+      "type": "object"
+    },
+    "KnowledgeSearchMatchResponse": {
+      "additionalProperties": false,
+      "properties": {
+        "chunk_id": {
+          "type": "string"
+        },
+        "combined_score": {
+          "type": "number"
+        },
+        "excerpt": {
+          "type": "string"
+        },
+        "lexical_rank": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "semantic_rank": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "semantic_similarity": {
+          "type": "number"
+        },
+        "source_id": {
+          "type": "string"
+        },
+        "source_label": {
+          "maxLength": 160,
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "chunk_id",
+        "source_id",
+        "source_label",
+        "excerpt",
+        "combined_score"
+      ],
+      "type": "object"
+    },
+    "KnowledgeSearchTestInput": {
+      "additionalProperties": false,
+      "properties": {
+        "query": {
+          "maxLength": 4000,
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "query"
+      ],
+      "type": "object"
+    },
+    "KnowledgeSearchTestResponse": {
+      "additionalProperties": false,
+      "properties": {
+        "matches": {
+          "items": {
+            "$ref": "#/$defs/KnowledgeSearchMatchResponse"
+          },
+          "maxItems": 20,
+          "type": "array"
+        }
+      },
+      "required": [
+        "matches"
+      ],
+      "type": "object"
+    },
+    "KnowledgeSourceResponse": {
+      "additionalProperties": false,
+      "properties": {
+        "chunk_count": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "created_at": {
+          "type": "string"
+        },
+        "failure_code": {
+          "type": "string"
+        },
+        "indexed_at": {
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "faq",
+            "text",
+            "pdf"
+          ],
+          "type": "string"
+        },
+        "source_id": {
+          "type": "string"
+        },
+        "source_label": {
+          "maxLength": 160,
+          "minLength": 1,
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "pending",
+            "indexing",
+            "ready",
+            "failed",
+            "archived"
+          ],
+          "type": "string"
+        },
+        "title": {
+          "maxLength": 160,
+          "minLength": 1,
+          "type": "string"
+        },
+        "updated_at": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "source_id",
+        "kind",
+        "title",
+        "source_label",
+        "status",
+        "chunk_count",
+        "created_at",
+        "updated_at"
+      ],
+      "type": "object"
+    },
+    "KnowledgeTextSourceInput": {
+      "additionalProperties": false,
+      "properties": {
+        "content": {
+          "maxLength": 100000,
+          "minLength": 1,
+          "type": "string"
+        },
+        "source_label": {
+          "maxLength": 160,
+          "minLength": 1,
+          "type": "string"
+        },
+        "title": {
+          "maxLength": 160,
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "title",
+        "source_label",
+        "content"
+      ],
+      "type": "object"
+    },
     "ListConversationMessagesQuery": {
       "additionalProperties": false,
       "properties": {
@@ -2292,6 +2502,21 @@
       },
       "required": [
         "locations"
+      ],
+      "type": "object"
+    },
+    "ListKnowledgeSourcesResponse": {
+      "additionalProperties": false,
+      "properties": {
+        "sources": {
+          "items": {
+            "$ref": "#/$defs/KnowledgeSourceResponse"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "sources"
       ],
       "type": "object"
     },

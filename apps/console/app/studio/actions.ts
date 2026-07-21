@@ -1,11 +1,16 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import type { KnowledgeSearchMatchResponse } from "@reservation-platform/sdk";
 import { createConsolePlatformClient } from "../../lib/platform-client";
 
 export interface StudioActionState {
   status: "idle" | "success" | "error";
   message?: string;
+}
+
+export interface KnowledgeSearchActionState extends StudioActionState {
+  matches?: KnowledgeSearchMatchResponse[];
 }
 
 export async function saveProfileAction(
@@ -135,6 +140,85 @@ export async function saveKnowledgeAction(
 export async function archiveKnowledgeAction(formData: FormData) {
   await createConsolePlatformClient().archiveExperienceKnowledge(requiredField(formData, "knowledge_id"));
   revalidatePath("/studio/knowledge");
+}
+
+export async function createKnowledgeSourceAction(
+  _previous: StudioActionState,
+  formData: FormData,
+): Promise<StudioActionState> {
+  try {
+    const client = createConsolePlatformClient();
+    const title = requiredField(formData, "title");
+    const sourceLabel = requiredField(formData, "source_label");
+    const file = formData.get("file");
+    const content = String(formData.get("content") ?? "").trim();
+    if (file instanceof File && file.size > 0) {
+      await client.uploadKnowledgePdf({ title, source_label: sourceLabel, file });
+    } else if (content) {
+      await client.createKnowledgeTextSource({ title, source_label: sourceLabel, content });
+    } else {
+      throw new Error("Paste text or select a PDF.");
+    }
+    revalidatePath("/studio/knowledge");
+    return { status: "success", message: "Knowledge source queued for local indexing." };
+  } catch (error) {
+    return actionError(error, "The knowledge source could not be added.");
+  }
+}
+
+export async function reindexKnowledgeSourceAction(formData: FormData) {
+  await createConsolePlatformClient().reindexKnowledgeSource(requiredField(formData, "source_id"));
+  revalidatePath("/studio/knowledge");
+}
+
+export async function replaceKnowledgeSourceAction(
+  _previous: StudioActionState,
+  formData: FormData,
+): Promise<StudioActionState> {
+  try {
+    const client = createConsolePlatformClient();
+    const sourceId = requiredField(formData, "source_id");
+    const title = requiredField(formData, "title");
+    const sourceLabel = requiredField(formData, "source_label");
+    const file = formData.get("file");
+    const content = String(formData.get("content") ?? "").trim();
+    if (file instanceof File && file.size > 0) {
+      await client.replaceKnowledgePdf(sourceId, { title, source_label: sourceLabel, file });
+    } else if (content) {
+      await client.replaceKnowledgeTextSource(sourceId, { title, source_label: sourceLabel, content });
+    } else {
+      throw new Error("Paste replacement text or select a PDF.");
+    }
+    revalidatePath("/studio/knowledge");
+    return { status: "success", message: "Replacement queued. The previous version remains excluded once indexing starts." };
+  } catch (error) {
+    return actionError(error, "The knowledge source could not be replaced.");
+  }
+}
+
+export async function archiveKnowledgeSourceAction(formData: FormData) {
+  await createConsolePlatformClient().archiveKnowledgeSource(requiredField(formData, "source_id"));
+  revalidatePath("/studio/knowledge");
+}
+
+export async function testKnowledgeSearchAction(
+  _previous: KnowledgeSearchActionState,
+  formData: FormData,
+): Promise<KnowledgeSearchActionState> {
+  try {
+    const result = await createConsolePlatformClient().testKnowledgeSearch({
+      query: requiredField(formData, "query"),
+    });
+    return {
+      status: "success",
+      message: result.matches.length
+        ? `Found ${result.matches.length} relevant chunk${result.matches.length === 1 ? "" : "s"}.`
+        : "No relevant knowledge matched this question.",
+      matches: result.matches,
+    };
+  } catch (error) {
+    return actionError(error, "Retrieval could not be tested.");
+  }
 }
 
 export async function saveChannelSettingsAction(

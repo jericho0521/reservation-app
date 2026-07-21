@@ -36,6 +36,7 @@ import type {
   IntegrationSettingsRepository,
   ExperienceStudioRepository,
   ExperienceKnowledgeRepository,
+  KnowledgeSourceRepository,
   ConversationRepository,
   ConversationOrchestratorDependencies,
   OperatingHoursRepository,
@@ -1601,6 +1602,77 @@ test("experience knowledge routes preserve owner scope and archive lifecycle", a
       id: "knowledge_1",
     },
   ]);
+});
+
+test("knowledge source routes create, replace, test retrieval, and archive inside owner scope", async () => {
+  const venueId = "00000000-0000-4000-8000-000000000001";
+  const sourceId = "00000000-0000-4000-8000-000000000100";
+  const observed: string[] = [];
+  const source = (status = "pending") => ({
+    source_id: sourceId,
+    kind: "text",
+    title: "Policy",
+    source_label: "Policy",
+    status,
+    chunk_count: 0,
+    created_at: "2026-07-21T00:00:00.000Z",
+    updated_at: "2026-07-21T00:00:00.000Z",
+  });
+  const repository: KnowledgeSourceRepository = {
+    async list() { return { data: [] }; },
+    async create() { observed.push("create"); return { data: source() }; },
+    async replace() { observed.push("replace"); return { data: source() }; },
+    async archive() { observed.push("archive"); return { data: source("archived") }; },
+    async reindex() { observed.push("reindex"); return { data: source() }; },
+    async testSearch() {
+      observed.push("search");
+      return {
+        data: {
+          matches: [{
+            chunk_id: "00000000-0000-4000-8000-000000000010",
+            source_id: sourceId,
+            source_label: "Policy",
+            excerpt: "Approved policy.",
+            combined_score: 0.01,
+          }],
+        },
+      };
+    },
+  };
+  const headers = {
+    authorization: "Bearer secret",
+    "x-reservation-tenant-id": "tenant_1",
+    "x-reservation-venue-id": venueId,
+  };
+  const created = await handleStandaloneApiRequest({
+    method: "POST",
+    path: "/v1/experience/knowledge-sources/text",
+    headers,
+    body: { title: "Policy", source_label: "Policy", content: "Approved policy." },
+  }, { serviceApiKey: "secret", knowledgeSourceRepository: repository });
+  const replaced = await handleStandaloneApiRequest({
+    method: "PUT",
+    path: `/v1/experience/knowledge-sources/${sourceId}`,
+    headers,
+    body: { title: "Policy", source_label: "Policy", content: "Updated approved policy." },
+  }, { serviceApiKey: "secret", knowledgeSourceRepository: repository });
+  const searched = await handleStandaloneApiRequest({
+    method: "POST",
+    path: "/v1/experience/knowledge-search/test",
+    headers,
+    body: { query: "What is the policy?" },
+  }, { serviceApiKey: "secret", knowledgeSourceRepository: repository });
+  const archived = await handleStandaloneApiRequest({
+    method: "POST",
+    path: `/v1/experience/knowledge-sources/${sourceId}/archive`,
+    headers,
+  }, { serviceApiKey: "secret", knowledgeSourceRepository: repository });
+
+  assert.equal(created.status, 201);
+  assert.equal(replaced.status, 202);
+  assert.equal(searched.status, 200);
+  assert.equal(archived.status, 200);
+  assert.deepEqual(observed, ["create", "replace", "search", "archive"]);
 });
 
 test("experience channel route separates desired settings from readiness", async () => {

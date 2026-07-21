@@ -441,6 +441,17 @@
       ]
     },
     {
+      "kind": "core-migration",
+      "order": 40,
+      "targetPath": "packages/database/migrations/supabase/000040_ai_knowledge_retrieval.sql",
+      "sourceAssets": [
+        {
+          "path": "packages/database/migrations/supabase/000040_ai_knowledge_retrieval.sql",
+          "section": "Venue-scoped hybrid FAQ, text, and PDF knowledge retrieval with pgvector and durable indexing"
+        }
+      ]
+    },
+    {
       "kind": "optional-ai-retrieval",
       "targetPath": "packages/database/migrations/supabase/optional/ai-retrieval/000001_knowledge_chunks.sql",
       "sourceAssets": [

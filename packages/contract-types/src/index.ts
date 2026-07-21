@@ -405,6 +405,56 @@ export interface ListExperienceKnowledgeResponse {
   entries: ExperienceKnowledgeEntryResponse[];
 }
 
+export type KnowledgeSourceKind = "faq" | "text" | "pdf";
+export type KnowledgeSourceStatus = "pending" | "indexing" | "ready" | "failed" | "archived";
+
+export interface KnowledgeTextSourceInput {
+  title: string;
+  source_label: string;
+  content: string;
+}
+
+export interface KnowledgeCitationResponse {
+  source_id: string;
+  label: string;
+}
+
+export interface KnowledgeSourceResponse {
+  source_id: string;
+  kind: KnowledgeSourceKind;
+  title: string;
+  source_label: string;
+  status: KnowledgeSourceStatus;
+  chunk_count: number;
+  indexed_at?: string;
+  failure_code?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ListKnowledgeSourcesResponse {
+  sources: KnowledgeSourceResponse[];
+}
+
+export interface KnowledgeSearchTestInput {
+  query: string;
+}
+
+export interface KnowledgeSearchMatchResponse {
+  chunk_id: string;
+  source_id: string;
+  source_label: string;
+  excerpt: string;
+  semantic_similarity?: number;
+  semantic_rank?: number;
+  lexical_rank?: number;
+  combined_score: number;
+}
+
+export interface KnowledgeSearchTestResponse {
+  matches: KnowledgeSearchMatchResponse[];
+}
+
 export type ExperienceChannelReadinessState = "ready" | "not_configured" | "degraded";
 
 export interface ExperienceChannelReadiness {
@@ -547,6 +597,7 @@ export interface ConversationMessageResponse {
   delivery_state: ConversationDeliveryState;
   content: string;
   reservation_id?: string;
+  sources?: KnowledgeCitationResponse[];
   created_at: string;
 }
 

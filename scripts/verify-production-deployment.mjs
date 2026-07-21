@@ -21,7 +21,7 @@ export const expectedProductionServices = Object.freeze([
 ]);
 
 const externalImagePatterns = Object.freeze([
-  /^\s+image: postgres:16-alpine@sha256:[a-f0-9]{64}$/mu,
+  /^\s+image: pgvector\/pgvector:0\.8\.2-pg16-bookworm@sha256:[a-f0-9]{64}$/mu,
   /^\s+image: postgrest\/postgrest:v14\.12@sha256:[a-f0-9]{64}$/mu,
   /^\s+image: caddy:2\.10\.0-alpine@sha256:[a-f0-9]{64}$/mu,
 ]);

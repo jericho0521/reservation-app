@@ -83,28 +83,23 @@ test("database live proof config rejects unsafe Docker container command text", 
 test("database live proof plan selects backend-owned core migrations by default", async () => {
   const plan = await loadMigrationProofPlan();
 
-  assert.equal(plan.migrations.length, 39);
+  assert.equal(plan.migrations.length, 40);
   assert.equal(plan.seeds.length, 0);
-  assert.equal(plan.entries.length, 39);
+  assert.equal(plan.entries.length, 40);
   assert.ok(plan.entries.every((entry) => entry.path.startsWith("packages/database/migrations/supabase/")));
   assert.equal(plan.entries.some((entry) => entry.path.includes("/optional/")), false);
 });
 
-test("database live proof plan can include optional AI retrieval migrations and development seed", async () => {
+test("database live proof treats the old AI option as a no-op and can include the development seed", async () => {
   const plan = await loadMigrationProofPlan({
     includeAiRetrieval: true,
     includeDevelopmentSeeds: true,
   });
 
-  assert.equal(plan.migrations.length, 42);
+  assert.equal(plan.migrations.length, 40);
   assert.equal(plan.seeds.length, 1);
-  assert.equal(plan.entries.length, 43);
-  assert.ok(
-    plan.entries.some(
-      (entry) =>
-        entry.path === "packages/database/migrations/supabase/optional/ai-retrieval/000001_knowledge_chunks.sql",
-    ),
-  );
+  assert.equal(plan.entries.length, 41);
+  assert.equal(plan.entries.some((entry) => entry.path.includes("/optional/ai-retrieval/")), false);
   assert.ok(plan.entries.some((entry) => entry.path === "packages/database/seeds/development/project-play-compat.sql"));
 });
 

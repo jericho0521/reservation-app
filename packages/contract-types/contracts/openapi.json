@@ -989,6 +989,13 @@
               "system"
             ],
             "type": "string"
+          },
+          "sources": {
+            "items": {
+              "$ref": "#/components/schemas/KnowledgeCitationResponse"
+            },
+            "maxItems": 3,
+            "type": "array"
           }
         },
         "required": [
@@ -2217,6 +2224,209 @@
           }
         ]
       },
+      "KnowledgeCitationResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "label": {
+            "maxLength": 160,
+            "minLength": 1,
+            "type": "string"
+          },
+          "source_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "source_id",
+          "label"
+        ],
+        "type": "object"
+      },
+      "KnowledgePdfSourceInput": {
+        "additionalProperties": false,
+        "properties": {
+          "file": {
+            "format": "binary",
+            "type": "string"
+          },
+          "source_label": {
+            "maxLength": 160,
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": {
+            "maxLength": 160,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "title",
+          "source_label",
+          "file"
+        ],
+        "type": "object"
+      },
+      "KnowledgeSearchMatchResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "chunk_id": {
+            "type": "string"
+          },
+          "combined_score": {
+            "type": "number"
+          },
+          "excerpt": {
+            "type": "string"
+          },
+          "lexical_rank": {
+            "minimum": 1,
+            "type": "integer"
+          },
+          "semantic_rank": {
+            "minimum": 1,
+            "type": "integer"
+          },
+          "semantic_similarity": {
+            "type": "number"
+          },
+          "source_id": {
+            "type": "string"
+          },
+          "source_label": {
+            "maxLength": 160,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "chunk_id",
+          "source_id",
+          "source_label",
+          "excerpt",
+          "combined_score"
+        ],
+        "type": "object"
+      },
+      "KnowledgeSearchTestInput": {
+        "additionalProperties": false,
+        "properties": {
+          "query": {
+            "maxLength": 4000,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "type": "object"
+      },
+      "KnowledgeSearchTestResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "matches": {
+            "items": {
+              "$ref": "#/components/schemas/KnowledgeSearchMatchResponse"
+            },
+            "maxItems": 20,
+            "type": "array"
+          }
+        },
+        "required": [
+          "matches"
+        ],
+        "type": "object"
+      },
+      "KnowledgeSourceResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "chunk_count": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "failure_code": {
+            "type": "string"
+          },
+          "indexed_at": {
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "faq",
+              "text",
+              "pdf"
+            ],
+            "type": "string"
+          },
+          "source_id": {
+            "type": "string"
+          },
+          "source_label": {
+            "maxLength": 160,
+            "minLength": 1,
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "pending",
+              "indexing",
+              "ready",
+              "failed",
+              "archived"
+            ],
+            "type": "string"
+          },
+          "title": {
+            "maxLength": 160,
+            "minLength": 1,
+            "type": "string"
+          },
+          "updated_at": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "source_id",
+          "kind",
+          "title",
+          "source_label",
+          "status",
+          "chunk_count",
+          "created_at",
+          "updated_at"
+        ],
+        "type": "object"
+      },
+      "KnowledgeTextSourceInput": {
+        "additionalProperties": false,
+        "properties": {
+          "content": {
+            "maxLength": 100000,
+            "minLength": 1,
+            "type": "string"
+          },
+          "source_label": {
+            "maxLength": 160,
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": {
+            "maxLength": 160,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "title",
+          "source_label",
+          "content"
+        ],
+        "type": "object"
+      },
       "ListConversationMessagesQuery": {
         "additionalProperties": false,
         "properties": {
@@ -2327,6 +2537,21 @@
         },
         "required": [
           "locations"
+        ],
+        "type": "object"
+      },
+      "ListKnowledgeSourcesResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "sources": {
+            "items": {
+              "$ref": "#/components/schemas/KnowledgeSourceResponse"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "sources"
         ],
         "type": "object"
       },
@@ -5404,6 +5629,399 @@
           }
         ],
         "summary": "Create an experience knowledge entry",
+        "tags": [
+          "experience"
+        ]
+      }
+    },
+    "/v1/experience/knowledge-search/test": {
+      "post": {
+        "operationId": "testKnowledgeSearch",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/TenantIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/VenueIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/CorrelationIdHeader"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/KnowledgeSearchTestInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KnowledgeSearchTestResponse"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformErrorResponse"
+                }
+              }
+            },
+            "description": "Platform error response."
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Test scoped hybrid retrieval without invoking an AI provider",
+        "tags": [
+          "experience"
+        ]
+      }
+    },
+    "/v1/experience/knowledge-sources": {
+      "get": {
+        "operationId": "listKnowledgeSources",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/TenantIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/VenueIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/CorrelationIdHeader"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListKnowledgeSourcesResponse"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformErrorResponse"
+                }
+              }
+            },
+            "description": "Platform error response."
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "List owner-managed indexed knowledge sources",
+        "tags": [
+          "experience"
+        ]
+      }
+    },
+    "/v1/experience/knowledge-sources/{source_id}": {
+      "put": {
+        "operationId": "replaceKnowledgeTextSource",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "source_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/TenantIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/VenueIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/CorrelationIdHeader"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/KnowledgeTextSourceInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KnowledgeSourceResponse"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformErrorResponse"
+                }
+              }
+            },
+            "description": "Platform error response."
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Replace an indexed text knowledge source and queue a new version",
+        "tags": [
+          "experience"
+        ]
+      }
+    },
+    "/v1/experience/knowledge-sources/{source_id}/archive": {
+      "post": {
+        "operationId": "archiveKnowledgeSource",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "source_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/TenantIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/VenueIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/CorrelationIdHeader"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KnowledgeSourceResponse"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformErrorResponse"
+                }
+              }
+            },
+            "description": "Platform error response."
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Archive an indexed knowledge source",
+        "tags": [
+          "experience"
+        ]
+      }
+    },
+    "/v1/experience/knowledge-sources/{source_id}/reindex": {
+      "post": {
+        "operationId": "reindexKnowledgeSource",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "source_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/TenantIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/VenueIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/CorrelationIdHeader"
+          }
+        ],
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KnowledgeSourceResponse"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformErrorResponse"
+                }
+              }
+            },
+            "description": "Platform error response."
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Retry local indexing for a knowledge source",
+        "tags": [
+          "experience"
+        ]
+      }
+    },
+    "/v1/experience/knowledge-sources/pdf": {
+      "post": {
+        "operationId": "uploadKnowledgePdf",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/TenantIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/VenueIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/CorrelationIdHeader"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/KnowledgePdfSourceInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KnowledgeSourceResponse"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformErrorResponse"
+                }
+              }
+            },
+            "description": "Platform error response."
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Upload a PDF knowledge source",
+        "tags": [
+          "experience"
+        ]
+      }
+    },
+    "/v1/experience/knowledge-sources/text": {
+      "post": {
+        "operationId": "createKnowledgeTextSource",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/TenantIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/VenueIdHeader"
+          },
+          {
+            "$ref": "#/components/parameters/CorrelationIdHeader"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/KnowledgeTextSourceInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KnowledgeSourceResponse"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformErrorResponse"
+                }
+              }
+            },
+            "description": "Platform error response."
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Create a pasted-text knowledge source",
         "tags": [
           "experience"
         ]

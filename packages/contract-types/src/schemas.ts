@@ -484,6 +484,49 @@ export const listExperienceKnowledgeResponseSchema = strictObject({
   entries: z.array(experienceKnowledgeEntryResponseSchema),
 });
 
+export const knowledgeSourceKindSchema = z.enum(["faq", "text", "pdf"]);
+export const knowledgeSourceStatusSchema = z.enum(["pending", "indexing", "ready", "failed", "archived"]);
+export const knowledgeTextSourceInputSchema = strictObject({
+  title: z.string().trim().min(1).max(160),
+  source_label: z.string().trim().min(1).max(160),
+  content: z.string().trim().min(1).max(100000),
+});
+export const knowledgeCitationResponseSchema = strictObject({
+  source_id: z.string().uuid(),
+  label: z.string().min(1).max(160),
+});
+export const knowledgeSourceResponseSchema = strictObject({
+  source_id: z.string().uuid(),
+  kind: knowledgeSourceKindSchema,
+  title: z.string().min(1).max(160),
+  source_label: z.string().min(1).max(160),
+  status: knowledgeSourceStatusSchema,
+  chunk_count: z.number().int().nonnegative(),
+  indexed_at: z.string().optional(),
+  failure_code: z.string().optional(),
+  created_at: z.string(),
+  updated_at: z.string(),
+});
+export const listKnowledgeSourcesResponseSchema = strictObject({
+  sources: z.array(knowledgeSourceResponseSchema),
+});
+export const knowledgeSearchTestInputSchema = strictObject({
+  query: z.string().trim().min(1).max(4000),
+});
+export const knowledgeSearchMatchResponseSchema = strictObject({
+  chunk_id: z.string().uuid(),
+  source_id: z.string().uuid(),
+  source_label: z.string().min(1).max(160),
+  excerpt: z.string(),
+  semantic_similarity: z.number().optional(),
+  semantic_rank: z.number().int().positive().optional(),
+  lexical_rank: z.number().int().positive().optional(),
+  combined_score: z.number(),
+});
+export const knowledgeSearchTestResponseSchema = strictObject({
+  matches: z.array(knowledgeSearchMatchResponseSchema).max(20),
+});
+
 export const experienceChannelReadinessSchema = strictObject({
   desired_enabled: z.boolean(),
   configured: z.boolean(),
@@ -616,6 +659,7 @@ export const conversationMessageResponseSchema = strictObject({
   delivery_state: conversationDeliveryStateSchema,
   content: z.string(),
   reservation_id: z.string().optional(),
+  sources: z.array(knowledgeCitationResponseSchema).max(3).optional(),
   created_at: z.string(),
 });
 

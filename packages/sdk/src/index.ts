@@ -40,6 +40,11 @@ import type {
   ExperienceKnowledgeInput,
   ExperienceKnowledgeEntryResponse,
   ListExperienceKnowledgeResponse,
+  ListKnowledgeSourcesResponse,
+  KnowledgeTextSourceInput,
+  KnowledgeSourceResponse,
+  KnowledgeSearchTestInput,
+  KnowledgeSearchTestResponse,
   ListConversationMessagesQuery,
   ListConversationMessagesResponse,
   ListConversationsQuery,
@@ -223,6 +228,14 @@ export interface ReservationPlatformClient {
   createExperienceKnowledge(input: ExperienceKnowledgeInput, options?: RequestOptions): Promise<ExperienceKnowledgeEntryResponse>;
   updateExperienceKnowledge(knowledgeId: string, input: ExperienceKnowledgeInput, options?: RequestOptions): Promise<ExperienceKnowledgeEntryResponse>;
   archiveExperienceKnowledge(knowledgeId: string, options?: RequestOptions): Promise<ExperienceKnowledgeEntryResponse>;
+  listKnowledgeSources(includeArchived?: boolean, options?: RequestOptions): Promise<ListKnowledgeSourcesResponse>;
+  createKnowledgeTextSource(input: KnowledgeTextSourceInput, options?: RequestOptions): Promise<KnowledgeSourceResponse>;
+  uploadKnowledgePdf(input: { title: string; source_label: string; file: Blob }, options?: RequestOptions): Promise<KnowledgeSourceResponse>;
+  replaceKnowledgeTextSource(sourceId: string, input: KnowledgeTextSourceInput, options?: RequestOptions): Promise<KnowledgeSourceResponse>;
+  replaceKnowledgePdf(sourceId: string, input: { title: string; source_label: string; file: Blob }, options?: RequestOptions): Promise<KnowledgeSourceResponse>;
+  reindexKnowledgeSource(sourceId: string, options?: RequestOptions): Promise<KnowledgeSourceResponse>;
+  archiveKnowledgeSource(sourceId: string, options?: RequestOptions): Promise<KnowledgeSourceResponse>;
+  testKnowledgeSearch(input: KnowledgeSearchTestInput, options?: RequestOptions): Promise<KnowledgeSearchTestResponse>;
   getExperienceChannelSettings(options?: RequestOptions): Promise<ExperienceChannelSettingsResponse>;
   updateExperienceChannelSettings(input: ExperienceChannels, options?: RequestOptions): Promise<ExperienceChannelSettingsResponse>;
   getPublicExperience(slug: string, options?: RequestOptions): Promise<PublicExperienceResponse>;
@@ -288,6 +301,7 @@ interface RequestConfig {
   path: string;
   query?: object;
   body?: unknown;
+  formBody?: FormData;
   options?: RequestOptions;
   stream?: boolean;
   public?: boolean;
@@ -386,6 +400,26 @@ export function createReservationPlatformClient(
     createExperienceKnowledge: (input, options) => request({ method: "POST", path: "/experience/knowledge", body: input, options }),
     updateExperienceKnowledge: (knowledgeId, input, options) => request({ method: "PUT", path: `/experience/knowledge/${encodeURIComponent(knowledgeId)}`, body: input, options }),
     archiveExperienceKnowledge: (knowledgeId, options) => request({ method: "POST", path: `/experience/knowledge/${encodeURIComponent(knowledgeId)}/archive`, body: {}, options }),
+    listKnowledgeSources: (includeArchived, options) => request({ method: "GET", path: "/experience/knowledge-sources", query: includeArchived ? { include_archived: true } : undefined, options }),
+    createKnowledgeTextSource: (input, options) => request({ method: "POST", path: "/experience/knowledge-sources/text", body: input, options }),
+    uploadKnowledgePdf: (input, options) => {
+      const formBody = new FormData();
+      formBody.set("title", input.title);
+      formBody.set("source_label", input.source_label);
+      formBody.set("file", input.file);
+      return request({ method: "POST", path: "/experience/knowledge-sources/pdf", formBody, options });
+    },
+    replaceKnowledgeTextSource: (sourceId, input, options) => request({ method: "PUT", path: `/experience/knowledge-sources/${encodeURIComponent(sourceId)}`, body: input, options }),
+    replaceKnowledgePdf: (sourceId, input, options) => {
+      const formBody = new FormData();
+      formBody.set("title", input.title);
+      formBody.set("source_label", input.source_label);
+      formBody.set("file", input.file);
+      return request({ method: "PUT", path: `/experience/knowledge-sources/${encodeURIComponent(sourceId)}`, formBody, options });
+    },
+    reindexKnowledgeSource: (sourceId, options) => request({ method: "POST", path: `/experience/knowledge-sources/${encodeURIComponent(sourceId)}/reindex`, body: {}, options }),
+    archiveKnowledgeSource: (sourceId, options) => request({ method: "POST", path: `/experience/knowledge-sources/${encodeURIComponent(sourceId)}/archive`, body: {}, options }),
+    testKnowledgeSearch: (input, options) => request({ method: "POST", path: "/experience/knowledge-search/test", body: input, options }),
     getExperienceChannelSettings: (options) => request({ method: "GET", path: "/experience/channels", options }),
     updateExperienceChannelSettings: (input, options) => request({ method: "PUT", path: "/experience/channels", body: input, options }),
     getPublicExperience: (slug, options) => request({
@@ -549,6 +583,9 @@ function createRequester(clientOptions: ReservationPlatformClientOptions) {
     if (config.body !== undefined) {
       headers.set("Content-Type", "application/json");
       init.body = JSON.stringify(config.body);
+    } else if (config.formBody) {
+      headers.delete("Content-Type");
+      init.body = config.formBody;
     }
 
     const maxAttempts = getMaxAttempts(config, clientOptions.retry, config.options?.retry);

@@ -12,14 +12,15 @@
   },
   "dependencies": {
     "@project-play/reservations-supabase": "workspace:*",
-    "@reservation-platform/api": "workspace:*",
     "@reservation-platform/ai-sdk-adapter": "workspace:*",
+    "@reservation-platform/api": "workspace:*",
     "@reservation-platform/contract-types": "workspace:*",
     "@reservation-platform/database": "workspace:*",
     "@reservation-platform/platform-config": "workspace:*",
     "@reservation-platform/whatsapp": "workspace:*",
     "@supabase/supabase-js": "^2.90.1",
-    "nodemailer": "^9.0.3"
+    "nodemailer": "^9.0.3",
+    "pdfjs-dist": "5.4.149"
   },
   "devDependencies": {
     "@project-play/reservations-core": "workspace:*",

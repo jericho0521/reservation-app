@@ -1,142 +1,214 @@
 # Reservation Platform
 
-An omnichannel reservation experience platform: owners configure and publish an
-industry-specific booking experience, customers reserve through web or an AI
-conversation, and staff operate every channel from one command center.
+A Docker-first, self-hosted appointment platform built from reusable TypeScript
+modules. A business can publish web booking, offer AI-assisted chat and
+WhatsApp, manage practitioners and reservations, and operate every channel from
+one owner console.
 
-This branch is the frontend-and-backend modular platform direction. Backend
-credentials stay in the backend API, while frontends consume the platform through
-`/v1`, `@reservation-platform/sdk`, `@reservation-platform/react`, or
-`@reservation-platform/ui`.
+The supported product model is deliberately simple: **one business per Docker
+installation**. Internally, tenant and venue boundaries remain enforced so the
+backend packages, SDK, and frontend toolkit can be reused safely in other
+products.
 
-## Final Demonstration
+> **Release status:** `0.2.0` is a release candidate with database migrations
+> through `000040`. The product and verification tooling are implemented, but a
+> production release remains conditional on deployment-specific recovery,
+> integration, and independent acceptance evidence.
 
-The deterministic demo tells one complete story across three polished domains:
+## What the platform provides
 
-1. Create, preview, validate, and publish an experience in Experience Studio.
-2. Book a racing simulator, capacity-matched room, or specialist appointment.
-3. Run the same proposal-and-confirmation workflow through AI chat or the
-   credential-free WhatsApp simulation.
-4. Pause automation, reply as staff, manage reservations and maintenance, and
-   inspect channel conversion and demand analytics.
+| Area | Implemented capability |
+| --- | --- |
+| First run | Blank Docker installation, generated infrastructure secrets, one-time browser owner setup, and guided appointment-business onboarding |
+| Public booking | Published business page, live availability, practitioner selection, conflict-safe confirmation, customer management link, rescheduling, and cancellation |
+| Owner operations | Appointment calendar, status changes, manual booking, maintenance, staff access, location scope, system status, and operational analytics |
+| Experience Studio | Business profile, branding, services, practitioners, opening hours, channels, customer preview, validation, versioned publishing, and public slug |
+| Web chat | Shared structured proposal-and-confirmation booking flow, deterministic fallback, staff takeover, and conversation history |
+| WhatsApp | Self-hosted Baileys linked-device pairing, encrypted session persistence, the shared booking workflow, staff takeover, and an isolated simulation mode |
+| AI | Owner-supplied OpenAI-compatible generation provider, bounded connection testing, structured outputs, and graceful deterministic fallback |
+| Knowledge/RAG | FAQs, pasted text, and PDF ingestion; local multilingual embeddings; PostgreSQL lexical and vector retrieval; citations; and retrieval-only testing |
+| Email | Owner-configured SMTP, encrypted credentials, durable delivery jobs, and manual staff-invitation fallback when delivery is unavailable |
+| Developer surface | Versioned HTTP contracts, OpenAPI and JSON Schema artifacts, TypeScript SDK, headless React hooks, reusable UI, and forkable frontend examples |
 
-Eight industry presets share the same platform model. Racing, rooms, and
-appointments are the deliberately polished flagship examples; the other five
-prove configurability without introducing separate domain subsystems.
+Every booking channel reaches the same availability and atomic reservation
+path. AI-generated free text cannot create a reservation directly: the platform
+stores a structured proposal, requires explicit confirmation, then revalidates
+the requested slot and practitioner before inserting the reservation.
 
-For the full system design and presentation path, see
-[`docs/architecture/final-platform-architecture.md`](docs/architecture/final-platform-architecture.md)
-and [`docs/demo/final-demonstration-runbook.md`](docs/demo/final-demonstration-runbook.md).
-
-## Production Operator Path
-
-The supported product deployment is one appointment business per Docker installation. Operators install a verified release without hand-editing an application `.env`; owners configure the business and optional providers in the console.
-
-- [Production first-run tutorial](docs/tutorials/production-first-run.md)
-- [Owner onboarding](docs/how-to/owner-onboarding.md)
-- [Staff working day](docs/how-to/staff-working-day.md)
-- [AI](docs/how-to/connect-ai.md) and [WhatsApp](docs/how-to/connect-whatsapp.md) connection guides
-- [Installation recovery](docs/how-to/recover-installation.md)
-- [Production configuration](docs/reference/production-configuration.md) and [release compatibility](docs/reference/release-compatibility.md)
-- [Full-day acceptance evidence template](docs/release-evidence/full-day-acceptance-template.md)
-
-## Project Intent
-
-The goal of this project is to make booking infrastructure reusable across
-different products. The same backend modules should support a racing simulator
-booking frontend, a movie ticketing frontend, a room booking frontend, or any
-other reservation UI without copying database logic into each app.
-
-The frontend is replaceable, but this monorepo now also includes reusable
-frontend modules so a new booking app can start by editing config, theme, copy,
-and images instead of rebuilding booking logic.
+## Architecture
 
 ```mermaid
 flowchart LR
-  Frontend["Frontend app or example"] --> UI["@reservation-platform/ui"]
+  Customer["Customer"] --> Booking["Public booking app"]
+  Customer --> WebChat["Web chat"]
+  Customer --> WA["WhatsApp"]
+  Operator["Owner or staff"] --> Console["Console and Experience Studio"]
+
+  Booking --> UI["@reservation-platform/ui"]
   UI --> React["@reservation-platform/react"]
   React --> SDK["@reservation-platform/sdk"]
-  Frontend --> SDK
-  Frontend --> API["/v1 HTTP API"]
-  SDK --> API
-  API --> Domain["Reservation domain modules"]
-  API --> Adapter["Supabase/Postgres adapter"]
-  Adapter --> Database["Postgres database"]
-  API --> Chat["Optional AI chat module"]
-  API --> WhatsApp["Optional WhatsApp channel module"]
+  Console --> SDK
+  SDK --> API["Standalone /v1 API"]
+  WebChat --> API
+  WA --> Worker["Durable worker"]
+  API --> Jobs["Postgres job queue"]
+  Jobs --> Worker
+
+  API --> Platform["Framework-neutral platform API"]
+  Worker --> Conversation["Shared conversation orchestrator"]
+  Platform --> Domain["Reservation domain rules"]
+  Conversation --> Domain
+  Domain --> Adapter["Supabase/Postgres adapter"]
+  Adapter --> DB[("PostgreSQL + pgvector")]
+
+  Worker --> Retrieval["Hybrid knowledge retrieval"]
+  Retrieval --> DB
+  Model["Bundled multilingual embedding model"] --> Worker
+  Worker --> Provider["Optional BYOK AI provider"]
 ```
 
-## What Lives In This Branch
+The browser receives only public experience data or an authenticated,
+server-mediated console session. Database credentials, provider keys,
+installation secrets, WhatsApp credentials, and encryption keys remain in the
+backend containers.
 
-| Path | Purpose |
+### Knowledge and AI flow
+
+```mermaid
+flowchart LR
+  Owner["Owner adds FAQ, text, or PDF"] --> Source["Tenant and venue-scoped source"]
+  Source --> Job["knowledge.index_source job"]
+  Job --> Chunk["Normalize and chunk"]
+  Chunk --> Embed["Local 384-dimensional embeddings"]
+  Embed --> PG[("Postgres full-text search + pgvector")]
+
+  Question["Web or WhatsApp question"] --> Query["Embed query locally"]
+  Query --> Hybrid["Semantic + lexical rank fusion"]
+  PG --> Hybrid
+  Hybrid --> Context["Up to five relevant chunks"]
+  Context --> AI["Configured generation provider"]
+  AI --> Answer["Grounded answer with source labels"]
+
+  Hybrid -. unavailable .-> Fallback["Deterministic FAQ and booking fallback"]
+  AI -. unavailable .-> Fallback
+```
+
+Embeddings run inside the existing worker using a checksum-verified model
+bundled into its image. No embedding API key or separate vector database is
+required. The owner’s BYOK provider is used only for final response generation.
+
+## Repository structure
+
+| Path | Responsibility |
 | --- | --- |
-| `apps/api` | Standalone backend HTTP API host for `/v1` routes. |
-| `apps/console` | Server-authenticated owner console and Experience Studio. |
-| `packages/reservation-platform-api` | Framework-neutral route handlers, request validation, auth context, idempotency, and response mapping. |
-| `packages/reservations-core` | Headless reservation domain logic for capacity, assigned resources, availability, and validation. |
-| `packages/reservations-supabase` | Supabase/Postgres adapter for catalog, availability, reservations, idempotency, and maintenance storage. |
-| `packages/database` | Backend-owned migrations, seeds, migration index, and database package metadata. |
-| `packages/contract-types` | Public API DTOs, schemas, OpenAPI artifacts, and shared contract types. |
-| `packages/sdk` | TypeScript client package for external frontend and server consumers. |
-| `packages/reservation-react` | Headless React provider and booking hooks. |
-| `packages/reservation-ui` | Plug-and-play booking UI, config helper, and Tailwind-ready components built on the React hooks. |
-| `packages/ai-chat` | Optional provider-neutral AI workflow and agent runtime package. |
-| `packages/reservation-chat-core` | Core reservation chat workflow contracts and helpers. |
-| `packages/whatsapp` | Optional backend WhatsApp channel module with QR session mode, knowledge/config storage, and AI booking automation. |
-| `apps/examples/starter-next` | Minimal forkable Next.js starter using the frontend packages. |
-| `apps/examples/room-booking` | Room booking example using the shared booking UI. |
-| `apps/examples/racing-simulator` | Racing simulator example using the shared booking UI. |
-| `supabase` | Legacy/reference Supabase SQL assets used for compatibility and migration planning. |
-| `scripts` | Backend verification, packaging, database, release, and local-development helpers. |
-| `docs` | Architecture plans, extraction manifests, contract notes, and backend packaging documentation. |
+| `apps/api` | Node HTTP host, runtime composition, authentication, provider wiring, and `/v1` routes |
+| `apps/worker` | Durable jobs, email, WhatsApp, knowledge indexing, retrieval, and conversation processing |
+| `apps/console` | Authenticated onboarding, Experience Studio, reservations, inbox, analytics, staff, integrations, and system status |
+| `apps/booking` | Main published customer experience for booking, chat, and reservation management |
+| `apps/examples/starter-next` | Minimal forkable Next.js frontend using the released frontend packages |
+| `apps/examples/appointments` | Appointment frontend example |
+| `apps/examples/room-booking` | Room-booking frontend example using the same platform boundary |
+| `apps/examples/racing-simulator` | Racing-simulator frontend example using the same platform boundary |
+| `packages/reservations-core` | Framework-neutral availability, capacity, resource, conflict, and reservation rules |
+| `packages/reservation-platform-api` | Framework-neutral handlers, authorization, idempotency, projections, and platform operations |
+| `packages/reservations-supabase` | Tenant-scoped persistence and atomic PostgreSQL operations |
+| `packages/database` | Ordered migrations, guarded seeds, migration index, and database metadata |
+| `packages/contract-types` | Public DTOs, Zod validation, OpenAPI, and generated JSON Schema artifacts |
+| `packages/sdk` | Browser-safe TypeScript client for public and authenticated API routes |
+| `packages/reservation-react` | Headless React provider and booking hooks |
+| `packages/reservation-ui` | Reusable booking components, presets, configuration helpers, and styles |
+| `packages/reservation-chat-core` | Provider-neutral structured booking conversation contracts and guards |
+| `packages/ai-chat` | AI workflow, checkpoint, audit, and agent runtime abstractions |
+| `packages/ai-sdk-adapter` | Backend-only Vercel AI SDK adapter for OpenAI-compatible providers |
+| `packages/whatsapp` | Baileys session lifecycle, encrypted credentials, delivery, and staff takeover |
+| `scripts` | Local stack, release, database, SDK, deployment, security, and acceptance tooling |
+| `tests` | Smoke, E2E, browser, Docker, production, and boundary verification |
 
-## What Stays Out Of Frontends
+Backend packages remain modular and framework-neutral where possible. Frontend
+packages are prevented from importing Supabase clients, service-role
+credentials, database adapters, or backend runtime code.
 
-- No Supabase service-role keys.
-- No direct database clients.
-- No imports from backend adapters such as `packages/reservations-supabase`.
-- No copied booking mutation logic.
+## Quick start: blank Docker product
 
-Frontend repositories should call the backend API, SDK, React hooks, or UI
-package. They should not import backend packages directly and should not receive
-Supabase service-role keys.
+### Prerequisites
 
-## Requirements
+- Docker Engine or Docker Desktop with Docker Compose v2.
+- Node.js `>=24 <25`.
+- pnpm `10.33.2`, pinned by the root `packageManager` field.
+- Free loopback ports `4100`, `4300`, and `4400`.
 
-- Node.js and pnpm `10.33.2` through the repository package manager setting.
-- Supabase/Postgres credentials only when running database-backed or live proof
-  flows.
+External AI, SMTP, and WhatsApp credentials are optional. They are not required
+to complete first-owner onboarding or test web booking.
 
-Install dependencies:
+### 1. Install workspace dependencies
 
-```powershell
-pnpm install
+```bash
+pnpm install --frozen-lockfile
 ```
 
-This is safe for local development. It installs workspace dependencies from the
-lockfile and does not publish packages or touch production data.
-
-## Test The Complete Local Docker Product
-
-Start the database, API, worker, owner console, and public booking application:
+### 2. Start the product installation
 
 ```bash
 pnpm run stack:up
+```
+
+This is equivalent to `docker compose up --build -d`. The default stack:
+
+- generates and retains local infrastructure secrets in protected Docker state;
+- applies migrations through `000040`;
+- creates one setup-pending installation;
+- creates no owner, venue, service, resource, reservation, or demo business;
+- starts PostgreSQL/PostgREST, the API, worker, console, and booking app.
+
+Do not create a fixture owner or manually edit an application `.env` for this
+flow.
+
+### 3. Create the first owner
+
+```bash
 pnpm run stack:setup-url
 ```
 
-Open the one-time URL printed by the second command. Create the first owner in
-the browser, then complete the appointment-business wizard and publish the
-booking experience. The default stack starts blank: it does not create a
-default password, fixture owner, venue, service, or finished demo.
+Open the one-time URL printed by the command. Create the owner through the
+browser, then complete the guided setup:
 
-After publication, use `http://127.0.0.1:4400/<your-public-slug>` for the
-customer experience. The local stack permits non-`Secure` session cookies only
-for its explicit loopback HTTP origins; production keeps `Secure` cookies by
-default.
+1. Business identity and public slug.
+2. First location and IANA timezone.
+3. Appointment services and durations.
+4. Practitioners and service assignments.
+5. Weekly opening hours and closures.
+6. Channel defaults.
+7. Review, validate, preview, and publish.
 
-The three deterministic showcase businesses remain available in an isolated
-demo stack:
+The setup token becomes permanently unusable after successful owner creation.
+Do not put the URL in screenshots, logs, tickets, or committed files.
+
+### 4. Use the installation
+
+| URL | Purpose |
+| --- | --- |
+| `http://127.0.0.1:4300/admin` | Owner and staff console |
+| `http://127.0.0.1:4300/admin/login` | Normal login after setup |
+| `http://127.0.0.1:4400/<public-slug>` | Published customer experience |
+| `http://127.0.0.1:4100/v1/health` | Local API health |
+
+Make a customer booking in a private window and confirm that it appears in
+**Reservations**. Attempting the same practitioner and time again must return a
+conflict rather than silently double-booking it.
+
+### 5. Stop or remove the installation
+
+```bash
+pnpm run stack:down
+```
+
+This stops containers while preserving product data. To delete product data,
+use `pnpm run stack:destroy` and accept its explicit confirmation prompt.
+
+## Run the isolated demonstrations
+
+The three completed showcase businesses are not part of the default product
+installation. They use a separate Compose project and separate volumes.
 
 ```bash
 pnpm run stack:down
@@ -144,87 +216,93 @@ pnpm run stack:demo:up
 pnpm run stack:demo:owner
 ```
 
-Product and demo stacks use separate Compose projects and volumes but share the
-same loopback ports, so stop one before starting the other. Manual product
-acceptance must use the browser setup and login forms; fixture cookies are
-reserved for automated browser tests.
-
-For a disposable automated proof of the same blank-install, browser-onboarding,
-booking, conflict, owner-console, and restart journey, run:
+The demo stack contains the Apex racing, Harbour room, and Luma appointment
+experiences. Product and demo stacks share the loopback ports, so they cannot
+run simultaneously.
 
 ```bash
-pnpm run stack:verify:onboarding
+pnpm run stack:demo:verify
+pnpm run stack:demo:down
 ```
 
-The proof writes sanitized screenshots, a recording, and result JSON under
-`tmp/product-onboarding-proof/`.
+Resetting or destroying the demo stack does not modify product volumes.
 
-## Start The Backend
+## Configure optional integrations
 
-Start the local Supabase/Postgres database first:
+Provider configuration belongs in the authenticated console. Secrets are
+write-only, encrypted at rest, excluded from public responses, and never meant
+for `NEXT_PUBLIC_*` variables.
 
-```powershell
-pnpm run local:supabase:start
+| Integration | Console location | Notes |
+| --- | --- | --- |
+| AI generation | `/admin/settings/ai` | Accepts an OpenAI-compatible endpoint, API key, and exact model ID. OpenRouter can be used with its compatible base URL and provider-qualified model ID. |
+| Knowledge/RAG | `/admin/studio/knowledge` | Add FAQs, pasted text, or text-based PDFs; inspect indexing state and test retrieval without spending provider credits. |
+| WhatsApp | `/admin/settings/whatsapp` | Uses Baileys linked-device QR pairing. QR payloads are displayed only to the authorized owner and must not appear in logs. |
+| Email | `/admin/settings/email` | Uses SMTP credentials and a connection test. A provider’s HTTP API key alone is not an SMTP configuration. |
+
+WhatsApp is hosted by the platform worker in the same Docker installation. AI
+generation requests are sent from the worker to the owner-configured provider;
+knowledge embedding and retrieval remain local.
+
+When integrations fail or are disabled:
+
+- web booking and owner operations continue;
+- AI falls back to deterministic FAQ and structured booking behavior;
+- retrieval failure prevents unsupported document claims but not booking;
+- staff invitations return a manual acceptance link if email cannot be queued;
+- WhatsApp simulation remains restricted to the explicit demo/test mode.
+
+See [Connect AI](docs/how-to/connect-ai.md),
+[Manage AI knowledge](docs/how-to/manage-ai-knowledge.md), and
+[Connect WhatsApp](docs/how-to/connect-whatsapp.md).
+
+## Build a separate frontend
+
+External frontends integrate through `/v1` or the frontend-safe packages. They
+do not connect directly to PostgreSQL or Supabase.
+
+Build and pack the release artifacts locally:
+
+```bash
+pnpm run packages:pack
 ```
 
-This is safe for local development. It starts the local Supabase Docker stack
-only; it does not expose a Cloudflare tunnel unless `scripts/start-local-supabase.ps1`
-is run manually with `-StartTunnel`.
+Tarballs are written to the ignored `dist-packages/` directory. A consumer
+typically installs matching versions of:
 
-Then start the standalone backend API:
+- `@reservation-platform/contract-types`
+- `@reservation-platform/sdk`
+- `@reservation-platform/react` for headless React state
+- `@reservation-platform/ui` for the complete reusable booking flow
 
-```powershell
-pnpm run dev
+Minimal SDK usage:
+
+```ts
+import { createReservationPlatformClient } from "@reservation-platform/sdk";
+
+const client = createReservationPlatformClient({
+  baseUrl: "https://appointments.example.com",
+  tenantId: "your-tenant-context",
+});
+
+const services = await client.listServices();
+const date = new Date(Date.now() + 7 * 24 * 60 * 60 * 1_000)
+  .toISOString()
+  .slice(0, 10);
+const availability = await client.listAvailability({
+  service_id: services.services[0].service_id,
+  date,
+});
 ```
 
-This is safe in this branch. It starts only the standalone backend API host from
-`apps/api`; it does not start a Next.js frontend. The local dev launcher loads
-`.env`, maps existing Supabase env names to backend-only
-`RESERVATION_SUPABASE_*` names, and defaults the local Supabase URL to
-`http://localhost:8000` unless `RESERVATION_SUPABASE_URL` is explicitly set.
-
-The backend exposes platform routes under `/v1`, including:
-
-- `/v1/metadata`
-- `/v1/services`
-- `/v1/resources`
-- `/v1/availability`
-- `/v1/reservations`
-- `/v1/resource-maintenance`
-- `/v1/experience/*` for authenticated Studio operations
-- `/v1/public/experiences/{slug}` for published browser-safe configuration
-- `/v1/chat/*` when the optional chat module is enabled
-- `/v1/channels/whatsapp/*` when the optional WhatsApp module is enabled
-
-## Start A Frontend Example
-
-Set the public backend URL and a service id from your local database:
-
-```powershell
-$env:NEXT_PUBLIC_RESERVATION_PLATFORM_BASE_URL="http://localhost:4100"
-$env:NEXT_PUBLIC_RESERVATION_SERVICE_ID="<service-id>"
-pnpm --filter @reservation-platform/example-room-booking run dev
-```
-
-This is safe locally. It starts only the room booking frontend on port 4201 and
-does not start Docker, Supabase, or production services.
-
-The other examples use the same pattern:
-
-```powershell
-pnpm --filter @reservation-platform/example-starter-next run dev
-pnpm --filter @reservation-platform/example-racing-simulator run dev
-```
-
-These are safe locally. They start frontend-only dev servers on ports 4200 and
-4202.
-
-Each example uses `reservation.config.ts` and `createBookingFlowConfig()` from
-`@reservation-platform/ui`. A new frontend can start with:
+Minimal reusable UI:
 
 ```tsx
 import "@reservation-platform/ui/styles.css";
-import { BookingFlow, createBookingFlowConfig } from "@reservation-platform/ui";
+import {
+  BookingFlow,
+  createBookingFlowConfig,
+} from "@reservation-platform/ui";
 
 const config = createBookingFlowConfig({
   apiBaseUrl: process.env.NEXT_PUBLIC_RESERVATION_PLATFORM_BASE_URL,
@@ -236,67 +314,34 @@ export default function Page() {
 }
 ```
 
-## Start The Owner Console
+Start from `apps/examples/starter-next` when a complete forkable Next.js shell
+is more useful than individual packages.
 
-The owner console runs on port `4300` and calls the standalone API from Next.js
-server components. Configure these server-only values in the local environment:
+## Local source development
+
+Start the in-memory backend for fast module development:
+
+```bash
+pnpm run dev:memory
+```
+
+Start the normal standalone backend after configuring its database connection:
+
+```bash
+pnpm run dev
+```
+
+Frontend development commands:
+
+```bash
+pnpm run dev:console
+pnpm run dev:booking
+pnpm --filter @reservation-platform/example-starter-next run dev
+```
+
+Common backend-only environment names include:
 
 ```env
-RESERVATION_PLATFORM_BASE_URL=http://localhost:4100
-RESERVATION_PLATFORM_SERVICE_API_KEY=replace-with-local-service-key
-RESERVATION_CONSOLE_TENANT_ID=platform_default
-RESERVATION_CONSOLE_VENUE_ID=00000000-0000-0000-0000-000000000001
-```
-
-Start it with:
-
-```powershell
-pnpm run dev:console
-```
-
-`RESERVATION_PLATFORM_SERVICE_API_KEY` is read only by server-guarded console
-code. It must never be renamed to a `NEXT_PUBLIC_*` variable or sent to the
-browser bundle.
-
-## Use From Another Frontend
-
-An external frontend should install the SDK package once it is packed or
-published, then point it at the backend URL.
-
-Local tarball packaging:
-
-```powershell
-pnpm run packages:pack
-```
-
-This is safe locally. It writes package tarballs under ignored
-`dist-packages/`; it does not publish to npm.
-
-Example frontend usage:
-
-```ts
-import { createReservationPlatformClient } from "@reservation-platform/sdk";
-
-const reservations = createReservationPlatformClient({
-  baseUrl: "http://localhost:4100",
-  tenantId: "demo-tenant",
-});
-
-const services = await reservations.listServices();
-const availability = await reservations.listAvailability({
-  service_id: services.data[0].service_id,
-  date: "2026-06-28",
-});
-```
-
-The frontend only needs the backend URL and safe tenant/venue context. Database
-credentials stay in this backend service.
-
-## Backend Environment
-
-Common backend environment names:
-
-```powershell
 RESERVATION_SUPABASE_URL=
 RESERVATION_SUPABASE_ANON_KEY=
 RESERVATION_SUPABASE_SERVICE_ROLE_KEY=
@@ -306,140 +351,102 @@ RESERVATION_PLATFORM_AUTH_ISSUER=
 RESERVATION_PLATFORM_AUTH_AUDIENCE=
 ```
 
-Do not expose backend secrets through `NEXT_PUBLIC_*` variables. A frontend can
-know the backend URL; it should not know the Supabase service-role key.
-
-Optional provider-neutral AI agent env for backend automation:
-
-```powershell
-AI_AGENT_PROVIDER=openai-compatible
-AI_AGENT_BASE_URL=
-AI_AGENT_API_KEY=
-AI_AGENT_MODEL=
-```
-
-Optional WhatsApp channel env:
-
-```powershell
-RESERVATION_WHATSAPP_ENABLED=false
-RESERVATION_WHATSAPP_PROVIDER=session_qr
-RESERVATION_WHATSAPP_SESSION_AUTH_DIR=.reservation-whatsapp-sessions
-RESERVATION_WHATSAPP_SESSION_ENCRYPTION_KEY=
-RESERVATION_WHATSAPP_ALLOW_MEMORY_STORE=false
-RESERVATION_WHATSAPP_SIMULATION_ENABLED=false
-```
-
-`session_qr` is a self-hosted WhatsApp linked-device mode. Production WhatsApp
-automation should use Supabase/Postgres storage and a protected persistent
-session auth directory. `RESERVATION_WHATSAPP_ALLOW_MEMORY_STORE=true` and
-`RESERVATION_WHATSAPP_SIMULATION_ENABLED=true` are local development/testing
-helpers, not production defaults.
+These variables are for manual source development. The supported local product
+stack and production installer generate infrastructure configuration instead of
+asking business owners to maintain it.
 
 ## Verification
 
-Build all backend modules:
+Fast source checks:
 
-```powershell
-pnpm run build
-```
-
-This is safe locally. It compiles backend packages and the standalone API
-skeleton.
-
-Run the main backend test suite:
-
-```powershell
+```bash
 pnpm run test
-```
-
-This is safe locally. It runs package tests, standalone API skeleton tests, and
-database migration bundle checks. It does not run live database mutation proofs
-unless you explicitly use the strict live-proof scripts.
-
-Useful focused checks:
-
-```powershell
-pnpm run backend-platform:verify-extraction-boundary
-pnpm run backend-platform:verify-extraction-manifest
+pnpm run apps:test
 pnpm run packages:verify-boundaries
 pnpm run database:verify-migration-bundle
-pnpm run sdk:release-artifacts:check
 ```
 
-These are safe local checks. They validate backend source boundaries, extraction
-metadata, package contents, database migration metadata, and generated SDK
-release docs.
+Product and browser journeys:
 
-Smoke and e2e checks now live under `tests/`:
-
-```text
-tests/
-  smoke/
-    backend-health.smoke.ts
-    backend-reservation.smoke.ts
-    whatsapp-readiness.smoke.ts
-  e2e/
-    studio-publish-book.e2e.ts
-    omnichannel-booking.e2e.ts
-    staff-takeover.e2e.ts
-    operations-analytics.e2e.ts
-```
-
-Run backend smoke checks against a running backend:
-
-```powershell
-$env:RESERVATION_SMOKE_BACKEND_BASE_URL="http://localhost:4100"
-pnpm run test:smoke
-```
-
-Safe when pointed at a local or disposable backend. The current smoke tests are
-read-only: health, metadata, services, availability, and WhatsApp readiness.
-If the backend requires service-token auth, also set `RESERVATION_SMOKE_API_KEY`.
-When no backend URL is explicitly configured and `localhost:4100` is not
-running, the smoke tests skip safely. Set `RESERVATION_SMOKE_STRICT=1` when CI
-should fail instead of skip.
-
-Run the deterministic presentation-critical e2e journeys:
-
-```powershell
+```bash
+pnpm run stack:verify
+pnpm run stack:verify:live
+pnpm run stack:verify:onboarding
+pnpm run stack:verify:persistence
 pnpm run test:e2e
+pnpm run test:browser
 ```
 
-Safe locally. It validates and resets the checked-in demo seed, then proves the
-Studio-to-booking, omnichannel, staff-takeover, and operations/analytics paths.
-Optional live page checks run when their documented base URLs are configured.
+Release-oriented checks:
 
-Live proof scripts such as `database:live-proof:strict`,
-`backend-platform:db-backed-live-parity-proof:strict`, and
-`sdk:registry-install-proof:strict` are opt-in because they may require Docker,
-database access, registry configuration, or external services.
+```bash
+pnpm run sdk:release-gate
+pnpm run deploy:verify
+pnpm run database:live-proof:strict
+pnpm run ci:verify
+```
 
-## Branch Strategy
+Strict and live commands may start containers, mutate disposable test data, or
+require infrastructure. Generated screenshots, recordings, sanitized responses,
+and logs belong under ignored `tmp/`; credentials, setup URLs, session cookies,
+QR values, and customer identifiers must never be committed.
 
-This branch, `platform/backend-modules`, contains the modular platform
-monorepo direction: backend modules, frontend packages, SDK, database bundle,
-API host, and forkable example apps.
+## Production installation
 
-For a final-year-project submission, the clean story is:
+Production uses the signed release bundle and installer rather than the local
+Compose shortcut. The supported target is currently x86-64 Ubuntu 22.04 or
+24.04 with Docker Compose v2, public DNS, and HTTPS ports available.
 
-1. Backend modules provide the reusable reservation infrastructure.
-2. Frontend packages provide a WordPress-like starting point for new booking
-   apps without copying booking logic.
-3. Forkable examples demonstrate that different UIs can reuse the same backend
-   contract and frontend packages.
-4. The SDK, React hooks, UI package, and `/v1` API are the integration points.
+Start with:
 
-## Current Status
+- [Production first-run tutorial](docs/tutorials/production-first-run.md)
+- [Production configuration reference](docs/reference/production-configuration.md)
+- [Release compatibility](docs/reference/release-compatibility.md)
+- [Backup and restore](docs/operations/backup-restore.md)
+- [Upgrade and rollback operations](docs/operations/upgrades.md)
+- [Installation recovery](docs/how-to/recover-installation.md)
 
-- Backend packages build and test locally.
-- Standalone API skeleton is present under `apps/api`.
-- Database migration package and migration metadata are present.
-- Matching SDK, contract-types, React, and UI packages are present for external consumers.
-- React hooks and reusable UI packages are present for frontend consumers.
-- Forkable frontend examples are present under `apps/examples`.
-- Experience Studio, owner operations, unified conversations, channel simulation,
-  and analytics are implemented in the owner console.
-- Deterministic final-demo reset, readiness, security, smoke, and e2e gates are
-  available from root package scripts.
-- Optional AI chat and WhatsApp backend modules are present, with production
-  WhatsApp requiring database-backed storage and real provider/session config.
+## Security model
+
+- The default deployment exposes only the web edge in production; database and
+  internal services remain on private Docker networks.
+- Public frontends never receive service-role keys or backend provider secrets.
+- Owner operations require authenticated tenant and venue context.
+- Reservation writes use idempotency and atomic database conflict checks.
+- AI and SMTP credentials are encrypted and write-only; installation secrets
+  live in protected configuration state, and WhatsApp sessions use their
+  dedicated encryption key.
+- WhatsApp QR payloads, raw session state, knowledge contents, and customer
+  queries are excluded from ordinary logs.
+- Knowledge sources and chunks are tenant- and venue-scoped; archived content
+  is excluded from retrieval immediately.
+
+## Scope and limitations
+
+- The primary product is an appointment/service business platform. Other
+  domains demonstrate package reuse rather than separate production products.
+- One business is supported per Docker installation.
+- Payments, a public marketplace, native mobile apps, OCR, website crawling,
+  DOCX ingestion, and enterprise identity are outside the current scope.
+- Baileys is an unofficial WhatsApp Web integration and can be affected by
+  upstream protocol changes.
+- AI and external delivery quality depend on the owner’s selected provider and
+  credentials; deterministic booking and web booking remain the baseline.
+- A source checkout is not automatically a production release. Production use
+  requires verified release artifacts, backups, restore drills, monitoring, and
+  environment-specific acceptance.
+
+## Documentation
+
+- [Documentation index](docs/README.md)
+- [Final platform architecture](docs/architecture/final-platform-architecture.md)
+- [Owner onboarding](docs/how-to/owner-onboarding.md)
+- [Staff working day](docs/how-to/staff-working-day.md)
+- [Manual Docker acceptance](docs/how-to/manual-docker-acceptance.md)
+- [Release evidence template](docs/release-evidence/full-day-acceptance-template.md)
+
+## License
+
+Release package metadata declares the reusable platform packages as MIT. See
+the repository license and release bundle for the exact terms that apply to a
+distributed build.

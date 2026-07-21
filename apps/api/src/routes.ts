@@ -1,4 +1,3 @@
-import { createHash, timingSafeEqual } from "node:crypto";
 import {
   appendStaffReply,
   acceptConversationInbound,
@@ -197,6 +196,23 @@ import { createWhatsAppSimulationMessage } from "@reservation-platform/whatsapp"
 import { jsonResponse, platformError, type StandaloneApiRequest, type StandaloneApiResponse } from "./http.js";
 import { applyRateLimit, isWhatsAppPairingRateLimitPath, type PersistentRateLimitRepository } from "./rate-limit.js";
 import { extractKnowledgePdf, KnowledgePdfError } from "./pdf-knowledge.js";
+import {
+  constantTimeEqual,
+  getHeader,
+  isPlainRecord,
+  isValidHttpStatus,
+  normalizePath,
+  parseRequestUrl,
+  readCookie,
+} from "./request-utils.js";
+import {
+  getStringField,
+  readMetadataField,
+  readWhatsAppConfigPatch,
+  readWhatsAppKnowledgeInput,
+  readWhatsAppKnowledgePatch,
+  toMetadataRecord,
+} from "./whatsapp-route-input.js";
 
 export interface StandaloneApiDependencies {
   auth?: StandaloneApiAuthConfig;
@@ -1627,26 +1643,6 @@ function validateSessionCsrf(
     return platformError(403, "forbidden", "CSRF validation failed.");
   }
   return undefined;
-}
-
-function constantTimeEqual(left: string, right: string) {
-  const leftDigest = createHash("sha256").update(left, "utf8").digest();
-  const rightDigest = createHash("sha256").update(right, "utf8").digest();
-  return timingSafeEqual(leftDigest, rightDigest);
-}
-
-function readCookie(request: StandaloneApiRequest, name: string): string | undefined {
-  const header = getHeader(request.headers, "Cookie");
-  if (!header) return undefined;
-  let matched: string | undefined;
-  for (const part of header.split(";")) {
-    const separator = part.indexOf("=");
-    if (separator < 0 || part.slice(0, separator).trim() !== name) continue;
-    const value = part.slice(separator + 1).trim();
-    if (!value || matched !== undefined) return undefined;
-    matched = value;
-  }
-  return matched;
 }
 
 function sessionAuthErrorResponse(error: unknown): StandaloneApiResponse {
@@ -3789,33 +3785,6 @@ function validateReservationMutationId(reservationId: string, message: string): 
   }]));
 }
 
-function parseRequestUrl(path: string) {
-  return new URL(path, "http://standalone-api.local");
-}
-
-function normalizePath(path: string) {
-  const normalized = path.replace(/\/+$/, "");
-  return normalized === "" ? "/" : normalized;
-}
-
-function getHeader(
-  headers: StandaloneApiRequest["headers"],
-  name: string,
-) {
-  if (!headers) {
-    return undefined;
-  }
-
-  const normalizedName = name.toLowerCase();
-  for (const [headerName, value] of Object.entries(headers)) {
-    if (headerName.toLowerCase() === normalizedName) {
-      return Array.isArray(value) ? value[0] : value;
-    }
-  }
-
-  return undefined;
-}
-
 function createChatContext(request: StandaloneApiRequest): StandaloneApiChatContext {
   const requestContext = readPlatformRequestContext(request.headers ?? {});
 
@@ -4077,144 +4046,6 @@ function readOptionalRecordBody(body: unknown):
   return { ok: true, value };
 }
 
-function getStringField(record: Record<string, unknown>, fieldName: string) {
-  const value = record[fieldName];
-  return typeof value === "string" && value.trim().length > 0 ? value.trim() : undefined;
-}
-
-function readMetadataField(record: Record<string, unknown>): MetadataRecord | undefined {
-  const metadata = record.metadata;
-  return isPlainRecord(metadata) ? metadata as MetadataRecord : undefined;
-}
-
-function toMetadataRecord(value: unknown): MetadataRecord | undefined {
-  if (!isPlainRecord(value)) return undefined;
-  const entries = Object.entries(value).filter(
-    (entry): entry is [string, string | number | boolean | null] =>
-      entry[1] === null
-      || typeof entry[1] === "string"
-      || typeof entry[1] === "boolean"
-      || (typeof entry[1] === "number" && Number.isFinite(entry[1])),
-  );
-  return entries.length > 0 ? Object.fromEntries(entries) : undefined;
-}
-
-function readWhatsAppConfigPatch(record: Record<string, unknown>):
-  | { ok: true; value: WhatsAppBusinessConfigPatch }
-  | { ok: false; response: StandaloneApiResponse } {
-  const validation = validateWhatsAppConfigPatch(record);
-  if (!validation.ok) {
-    return validation;
-  }
-
-  const patch: WhatsAppBusinessConfigPatch = {};
-  assignOptionalString(record, patch, "business_name");
-  assignOptionalStringOrNull(record, patch, "default_service_id");
-  assignOptionalString(record, patch, "language");
-  assignOptionalString(record, patch, "tone");
-  assignOptionalString(record, patch, "fallback_message");
-  assignOptionalBoolean(record, patch, "booking_confirmation_required");
-  assignOptionalStringOrNull(record, patch, "opening_hours");
-  const metadata = readMetadataField(record);
-  if (metadata) {
-    patch.metadata = metadata;
-  }
-  return { ok: true, value: patch };
-}
-
-function validateWhatsAppConfigPatch(record: Record<string, unknown>):
-  | { ok: true }
-  | { ok: false; response: StandaloneApiResponse } {
-  for (const fieldName of ["business_name", "language", "tone", "fallback_message"] as const) {
-    if (fieldName in record && getStringField(record, fieldName) === undefined) {
-      return {
-        ok: false,
-        response: platformError(400, "validation_failed", `${fieldName} must be a non-empty string.`),
-      };
-    }
-  }
-
-  if (
-    "default_service_id" in record &&
-      record.default_service_id !== null &&
-      getStringField(record, "default_service_id") === undefined
-  ) {
-    return {
-      ok: false,
-      response: platformError(400, "validation_failed", "default_service_id must be a non-empty string or null."),
-    };
-  }
-
-  if (
-    "opening_hours" in record &&
-      record.opening_hours !== null &&
-      getStringField(record, "opening_hours") === undefined
-  ) {
-    return {
-      ok: false,
-      response: platformError(400, "validation_failed", "opening_hours must be a non-empty string or null."),
-    };
-  }
-
-  if (
-    "booking_confirmation_required" in record &&
-      typeof record.booking_confirmation_required !== "boolean"
-  ) {
-    return {
-      ok: false,
-      response: platformError(400, "validation_failed", "booking_confirmation_required must be a boolean."),
-    };
-  }
-
-  if ("metadata" in record && record.metadata !== undefined && !isPlainRecord(record.metadata)) {
-    return {
-      ok: false,
-      response: platformError(400, "validation_failed", "metadata must be an object."),
-    };
-  }
-
-  return { ok: true };
-}
-
-function readWhatsAppKnowledgeInput(record: Record<string, unknown>):
-  | { ok: true; value: WhatsAppKnowledgeInput }
-  | { ok: false; response: StandaloneApiResponse } {
-  const title = getStringField(record, "title");
-  const content = getStringField(record, "content");
-  if (!title || !content) {
-    return {
-      ok: false,
-      response: jsonResponse(400, platformErrorBody("validation_failed", "Knowledge title and content are required.", 400)),
-    };
-  }
-
-  return {
-    ok: true,
-    value: {
-      title,
-      content,
-      tags: readStringArray(record.tags),
-      active: typeof record.active === "boolean" ? record.active : undefined,
-      metadata: readMetadataField(record),
-    },
-  };
-}
-
-function readWhatsAppKnowledgePatch(record: Record<string, unknown>): WhatsAppKnowledgePatch {
-  const patch: WhatsAppKnowledgePatch = {};
-  assignOptionalString(record, patch, "title");
-  assignOptionalString(record, patch, "content");
-  if (Array.isArray(record.tags)) {
-    patch.tags = readStringArray(record.tags);
-  }
-  assignOptionalBoolean(record, patch, "active");
-  const metadata = readMetadataField(record);
-  if (metadata) {
-    patch.metadata = metadata;
-  }
-  return patch;
-}
-
 function withWhatsAppOwnerContext<T extends { metadata?: MetadataRecord }>(
   input: T,
   request: StandaloneApiRequest,
@@ -4233,55 +4064,6 @@ function withWhatsAppOwnerContext<T extends { metadata?: MetadataRecord }>(
 function readWhatsAppChangedBy(request: StandaloneApiRequest) {
   const context = createChatContext(request);
   return context.bearerToken ? "authenticated-owner" : "system";
-}
-
-function assignOptionalString(
-  source: Record<string, unknown>,
-  target: object,
-  fieldName: string,
-) {
-  const value = getStringField(source, fieldName);
-  if (value !== undefined) {
-    (target as Record<string, unknown>)[fieldName] = value;
-  }
-}
-
-function assignOptionalStringOrNull(
-  source: Record<string, unknown>,
-  target: object,
-  fieldName: string,
-) {
-  if (source[fieldName] === null) {
-    (target as Record<string, unknown>)[fieldName] = null;
-    return;
-  }
-  assignOptionalString(source, target, fieldName);
-}
-
-function assignOptionalBoolean(
-  source: Record<string, unknown>,
-  target: object,
-  fieldName: string,
-) {
-  if (typeof source[fieldName] === "boolean") {
-    (target as Record<string, unknown>)[fieldName] = source[fieldName];
-  }
-}
-
-function readStringArray(value: unknown): string[] | undefined {
-  if (!Array.isArray(value)) {
-    return undefined;
-  }
-
-  return value.filter((entry): entry is string => typeof entry === "string");
-}
-
-function isPlainRecord(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === "object" && !Array.isArray(value);
-}
-
-function isValidHttpStatus(status: number | undefined): status is number {
-  return typeof status === "number" && Number.isInteger(status) && status >= 100 && status <= 599;
 }
 
 function chatModuleDisabled(): StandaloneApiResponse {

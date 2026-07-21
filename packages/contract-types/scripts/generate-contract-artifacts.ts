@@ -8,6 +8,8 @@ import {
   publicJsonSchemaDefinitions,
   publicOpenApiInfo,
 } from "../src/contract-artifact-registry.js";
+import { collectReachableJsonSchemaDefinitions } from "../src/json-schema-closure.js";
+import { buildOpenApiTags } from "../src/openapi-tags.js";
 
 const packageRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 const contractsRoot = join(packageRoot, "contracts");
@@ -83,7 +85,7 @@ function buildJsonSchemaArtifact(name: string) {
     $id: `https://reservation-platform.local/contracts/json-schema/${toKebabCase(name)}.schema.json`,
     title: name,
     $ref: `#/$defs/${name}`,
-    $defs: publicJsonSchemaDefinitions,
+    $defs: collectReachableJsonSchemaDefinitions(name, publicJsonSchemaDefinitions),
   };
 }
 
@@ -97,16 +99,7 @@ function buildOpenApiArtifact() {
         description: "Replace with the reservation platform backend base URL.",
       },
     ],
-    tags: [
-      { name: "Metadata" },
-      { name: "Tenants" },
-      { name: "Catalog" },
-      { name: "Availability" },
-      { name: "Reservations" },
-      { name: "Resource maintenance" },
-      { name: "Public booking" },
-      { name: "Chat", description: "Module-gated. Disabled backends return chat_module_disabled in the shared error shape." },
-    ],
+    tags: buildOpenApiTags(publicContractOperations),
     paths: buildOpenApiPaths(publicContractOperations),
     components: {
       securitySchemes: {

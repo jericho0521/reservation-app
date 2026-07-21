@@ -5359,7 +5359,7 @@
         ],
         "summary": "Read desired channel settings and runtime readiness",
         "tags": [
-          "experience"
+          "Experience Studio"
         ]
       },
       "put": {
@@ -5414,7 +5414,7 @@
         ],
         "summary": "Update desired customer channels",
         "tags": [
-          "experience"
+          "Experience Studio"
         ]
       }
     },
@@ -5575,7 +5575,7 @@
         ],
         "summary": "List owner-managed experience knowledge",
         "tags": [
-          "experience"
+          "Experience Studio"
         ]
       },
       "post": {
@@ -5630,7 +5630,7 @@
         ],
         "summary": "Create an experience knowledge entry",
         "tags": [
-          "experience"
+          "Experience Studio"
         ]
       }
     },
@@ -5687,7 +5687,7 @@
         ],
         "summary": "Test scoped hybrid retrieval without invoking an AI provider",
         "tags": [
-          "experience"
+          "Experience Studio"
         ]
       }
     },
@@ -5734,7 +5734,7 @@
         ],
         "summary": "List owner-managed indexed knowledge sources",
         "tags": [
-          "experience"
+          "Experience Studio"
         ]
       }
     },
@@ -5799,7 +5799,7 @@
         ],
         "summary": "Replace an indexed text knowledge source and queue a new version",
         "tags": [
-          "experience"
+          "Experience Studio"
         ]
       }
     },
@@ -5854,7 +5854,7 @@
         ],
         "summary": "Archive an indexed knowledge source",
         "tags": [
-          "experience"
+          "Experience Studio"
         ]
       }
     },
@@ -5909,7 +5909,7 @@
         ],
         "summary": "Retry local indexing for a knowledge source",
         "tags": [
-          "experience"
+          "Experience Studio"
         ]
       }
     },
@@ -5966,7 +5966,7 @@
         ],
         "summary": "Upload a PDF knowledge source",
         "tags": [
-          "experience"
+          "Experience Studio"
         ]
       }
     },
@@ -6023,7 +6023,7 @@
         ],
         "summary": "Create a pasted-text knowledge source",
         "tags": [
-          "experience"
+          "Experience Studio"
         ]
       }
     },
@@ -6088,7 +6088,7 @@
         ],
         "summary": "Update an experience knowledge entry",
         "tags": [
-          "experience"
+          "Experience Studio"
         ]
       }
     },
@@ -6143,7 +6143,7 @@
         ],
         "summary": "Archive an experience knowledge entry",
         "tags": [
-          "experience"
+          "Experience Studio"
         ]
       }
     },
@@ -6190,7 +6190,7 @@
         ],
         "summary": "Read venue operating hours and booking rules",
         "tags": [
-          "experience"
+          "Experience Studio"
         ]
       },
       "put": {
@@ -6245,7 +6245,7 @@
         ],
         "summary": "Replace venue operating hours and booking rules",
         "tags": [
-          "experience"
+          "Experience Studio"
         ]
       }
     },
@@ -6884,7 +6884,7 @@
         ],
         "summary": "Validate every required Studio section",
         "tags": [
-          "experience"
+          "Experience Studio"
         ]
       }
     },
@@ -9556,16 +9556,44 @@
   ],
   "tags": [
     {
-      "name": "Metadata"
+      "name": "Analytics"
     },
     {
-      "name": "Tenants"
+      "name": "Authentication"
+    },
+    {
+      "name": "Availability"
     },
     {
       "name": "Catalog"
     },
     {
-      "name": "Availability"
+      "description": "Module-gated. Disabled backends return chat_module_disabled in the shared error shape.",
+      "name": "Chat"
+    },
+    {
+      "name": "Conversations"
+    },
+    {
+      "name": "Experience Studio"
+    },
+    {
+      "name": "Integrations"
+    },
+    {
+      "name": "Metadata"
+    },
+    {
+      "name": "Onboarding"
+    },
+    {
+      "name": "Operations"
+    },
+    {
+      "name": "Public booking"
+    },
+    {
+      "name": "Public chat"
     },
     {
       "name": "Reservations"
@@ -9574,11 +9602,7 @@
       "name": "Resource maintenance"
     },
     {
-      "name": "Public booking"
-    },
-    {
-      "description": "Module-gated. Disabled backends return chat_module_disabled in the shared error shape.",
-      "name": "Chat"
+      "name": "Tenants"
     }
   ]
 }

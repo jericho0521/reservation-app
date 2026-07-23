@@ -1,6 +1,6 @@
 # Release compatibility reference
 
-The current source candidate is `0.2.0` with required migration `000040`. It remains a candidate until independent full-day acceptance evidence is completed and accepted; the checked-in pending record is not release proof.
+The current source candidate is `0.2.0` with required migration `000043`. It remains a candidate until independent full-day acceptance evidence is completed and accepted; the checked-in pending record is not release proof.
 
 ## Compatibility rules
 

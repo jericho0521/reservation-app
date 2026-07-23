@@ -56,6 +56,12 @@ export async function ensureLocalStackConfig(
         apiEnv,
       );
     }
+    const consoleEnvPath = path.join(directory, "console.env");
+    let consoleEnv = await readFile(consoleEnvPath, "utf8");
+    if (!/^RESERVATION_SESSION_COOKIE_SECURE=\S+$/mu.test(consoleEnv)) {
+      consoleEnv = `${consoleEnv.trimEnd()}\nRESERVATION_SESSION_COOKIE_SECURE=false\n`;
+      await writePrivateFile(directory, "console.env", consoleEnv);
+    }
     if (options.applyContainerOwnership === true) {
       await applyContainerOwnership(directory);
     }
@@ -109,6 +115,7 @@ export async function ensureLocalStackConfig(
     "console.env": envFile({
       RESERVATION_PLATFORM_BASE_URL: "http://reservation-api:4100",
       RESERVATION_PLATFORM_SERVICE_API_KEY: serviceApiKey,
+      RESERVATION_SESSION_COOKIE_SECURE: "false",
       ...(mode === "demo" ? {
         RESERVATION_CONSOLE_TENANT_ID: "final_demo",
         RESERVATION_CONSOLE_VENUE_ID: "00000000-0000-4000-8000-000000000101",

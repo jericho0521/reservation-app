@@ -28,6 +28,7 @@ test("local stack config is generated once and remains stable", async () => {
   assert.match(first.setupToken, /^[A-Za-z0-9_-]{43}$/u);
   assert.equal(first.mode, "product");
   assert.doesNotMatch(first.consoleEnv, /final_demo|RESERVATION_CONSOLE_(?:TENANT|VENUE)_ID/u);
+  assert.match(first.consoleEnv, /^RESERVATION_SESSION_COOKIE_SECURE=false$/mu);
   assert.match(first.bookingEnv, /^RESERVATION_PLATFORM_PUBLIC_BASE_URL=http:\/\/localhost:4100$/mu);
 
   for (const fileName of localStackConfigFileNames) {
@@ -86,11 +87,17 @@ test("existing local stack config is upgraded with local authentication settings
       .replace(/^RESERVATION_SESSION_COOKIE_SECURE=.*\n/mu, ""),
     { mode: 0o600 },
   );
+  await writeFile(
+    join(directory, "console.env"),
+    initial.consoleEnv.replace(/^RESERVATION_SESSION_COOKIE_SECURE=.*\n/mu, ""),
+    { mode: 0o600 },
+  );
 
   const upgraded = await ensureLocalStackConfig(directory);
   assert.equal(upgraded.installationMasterKey.length >= 32, true);
   assert.match(upgraded.apiEnv, /^RESERVATION_INSTALLATION_MASTER_KEY=\S+$/mu);
   assert.match(upgraded.apiEnv, /^RESERVATION_SESSION_COOKIE_SECURE=false$/mu);
+  assert.match(upgraded.consoleEnv, /^RESERVATION_SESSION_COOKIE_SECURE=false$/mu);
 });
 
 test("generated service files expose only the values each service needs", async () => {

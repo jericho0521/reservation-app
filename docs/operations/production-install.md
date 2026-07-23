@@ -1,6 +1,6 @@
 # Install the reservation platform on Ubuntu
 
-This how-to guide installs one appointment business on one clean Ubuntu VPS. It is for an operator who can connect to the server with SSH and manage DNS but does not need to understand the monorepo or edit application environment variables.
+This how-to guide installs one reservation business on one clean Ubuntu VPS. It is for an operator who can connect to the server with SSH and manage DNS but does not need to understand the monorepo or edit application environment variables.
 
 The supported path uses prebuilt release images. It does not compile source, load demo data, or ask you to maintain a production `.env` file.
 

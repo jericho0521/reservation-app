@@ -12,7 +12,7 @@ Production upgrades accept a release manifest, never a floating tag. The target 
     "booking": { "image": "ghcr.io/example/booking:0.2.0", "digest": "sha256:<64-hex>" },
     "tools": { "image": "ghcr.io/example/tools:0.2.0", "digest": "sha256:<64-hex>" }
   },
-  "requiredMigration": "000040",
+  "requiredMigration": "000043",
   "minimumFromVersion": "0.1.0",
   "rollbackCompatible": true
 }

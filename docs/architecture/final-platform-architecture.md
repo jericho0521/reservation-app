@@ -54,7 +54,7 @@ encrypted, and used only by backend containers.
 | `packages/reservations-core` | Availability, capacity, resource assignment, overlap, and reservation rules |
 | `packages/reservation-platform-api` | Framework-neutral route handling, authorization, idempotency, public/owner mapping |
 | `packages/reservations-supabase` | Tenant-scoped persistence and atomic Postgres operations |
-| `packages/database` | Ordered migrations through `000040`, indexes, and guarded deterministic seeds |
+| `packages/database` | Ordered migrations through `000043`, indexes, and guarded deterministic seeds |
 | `packages/contract-types` | DTOs, validation schemas, and generated OpenAPI contract |
 | `packages/sdk` | Typed client for public and authenticated platform routes |
 | `packages/reservation-react` / `reservation-ui` | Headless state and reusable public booking components |
@@ -126,7 +126,7 @@ flowchart TB
   Model["Bundled multilingual embedding model"] --> Worker
   Secrets["Generated installation configuration"] --> API
   Secrets --> Worker
-  Migrations["Indexed migrations 000001-000040"] --> Postgres
+  Migrations["Indexed migrations 000001-000043"] --> Postgres
   Seed["Explicit demo override"] -.->|"Separate demo volumes"| Postgres
 ```
 
@@ -141,7 +141,7 @@ development-only smoke harness.
 
 | Capability | Live mode | Deterministic demonstration mode |
 | --- | --- | --- |
-| Database | PostgreSQL/pgvector with migrations `000001`–`000040` | Same schema with explicit, isolated demo seed |
+| Database | PostgreSQL/pgvector with migrations `000001` through `000043` | Same schema with explicit, isolated demo seed |
 | AI and retrieval | Owner-configured BYOK generation plus local hybrid retrieval over indexed FAQs, text, and PDFs | Deterministic FAQ and structured booking fallback without provider credentials |
 | WhatsApp | Baileys linked-device session with encrypted credential payload when a key is set | Credential-free channel adapter using the same orchestrator and persistence |
 | Email | Owner-configured SMTP with encrypted credentials and durable delivery jobs | Manual invitation fallback when SMTP is absent |

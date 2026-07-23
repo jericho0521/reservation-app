@@ -6,17 +6,17 @@ import { planCoreMigrations } from "./local-stack-migrate.mjs";
 
 const indexUrl = new URL("../packages/database/migrations/supabase/migration-index.json", import.meta.url);
 
-test("migration planner requires exactly 000001 through 000040 in order", async () => {
+test("migration planner requires exactly 000001 through 000043 in order", async () => {
   const index = JSON.parse(await readFile(indexUrl, "utf8"));
   const plan = planCoreMigrations(index, []);
-  assert.equal(plan.length, 40);
+  assert.equal(plan.length, 43);
   assert.deepEqual(
     plan.map((entry) => entry.path.match(/\/(\d{6})_/u)?.[1]),
-    Array.from({ length: 40 }, (_, index) => String(index + 1).padStart(6, "0")),
+    Array.from({ length: 43 }, (_, index) => String(index + 1).padStart(6, "0")),
   );
   assert.throws(
     () => planCoreMigrations({ ...index, coreMigrations: index.coreMigrations.slice(0, 21) }, []),
-    /exactly 40 core migrations/u,
+    /exactly 43 core migrations/u,
   );
 });
 
@@ -24,7 +24,7 @@ test("migration planner skips byte-identical ledger rows", async () => {
   const index = JSON.parse(await readFile(indexUrl, "utf8"));
   const first = index.coreMigrations[0];
   const plan = planCoreMigrations(index, [{ filename: first.path, sha256: first.sha256 }]);
-  assert.equal(plan.length, 39);
+  assert.equal(plan.length, 42);
   assert.equal(plan[0].order, 2);
 });
 

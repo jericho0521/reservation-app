@@ -1,6 +1,6 @@
 # Production configuration reference
 
-The supported deployment runs one appointment business per installation. Only the edge service publishes ports 80 and 443; PostgreSQL, PostgREST, API, worker, console, booking, and operations services remain on private Docker networks.
+The supported deployment runs one reservation business per installation. New installations default to pooled seat-capacity booking; existing appointment businesses remain supported. Only the edge service publishes ports 80 and 443; PostgreSQL, PostgREST, API, worker, console, booking, and operations services remain on private Docker networks.
 
 ## Configuration ownership
 
@@ -25,14 +25,14 @@ Do not maintain a hand-written production `.env`. `/opt/reservation-platform/rel
 - `--host-ip <public-ip>` — public address to compare with DNS when host discovery is insufficient;
 - `--resume` — repeat the same interrupted installation without rotating retained secrets.
 
-The supported installation directory is `/opt/reservation-platform`. A release is identified by a signed manifest, digest-pinned API, worker, console, booking, and tools images, and required migration `000040` for the 0.2.0 candidate.
+The supported installation directory is `/opt/reservation-platform`. A release is identified by a signed manifest, digest-pinned API, worker, console, booking, and tools images, and required migration `000043` for the 0.2.0 candidate.
 
 ## Public routes
 
 | Route | Audience | Purpose |
 | --- | --- | --- |
 | `/` | Customer | Published business landing page |
-| `/<slug>/book` | Customer | Public appointment booking |
+| `/<slug>/book` | Customer | Public reservation booking |
 | `/admin/login` | Owner/staff | Console authentication |
 | `/admin/setup?token=...` | First owner only | One-time installation setup |
 | `/admin` | Owner/staff | Operations console |

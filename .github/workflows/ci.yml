@@ -56,6 +56,7 @@ jobs:
     env:
       CI: true
       RESERVATION_BROWSER_MUTATIONS: "false"
+      RESERVATION_BROWSER_USE_LOCAL_DEMO_FIXTURE: "true"
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -78,11 +79,11 @@ jobs:
       - name: Install Chromium
         run: pnpm run browser:install:ci
 
-      - name: Start the deterministic local stack
-        run: pnpm run stack:up
+      - name: Start the deterministic demo stack
+        run: pnpm run stack:demo:up
 
       - name: Verify stack readiness
-        run: pnpm run stack:verify:live
+        run: pnpm run stack:demo:verify
 
       - name: Run browser, mobile, and accessibility journeys
         run: pnpm run test:browser
@@ -95,6 +96,55 @@ jobs:
           path: |
             test-results/
             playwright-report/
+          if-no-files-found: ignore
+
+      - name: Stop the local stack
+        if: always()
+        run: pnpm run stack:demo:down
+
+  product-onboarding:
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      CI: true
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.2
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Chromium
+        run: pnpm run browser:install:ci
+
+      - name: Start clean product stack
+        run: pnpm run stack:up
+
+      - name: Verify stack readiness
+        run: pnpm run stack:verify:live
+
+      - name: Verify clean owner onboarding and capacity booking
+        run: pnpm run stack:verify:onboarding
+
+      - name: Upload onboarding evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: product-onboarding-evidence
+          path: tmp/product-onboarding-proof/
           if-no-files-found: ignore
 
       - name: Stop the local stack

@@ -1,9 +1,10 @@
 # Reservation Platform
 
-A Docker-first, self-hosted appointment platform built from reusable TypeScript
-modules. A business can publish web booking, offer AI-assisted chat and
-WhatsApp, manage practitioners and reservations, and operate every channel from
-one owner console.
+A Docker-first, self-hosted reservation platform built from reusable TypeScript
+modules. A business can publish pooled seat-capacity booking, offer AI-assisted
+chat and WhatsApp, manage reservations, and operate every channel from one owner
+console. Practitioner appointments remain available as a compatible specialist
+preset rather than the default setup path.
 
 The supported product model is deliberately simple: **one business per Docker
 installation**. Internally, tenant and venue boundaries remain enforced so the
@@ -11,7 +12,7 @@ backend packages, SDK, and frontend toolkit can be reused safely in other
 products.
 
 > **Release status:** `0.2.0` is a release candidate with database migrations
-> through `000040`. The product and verification tooling are implemented, but a
+> through `000043`. The product and verification tooling are implemented, but a
 > production release remains conditional on deployment-specific recovery,
 > integration, and independent acceptance evidence.
 
@@ -19,10 +20,10 @@ products.
 
 | Area | Implemented capability |
 | --- | --- |
-| First run | Blank Docker installation, generated infrastructure secrets, one-time browser owner setup, and guided appointment-business onboarding |
-| Public booking | Published business page, live availability, practitioner selection, conflict-safe confirmation, customer management link, rescheduling, and cancellation |
-| Owner operations | Appointment calendar, status changes, manual booking, maintenance, staff access, location scope, system status, and operational analytics |
-| Experience Studio | Business profile, branding, services, practitioners, opening hours, channels, customer preview, validation, versioned publishing, and public slug |
+| First run | Blank Docker installation, generated infrastructure secrets, one-time browser owner setup, and guided seat-capacity business onboarding |
+| Public booking | Seat count before date/time, live capacity, conflict-safe confirmation, customer management link, rescheduling, and cancellation |
+| Owner operations | Reservation schedule, live-slot manual booking, status changes, maintenance, staff access, location scope, system status, and operational analytics |
+| Experience Studio | Business profile, branding, services and pooled capacity, opening hours, channels, customer preview, validation, versioned publishing, and public slug |
 | Web chat | Shared structured proposal-and-confirmation booking flow, deterministic fallback, staff takeover, and conversation history |
 | WhatsApp | Self-hosted Baileys linked-device pairing, encrypted session persistence, the shared booking workflow, staff takeover, and an isolated simulation mode |
 | AI | Owner-supplied OpenAI-compatible generation provider, bounded connection testing, structured outputs, and graceful deterministic fallback |
@@ -33,7 +34,7 @@ products.
 Every booking channel reaches the same availability and atomic reservation
 path. AI-generated free text cannot create a reservation directly: the platform
 stores a structured proposal, requires explicit confirmation, then revalidates
-the requested slot and practitioner before inserting the reservation.
+the requested slot and remaining seat capacity before inserting the reservation.
 
 ## Architecture
 
@@ -155,7 +156,7 @@ pnpm run stack:up
 This is equivalent to `docker compose up --build -d`. The default stack:
 
 - generates and retains local infrastructure secrets in protected Docker state;
-- applies migrations through `000040`;
+- applies migrations through `000043`;
 - creates one setup-pending installation;
 - creates no owner, venue, service, resource, reservation, or demo business;
 - starts PostgreSQL/PostgREST, the API, worker, console, and booking app.
@@ -172,13 +173,10 @@ pnpm run stack:setup-url
 Open the one-time URL printed by the command. Create the owner through the
 browser, then complete the guided setup:
 
-1. Business identity and public slug.
-2. First location and IANA timezone.
-3. Appointment services and durations.
-4. Practitioners and service assignments.
-5. Weekly opening hours and closures.
-6. Channel defaults.
-7. Review, validate, preview, and publish.
+1. Business identity, first location, public slug, and IANA timezone.
+2. A service, its duration, and seats available per time slot.
+3. Weekly opening hours and closures.
+4. Review, validate, preview, and publish.
 
 The setup token becomes permanently unusable after successful owner creation.
 Do not put the URL in screenshots, logs, tickets, or committed files.
@@ -193,8 +191,8 @@ Do not put the URL in screenshots, logs, tickets, or committed files.
 | `http://127.0.0.1:4100/v1/health` | Local API health |
 
 Make a customer booking in a private window and confirm that it appears in
-**Reservations**. Attempting the same practitioner and time again must return a
-conflict rather than silently double-booking it.
+**Reservations**. Attempting to reserve more seats than remain in the same time
+slot must return a conflict rather than silently overbooking capacity.
 
 ### 5. Stop or remove the installation
 

@@ -11,11 +11,11 @@
   "assets": [
     {
       "path": "package.json",
-      "sha256": "3e068e5c08a79f27b7cd066c527ae977af9b9daa97ba3e11ae873247f6beff0f"
+      "sha256": "a1e1d7d84868afe7dcf315b06c319b465a41c547a09c3b2d25e050707e2dc969"
     },
     {
       "path": "compose.production.yml",
-      "sha256": "d0c82087b576a37f5b25b7f431ea69a1823af6b5ecf24bede6f0457db9b0613e"
+      "sha256": "5f9f907260caa9fdcf07155b5283fe638871b4d98ef987a0c35f4391c98bd3e0"
     },
     {
       "path": "docker/production/Caddyfile",
@@ -47,7 +47,7 @@
     },
     {
       "path": "scripts/production/release-manifest.mjs",
-      "sha256": "a0987687ffe41576fc5b2ce17e289bd837e4316d12bc321364fdba1ce6d88491"
+      "sha256": "355f77a3c05b98358c44e265268a067f2c00412cde052dceea4ccb9c1430a328"
     },
     {
       "path": "scripts/production/smoke.mjs",

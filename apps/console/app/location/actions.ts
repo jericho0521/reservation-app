@@ -4,6 +4,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import {
   activeVenueCookieName,
+  secureSessionCookie,
   validateActiveVenueSelection,
 } from "../../lib/auth-session";
 import { createConsolePlatformClient } from "../../lib/platform-client";
@@ -23,7 +24,7 @@ export async function selectActiveVenue(formData: FormData) {
   (await cookies()).set(activeVenueCookieName, venueId, {
     httpOnly: true,
     sameSite: "strict",
-    secure: process.env.NODE_ENV === "production",
+    secure: secureSessionCookie(process.env),
     path: "/admin",
   });
   redirect("/");

@@ -8,6 +8,7 @@ export const dynamic = "force-dynamic";
 export default async function LocationSetupPage() {
   const data = await loadOnboardingData();
   if (!data.business) redirect("/setup/business");
+  if (data.business.profile.preset_id !== "appointments_salon") redirect("/setup/services");
   const required = requiredPriorStep(data.state, "location");
   if (required) redirect(`/setup/${required}`);
 

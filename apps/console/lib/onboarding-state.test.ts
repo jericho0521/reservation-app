@@ -5,6 +5,7 @@ import { deriveOnboardingState, onboardingSteps, requiredPriorStep } from "./onb
 
 test("onboarding blocks publish until required appointment sections are complete", () => {
   const result = deriveOnboardingState({
+    presetId: "appointments_salon",
     ownerCreated: true,
     businessConfigured: true,
     locations: 1,
@@ -31,6 +32,7 @@ test("onboarding follows the fixed production sequence and completes only after 
     "review",
   ]);
   const ready = deriveOnboardingState({
+    presetId: "appointments_salon",
     ownerCreated: true,
     businessConfigured: true,
     locations: 2,
@@ -49,6 +51,26 @@ test("onboarding follows the fixed production sequence and completes only after 
   assert.equal(published.nextStep, undefined);
   assert.equal(published.canPublish, false);
   assert.equal(published.complete, true);
+});
+
+test("seat-capacity onboarding skips location confirmation, practitioners, and channels", () => {
+  const result = deriveOnboardingState({
+    ownerCreated: true,
+    presetId: "seat_capacity",
+    businessConfigured: true,
+    locations: 1,
+    activeServices: 1,
+    activePractitioners: 0,
+    operatingIntervals: 5,
+    webBookingReady: true,
+    emailReady: false,
+    published: false,
+  });
+
+  assert.deepEqual(result.sequence, ["business", "services", "hours", "review"]);
+  assert.equal(result.nextStep, "review");
+  assert.equal(result.canPublish, true);
+  assert.equal(result.steps.staff, true);
 });
 
 test("web booking can reach review while Phase 3 email delivery remains pending", () => {
@@ -80,6 +102,7 @@ test("future setup URLs return to the first incomplete persisted step", () => {
 
 function readyInput() {
   return {
+    presetId: "appointments_salon",
     ownerCreated: true,
     businessConfigured: true,
     locations: 1,

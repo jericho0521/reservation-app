@@ -21,6 +21,7 @@ export async function loadOnboardingData() {
       workspace: undefined,
       state: deriveOnboardingState({
         ownerCreated: session.role === "owner",
+        presetId: "seat_capacity",
         businessConfigured: false,
         locations: 0,
         activeServices: 0,
@@ -45,7 +46,10 @@ export async function loadOnboardingData() {
     unscopedClient.getEmailIntegrationSettings(),
   ]);
   const activeServices = services.filter((service) => service.is_active !== false);
-  const activePractitioners = resources.filter((resource) => resource.is_active !== false);
+  const activePractitioners = resources.filter((resource) => (
+    resource.is_active !== false
+    && typeof resource.metadata?.platform_staff_id === "string"
+  ));
 
   return {
     session,
@@ -60,6 +64,7 @@ export async function loadOnboardingData() {
     email,
     state: deriveOnboardingState({
       ownerCreated: session.role === "owner",
+      presetId: business.profile.preset_id,
       businessConfigured: true,
       locations: locations.length,
       activeServices: activeServices.length,

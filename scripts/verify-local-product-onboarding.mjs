@@ -19,7 +19,7 @@ export async function verifyLocalProductOnboarding(options = {}) {
   const setupUrl = readSetupUrl(project);
   const setupToken = new URL(setupUrl).searchParams.get("token");
   if (!setupToken) throw new Error("The protected setup URL did not contain a capability.");
-  const slug = `proof-appointments-${Date.now()}`;
+  const slug = `proof-seats-${Date.now()}`;
   const customerName = "Proof Customer";
   const bookingDate = futureIsoDate(7);
   const browser = await chromium.launch({ headless: true });
@@ -42,38 +42,36 @@ export async function verifyLocalProductOnboarding(options = {}) {
     await page.getByLabel("Password").fill("product-proof-password-2026");
     await page.getByRole("button", { name: "Create owner account" }).click();
     await page.waitForURL(/\/admin\/setup\/business$/u);
-    const reuseResponse = await context.request.post("http://127.0.0.1:4100/v1/setup/owner", {
-      headers: { Origin: "http://127.0.0.1:4300" },
-      data: {
+    const reuseResponse = await fetch("http://127.0.0.1:4100/v1/setup/owner", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Origin: "http://127.0.0.1:4300",
+      },
+      body: JSON.stringify({
         setup_token: setupToken,
         email: "second-owner@example.test",
         display_name: "Second Owner",
         password: "second-owner-password-2026",
-      },
+      }),
     });
-    if (reuseResponse.status() !== 401 && reuseResponse.status() !== 409) {
+    if (reuseResponse.status !== 401 && reuseResponse.status !== 409) {
       throw new Error("The consumed first-owner setup capability was accepted again.");
     }
     await screenshot(page, evidenceDirectory, "02-empty-business-onboarding.png");
 
-    await page.locator('input[name="name"]').fill("Product Proof Appointments");
+    await page.locator('input[name="name"]').fill("Product Proof Reservations");
     await page.locator('input[name="public_slug"]').fill(slug);
     await page.locator('input[name="location_name"]').fill("Main Studio");
     await page.locator('input[name="timezone"]').fill("Asia/Kuala_Lumpur");
     await page.locator('textarea[name="address"]').fill("Synthetic acceptance location");
     await page.getByRole("button", { name: "Save and continue" }).click();
-    await page.waitForURL(/\/admin\/setup\/location$/u);
-    await page.getByRole("link", { name: "Use this location" }).click();
-
     await page.waitForURL(/\/admin\/setup\/services$/u);
-    await page.locator('input[name="name"]').fill("Proof Consultation");
-    await page.locator('textarea[name="description"]').fill("A synthetic appointment used for Docker product verification.");
+    await page.locator('input[name="name"]').fill("Proof Group Session");
+    await page.locator('textarea[name="description"]').fill("A synthetic seat-capacity service used for Docker product verification.");
     await page.locator('input[name="duration_minutes"]').fill("30");
+    await page.locator('input[name="total_quantity"]').fill("4");
     await page.getByRole("button", { name: "Save and continue" }).click();
-
-    await page.waitForURL(/\/admin\/setup\/staff$/u);
-    await page.locator('input[name="label"]').fill("Proof Practitioner");
-    await page.getByRole("button", { name: "Save practitioner and continue" }).click();
 
     await page.waitForURL(/\/admin\/setup\/hours$/u);
     await page.locator('input[name="booking_horizon_days"]').fill("60");
@@ -85,31 +83,29 @@ export async function verifyLocalProductOnboarding(options = {}) {
     }
     await page.getByRole("button", { name: "Save and continue" }).click();
 
-    await page.waitForURL(/\/admin\/setup\/channels$/u);
-    await page.getByRole("button", { name: "Save and continue" }).click();
-
     await page.waitForURL(/\/admin\/setup\/review$/u);
     await screenshot(page, evidenceDirectory, "03-review-before-publish.png");
     await page.locator('input[name="confirm_publish"]').check();
     await page.getByRole("button", { name: "Publish and open dashboard" }).click();
     await page.waitForURL(/\/admin\/?$/u);
-    await page.getByRole("heading", { name: "Product Proof Appointments" }).waitFor();
+    await page.getByRole("heading", { name: "Product Proof Reservations" }).waitFor();
     await screenshot(page, evidenceDirectory, "04-published-owner-dashboard.png");
 
     await page.goto(`http://127.0.0.1:4400/${slug}`, { waitUntil: "networkidle" });
-    await page.getByRole("heading", { name: "Product Proof Appointments" }).waitFor();
+    await page.getByRole("heading", { name: "Product Proof Reservations" }).waitFor();
     await screenshot(page, evidenceDirectory, "05-published-public-experience.png");
 
     await page.goto(`http://127.0.0.1:4400/${slug}/book`, { waitUntil: "networkidle" });
-    await page.getByRole("button", { name: /Proof Consultation/u }).click();
-    await page.locator("button.rp-practitioner-card", { hasText: "Proof Practitioner" }).click();
+    await page.getByRole("button", { name: /Proof Group Session/u }).click();
+    await page.getByRole("heading", { name: "Choose quantity" }).waitFor();
+    await page.locator('input[type="number"]').fill("3");
     await page.getByRole("button", { name: "Continue" }).click();
     await page.locator('input[type="date"]').fill(bookingDate);
     await page.getByRole("button", { name: "Continue" }).click();
     const firstSlot = page.locator("button.rp-slot:not([disabled])").first();
     await firstSlot.waitFor();
     selectedTime = (await firstSlot.locator(".rp-slot-time").textContent())?.trim();
-    if (!selectedTime) throw new Error("No selectable time was returned for the configured appointment.");
+    if (!selectedTime) throw new Error("No selectable time was returned for the configured seat capacity.");
     await firstSlot.click();
     await page.getByRole("button", { name: "Continue" }).click();
     const customerInputs = page.locator(".rp-customer-grid input");
@@ -127,15 +123,16 @@ export async function verifyLocalProductOnboarding(options = {}) {
     await screenshot(page, evidenceDirectory, "08-owner-sees-booking.png");
 
     await page.goto(`http://127.0.0.1:4400/${slug}/book`, { waitUntil: "networkidle" });
-    await page.getByRole("button", { name: /Proof Consultation/u }).click();
-    await page.locator("button.rp-practitioner-card", { hasText: "Proof Practitioner" }).click();
+    await page.getByRole("button", { name: /Proof Group Session/u }).click();
+    await page.getByRole("heading", { name: "Choose quantity" }).waitFor();
+    await page.locator('input[type="number"]').fill("2");
     await page.getByRole("button", { name: "Continue" }).click();
     await page.locator('input[type="date"]').fill(bookingDate);
     await page.getByRole("button", { name: "Continue" }).click();
     await page.locator(".rp-slot-grid").waitFor();
     const conflictingSlot = page.locator("button.rp-slot").filter({ hasText: selectedTime });
     if (await conflictingSlot.count() > 0 && await conflictingSlot.first().isEnabled()) {
-      throw new Error("The already-booked practitioner slot remained selectable.");
+      throw new Error("A slot without enough remaining seats stayed selectable.");
     }
     await screenshot(page, evidenceDirectory, "09-conflict-capacity-reflected.png");
 
@@ -145,6 +142,9 @@ export async function verifyLocalProductOnboarding(options = {}) {
     }
     if (bookingProof.reservations !== 1) {
       throw new Error("The product proof expected exactly one confirmed reservation.");
+    }
+    if (bookingProof.seats_booked !== 3 || bookingProof.resources !== 0) {
+      throw new Error("The product proof did not persist pooled seat capacity correctly.");
     }
 
     compose(project, ["down"]);
@@ -166,6 +166,8 @@ export async function verifyLocalProductOnboarding(options = {}) {
       setup_token_reuse_rejected: true,
       booking_visible_to_owner: true,
       conflicting_slot_selectable: false,
+      seats_booked: bookingProof.seats_booked,
+      reservable_resources: bookingProof.resources,
       service_duration_minutes: bookingProof.service_duration_minutes,
       booking_duration_minutes: bookingProof.booking_duration_minutes,
       restart_persistence: true,
@@ -207,12 +209,14 @@ function readBookingProof(project) {
   const result = compose(project, [
     "exec", "-T", "reservation-db", "psql", "-X", "-v", "ON_ERROR_STOP=1",
     "-U", "postgres", "-d", "reservation", "--tuples-only", "--no-align",
-    "--command", "select json_build_object('service_duration_minutes',(select duration_minutes from public.services limit 1),'booking_duration_minutes',(select extract(epoch from (end_time-start_time))/60 from public.bookings limit 1),'reservations',(select count(*) from public.bookings));",
+    "--command", "select json_build_object('service_duration_minutes',(select duration_minutes from public.services limit 1),'booking_duration_minutes',(select extract(epoch from (end_time-start_time))/60 from public.bookings limit 1),'seats_booked',(select seats_booked from public.bookings limit 1),'resources',(select count(*) from public.reservable_resources),'reservations',(select count(*) from public.bookings));",
   ], { encoding: "utf8" });
   const value = JSON.parse(result.stdout.trim());
   return {
     service_duration_minutes: Number(value.service_duration_minutes),
     booking_duration_minutes: Number(value.booking_duration_minutes),
+    seats_booked: Number(value.seats_booked),
+    resources: Number(value.resources),
     reservations: Number(value.reservations),
   };
 }

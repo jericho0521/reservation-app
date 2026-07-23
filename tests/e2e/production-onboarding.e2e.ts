@@ -37,6 +37,7 @@ test("onboarding implementation uses platform APIs and derives the production or
   assert.match(loader, /emailReady:\s*email\.enabled && email\.configured/u);
 
   const records = {
+    presetId: "seat_capacity",
     ownerCreated: true,
     businessConfigured: false,
     locations: 0,
@@ -51,11 +52,8 @@ test("onboarding implementation uses platform APIs and derives the production or
   Object.assign(records, { businessConfigured: true, locations: 1 });
   assert.equal(deriveOnboardingState(records).nextStep, "services");
   records.activeServices = 1;
-  assert.equal(deriveOnboardingState(records).nextStep, "staff");
-  records.activePractitioners = 1;
   assert.equal(deriveOnboardingState(records).nextStep, "hours");
   records.operatingIntervals = 5;
-  assert.equal(deriveOnboardingState(records).nextStep, "channels");
   records.webBookingReady = true;
   const ready = deriveOnboardingState(records);
   assert.equal(ready.nextStep, "review");
@@ -65,7 +63,7 @@ test("onboarding implementation uses platform APIs and derives the production or
   assert.equal(deriveOnboardingState(records).complete, true);
 });
 
-test("unused installation completes owner-to-public appointment onboarding", async (context) => {
+test("unused installation completes owner-to-public seat-capacity onboarding", async (context) => {
   const apiUrl = process.env.RESERVATION_PRODUCTION_E2E_API_URL?.trim();
   const setupToken = process.env.RESERVATION_PRODUCTION_E2E_SETUP_TOKEN?.trim();
   const databaseUrl = process.env.RESERVATION_PRODUCTION_E2E_DATABASE_URL?.trim();
@@ -98,13 +96,14 @@ test("unused installation completes owner-to-public appointment onboarding", asy
     method: "PUT",
     headers: authHeaders,
     body: {
-      name: "Production Appointment Studio",
+      name: "Production Reservation Venue",
       public_slug: slug,
       timezone: "Asia/Kuala_Lumpur",
       location: { name: "Main location", address: "Production fixture" },
     },
   });
   assert.equal(business.response.status, 200);
+  assert.equal((business.body as { profile: { preset_id: string } }).profile.preset_id, "seat_capacity");
   const venueId = String((business.body as { locations: Array<{ location_id: string }> }).locations[0]?.location_id ?? "");
   assert.match(venueId, /^[0-9a-f-]{36}$/u);
   const scopedHeaders = { ...authHeaders, "x-reservation-venue-id": venueId };
@@ -113,23 +112,15 @@ test("unused installation completes owner-to-public appointment onboarding", asy
     method: "POST",
     headers: scopedHeaders,
     body: {
-      name: "Consultation",
-      description: "A production onboarding consultation.",
+      name: "Group Session",
+      description: "A production pooled-capacity session.",
       duration_minutes: 60,
-      total_quantity: 1,
-      resource_kind: "custom",
-      resource_strategy: "assigned_resource",
+      total_quantity: 12,
+      resource_kind: "capacity_bucket",
+      resource_strategy: "quantity",
     },
   });
   assert.equal(service.response.status, 201);
-  const serviceId = String((service.body as { service_id: string }).service_id);
-
-  const practitioner = await requestJson(apiUrl, "/v1/experience/resources", {
-    method: "POST",
-    headers: scopedHeaders,
-    body: { service_id: serviceId, label: "Primary practitioner", kind: "custom", capacity: 1 },
-  });
-  assert.equal(practitioner.response.status, 201);
 
   const hours = await requestJson(apiUrl, "/v1/experience/operating-hours", {
     method: "PUT",

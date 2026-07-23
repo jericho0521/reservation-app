@@ -11,11 +11,12 @@ export default async function HoursSetupPage() {
   if (!data.business) redirect("/setup/business");
   const required = requiredPriorStep(data.state, "hours");
   if (required) redirect(`/setup/${required}`);
-  if (!data.operatingHours) redirect("/setup/staff");
+  const appointmentMode = data.business.profile.preset_id === "appointments_salon";
+  if (!data.operatingHours) redirect(appointmentMode ? "/setup/staff" : "/setup/services");
 
   return <main className="setup-workspace page-stack">
     <SetupProgress current="hours" state={data.state} />
-    <header className="page-header"><span className="eyebrow">Business setup · 5 of 7</span><h1>Set bookable hours</h1><p>The same location-local schedule controls every booking channel.</p></header>
-    <AvailabilityEditor onboarding value={data.operatingHours} />
+    <header className="page-header"><span className="eyebrow">Opening hours</span><h1>Set bookable hours</h1><p>The same local schedule and seat capacity control every reservation channel.</p></header>
+    <AvailabilityEditor onboarding nextStep={appointmentMode ? "channels" : "review"} value={data.operatingHours} />
   </main>;
 }

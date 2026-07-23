@@ -20,8 +20,8 @@ export function SetupProgress({
   return (
     <nav aria-label="Business setup progress" className="setup-progress">
       <ol>
-        {Object.entries(labels).map(([step, label]) => {
-          const id = step as OnboardingStep;
+        {state.sequence.map((id) => {
+          const label = labels[id];
           const complete = state.steps[id];
           return (
             <li className={complete ? "is-complete" : undefined} key={id}>

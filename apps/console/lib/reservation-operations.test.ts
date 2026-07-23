@@ -3,16 +3,19 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 import type { ReservationResponse, ResourceResponse } from "@reservation-platform/sdk";
-import { filterReservations, futureReservationWarnings } from "./reservation-operations";
+import { filterReservations, futureReservationWarnings, reservationChannel } from "./reservation-operations";
 
 const reservations: ReservationResponse[] = [
   { reservation_id: "r1", service_id: "s1", status: "confirmed", date: "2026-08-10", quantity: 1, customer: { name: "Ada" }, reservation_items: [{ resource_id: "resource_1", quantity: 1 }], metadata: { channel_origin: "web_chat", service_name: "Room" } },
   { reservation_id: "r2", service_id: "s2", status: "cancelled", date: "2026-08-11", quantity: 1, customer: { name: "Ben" }, metadata: { channel_origin: "web_booking" } },
+  { reservation_id: "r3", service_id: "s1", status: "confirmed", date: "2026-08-10", quantity: 1, customer: { name: "Cara" }, metadata: { channel_origin: "staff" } },
 ];
 
 test("reservation filters combine search, status, channel, and service", () => {
   assert.deepEqual(filterReservations(reservations, { search: "ada", status: "confirmed", channel: "web_chat", serviceId: "s1" }).map((item) => item.reservation_id), ["r1"]);
   assert.deepEqual(filterReservations(reservations, { status: "cancelled" }).map((item) => item.reservation_id), ["r2"]);
+  assert.deepEqual(filterReservations(reservations, { channel: "staff" }).map((item) => item.reservation_id), ["r3"]);
+  assert.equal(reservationChannel(reservations[2]!), "Staff");
 });
 
 test("maintenance warnings include confirmed future reservations for the selected resource", () => {

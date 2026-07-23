@@ -20,16 +20,16 @@ export function AiSettingsForm({ value }: { value: AiIntegrationSettingsResponse
     <form action={saveAction} className="panel studio-form">
       <label className="channel-option">
         <span><strong>Enable AI automation</strong><small>New automated conversation turns use the saved provider after a successful configuration.</small></span>
-        <span className={`readiness-state ${value.enabled && value.credential_present ? "ready" : "degraded"}`}>{value.enabled ? "enabled" : "disabled"}</span>
+        <span className={`readiness-state ${value.enabled && value.credential_present ? "ready" : "degraded"}`}>{value.enabled && value.credential_present ? "Booking assistant available" : value.enabled ? "Degraded (Key required)" : "Disabled"}</span>
         <input type="checkbox" name="enabled" defaultChecked={value.enabled} />
       </label>
       <div className="form-columns">
-        <label>Provider<select disabled defaultValue="openai"><option value="openai">OpenAI</option></select></label>
+        <label>Provider<select disabled defaultValue="openai"><option value="openai">OpenAI / OpenRouter Compatible</option></select></label>
         <label>Model<input name="model" required maxLength={200} defaultValue={value.model ?? "gpt-4.1-mini"} /></label>
       </div>
-      <label>Base URL <small>Optional</small><input name="base_url" type="url" maxLength={2048} defaultValue={value.base_url ?? ""} placeholder="https://api.openai.com/v1" /></label>
+      <label>Base URL <small>Optional BYOK provider endpoint</small><input name="base_url" type="url" maxLength={2048} defaultValue={value.base_url ?? ""} placeholder="https://api.openai.com/v1" /></label>
       <label>API key<input name="api_key" type="password" autoComplete="new-password" maxLength={4096} placeholder={value.credential_present ? "Stored securely — enter a new key to rotate" : "Enter an API key"} /></label>
-      <p className="field-hint">{value.credential_present ? "A credential is stored. Leaving this blank preserves it." : "No credential is stored yet."}</p>
+      <p className="field-hint">{value.credential_present ? "A credential is stored securely. Leaving this blank preserves it." : "No credential is stored yet."}</p>
       <div className="form-footer">
         <p className={`form-message ${saveState.status}`} aria-live="polite">{saveState.message}</p>
         <button className="primary-action" disabled={saving}>{saving ? "Saving…" : "Save AI settings"}</button>
@@ -37,7 +37,7 @@ export function AiSettingsForm({ value }: { value: AiIntegrationSettingsResponse
     </form>
     <div className="form-columns">
       <form action={testAction} className="panel setup-summary">
-        <h2>Test provider</h2><p>Runs one bounded, non-sensitive request using the stored key.</p>
+        <h2>Test provider connection</h2><p>Runs one bounded, non-sensitive test request using the stored credential.</p>
         <p className={`form-message ${testState.status}`} aria-live="polite">{testState.message}</p>
         <button className="secondary-action" disabled={!value.credential_present || testing}>{testing ? "Testing…" : "Test connection"}</button>
       </form>

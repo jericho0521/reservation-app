@@ -4,14 +4,14 @@ import test from "node:test";
 
 const setupSteps = ["business", "location", "services", "staff", "hours", "channels", "review"] as const;
 
-test("production onboarding has one server-backed page for every fixed step", async () => {
+test("production onboarding keeps server-backed pages for capacity and appointment sequences", async () => {
   const pages = await Promise.all(setupSteps.map((step) => (
     readFile(new URL(`../app/setup/${step}/page.tsx`, import.meta.url), "utf8")
   )));
   const loader = await readFile(new URL("./onboarding-loader.ts", import.meta.url), "utf8");
 
-  for (const [index, source] of pages.entries()) {
-    assert.match(source, new RegExp(`Business setup · ${index + 1} of 7`, "u"));
+  for (const source of pages) {
+    assert.match(source, /<SetupProgress/u);
     assert.match(source, /loadOnboardingData/u);
     assert.doesNotMatch(source, /localStorage|sessionStorage/u);
   }
@@ -19,9 +19,11 @@ test("production onboarding has one server-backed page for every fixed step", as
   assert.match(loader, /listInstallationLocations/u);
   assert.match(loader, /getEmailIntegrationSettings/u);
   assert.match(loader, /venueId: business\.profile\.venue_id/u);
+  assert.match(loader, /presetId: "seat_capacity"/u);
+  assert.match(loader, /presetId: business\.profile\.preset_id/u);
 });
 
-test("wizard actions save through platform APIs and redirect in the approved sequence", async () => {
+test("wizard actions save through platform APIs and branch by booking model", async () => {
   const actions = await readFile(new URL("../app/setup/actions.ts", import.meta.url), "utf8");
 
   for (const method of [
@@ -32,9 +34,12 @@ test("wizard actions save through platform APIs and redirect in the approved seq
     "updateExperienceChannelSettings",
     "publishExperienceDraft",
   ]) assert.match(actions, new RegExp(`\\.${method}\\(`, "u"));
-  for (const step of ["location", "staff", "hours", "channels", "review"]) {
-    assert.match(actions, new RegExp(`redirect\\(\"/setup/${step}\"\\)`, "u"));
+  for (const step of ["location", "services", "staff", "hours", "channels", "review"]) {
+    assert.match(actions, new RegExp(`"/setup/${step}"`, "u"));
   }
+  assert.match(actions, /preset_id === "appointments_salon"/u);
+  assert.match(actions, /resource_strategy"\) === "quantity"/u);
+  assert.match(actions, /next_step"\) === "review"/u);
   assert.match(actions, /redirect\("\/"\)/u);
   assert.doesNotMatch(actions, /createInstallationLocation/u);
 });

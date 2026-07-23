@@ -19,4 +19,4 @@ export function buildOperationsAttentionItems(overview: OperationsOverviewRespon
   return items;
 }
 
-export function channelLabel(value: string) { return value === "web_booking" ? "Web booking" : value === "web_chat" ? "Web chat" : "WhatsApp"; }
+export function channelLabel(value: string) { return value === "web_booking" ? "Web booking" : value === "web_chat" ? "Web chat" : value === "whatsapp" ? "WhatsApp" : value === "staff" ? "Staff" : value === "simulation" ? "Simulation" : "Unknown"; }

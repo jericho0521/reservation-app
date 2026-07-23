@@ -10,6 +10,7 @@ import {
   hasConsoleAuthentication,
   localBrowserFixtureAvailable,
   localBrowserManagementToken,
+  localBrowserPublicSlug,
   openAuthenticatedConsole,
 } from "./support/release-fixture";
 
@@ -22,7 +23,7 @@ const bookingOrigin = originFromEnv(
   "http://127.0.0.1:4400",
 );
 const bookingSlug = process.env.RESERVATION_BROWSER_BOOKING_SLUG?.trim()
-  || "apex-racing-demo";
+  || (localBrowserFixtureAvailable ? localBrowserPublicSlug : undefined);
 const managementToken = process.env.RESERVATION_BROWSER_MANAGEMENT_TOKEN?.trim()
   || (localBrowserFixtureAvailable ? localBrowserManagementToken : undefined);
 
@@ -53,7 +54,7 @@ test.describe("console accessibility", () => {
     test.skip(!consoleAvailable, `Console origin unavailable: ${consoleOrigin}`);
     test.skip(!hasConsoleAuthentication(), "Owner credentials or a storage state are required for the protected journey.");
     await openAuthenticatedConsole(page, "/admin");
-    await expect(page.getByText("Operations command center", { exact: true })).toBeVisible();
+    await expect(page.getByText("Operations", { exact: true })).toBeVisible();
     await expectAccessiblePage(page);
     await expectKeyboardReachable(page, page.getByRole("link", { name: "Open Studio" }));
   });
@@ -86,7 +87,8 @@ test.describe("public booking accessibility", () => {
 
   test("booking", async ({ page }) => {
     test.skip(!bookingAvailable, `Booking origin unavailable: ${bookingOrigin}`);
-    await openRoute(page, `${bookingOrigin}/${encodeURIComponent(bookingSlug)}/book`);
+    test.skip(!bookingSlug, "A published booking slug is required for the public accessibility journey.");
+    await openRoute(page, `${bookingOrigin}/${encodeURIComponent(bookingSlug!)}/book`);
     await expect(page.getByRole("heading", { level: 1, name: /^Book /u })).toBeVisible();
     await expect(page.getByRole("heading", { level: 2, name: "Choose an experience" })).toBeVisible();
     await expectAccessiblePage(page);

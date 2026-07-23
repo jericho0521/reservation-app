@@ -9,7 +9,7 @@ import { createAvailabilityPreviewSlots } from "../../lib/availability-preview";
 const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 const initialState: StudioActionState = { status: "idle", message: "" };
 
-export function AvailabilityEditor({ value, onboarding = false }: { value: ExperienceOperatingHoursResponse; onboarding?: boolean }) {
+export function AvailabilityEditor({ value, onboarding = false, nextStep = "channels" }: { value: ExperienceOperatingHoursResponse; onboarding?: boolean; nextStep?: "channels" | "review" }) {
   const [state, action, pending] = useActionState(onboarding ? saveSetupOperatingHoursAction : saveOperatingHoursAction, initialState);
   const [sampleDay, setSampleDay] = useState(1);
   const [slotInterval, setSlotInterval] = useState(value.slot_interval_minutes);
@@ -23,6 +23,7 @@ export function AvailabilityEditor({ value, onboarding = false }: { value: Exper
   ), [intervalsByDay, sampleDay, slotInterval]);
 
   return <form action={action} className="studio-form availability-editor">
+    {onboarding ? <input name="next_step" type="hidden" value={nextStep} /> : null}
     <div className="form-columns">
       <label>Timezone<input name="timezone" defaultValue={value.timezone} required /></label>
       <label>Booking horizon (days)<input name="booking_horizon_days" type="number" min="1" max="365" defaultValue={value.booking_horizon_days} required /></label>

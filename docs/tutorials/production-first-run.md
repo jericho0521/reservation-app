@@ -1,4 +1,4 @@
-# Put one appointment business into service
+# Put one reservation business into service
 
 This tutorial is for the person responsible for a new production installation. It starts with a clean Ubuntu server and ends with one verified public booking, an off-host recovery key, and a verified backup. The supported product model is one business per installation.
 
@@ -8,7 +8,7 @@ This tutorial is for the person responsible for a new production installation. I
 - Docker Engine and Docker Compose v2 available to `root`.
 - A DNS A record pointing a dedicated domain to the server, with ports 80 and 443 open.
 - The extracted, signed release bundle and access to its digest-pinned images.
-- The business name, public slug, timezone, address, services, practitioners, and normal opening hours.
+- The business name, public slug, timezone, address, services, seat capacity per time slot, and normal opening hours.
 
 Do not create or edit a production `.env` file. The installer owns infrastructure configuration; the owner console owns business and provider configuration.
 
@@ -29,17 +29,18 @@ The installer verifies the bundle and image identities, creates protected secret
 
 Open the printed `/admin/setup?token=...` URL in a private browser window. Do not copy it into a ticket, screenshot, chat, or shell history. Create the owner account, then sign in at `/admin/login`. The setup capability must not appear in the rendered page after it has been accepted.
 
-## 3. Complete the seven setup steps
+## 3. Complete the four setup steps
 
 Follow the console in order:
 
-1. Name the business and choose its public slug.
-2. Confirm the first location, address, and IANA timezone.
-3. Add the appointment services and durations customers can book.
-4. Add practitioners and associate them with the services they perform.
-5. Set weekly hours and closures.
-6. Choose channel defaults. AI and WhatsApp may remain disabled at launch.
-7. Review validation, preview the customer experience, and publish deliberately.
+1. Name the business, choose its public slug, and configure the first location and IANA timezone.
+2. Add a service, its duration, and the seats available in each time slot.
+3. Set weekly hours and closures.
+4. Review validation, preview the customer experience, and publish deliberately.
+
+The default setup uses pooled seat capacity and does not ask for a practitioner.
+Existing appointment installations continue to use the longer practitioner-aware
+workflow.
 
 For field-level guidance, use [Owner onboarding](../how-to/owner-onboarding.md).
 
@@ -54,7 +55,7 @@ The public web booking flow remains the required baseline channel.
 
 ## 5. Make a real booking
 
-Open the public booking URL in a private window. Choose a service, practitioner where applicable, date, and live slot. Enter test contact details controlled by the business and press **Confirm reservation** once. In the console, open **Reservations** and verify that the appointment appears at the correct local time with the web channel recorded.
+Open the public booking URL in a private window. Choose a service, number of seats, date, and live slot. Enter test contact details controlled by the business and press **Confirm reservation** once. In the console, open **Reservations** and verify that the reservation appears at the correct local time, seat count, and web channel.
 
 Use the customer management link to verify that the installation can load the reservation without exposing an owner credential. Do not include that opaque link in release evidence.
 
@@ -66,4 +67,4 @@ Copy the backup recovery key to an offline password manager or encrypted removab
 
 Open **System status** and confirm the release, migration, database, worker, disk, and backup status. Run the public readiness probe and inspect the Compose service list as described in [Interpret System Status](../operations/system-status.md). Finally, generate a sanitized support bundle and store it with the operator record—not with customer data.
 
-The installation is ready for normal operation when public booking works, the appointment is visible to staff, readiness is healthy, and a verified off-host backup can be identified.
+The installation is ready for normal operation when public booking works, the reservation is visible to staff, readiness is healthy, and a verified off-host backup can be identified.

@@ -12,6 +12,13 @@ const setupWizardPrefix = "/setup/";
 const safeCookieValuePattern = /^[A-Za-z0-9_-]+$/u;
 const writeMethods = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 
+export function secureSessionCookie(env: NodeJS.ProcessEnv): boolean {
+  const configured = env.RESERVATION_SESSION_COOKIE_SECURE?.trim().toLowerCase();
+  if (configured === "true") return true;
+  if (configured === "false") return false;
+  return env.NODE_ENV === "production";
+}
+
 export interface AuthRedirectInput {
   pathname: string;
   hasSessionCookie: boolean;

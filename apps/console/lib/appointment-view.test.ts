@@ -77,7 +77,11 @@ test("command center exposes every lifecycle state and audited mutations", async
   assert.match(filters, /pending/u);
   assert.match(filters, /no_show/u);
   assert.match(detail, /AppointmentStatusActions/u);
+  assert.match(detail, /resourceSelectionRequired=\{requiresOwnerResourceSelection\(service\)\}/u);
+  assert.match(detail, /listServices\(\{ include_inactive: true \}\)/u);
   assert.match(actions, /expected_status/u);
   assert.match(actions, /transition_reason/u);
+  assert.match(actions, /listServices\(\{ include_inactive: true \}\)/u);
+  assert.match(actions, /if \(requiresOwnerResourceSelection\(service\)\)/u);
   assert.match(actions, /revalidatePath\("\/analytics"\)/u);
 });

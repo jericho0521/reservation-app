@@ -12,8 +12,8 @@ test("staff appointment command center exposes create, filter, and schedule cont
 
   await openAuthenticatedConsole(page, "/admin/reservations");
   await expect(page.getByRole("heading", { name: "Operate the working day" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Create an appointment" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Create appointment" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Create a reservation" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Create reservation" })).toBeVisible();
   await expect(page.getByLabel(/Date/u).first()).toBeVisible();
   await expect(page.getByLabel(/Status/u).first()).toBeVisible();
 });

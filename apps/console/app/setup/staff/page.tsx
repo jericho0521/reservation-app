@@ -3,17 +3,19 @@ import { SetupProgress } from "../../../components/setup/setup-progress";
 import { ResourceEditor } from "../../../components/studio/resource-editor";
 import { loadOnboardingData } from "../../../lib/onboarding-loader";
 import { requiredPriorStep } from "../../../lib/onboarding-state";
+import { isActivePractitionerResource } from "../../../lib/practitioner-mode";
 
 export const dynamic = "force-dynamic";
 
 export default async function StaffSetupPage() {
   const data = await loadOnboardingData();
   if (!data.business) redirect("/setup/business");
+  if (data.business.profile.preset_id !== "appointments_salon") redirect("/setup/hours");
   const required = requiredPriorStep(data.state, "staff");
   if (required) redirect(`/setup/${required}`);
   const activeServices = data.services.filter((service) => service.is_active !== false);
   if (activeServices.length === 0) redirect("/setup/services");
-  const practitioners = data.resources.filter((resource) => resource.is_active !== false);
+  const practitioners = data.resources.filter(isActivePractitionerResource);
 
   return <main className="setup-workspace page-stack">
     <SetupProgress current="staff" state={data.state} />

@@ -34,7 +34,7 @@ export default async function SetupLandingPage({
   const state = getSetupLandingState(token);
 
   return (
-    <div className="page-stack">
+    <main className="setup-workspace page-stack">
       <header className="page-header">
         <span className="eyebrow">Production setup</span>
         <h1>{state.heading}</h1>
@@ -47,6 +47,6 @@ export default async function SetupLandingPage({
           ? <SetupOwnerForm setupToken={token} />
           : <p>The setup capability is accepted only from the generated link. The token is not displayed or copied into this page.</p>}
       </section>
-    </div>
+    </main>
   );
 }

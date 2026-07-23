@@ -4,7 +4,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { isPlatformError } from "@reservation-platform/sdk";
-import { activeVenueCookieName } from "../../lib/auth-session";
+import { activeVenueCookieName, secureSessionCookie } from "../../lib/auth-session";
 import { createConsolePlatformClient } from "../../lib/platform-client";
 import type { StudioActionState } from "../studio/actions";
 
@@ -25,11 +25,11 @@ export async function configureBusinessSetupAction(formData: FormData) {
   (await cookies()).set(activeVenueCookieName, result.profile.venue_id, {
     httpOnly: true,
     sameSite: "strict",
-    secure: process.env.NODE_ENV === "production",
+    secure: secureSessionCookie(process.env),
     path: "/admin",
   });
   revalidatePath("/setup", "layout");
-  redirect("/setup/location");
+  redirect(result.profile.preset_id === "appointments_salon" ? "/setup/location" : "/setup/services");
 }
 
 export async function saveSetupServiceAction(
@@ -39,13 +39,14 @@ export async function saveSetupServiceAction(
   try {
     const { client, options } = await createSetupExperienceClient();
     const serviceId = String(formData.get("service_id") ?? "").trim();
+    const resourceStrategy = requiredField(formData, "resource_strategy") as "quantity" | "assigned_resource" | "hybrid";
     const value = {
       name: requiredField(formData, "name"),
       description: String(formData.get("description") ?? "").trim() || undefined,
       duration_minutes: positiveInteger(formData, "duration_minutes"),
       total_quantity: positiveInteger(formData, "total_quantity"),
       resource_kind: requiredField(formData, "resource_kind") as "seat" | "station" | "room" | "court" | "screening" | "capacity_bucket" | "custom",
-      resource_strategy: requiredField(formData, "resource_strategy") as "quantity" | "assigned_resource" | "hybrid",
+      resource_strategy: resourceStrategy,
     };
     if (serviceId) await client.updateExperienceService(serviceId, value, options);
     else await client.createExperienceService(value, options);
@@ -53,7 +54,7 @@ export async function saveSetupServiceAction(
   } catch (error) {
     return actionError(error, "The service could not be saved.");
   }
-  redirect("/setup/staff");
+  redirect(formData.get("resource_strategy") === "quantity" ? "/setup/hours" : "/setup/staff");
 }
 
 export async function saveSetupPractitionerAction(
@@ -112,7 +113,7 @@ export async function saveSetupOperatingHoursAction(
   } catch (error) {
     return actionError(error, "Operating hours could not be saved.");
   }
-  redirect("/setup/channels");
+  redirect(formData.get("next_step") === "review" ? "/setup/review" : "/setup/channels");
 }
 
 export async function saveSetupChannelsAction(

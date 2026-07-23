@@ -18,7 +18,7 @@ export default async function ReviewSetupPage() {
 
   return <main className="setup-workspace page-stack">
     <SetupProgress current="review" state={data.state} />
-    <header className="page-header"><span className="eyebrow">Business setup · 7 of 7</span><h1>Review and publish</h1><p>Check the saved customer experience, resolve any linked issue, then make it live deliberately.</p></header>
+    <header className="page-header"><span className="eyebrow">Review</span><h1>Review and publish</h1><p>Check the customer experience and availability rules before making reservations live.</p></header>
     <ExperiencePreview draft={data.workspace.draft} services={services} />
     {data.state.emailDelivery === "phase_3_pending" ? <section className="panel setup-summary"><h2>Email delivery is optional</h2><p>Publishing enables the public web booking flow. You can connect SMTP now from email settings or add it after launch.</p><a className="secondary-action" href="/admin/settings/email">Configure email delivery</a></section> : null}
     <ValidationSummary validation={data.validation} />

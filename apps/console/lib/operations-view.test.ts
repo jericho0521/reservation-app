@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 import type { OperationsOverviewResponse } from "@reservation-platform/sdk";
-import { buildOperationsAttentionItems } from "./operations-view";
+import { buildOperationsAttentionItems, channelLabel } from "./operations-view";
 
 const overview: OperationsOverviewResponse = {
   generated_at: "2026-08-05T00:00:00Z", timezone: "UTC", local_date: "2026-08-05",
@@ -33,6 +33,11 @@ test("operations attention links pending appointments to the daily queue", () =>
 test("healthy empty operations render a positive no-issues state", () => {
   const items = buildOperationsAttentionItems({ ...overview, resources: { total: 0, available: 0, maintenance: 0 }, conversations: { open: 0, staff_takeover: 0 }, channel_readiness: { ...overview.channel_readiness, web_chat: { desired_enabled: false, configured: false, ready: false, state: "not_configured" } } });
   assert.equal(items[0]?.label, "No urgent issues");
+});
+
+test("operations labels staff-created reservation channels explicitly", () => {
+  assert.equal(channelLabel("staff"), "Staff");
+  assert.equal(channelLabel("simulation"), "Simulation");
 });
 
 test("overview has explicit slow-loading and partial-outage states", async () => {

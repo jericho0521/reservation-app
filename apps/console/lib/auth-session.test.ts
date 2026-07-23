@@ -11,8 +11,16 @@ import {
   buildPlatformForwardHeaders,
   buildSessionForwardHeaders,
   resolveActiveLocation,
+  secureSessionCookie,
   validateActiveVenueSelection,
 } from "./auth-session.js";
+
+test("active venue cookies follow the explicit deployment cookie policy", () => {
+  assert.equal(secureSessionCookie({ NODE_ENV: "production", RESERVATION_SESSION_COOKIE_SECURE: "false" }), false);
+  assert.equal(secureSessionCookie({ NODE_ENV: "development", RESERVATION_SESSION_COOKIE_SECURE: "true" }), true);
+  assert.equal(secureSessionCookie({ NODE_ENV: "production" }), true);
+  assert.equal(secureSessionCookie({ NODE_ENV: "development" }), false);
+});
 
 test("protected route redirects an anonymous request to login", () => {
   assert.equal(

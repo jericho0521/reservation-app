@@ -29,6 +29,7 @@ const nextConfig: NextConfig = {
       headers: privateHeaders,
       })),
       { source: "/channels", headers: privateHeaders },
+      { source: "/api/availability", headers: [...privateHeaders, { key: "Vary", value: "Cookie" }] },
       { source: "/api/whatsapp/qr", headers: [...privateHeaders, { key: "Vary", value: "Cookie" }] },
     ];
   },

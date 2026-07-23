@@ -20,7 +20,7 @@ export function ConsoleShell({
           <span className="brand-mark">R</span>
           <span>
             <strong>Reservation</strong>
-            <small>Experience Platform</small>
+            <small>Owner Console</small>
           </span>
         </a>
         <nav aria-label="Owner console">
@@ -45,7 +45,7 @@ export function ConsoleShell({
         </nav>
         <div className="sidebar-context">
           {activeLocation ? <p>Location <code>{activeLocation.venueId}</code>{activeLocation.canChange ? <> · <a href="/admin/location">Change</a></> : null}</p> : null}
-          <p>{role ? `${role} session` : "Authenticated session"} · One engine. Every booking channel.</p>
+          <p>{role ? `${role} session` : "Authenticated session"} · Operational Platform</p>
         </div>
       </aside>
       <main className="console-main" id="console-main" tabIndex={-1}>{children}</main>

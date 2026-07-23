@@ -9,6 +9,7 @@ export const dynamic = "force-dynamic";
 export default async function ChannelsSetupPage() {
   const data = await loadOnboardingData();
   if (!data.business) redirect("/setup/business");
+  if (data.business.profile.preset_id !== "appointments_salon") redirect("/setup/review");
   const required = requiredPriorStep(data.state, "channels");
   if (required) redirect(`/setup/${required}`);
   if (!data.channels) redirect("/setup/hours");

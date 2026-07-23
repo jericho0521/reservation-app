@@ -19,5 +19,5 @@ export function futureReservationWarnings(resource: ResourceResponse, reservatio
 
 export function reservationChannel(reservation: ReservationResponse) {
   const channel = reservation.metadata?.channel_origin;
-  return channel === "web_chat" ? "Web chat" : channel === "whatsapp" ? "WhatsApp" : channel === "simulation" ? "Simulation" : "Web booking";
+  return channel === "web_chat" ? "Web chat" : channel === "whatsapp" ? "WhatsApp" : channel === "staff" ? "Staff" : channel === "simulation" ? "Simulation" : "Web booking";
 }

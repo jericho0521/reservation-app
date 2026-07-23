@@ -31,6 +31,7 @@ export interface IdempotencyCommitRecord {
 export interface IdempotencyRepository {
   claimInProgress(record: IdempotencyRecord): Promise<IdempotencyRecord | null | undefined> | IdempotencyRecord | null | undefined;
   storeCompleted(record: IdempotencyCommitRecord): Promise<void> | void;
+  releaseInProgress(token: IdempotentMutationToken): Promise<void> | void;
 }
 
 export interface IdempotentMutationInput {
@@ -144,6 +145,13 @@ export async function commitIdempotentMutation(
     status: "completed",
     response,
   });
+}
+
+export async function releaseIdempotentMutation(
+  repository: IdempotencyRepository,
+  token: IdempotentMutationToken,
+): Promise<void> {
+  await repository.releaseInProgress(token);
 }
 
 export function createJsonRequestFingerprint(value: JsonValue): string {

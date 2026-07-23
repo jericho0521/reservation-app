@@ -22,6 +22,13 @@ function preset(
 
 export const experiencePresets: readonly Readonly<ExperiencePresetSummary>[] = Object.freeze([
   preset({
+    preset_id: "seat_capacity",
+    name: "Seat Capacity",
+    description: "Shared-capacity reservations without named seats or practitioners.",
+    resource_strategy: "quantity",
+    terminology: { customer: "Customer", resource: "Seat", booking: "Reservation" },
+  }),
+  preset({
     preset_id: "racing_gaming",
     name: "Racing & Gaming",
     description: "Assigned simulator and gaming-station sessions.",

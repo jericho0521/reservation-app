@@ -5,6 +5,7 @@ import {
   bookingErrorMessage,
   canAdvanceBookingJourney,
   createReservationPayload,
+  isPureQuantityBooking,
   nextBookingJourneyStep,
   localDateInputValue,
   previousBookingJourneyStep,
@@ -94,7 +95,7 @@ test("validateBookingFlow rejects assigned resource count mismatches", () => {
 test("room resources satisfy attendee quantity through configured capacity", () => {
   const roomState: BookingFlowState = {
     ...baseState,
-    service: { service_id: "svc_123", name: "Meeting room", resource_strategy: "hybrid" },
+    service: { service_id: "svc_123", name: "Meeting room", resource_strategy: "hybrid", total_quantity: 3 },
     availability: { slots: [{ start_time: "09:00", end_time: "10:00", available_quantity: 10, is_available: true }] },
     selectedSlot: { start_time: "09:00", end_time: "10:00", available_quantity: 10, is_available: true },
     quantity: 6,
@@ -222,6 +223,7 @@ test("createReservationPayload rejects stale selected slots when availability is
 });
 
 test("booking journey advances and returns only when the current step is complete", () => {
+  assert.equal(nextBookingJourneyStep("quantity", baseState), "date");
   assert.equal(canAdvanceBookingJourney("date", baseState), true);
   assert.equal(nextBookingJourneyStep("date", baseState), "slot");
   assert.equal(nextBookingJourneyStep("details", baseState), "details");
@@ -230,7 +232,29 @@ test("booking journey advances and returns only when the current step is complet
     customer: { name: "Alex", email: "alex@example.com" },
   }), "review");
   assert.equal(previousBookingJourneyStep("review"), "details");
-  assert.equal(previousBookingJourneyStep("date"), "practitioner");
+  assert.equal(previousBookingJourneyStep("date", baseState), "quantity");
+});
+
+test("pure quantity journey selects seats before availability and enforces service capacity", () => {
+  const capacityState: BookingFlowState = {
+    ...baseState,
+    service: {
+      service_id: "svc_123",
+      name: "Open play",
+      total_quantity: 8,
+      resource_strategy: "quantity",
+    },
+    quantity: 4,
+  };
+
+  assert.equal(canAdvanceBookingJourney("quantity", capacityState), true);
+  assert.equal(nextBookingJourneyStep("practitioner", capacityState), "quantity");
+  assert.equal(nextBookingJourneyStep("quantity", capacityState), "date");
+  assert.equal(nextBookingJourneyStep("slot", capacityState), "details");
+  assert.equal(previousBookingJourneyStep("date", capacityState), "quantity");
+  assert.equal(previousBookingJourneyStep("details", capacityState), "slot");
+  assert.equal(canAdvanceBookingJourney("quantity", { ...capacityState, quantity: 9 }), false);
+  assert.equal(validateBookingFlow({ ...capacityState, quantity: 9 }).missing.includes("quantity"), true);
 });
 
 test("appointment journey requires a practitioner before date selection and forwards staff id", () => {
@@ -256,9 +280,39 @@ test("appointment journey requires a practitioner before date selection and forw
   };
   assert.equal(canAdvanceBookingJourney("practitioner", { ...appointmentState, selectedStaffId: undefined }), false);
   assert.equal(nextBookingJourneyStep("practitioner", appointmentState), "date");
+  assert.equal(previousBookingJourneyStep("date", appointmentState), "practitioner");
   assert.equal(nextBookingJourneyStep("slot", appointmentState), "details");
   assert.equal(previousBookingJourneyStep("details", appointmentState), "slot");
   assert.equal(createReservationPayload(appointmentState).staff_id, appointmentState.selectedStaffId);
+});
+
+test("practitioner-backed appointments take precedence over a quantity resource strategy", () => {
+  const appointmentState: BookingFlowState = {
+    ...baseState,
+    service: {
+      service_id: "svc_123",
+      name: "Consultation",
+      booking_mode: "appointment",
+      resource_strategy: "quantity",
+      resources: [{
+        resource_id: "res_staff",
+        label: "Dr Rivera",
+        kind: "custom",
+        is_active: true,
+        metadata: { platform_staff_id: "33333333-3333-4333-8333-333333333333" },
+      }],
+    },
+    quantity: 1,
+    selectedResourceIds: ["res_staff"],
+    selectedResourceLabels: ["Dr Rivera"],
+    selectedResourceCapacities: [1],
+    selectedStaffId: "33333333-3333-4333-8333-333333333333",
+  };
+
+  assert.equal(isPureQuantityBooking(appointmentState), false);
+  assert.equal(nextBookingJourneyStep("practitioner", appointmentState), "date");
+  assert.equal(previousBookingJourneyStep("date", appointmentState), "practitioner");
+  assert.equal(nextBookingJourneyStep("slot", appointmentState), "details");
 });
 
 test("booking journey maps stale API validation to a recovery instruction", () => {

@@ -174,6 +174,11 @@ export interface ReservationMutationRepositoryPort {
     tenantId: string; venueId: string; actorUserId: string; reservationId: string;
     expectedStatus: AppointmentStatus; date: string; startTime: string; staffId: string; reason: string;
   }): Promise<ReservationMutationRepositoryResult<unknown>>;
+  rescheduleCapacityReservation?(input: {
+    tenantId: string; venueId: string; actorUserId: string; reservationId: string;
+    expectedStatus: AppointmentStatus; date: string; startTime: string; endTime: string;
+    quantity: number; reason: string;
+  }): Promise<ReservationMutationRepositoryResult<unknown>>;
   staffCreateAppointment?(input: {
     tenantId: string; venueId: string; actorUserId: string; reservation: LegacyCoreReservation;
   }): Promise<ReservationMutationRepositoryResult<unknown>>;
@@ -208,6 +213,40 @@ export async function staffRescheduleAppointment(input: {
 }): Promise<ReservationApplicationResult<ReservationResponse>> {
   if (!input.repository.staffRescheduleAppointment) return appointmentOperationUnavailable();
   return normalizeAppointmentOperation(await input.repository.staffRescheduleAppointment(input));
+}
+
+export async function rescheduleCapacityReservation(input: {
+  repository: ReservationMutationRepositoryPort;
+  tenantId: string; venueId: string; actorUserId: string; reservationId: string;
+  expectedStatus: AppointmentStatus; date: string; startTime: string; endTime: string;
+  quantity: number; reason: string;
+}): Promise<ReservationApplicationResult<ReservationResponse>> {
+  const reschedule = input.repository.rescheduleCapacityReservation;
+  if (!reschedule) {
+    return { status: 503, body: platformErrorBody("internal_error", "Capacity reservation operations are not configured", 503) };
+  }
+  const { repository: _repository, ...operation } = input;
+  const result = await reschedule(operation);
+  if (result.error) return { status: 500, body: platformErrorBody("internal_error", "Failed to reschedule reservation", 500) };
+  const record = result.data && typeof result.data === "object" && !Array.isArray(result.data)
+    ? result.data as Record<string, unknown> : {};
+  if (record.ok === true && record.booking) return { status: 200, body: toPlatformReservation(record.booking) };
+  if (record.error_code === "not_found") return { status: 404, body: platformErrorBody("not_found", "Reservation not found", 404) };
+  if (record.error_code === "forbidden") return { status: 403, body: platformErrorBody("forbidden", "Reservation access is not allowed", 403) };
+  const messages: Record<string, string> = {
+    stale: "The reservation changed since it was loaded.",
+    invalid_transition: "This reservation can no longer be rescheduled.",
+    reason_required: "An audit reason is required for this reservation operation.",
+    outside_availability: "The requested time is outside the configured booking availability.",
+    unsupported_mode: "This reservation requires its resource-specific reschedule workflow.",
+    invalid_reservation: "The reservation details are invalid.",
+    not_enough_capacity: "The requested seat capacity is no longer available.",
+  };
+  const code = record.error_code;
+  if (typeof code === "string" && messages[code]) {
+    return { status: 409, body: platformErrorBody("conflict", messages[code], 409, { operation_code: code }) };
+  }
+  return { status: 503, body: platformErrorBody("internal_error", "Capacity reservation operations are not configured", 503) };
 }
 
 function normalizeAppointmentOperation(result: ReservationMutationRepositoryResult<unknown>): ReservationApplicationResult<ReservationResponse> {

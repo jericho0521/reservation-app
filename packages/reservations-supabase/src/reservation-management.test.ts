@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   CANCEL_MANAGED_RESERVATION_RPC,
   READ_MANAGED_RESERVATION_RPC,
+  RESCHEDULE_MANAGED_CAPACITY_RESERVATION_RPC,
   RESCHEDULE_MANAGED_RESERVATION_RPC,
   RESERVATION_MANAGEMENT_TOKENS_TABLE,
   createSupabaseReservationManagementRepository,
@@ -38,6 +39,12 @@ test("management repository persists hashes and owns slug-scoped RPC shapes", as
     startTime: "10:30",
     staffId: "33333333-3333-4333-8333-333333333333",
   });
+  await repository.reschedule({
+    publicSlug: "seat-business",
+    tokenHash,
+    date: "2026-08-02",
+    startTime: "11:00",
+  });
 
   assert.deepEqual(calls, [
     ["from", RESERVATION_MANAGEMENT_TOKENS_TABLE],
@@ -51,6 +58,12 @@ test("management repository persists hashes and owns slug-scoped RPC shapes", as
       p_date: "2026-08-01",
       p_start_time: "10:30",
       p_staff_id: "33333333-3333-4333-8333-333333333333",
+    }],
+    ["rpc", RESCHEDULE_MANAGED_CAPACITY_RESERVATION_RPC, {
+      p_public_slug: "seat-business",
+      p_token_hash: tokenHash,
+      p_date: "2026-08-02",
+      p_start_time: "11:00",
     }],
   ]);
 });

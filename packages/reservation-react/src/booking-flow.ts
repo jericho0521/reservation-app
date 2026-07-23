@@ -11,9 +11,9 @@ import type {
 } from "@reservation-platform/contract-types";
 
 export type BookingStrategy = "quantity" | "assigned_resource" | "hybrid";
-export type BookingJourneyStep = "practitioner" | "date" | "slot" | "options" | "details" | "review" | "success";
+export type BookingJourneyStep = "practitioner" | "quantity" | "date" | "slot" | "options" | "details" | "review" | "success";
 
-export const bookingJourneySteps = ["practitioner", "date", "slot", "options", "details", "review"] as const;
+export const bookingJourneySteps = ["practitioner", "quantity", "date", "slot", "options", "details", "review"] as const;
 
 export function localDateInputValue(date = new Date()): string {
   const year = date.getFullYear();
@@ -109,7 +109,7 @@ export function validateBookingFlow(state: BookingFlowState): BookingFlowValidat
   if (!state.availability) missing.push("availability");
   const currentSelectedSlot = resolveSelectedAvailabilitySlot(state);
   if (!isSlotBookable(currentSelectedSlot, state.quantity)) missing.push("slot");
-  if (!Number.isInteger(state.quantity) || state.quantity < 1) missing.push("quantity");
+  if (!isQuantityWithinServiceCapacity(state)) missing.push("quantity");
   const usesAssignedResources = strategy === "assigned_resource"
     || state.service?.resource_kind === "room"
     || state.selectedResourceIds.length > 0;
@@ -154,10 +154,11 @@ export function canAdvanceBookingJourney(step: BookingJourneyStep, state: Bookin
   const strategy = getServiceStrategy(state.service);
   switch (step) {
     case "practitioner": return appointmentPractitioners(state.service).length === 0 || Boolean(state.selectedStaffId);
+    case "quantity": return isQuantityWithinServiceCapacity(state);
     case "date": return Boolean(state.serviceId && state.date && state.availability);
     case "slot": return isSlotBookable(currentSlot, state.quantity);
     case "options": {
-      if (!Number.isInteger(state.quantity) || state.quantity < 1) return false;
+      if (!isQuantityWithinServiceCapacity(state)) return false;
       const selectedCapacity = getSelectedResourceCapacity(state);
       const requiresResource = strategy === "assigned_resource" || state.service?.resource_kind === "room";
       const allowsCapacitySurplus = state.service?.resource_kind === "room"
@@ -185,16 +186,35 @@ function getSelectedResourceCapacity(
 
 export function nextBookingJourneyStep(step: BookingJourneyStep, state: BookingFlowState): BookingJourneyStep {
   if (!canAdvanceBookingJourney(step, state)) return step;
-  if (step === "slot" && appointmentPractitioners(state.service).length > 0) return "details";
+  if (step === "practitioner") return isPureQuantityBooking(state) ? "quantity" : "date";
+  if (step === "quantity") return "date";
+  if (step === "slot" && (appointmentPractitioners(state.service).length > 0 || isPureQuantityBooking(state))) return "details";
   const index = bookingJourneySteps.indexOf(step as typeof bookingJourneySteps[number]);
   return bookingJourneySteps[index + 1] ?? "review";
 }
 
 export function previousBookingJourneyStep(step: BookingJourneyStep, state?: BookingFlowState): BookingJourneyStep {
   if (step === "success") return "review";
-  if (step === "details" && appointmentPractitioners(state?.service).length > 0) return "slot";
+  if (step === "date" && isPureQuantityBooking(state)) return "quantity";
+  if (step === "date" && appointmentPractitioners(state?.service).length > 0) return "practitioner";
+  if (step === "details" && (appointmentPractitioners(state?.service).length > 0 || isPureQuantityBooking(state))) return "slot";
   const index = bookingJourneySteps.indexOf(step as typeof bookingJourneySteps[number]);
   return bookingJourneySteps[Math.max(0, index - 1)] ?? "practitioner";
+}
+
+export function isPureQuantityBooking(state: Pick<BookingFlowState, "service"> | undefined) {
+  return Boolean(
+    state?.service
+    && getServiceStrategy(state.service) === "quantity"
+    && appointmentPractitioners(state.service).length === 0,
+  );
+}
+
+function isQuantityWithinServiceCapacity(state: Pick<BookingFlowState, "quantity" | "service">) {
+  const maximum = isPureQuantityBooking(state) ? state.service?.total_quantity : undefined;
+  return Number.isInteger(state.quantity)
+    && state.quantity >= 1
+    && (maximum === undefined || maximum <= 0 || state.quantity <= maximum);
 }
 
 export function appointmentPractitioners(service?: ServiceResponse): ResourceResponse[] {

@@ -223,7 +223,7 @@
             ],
             "type": "object"
           },
-          "maxItems": 4,
+          "maxItems": 5,
           "type": "array"
         },
         "reservations_by_day": {
@@ -373,6 +373,7 @@
         "web_booking",
         "web_chat",
         "whatsapp",
+        "staff",
         "simulation"
       ],
       "type": "string"

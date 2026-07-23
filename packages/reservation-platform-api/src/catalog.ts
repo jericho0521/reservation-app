@@ -42,7 +42,7 @@ export type PlatformCatalogRepository = {
   listVenues(): Promise<CatalogListResult<unknown>>;
   getVenue(id: string): Promise<CatalogReadResult<unknown>>;
   listServices(input?: { venueId?: string | null; includeInactive?: boolean }): Promise<CatalogListResult<unknown>>;
-  getService(id: string): Promise<CatalogReadResult<unknown>>;
+  getService(id: string, input?: { includeInactive?: boolean }): Promise<CatalogReadResult<unknown>>;
   listResources(input?: { serviceId?: string | null; venueId?: string | null; includeInactive?: boolean }): Promise<CatalogListResult<unknown>>;
   getResource(id: string): Promise<CatalogReadResult<unknown>>;
   getResourceLayout(id: string): Promise<CatalogReadResult<unknown>>;
@@ -317,9 +317,10 @@ async function runCatalogMutation<TValue, TResponse, TOperation>(
 export async function getPlatformService(
   repository: Pick<PlatformCatalogRepository, "getService">,
   id: string,
+  input?: { includeInactive?: boolean },
 ): Promise<PlatformCatalogResult<ServiceResponse>> {
   const repositoryResult = await readCatalogRepository(
-    () => repository.getService(id),
+    () => repository.getService(id, input),
     {
       failureMessage: "Failed to fetch service.",
       notFoundMessage: "Service not found.",

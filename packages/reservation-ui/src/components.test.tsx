@@ -250,6 +250,18 @@ test("appointment progress uses the fixed practitioner booking sequence", () => 
   assert.equal(collectProps(element, (props) => props["aria-current"] === "step" ? true : undefined).length, 1);
 });
 
+test("capacity progress asks for seats before live availability", () => {
+  const element = BookingStepProgress({ step: "quantity", capacity: true });
+  assert.match(flattenText(element), /Service.*Seats.*Date.*Time.*Details.*Review/u);
+  assert.doesNotMatch(flattenText(element), /Practitioner|Options/u);
+});
+
+test("capacity progress preserves configured quantity terminology", () => {
+  const element = BookingStepProgress({ step: "quantity", capacity: true, quantityLabel: "Participants" });
+  assert.match(flattenText(element), /Service.*Participants.*Date.*Time.*Details.*Review/u);
+  assert.doesNotMatch(flattenText(element), /Seats/u);
+});
+
 test("booking step actions keep confirmation disabled until review is valid", () => {
   const element = BookingStepActions({
     canContinue: false,

@@ -325,6 +325,30 @@
       "scope": "reservation-platform",
       "sha256": "2c2fffe29bdf68aa52f5c957934205ef450eadeb51ebf23fd0f4a1a1c2fca225",
       "bytes": 28928
+    },
+    {
+      "order": 41,
+      "path": "packages/database/migrations/supabase/000041_capacity_booking_default.sql",
+      "module": "core",
+      "scope": "reservation-platform",
+      "sha256": "115f1373bd129c73c833942b7b7314b759b15b1824b603f62903b56645b1361c",
+      "bytes": 12716
+    },
+    {
+      "order": 42,
+      "path": "packages/database/migrations/supabase/000042_capacity_reschedule_safety.sql",
+      "module": "core",
+      "scope": "reservation-platform",
+      "sha256": "0c9f09536094de5f8073a31b58570badc87a69bf7b195b718934378f6be7d2a3",
+      "bytes": 29759
+    },
+    {
+      "order": 43,
+      "path": "packages/database/migrations/supabase/000043_capacity_booking_concurrency.sql",
+      "module": "core",
+      "scope": "reservation-platform",
+      "sha256": "1cab705ad69c4f98838a24cee0da8344e7c93b351384e824eb8936aad873368d",
+      "bytes": 10007
     }
   ],
   "optionalMigrations": [

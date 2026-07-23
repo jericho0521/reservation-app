@@ -1,8 +1,10 @@
 import {
   isPlatformError,
   type AvailabilitySlot,
+  type ReservationItemInput,
   type ReservationPlatformClient,
   type ReservationResponse,
+  type ResourceResponse,
   type RescheduleManagedReservationInput,
 } from "@reservation-platform/sdk";
 
@@ -25,15 +27,41 @@ export async function loadManagedRescheduleAvailability(
   token: string,
   reservation: Pick<ReservationResponse, "service_id" | "staff_id" | "quantity">,
   date: string,
-): Promise<AvailabilitySlot[]> {
-  if (!reservation.staff_id) return [];
+): Promise<{
+  slots: AvailabilitySlot[];
+  resourceStrategy?: "quantity" | "assigned_resource" | "hybrid";
+  resources?: ResourceResponse[];
+}> {
   const result = await client.listManagedReservationAvailability(slug, token, {
     service_id: reservation.service_id,
     date,
     quantity: reservation.quantity,
-    staff_id: reservation.staff_id,
+    ...(reservation.staff_id ? { staff_id: reservation.staff_id } : {}),
   });
-  return result.slots.filter((slot) => slot.is_available && slot.available_quantity >= reservation.quantity);
+  return {
+    slots: result.slots.filter((slot) => slot.is_available && slot.available_quantity >= reservation.quantity),
+    ...(result.resource_strategy ? { resourceStrategy: result.resource_strategy } : {}),
+    ...(result.resources ? { resources: result.resources } : {}),
+  };
+}
+
+export function supportsManagedReschedule(input: {
+  staffId?: string;
+  resourceStrategy?: "quantity" | "assigned_resource" | "hybrid";
+  reservationItems?: ReservationItemInput[];
+  resources?: ResourceResponse[];
+}) {
+  if (input.staffId) return true;
+  if (input.resourceStrategy !== "quantity") return false;
+
+  const resourcesById = new Map(
+    (input.resources ?? []).map((resource) => [resource.resource_id, resource]),
+  );
+  return (input.reservationItems ?? []).every((item) => {
+    if (item.resource_label) return false;
+    if (!item.resource_id) return true;
+    return resourcesById.get(item.resource_id)?.kind === "capacity_bucket";
+  });
 }
 
 export async function submitManagedReschedule(

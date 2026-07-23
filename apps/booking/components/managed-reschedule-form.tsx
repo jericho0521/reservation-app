@@ -9,6 +9,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import {
   loadManagedRescheduleAvailability,
+  supportsManagedReschedule,
   submitManagedReschedule,
 } from "../lib/reservation-management";
 
@@ -21,7 +22,7 @@ export function ManagedRescheduleForm({
   baseUrl: string;
   slug: string;
   token: string;
-  reservation: Pick<ReservationResponse, "service_id" | "staff_id" | "quantity" | "date" | "start_at">;
+  reservation: Pick<ReservationResponse, "service_id" | "staff_id" | "quantity" | "date" | "start_at" | "reservation_items">;
 }) {
   const router = useRouter();
   const client = useMemo(() => createReservationPlatformClient({ baseUrl }), [baseUrl]);
@@ -30,19 +31,33 @@ export function ManagedRescheduleForm({
   const [selectedStart, setSelectedStart] = useState("");
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [rescheduleMode, setRescheduleMode] = useState<"checking" | "supported" | "unsupported" | "error">(
+    reservation.staff_id ? "supported" : "checking",
+  );
   const [notice, setNotice] = useState<{ kind: "error" | "success"; message: string }>();
 
   async function refreshAvailability(nextDate: string) {
-    if (!nextDate || !reservation.staff_id) {
+    if (!nextDate) {
       setSlots([]);
       return;
     }
+    if (!reservation.staff_id) setRescheduleMode("checking");
+    setNotice(undefined);
     setLoading(true);
     try {
-      setSlots(await loadManagedRescheduleAvailability(client, slug, token, reservation, nextDate));
+      const availability = await loadManagedRescheduleAvailability(client, slug, token, reservation, nextDate);
+      const supported = supportsManagedReschedule({
+        ...(reservation.staff_id ? { staffId: reservation.staff_id } : {}),
+        ...(availability.resourceStrategy ? { resourceStrategy: availability.resourceStrategy } : {}),
+        ...(reservation.reservation_items ? { reservationItems: reservation.reservation_items } : {}),
+        ...(availability.resources ? { resources: availability.resources } : {}),
+      });
+      setRescheduleMode(supported ? "supported" : "unsupported");
+      setSlots(supported ? availability.slots : []);
     } catch {
       setSlots([]);
       setNotice({ kind: "error", message: "Available times could not be loaded. Please try again." });
+      if (!reservation.staff_id) setRescheduleMode("error");
     } finally {
       setLoading(false);
     }
@@ -52,18 +67,18 @@ export function ManagedRescheduleForm({
     setSelectedStart("");
     setNotice(undefined);
     void refreshAvailability(date);
-  }, [client, date, reservation.service_id, reservation.staff_id, slug, token]);
+  }, [client, date, reservation.service_id, reservation.staff_id, reservation.reservation_items, slug, token]);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!reservation.staff_id || !selectedStart) return;
+    if (!selectedStart) return;
     setSubmitting(true);
     setNotice(undefined);
     try {
       const result = await submitManagedReschedule(client, slug, token, {
         date,
         start_time: selectedStart,
-        staff_id: reservation.staff_id,
+        ...(reservation.staff_id ? { staff_id: reservation.staff_id } : {}),
       });
       if (!result.updated) {
         setSelectedStart("");
@@ -71,23 +86,36 @@ export function ManagedRescheduleForm({
         await refreshAvailability(date);
         return;
       }
-      setNotice({ kind: "success", message: "Your appointment was rescheduled." });
+      setNotice({ kind: "success", message: `Your ${reservation.staff_id ? "appointment" : "reservation"} was rescheduled.` });
       await refreshAvailability(date);
       router.refresh();
     } catch {
-      setNotice({ kind: "error", message: "The appointment could not be rescheduled. Please try again." });
+      setNotice({ kind: "error", message: `The ${reservation.staff_id ? "appointment" : "reservation"} could not be rescheduled. Please try again.` });
     } finally {
       setSubmitting(false);
     }
   }
 
-  if (!reservation.staff_id) {
-    return <p className="manage-cancelled">Contact the business to change the practitioner or appointment time.</p>;
-  }
+  if (rescheduleMode === "checking") return <section className="manage-reschedule" aria-live="polite">
+    <h2>Checking reschedule options</h2>
+    <p>Confirming whether this reservation can be rescheduled online…</p>
+  </section>;
+
+  if (rescheduleMode === "error") return <section className="manage-reschedule">
+    <h2>Choose a new date</h2>
+    <p role="alert" className="manage-error">{notice?.message ?? "Available times could not be loaded. Please try again."}</p>
+    <label>Date<input type="date" value={date} onChange={(event) => setDate(event.currentTarget.value)} required /></label>
+    <button type="button" disabled={loading || !date} onClick={() => void refreshAvailability(date)}>{loading ? "Checking…" : "Try again"}</button>
+  </section>;
+
+  if (rescheduleMode === "unsupported") return <section className="manage-reschedule">
+    <h2>Contact the business to reschedule</h2>
+    <p>This reservation uses an assigned resource. The business must confirm another available resource before moving it.</p>
+  </section>;
 
   return <form onSubmit={submit} className="manage-reschedule">
     <h2>Choose a new time</h2>
-    <p>Only currently available times for your practitioner can be selected.</p>
+    <p>{reservation.staff_id ? "Only currently available times for your practitioner can be selected." : "Only times with enough remaining capacity are shown."}</p>
     {notice ? <p role={notice.kind === "error" ? "alert" : "status"} className={notice.kind === "error" ? "manage-error" : "manage-success"}>{notice.message}</p> : null}
     <label>Date<input type="date" value={date} onChange={(event) => setDate(event.currentTarget.value)} required /></label>
     <fieldset className="manage-slot-fieldset" disabled={loading || submitting}>
@@ -102,6 +130,6 @@ export function ManagedRescheduleForm({
         })}
       </div>}
     </fieldset>
-    <button type="submit" disabled={!selectedStart || submitting}>{submitting ? "Rescheduling…" : "Reschedule appointment"}</button>
+    <button type="submit" disabled={!selectedStart || submitting}>{submitting ? "Rescheduling…" : `Reschedule ${reservation.staff_id ? "appointment" : "reservation"}`}</button>
   </form>;
 }

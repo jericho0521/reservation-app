@@ -16,6 +16,7 @@ import {
   prepareReservationRescheduleInput,
   prepareReservationUpdatePatch,
   readReservationById,
+  rescheduleCapacityReservation,
   normalizeReservationSearchTerm,
   rescheduleReservationWithLegacyPatch,
   staffRescheduleAppointment,
@@ -71,6 +72,75 @@ test("staff reschedule maps successful atomic bookings to the typed response", a
   });
   assert.equal(result.status, 200);
   assert.equal("staff_id" in result.body ? result.body.staff_id : undefined, "55555555-5555-4555-8555-555555555555");
+});
+
+test("capacity reschedule preserves actor, reason, quantity, and optimistic status in one repository call", async () => {
+  let call: unknown;
+  const repository: ReservationMutationRepositoryPort = {
+    async updateReservation() { return { data: null }; },
+    async rescheduleCapacityReservation(input) {
+      call = input;
+      return { data: { ok: true, booking: {
+        id: input.reservationId,
+        service_id: "44444444-4444-4444-8444-444444444444",
+        booking_date: input.date,
+        start_time: input.startTime,
+        end_time: input.endTime,
+        seats_booked: input.quantity,
+        status: "confirmed",
+      } } };
+    },
+  };
+  const result = await rescheduleCapacityReservation({
+    repository,
+    tenantId: "tenant-a",
+    venueId: "11111111-1111-4111-8111-111111111111",
+    actorUserId: "22222222-2222-4222-8222-222222222222",
+    reservationId: "33333333-3333-4333-8333-333333333333",
+    expectedStatus: "confirmed",
+    date: "2026-07-20",
+    startTime: "10:00",
+    endTime: "11:00",
+    quantity: 3,
+    reason: "Customer requested a later time",
+  });
+  assert.equal(result.status, 200);
+  assert.equal("quantity" in result.body ? result.body.quantity : undefined, 3);
+  assert.deepEqual(call, {
+    tenantId: "tenant-a",
+    venueId: "11111111-1111-4111-8111-111111111111",
+    actorUserId: "22222222-2222-4222-8222-222222222222",
+    reservationId: "33333333-3333-4333-8333-333333333333",
+    expectedStatus: "confirmed",
+    date: "2026-07-20",
+    startTime: "10:00",
+    endTime: "11:00",
+    quantity: 3,
+    reason: "Customer requested a later time",
+  });
+});
+
+test("capacity reschedule maps unavailable capacity to a stable conflict", async () => {
+  const result = await rescheduleCapacityReservation({
+    repository: {
+      async updateReservation() { return { data: null }; },
+      async rescheduleCapacityReservation() {
+        return { data: { ok: false, error_code: "not_enough_capacity", available_quantity: 1 } };
+      },
+    },
+    tenantId: "tenant-a",
+    venueId: "11111111-1111-4111-8111-111111111111",
+    actorUserId: "22222222-2222-4222-8222-222222222222",
+    reservationId: "33333333-3333-4333-8333-333333333333",
+    expectedStatus: "confirmed",
+    date: "2026-07-20",
+    startTime: "10:00",
+    endTime: "11:00",
+    quantity: 3,
+    reason: "Customer requested a later time",
+  });
+  assert.equal(result.status, 409);
+  assert.equal("error" in result.body ? result.body.error.message : undefined, "The requested seat capacity is no longer available.");
 });
 
 const apiPackageSrcDir = dirname(fileURLToPath(import.meta.url));

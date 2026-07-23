@@ -5,6 +5,7 @@
         "web_booking",
         "web_chat",
         "whatsapp",
+        "staff",
         "simulation"
       ],
       "type": "string"

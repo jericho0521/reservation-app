@@ -15,6 +15,7 @@ export const jsonValueSchema: z.ZodType<unknown> = z.lazy(() => z.union([
 ]));
 
 export const experiencePresetIdSchema = z.enum([
+  "seat_capacity",
   "racing_gaming",
   "rooms_facilities",
   "appointments_salon",
@@ -544,7 +545,7 @@ export const experienceChannelSettingsResponseSchema = strictObject({
   }),
 });
 
-export const operationsReservationChannelSchema = z.enum(["web_booking", "web_chat", "whatsapp", "simulation"]);
+export const operationsReservationChannelSchema = z.enum(["web_booking", "web_chat", "whatsapp", "staff", "simulation"]);
 export const operationsTimelineReservationSchema = strictObject({
   reservation_id: z.string(),
   service_name: z.string(),
@@ -611,7 +612,7 @@ export const analyticsResponseSchema = strictObject({
   totals: strictObject({ reservations: boundedCountSchema, cancelled: boundedCountSchema, cancellation_rate: analyticsRateSchema }),
   reservations_by_day: z.array(strictObject({ date: analyticsDateSchema, total: boundedCountSchema, confirmed: boundedCountSchema, completed: boundedCountSchema, cancelled: boundedCountSchema })).max(366),
   reservations_by_status: z.array(strictObject({ status: z.string(), count: boundedCountSchema })).max(20),
-  reservations_by_channel: z.array(strictObject({ channel: operationsReservationChannelSchema, count: boundedCountSchema })).max(4),
+  reservations_by_channel: z.array(strictObject({ channel: operationsReservationChannelSchema, count: boundedCountSchema })).max(5),
   channel_performance: z.array(strictObject({ channel: z.enum(["web_chat", "whatsapp", "simulation"]), conversations_started: boundedCountSchema, proposal_shown: boundedCountSchema, confirmation_requested: boundedCountSchema, reservations_created: boundedCountSchema, conversion_rate: analyticsRateSchema })).max(3),
   reservations_by_service: z.array(strictObject({ service_id: z.string(), service_name: z.string(), count: boundedCountSchema })).max(20),
   popular_slots: z.array(strictObject({ day_of_week: z.number().int().min(1).max(7), start_time: z.string(), count: boundedCountSchema })).max(20),
@@ -897,7 +898,7 @@ export const rescheduleReservationInputSchema = strictObject({
 export const rescheduleManagedReservationInputSchema = strictObject({
   date: localDateSchema,
   start_time: localTimeSchema,
-  staff_id: z.string().uuid(),
+  staff_id: z.string().uuid().optional(),
 });
 
 export const listResourceMaintenanceQuerySchema = strictObject({

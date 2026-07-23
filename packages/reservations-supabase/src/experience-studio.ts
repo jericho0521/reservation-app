@@ -40,6 +40,7 @@ export interface ExperienceSupabaseLikeClient {
 }
 
 const presetIds = new Set<ExperiencePresetId>([
+  "seat_capacity",
   "racing_gaming",
   "rooms_facilities",
   "appointments_salon",

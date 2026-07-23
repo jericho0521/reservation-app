@@ -18,8 +18,7 @@
       },
       "required": [
         "date",
-        "start_time",
-        "staff_id"
+        "start_time"
       ],
       "type": "object"
     }

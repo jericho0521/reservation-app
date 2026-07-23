@@ -276,10 +276,11 @@ function BookingFlowInner({
     bookingStrategy,
     resources.length,
   );
+  const capacityBooking = bookingStrategy === "quantity";
 
   useEffect(() => {
-    if (step === "practitioner" && flow.state.service && practitioners.length === 0) setStep("date");
-  }, [flow.state.service, practitioners.length, step]);
+    if (step === "practitioner" && flow.state.service && practitioners.length === 0) setStep(capacityBooking ? "quantity" : "date");
+  }, [capacityBooking, flow.state.service, practitioners.length, step]);
 
   async function submit() {
     setSubmitError(undefined);
@@ -296,7 +297,9 @@ function BookingFlowInner({
   const canContinue = canAdvanceBookingJourney(step, flow.state);
   const journey: readonly BookingJourneyStep[] = practitioners.length > 0
     ? ["practitioner", "date", "slot", "details", "review"]
-    : ["date", "slot", "options", "details", "review"];
+    : capacityBooking
+      ? ["quantity", "date", "slot", "details", "review"]
+      : ["date", "slot", "options", "details", "review"];
   const stepIndex = step === "success" ? journey.length : journey.indexOf(step);
 
   return (
@@ -322,7 +325,7 @@ function BookingFlowInner({
           </div>
         )}
       </div>
-      <BookingStepProgress step={step} appointment={practitioners.length > 0} />
+      <BookingStepProgress step={step} appointment={practitioners.length > 0} capacity={capacityBooking} quantityLabel={mergedLabels.quantity} />
       <div className="rp-layout rp-journey-layout">
         <div className="rp-main">
           {step === "practitioner" ? <BookingStepPanel step={step} title="Choose a practitioner" description="Select who you would like to see before choosing a date and time.">
@@ -342,6 +345,9 @@ function BookingFlowInner({
                 </button>;
               })}
             </div>
+          </BookingStepPanel> : null}
+          {step === "quantity" ? <BookingStepPanel step={step} stepLabel={mergedLabels.quantity} title={`Choose ${mergedLabels.quantity.toLowerCase()}`} description={`Select a value from 1 to ${flow.state.service?.total_quantity ?? 1} before checking live availability.`}>
+            <QuantitySelector label={mergedLabels.quantity} value={flow.state.quantity} max={flow.state.service?.total_quantity ?? 1} onChange={flow.actions.setQuantity} className={mergedTheme.input} />
           </BookingStepPanel> : null}
           {step === "date" ? <BookingStepPanel step={step} title="Choose a date" description="We will check the latest opening hours and booking notice rules.">
             <DatePicker label={mergedLabels.date} value={flow.state.date} onChange={flow.actions.setDate} className={mergedTheme.input} />
@@ -364,7 +370,7 @@ function BookingFlowInner({
               }}
               theme={mergedTheme}
             /> : null}
-            {controlVisibility.showQuantitySelector ? <QuantitySelector label={mergedLabels.quantity} value={flow.state.quantity} onChange={flow.actions.setQuantity} className={mergedTheme.input} /> : null}
+            {controlVisibility.showQuantitySelector ? <QuantitySelector label={mergedLabels.quantity} value={flow.state.quantity} max={flow.state.service?.total_quantity} onChange={flow.actions.setQuantity} className={mergedTheme.input} /> : null}
           </BookingStepPanel> : null}
           {step === "details" ? <BookingStepPanel step={step} title="Your details" description="We use these details only for this reservation and its updates.">
             <CustomerForm labels={mergedLabels} customer={flow.state.customer} purpose={flow.state.purpose} inputClassName={mergedTheme.input} onCustomerChange={flow.actions.setCustomer} onPurposeChange={flow.actions.setPurpose} />
@@ -536,11 +542,13 @@ export function QuantitySelector({
   label,
   value,
   onChange,
+  max,
   className,
 }: {
   label: string;
   value: number;
   onChange: (value: number) => void;
+  max?: number;
   className?: string;
 }) {
   return (
@@ -551,6 +559,7 @@ export function QuantitySelector({
       <input
         type="number"
         min={1}
+        max={max}
         value={value}
         className={cn(className, "focus:ring-1 focus:ring-black dark:focus:ring-white")}
         onChange={(event) => onChange(Number(event.currentTarget.value))}

@@ -21,11 +21,16 @@ import {
   type ConversationResponse,
   type ExperienceConfigurationResponse,
   type ExperienceWorkspaceResponse,
+  type JsonValue,
   type PlatformErrorResponse,
   type PublicExperienceResponse,
 } from "@reservation-platform/contract-types";
 import { createAssignedResourcePolicy, type ReservationService } from "@project-play/reservations-core";
-import { InMemoryConversationBookingStateStore } from "@reservation-platform/api";
+import {
+  createJsonRequestFingerprint,
+  InMemoryConversationBookingStateStore,
+  prepareReservationCreateInput,
+} from "@reservation-platform/api";
 import type {
   AuthenticatedPlatformPrincipal,
   AvailabilityRepositoryPort,
@@ -1198,6 +1203,7 @@ test("public booking creates only against a published venue service and scopes i
   const serviceId = "11111111-1111-4111-8111-111111111111";
   const idempotencyRepository = new InMemoryIdempotencyRepository();
   let managementIssue: unknown;
+  let persistedReservation: unknown;
   const response = await handleStandaloneApiRequest({
     method: "POST",
     path: "/v1/public/experiences/apex-racing/reservations",
@@ -1208,6 +1214,7 @@ test("public booking creates only against a published venue service and scopes i
       start_time: "09:00",
       end_time: "10:00",
       quantity: 1,
+      source: "simulation",
       customer: { name: "Alex", email: "alex@example.com" },
     },
   }, {
@@ -1219,7 +1226,12 @@ test("public booking creates only against a published venue service and scopes i
       },
     }),
     idempotencyRepository,
-    reservationCreateRepository: reservationCreateRepository(),
+    reservationCreateRepository: reservationCreateRepository({
+      async createReservationAtomic(input) {
+        persistedReservation = input.reservation;
+        return { ok: true, atomic: true, reservation: input.reservation, booking: reservationRow(), validation: { ok: true } };
+      },
+    }),
     reservationManagementRepository: reservationManagementRepository({
       issue: async (input) => { managementIssue = input; return { data: { id: "token-row" } }; },
     }),
@@ -1228,6 +1240,8 @@ test("public booking creates only against a published venue service and scopes i
   assert.equal(response.status, 201);
   assert.equal(idempotencyRepository.records.get("public_booking_12345678")?.tenantId, "tenant_1");
   assert.equal(idempotencyRepository.records.get("public_booking_12345678")?.path, "/v1/public/experiences/apex-racing/reservations");
+  assert.equal((persistedReservation as { channel?: string }).channel, "web_booking");
+  assert.equal((persistedReservation as { interface_type?: string }).interface_type, "form");
   const body = response.body as { management_token?: string; management_expires_at?: string };
   assert.match(body.management_token ?? "", /^[A-Za-z0-9_-]{43}$/u);
   assert.match(body.management_expires_at ?? "", /^\d{4}-\d{2}-\d{2}T/u);
@@ -1316,12 +1330,27 @@ test("public management routes read, reschedule, and replay cancellation without
       staff_id: "33333333-3333-4333-8333-333333333333",
     },
   }, { serviceApiKey: "secret", reservationManagementRepository: repository });
+  const capacityRescheduled = await handleStandaloneApiRequest({
+    method: "POST",
+    path: `/v1/public/experiences/apex-racing/manage/${token}/reschedule`,
+    headers: {},
+    body: {
+      date: "2026-08-03",
+      start_time: "11:00",
+    },
+  }, { serviceApiKey: "secret", reservationManagementRepository: repository });
 
   assert.equal(read.status, 200);
   assert.equal(cancelled.status, 200);
   assert.equal((cancelled.body as { status: string }).status, "cancelled");
   assert.equal(rescheduled.status, 200);
-  assert.deepEqual(calls, ["read", "cancel", "reschedule:2026-08-02:10:30:33333333-3333-4333-8333-333333333333"]);
+  assert.equal(capacityRescheduled.status, 200);
+  assert.deepEqual(calls, [
+    "read",
+    "cancel",
+    "reschedule:2026-08-02:10:30:33333333-3333-4333-8333-333333333333",
+    "reschedule:2026-08-03:11:00:undefined",
+  ]);
 });
 
 test("managed availability hashes the token and uses the self-excluding repository scope", async () => {
@@ -3658,6 +3687,10 @@ test("bearer verifier runs before idempotency, body validation, and repository w
         calls.push("idempotency");
         idempotencyRepository.storeCompleted(record);
       },
+      releaseInProgress(token) {
+        calls.push("idempotency");
+        idempotencyRepository.releaseInProgress(token);
+      },
     },
     reservationCreateRepository: reservationCreateRepository({
       async createReservationAtomic() {
@@ -3993,6 +4026,10 @@ test("service-token auth protects each platform data route class before route de
       storeCompleted(record) {
         idempotencyCalls += 1;
         idempotencyRepository.storeCompleted(record);
+      },
+      releaseInProgress(token) {
+        idempotencyCalls += 1;
+        idempotencyRepository.releaseInProgress(token);
       },
     },
     reservationCreateRepository: reservationCreateRepository({
@@ -4879,7 +4916,7 @@ test("reservation create route requires an idempotency key before validation or 
   const response = await handler({
     method: "POST",
     path: "/v1/reservations",
-    body: validCreateReservationBody(),
+    body: validCreateReservationBody({ source: "simulation" }),
   });
 
   assert.equal(repositoryCalled, false);
@@ -4958,6 +4995,9 @@ test("standalone Node server rejects unauthenticated malformed reservation JSON 
       storeCompleted() {
         idempotencyCalls += 1;
       },
+      releaseInProgress() {
+        idempotencyCalls += 1;
+      },
     },
     reservationCreateRepository: reservationCreateRepository({
       async createReservationAtomic() {
@@ -5003,6 +5043,9 @@ test("standalone Node server rejects unauthenticated malformed optional-body mut
         return new InMemoryIdempotencyRepository().claimInProgress(record);
       },
       storeCompleted() {
+        idempotencyCalls += 1;
+      },
+      releaseInProgress() {
         idempotencyCalls += 1;
       },
     },
@@ -5063,6 +5106,9 @@ test("standalone Node server does not mutate authenticated optional-body routes 
         return new InMemoryIdempotencyRepository().claimInProgress(record);
       },
       storeCompleted() {
+        idempotencyCalls += 1;
+      },
+      releaseInProgress() {
         idempotencyCalls += 1;
       },
     },
@@ -5135,6 +5181,9 @@ test("standalone Node server preserves non-204 auth preflight failures before ma
         throw new Error("auth preflight failure should block idempotency");
       },
       storeCompleted() {
+        throw new Error("auth preflight failure should block idempotency");
+      },
+      releaseInProgress() {
         throw new Error("auth preflight failure should block idempotency");
       },
     },
@@ -5349,6 +5398,7 @@ test("reservation create route uses injected repositories and commits successful
       ],
       status: "confirmed",
       interface_type: "form",
+      channel: "web_booking",
       seats_booked: 2,
       seat_labels: ["A1", "B1"],
     },
@@ -5388,6 +5438,45 @@ test("reservation create route replays completed idempotent responses without a 
   assert.equal(second.status, 201);
   assert.deepEqual(second.body, first.body);
   assert.equal(createCalls, 1);
+});
+
+test("reservation create replays fingerprints created before trusted channel attribution", async () => {
+  let createCalls = 0;
+  const key = "idem_pre_trusted_channel_123";
+  const body = validCreateReservationBody();
+  const prepared = prepareReservationCreateInput(body);
+  assert.equal(prepared.status, 200);
+  if (prepared.status !== 200) return;
+  const previousResponse = { reservation_id: validReservationId(), replayed: true };
+  const idempotencyRepository = new InMemoryIdempotencyRepository();
+  idempotencyRepository.records.set(key, {
+    key,
+    method: "POST",
+    path: "/v1/reservations",
+    fingerprint: createJsonRequestFingerprint(prepared.input as unknown as JsonValue),
+    status: "completed",
+    response: { status: 201, body: previousResponse },
+  });
+  const handler = createStandaloneApiHandler({
+    idempotencyRepository,
+    reservationCreateRepository: reservationCreateRepository({
+      async createReservationAtomic() {
+        createCalls += 1;
+        throw new Error("a completed pre-upgrade request must replay without another mutation");
+      },
+    }),
+  });
+
+  const replay = await handler({
+    method: "POST",
+    path: "/v1/reservations",
+    headers: { "Idempotency-Key": key },
+    body,
+  });
+
+  assert.equal(replay.status, 201);
+  assert.deepEqual(replay.body, previousResponse);
+  assert.equal(createCalls, 0);
 });
 
 test("reservation create route rejects idempotency key reuse with a different request", async () => {
@@ -5553,9 +5642,470 @@ test("reservation update route uses injected repositories and commits successful
   assert.equal(idempotencyRepository.records.get("idem_update_success_123")?.tenantId, "tenant_1");
 });
 
-test("reservation reschedule route uses injected repositories and platform response mapping", async () => {
+test("capacity reschedule route includes archived services and uses the authenticated actor", async () => {
+  let repositoryCall: unknown;
+  let serviceRead: unknown;
+  const actorUserId = "223e4567-e89b-42d3-a456-426614174000";
+  const venueId = "123e4567-e89b-42d3-a456-426614174000";
+  const dependencies = {
+    sessionAuth: { repositories: authRepository({
+      async readSession() {
+        return { userId: actorUserId, tenantId: "tenant-1", role: "staff", venueIds: [venueId], expiresAt: "2026-07-15T12:00:00.000Z" };
+      },
+    }), allowedOrigins: [authOrigin] },
+    idempotencyRepository: new InMemoryIdempotencyRepository(),
+    reservationReadRepository: reservationReadRepository(),
+    catalogRepository: catalogRepository({
+      async getService(id, input) {
+        serviceRead = { id, input };
+        return { data: { id, venue_id: venueId, name: "Simulator", resource_strategy: "quantity", metadata: { is_active: false } } };
+      },
+    }),
+    reservationMutationRepository: reservationMutationRepository({
+      async rescheduleCapacityReservation(input) {
+        repositoryCall = input;
+        return {
+          data: { ok: true, booking: reservationRow({
+            id: input.reservationId, booking_date: input.date, start_time: input.startTime,
+            end_time: input.endTime, seats_booked: input.quantity, seat_labels: [],
+          }) },
+        };
+      },
+    }),
+  };
+
+  const response = await handleStandaloneApiRequest({
+    method: "POST",
+    path: `/v1/reservations/${validReservationId()}/reschedule`,
+    headers: {
+      cookie: `reservation_session=${"s".repeat(43)}; reservation_csrf=${"c".repeat(43)}`,
+      origin: authOrigin,
+      "x-csrf-token": "c".repeat(43),
+      "x-reservation-venue-id": venueId,
+      "Idempotency-Key": "idem_reschedule_success_123",
+    },
+    body: {
+      date: "2026-07-02",
+      start_time: "15:00",
+      end_time: "16:00",
+      quantity: 1,
+      metadata: {
+        expected_status: "confirmed",
+        reschedule_reason: "Customer requested later",
+        changed_by: "owner_console",
+      },
+    },
+  }, dependencies);
+
+  assert.equal(response.status, 200);
+  assert.deepEqual(serviceRead, {
+    id: "svc_123",
+    input: { includeInactive: true },
+  });
+  assert.equal(reservationResponseSchema.safeParse(response.body).success, true);
+  assert.deepEqual(response.body, reservationBody({
+    date: "2026-07-02",
+    start_time: "15:00",
+    end_time: "16:00",
+    quantity: 1,
+    reservation_items: undefined,
+  }));
+  assert.deepEqual(repositoryCall, {
+    tenantId: "tenant-1",
+    venueId,
+    actorUserId,
+    reservationId: validReservationId(),
+    expectedStatus: "confirmed",
+    date: "2026-07-02",
+    startTime: "15:00",
+    endTime: "16:00",
+    quantity: 1,
+    reason: "Customer requested later",
+  });
+});
+
+test("session capacity reschedules without console metadata still use the atomic path", async () => {
+  let repositoryCall: unknown;
+  let legacyUpdateCalls = 0;
+  const actorUserId = "223e4567-e89b-42d3-a456-426614174000";
+  const venueId = "123e4567-e89b-42d3-a456-426614174000";
+  const response = await handleStandaloneApiRequest({
+    method: "POST",
+    path: `/v1/reservations/${validReservationId()}/reschedule`,
+    headers: {
+      cookie: `reservation_session=${"s".repeat(43)}; reservation_csrf=${"c".repeat(43)}`,
+      origin: authOrigin,
+      "x-csrf-token": "c".repeat(43),
+      "x-reservation-venue-id": venueId,
+      "Idempotency-Key": "idem_session_capacity_reschedule_123",
+    },
+    body: {
+      start_at: "2026-07-02T15:00:00.000Z",
+      end_at: "2026-07-02T16:00:00.000Z",
+      quantity: 1,
+    },
+  }, {
+    sessionAuth: { repositories: authRepository({
+      async readSession() {
+        return { userId: actorUserId, tenantId: "tenant-1", role: "staff", venueIds: [venueId], expiresAt: "2026-07-15T12:00:00.000Z" };
+      },
+    }), allowedOrigins: [authOrigin] },
+    idempotencyRepository: new InMemoryIdempotencyRepository(),
+    reservationReadRepository: reservationReadRepository(),
+    catalogRepository: catalogRepository({
+      async getService(id) {
+        return { data: { id, venue_id: venueId, name: "Simulator", resource_strategy: "quantity" } };
+      },
+    }),
+    reservationMutationRepository: reservationMutationRepository({
+      async updateReservation() {
+        legacyUpdateCalls += 1;
+        return { data: reservationRow() };
+      },
+      async rescheduleCapacityReservation(input) {
+        repositoryCall = input;
+        return {
+          data: { ok: true, booking: reservationRow({
+            id: input.reservationId,
+            booking_date: input.date,
+            start_time: input.startTime,
+            end_time: input.endTime,
+            seats_booked: input.quantity,
+            seat_labels: [],
+          }) },
+        };
+      },
+    }),
+  });
+
+  assert.equal(response.status, 200);
+  assert.equal(legacyUpdateCalls, 0);
+  assert.deepEqual(repositoryCall, {
+    tenantId: "tenant-1",
+    venueId,
+    actorUserId,
+    reservationId: validReservationId(),
+    expectedStatus: "confirmed",
+    date: "2026-07-02",
+    startTime: "15:00",
+    endTime: "16:00",
+    quantity: 1,
+    reason: "Reservation rescheduled through authenticated API.",
+  });
+});
+
+test("session capacity reschedules derive the end when only the start changes", async () => {
+  const actorUserId = "223e4567-e89b-42d3-a456-426614174000";
+  const venueId = "123e4567-e89b-42d3-a456-426614174000";
+  const cases = [
+    {
+      key: "idem_start_time_only_123",
+      body: { start_time: "15:30" },
+      expectedDate: "2026-07-01",
+    },
+    {
+      key: "idem_start_at_only_123",
+      body: { start_at: "2026-07-02T15:30:00.000Z" },
+      expectedDate: "2026-07-02",
+    },
+  ];
+
+  for (const testCase of cases) {
+    let repositoryCall: unknown;
+    const response = await handleStandaloneApiRequest({
+      method: "POST",
+      path: `/v1/reservations/${validReservationId()}/reschedule`,
+      headers: {
+        cookie: `reservation_session=${"s".repeat(43)}; reservation_csrf=${"c".repeat(43)}`,
+        origin: authOrigin,
+        "x-csrf-token": "c".repeat(43),
+        "x-reservation-venue-id": venueId,
+        "Idempotency-Key": testCase.key,
+      },
+      body: testCase.body,
+    }, {
+      sessionAuth: { repositories: authRepository({
+        async readSession() {
+          return { userId: actorUserId, tenantId: "tenant-1", role: "staff", venueIds: [venueId], expiresAt: "2026-07-15T12:00:00.000Z" };
+        },
+      }), allowedOrigins: [authOrigin] },
+      idempotencyRepository: new InMemoryIdempotencyRepository(),
+      reservationReadRepository: reservationReadRepository(),
+      catalogRepository: catalogRepository({
+        async getService(id) {
+          return { data: { id, venue_id: venueId, name: "Simulator", duration_minutes: 60, resource_strategy: "quantity" } };
+        },
+      }),
+      reservationMutationRepository: reservationMutationRepository({
+        async rescheduleCapacityReservation(input) {
+          repositoryCall = input;
+          return { data: { ok: true, booking: reservationRow({
+            id: input.reservationId,
+            booking_date: input.date,
+            start_time: input.startTime,
+            end_time: input.endTime,
+            seats_booked: input.quantity,
+            seat_labels: [],
+          }) } };
+        },
+      }),
+    });
+
+    assert.equal(response.status, 200, testCase.key);
+    assert.deepEqual(repositoryCall, {
+      tenantId: "tenant-1",
+      venueId,
+      actorUserId,
+      reservationId: validReservationId(),
+      expectedStatus: "confirmed",
+      date: testCase.expectedDate,
+      startTime: "15:30",
+      endTime: "16:30",
+      quantity: 2,
+      reason: "Reservation rescheduled through authenticated API.",
+    }, testCase.key);
+  }
+});
+
+test("completed session capacity reschedules replay before mutable reservation reads", async () => {
+  let reservationReadCalls = 0;
+  let mutationCalls = 0;
+  let reservationReadable = true;
+  const actorUserId = "223e4567-e89b-42d3-a456-426614174000";
+  const venueId = "123e4567-e89b-42d3-a456-426614174000";
+  const request = {
+    method: "POST" as const,
+    path: `/v1/reservations/${validReservationId()}/reschedule`,
+    headers: {
+      cookie: `reservation_session=${"s".repeat(43)}; reservation_csrf=${"c".repeat(43)}`,
+      origin: authOrigin,
+      "x-csrf-token": "c".repeat(43),
+      "x-reservation-venue-id": venueId,
+      "Idempotency-Key": "idem_session_capacity_replay_123",
+    },
+    body: {
+      start_at: "2026-07-02T15:00:00.000Z",
+      end_at: "2026-07-02T16:00:00.000Z",
+      quantity: 1,
+    },
+  };
+  const dependencies = {
+    sessionAuth: { repositories: authRepository({
+      async readSession() {
+        return { userId: actorUserId, tenantId: "tenant-1", role: "staff", venueIds: [venueId], expiresAt: "2026-07-15T12:00:00.000Z" };
+      },
+    }), allowedOrigins: [authOrigin] },
+    idempotencyRepository: new InMemoryIdempotencyRepository(),
+    reservationReadRepository: reservationReadRepository({
+      async readReservationById(reservationId) {
+        reservationReadCalls += 1;
+        if (!reservationReadable) throw new Error("reservation changed after successful reschedule");
+        return { data: reservationRow({ id: reservationId }) };
+      },
+    }),
+    catalogRepository: catalogRepository({
+      async getService(id) {
+        return { data: { id, venue_id: venueId, name: "Simulator", resource_strategy: "quantity" } };
+      },
+    }),
+    reservationMutationRepository: reservationMutationRepository({
+      async rescheduleCapacityReservation(input) {
+        mutationCalls += 1;
+        return {
+          data: { ok: true, booking: reservationRow({
+            id: input.reservationId,
+            booking_date: input.date,
+            start_time: input.startTime,
+            end_time: input.endTime,
+            seats_booked: input.quantity,
+            seat_labels: [],
+          }) },
+        };
+      },
+    }),
+  };
+
+  const first = await handleStandaloneApiRequest(request, dependencies);
+  reservationReadable = false;
+  const replay = await handleStandaloneApiRequest(request, dependencies);
+
+  assert.equal(first.status, 200);
+  assert.deepEqual(replay, first);
+  assert.equal(reservationReadCalls, 1);
+  assert.equal(mutationCalls, 1);
+});
+
+test("session reschedule lookup failures complete their idempotency claim", async () => {
+  let reservationReadCalls = 0;
+  const venueId = "123e4567-e89b-42d3-a456-426614174000";
+  const idempotencyRepository = new InMemoryIdempotencyRepository();
+  const request = {
+    method: "POST" as const,
+    path: `/v1/reservations/${validReservationId()}/reschedule`,
+    headers: {
+      cookie: `reservation_session=${"s".repeat(43)}; reservation_csrf=${"c".repeat(43)}`,
+      origin: authOrigin,
+      "x-csrf-token": "c".repeat(43),
+      "x-reservation-venue-id": venueId,
+      "Idempotency-Key": "idem_session_lookup_failure_123",
+    },
+    body: { date: "2026-07-02", start_time: "15:00", end_time: "16:00", quantity: 1 },
+  };
+  const dependencies = {
+    sessionAuth: { repositories: authRepository(), allowedOrigins: [authOrigin] },
+    tenantVenueRepository: tenantVenueRepository({
+      async getVenue(id) {
+        return { data: { id, tenant_id: "tenant-1" } };
+      },
+    }),
+    idempotencyRepository,
+    reservationReadRepository: reservationReadRepository({
+      async readReservationById() {
+        reservationReadCalls += 1;
+        return { data: null, error: { code: "PGRST116" } };
+      },
+    }),
+    catalogRepository: catalogRepository(),
+    reservationMutationRepository: reservationMutationRepository(),
+  };
+
+  const first = await handleStandaloneApiRequest(request, dependencies);
+  const replay = await handleStandaloneApiRequest(request, dependencies);
+
+  assert.equal(first.status, 404);
+  assert.deepEqual(replay, first);
+  assert.equal(reservationReadCalls, 1);
+  assert.equal(idempotencyRepository.records.get("idem_session_lookup_failure_123")?.status, "completed");
+});
+
+test("session reschedule releases transient lookup failures so the same key can recover", async () => {
+  let reservationReadCalls = 0;
+  let mutationCalls = 0;
+  const venueId = "123e4567-e89b-42d3-a456-426614174000";
+  const idempotencyRepository = new InMemoryIdempotencyRepository();
+  const request = {
+    method: "POST" as const,
+    path: `/v1/reservations/${validReservationId()}/reschedule`,
+    headers: {
+      cookie: `reservation_session=${"s".repeat(43)}; reservation_csrf=${"c".repeat(43)}`,
+      origin: authOrigin,
+      "x-csrf-token": "c".repeat(43),
+      "x-reservation-venue-id": venueId,
+      "Idempotency-Key": "idem_session_transient_lookup_123",
+    },
+    body: { date: "2026-07-02", start_time: "15:00", end_time: "16:00", quantity: 1 },
+  };
+  const dependencies = {
+    sessionAuth: { repositories: authRepository(), allowedOrigins: [authOrigin] },
+    tenantVenueRepository: tenantVenueRepository({
+      async getVenue(id) {
+        return { data: { id, tenant_id: "tenant-1" } };
+      },
+    }),
+    idempotencyRepository,
+    reservationReadRepository: reservationReadRepository({
+      async readReservationById(reservationId) {
+        reservationReadCalls += 1;
+        if (reservationReadCalls === 1) {
+          return { data: null, error: { code: "PGRST000", message: "temporary database failure" } };
+        }
+        return { data: reservationRow({ id: reservationId }) };
+      },
+    }),
+    catalogRepository: catalogRepository({
+      async getService(id) {
+        return { data: { id, venue_id: venueId, name: "Simulator", resource_strategy: "quantity" } };
+      },
+    }),
+    reservationMutationRepository: reservationMutationRepository({
+      async rescheduleCapacityReservation(input) {
+        mutationCalls += 1;
+        return { data: { ok: true, booking: reservationRow({
+          id: input.reservationId,
+          booking_date: input.date,
+          start_time: input.startTime,
+          end_time: input.endTime,
+          seats_booked: input.quantity,
+          seat_labels: [],
+        }) } };
+      },
+    }),
+  };
+
+  const transientFailure = await handleStandaloneApiRequest(request, dependencies);
+  assert.equal(transientFailure.status, 500);
+  assert.equal(idempotencyRepository.records.has("idem_session_transient_lookup_123"), false);
+
+  const retry = await handleStandaloneApiRequest(request, dependencies);
+  assert.equal(retry.status, 200);
+  assert.equal(reservationReadCalls, 2);
+  assert.equal(mutationCalls, 1);
+  assert.equal(idempotencyRepository.records.get("idem_session_transient_lookup_123")?.status, "completed");
+});
+
+test("reservation mutations retain ambiguous failures so the same key cannot execute twice", async () => {
+  let mutationCalls = 0;
+  const venueId = "123e4567-e89b-42d3-a456-426614174000";
+  const idempotencyRepository = new InMemoryIdempotencyRepository();
+  const request = {
+    method: "POST" as const,
+    path: `/v1/reservations/${validReservationId()}/reschedule`,
+    headers: {
+      cookie: `reservation_session=${"s".repeat(43)}; reservation_csrf=${"c".repeat(43)}`,
+      origin: authOrigin,
+      "x-csrf-token": "c".repeat(43),
+      "x-reservation-venue-id": venueId,
+      "Idempotency-Key": "idem_session_transient_mutation_123",
+    },
+    body: { date: "2026-07-02", start_time: "15:00", end_time: "16:00", quantity: 1 },
+  };
+  const dependencies = {
+    sessionAuth: { repositories: authRepository(), allowedOrigins: [authOrigin] },
+    tenantVenueRepository: tenantVenueRepository({
+      async getVenue(id) {
+        return { data: { id, tenant_id: "tenant-1" } };
+      },
+    }),
+    idempotencyRepository,
+    reservationReadRepository: reservationReadRepository(),
+    catalogRepository: catalogRepository({
+      async getService(id) {
+        return { data: { id, venue_id: venueId, name: "Simulator", resource_strategy: "quantity" } };
+      },
+    }),
+    reservationMutationRepository: reservationMutationRepository({
+      async rescheduleCapacityReservation(input) {
+        mutationCalls += 1;
+        if (mutationCalls === 1) {
+          return { data: null, error: { message: "temporary database failure" } };
+        }
+        return { data: { ok: true, booking: reservationRow({
+          id: input.reservationId,
+          booking_date: input.date,
+          start_time: input.startTime,
+          end_time: input.endTime,
+          seats_booked: input.quantity,
+          seat_labels: [],
+        }) } };
+      },
+    }),
+  };
+
+  const transientFailure = await handleStandaloneApiRequest(request, dependencies);
+  assert.equal(transientFailure.status, 500);
+  assert.equal(idempotencyRepository.records.get("idem_session_transient_mutation_123")?.status, "in_progress");
+
+  const retry = await handleStandaloneApiRequest(request, dependencies);
+  assert.equal(retry.status, 409);
+  assert.equal((retry.body as { error: { code: string } }).error.code, "conflict");
+  assert.equal(mutationCalls, 1);
+  assert.equal(idempotencyRepository.records.get("idem_session_transient_mutation_123")?.status, "in_progress");
+});
+
+test("bearer-authenticated reschedules preserve the published legacy contract", async () => {
   let repositoryCall: unknown;
   const handler = createStandaloneApiHandler({
+    serviceApiKey: "platform-service-secret",
     idempotencyRepository: new InMemoryIdempotencyRepository(),
     reservationMutationRepository: reservationMutationRepository({
       async updateReservation(input) {
@@ -5563,14 +6113,16 @@ test("reservation reschedule route uses injected repositories and platform respo
         return {
           data: reservationRow({
             id: input.reservationId,
-            booking_date: input.patch.booking_date,
-            start_time: input.patch.start_time,
-            end_time: input.patch.end_time,
-            seats_booked: input.patch.seats_booked,
-            seat_labels: input.patch.seat_labels,
-            updated_at: input.patch.updated_at,
+            booking_date: "2026-07-02",
+            start_time: "15:00",
+            end_time: "16:00",
+            seats_booked: 2,
+            seat_labels: ["seat-a", "seat-b"],
           }),
         };
+      },
+      async rescheduleCapacityReservation() {
+        throw new Error("bearer requests must preserve the published generic reschedule path");
       },
     }),
   });
@@ -5578,37 +6130,138 @@ test("reservation reschedule route uses injected repositories and platform respo
   const response = await handler({
     method: "POST",
     path: `/v1/reservations/${validReservationId()}/reschedule`,
-    headers: { "Idempotency-Key": "idem_reschedule_success_123" },
+    headers: {
+      authorization: "Bearer platform-service-secret",
+      "x-reservation-tenant-id": "tenant_1",
+      "x-reservation-venue-id": "123e4567-e89b-42d3-a456-426614174000",
+      "Idempotency-Key": "idem_bearer_reschedule_123",
+    },
+    body: {
+      start_at: "2026-07-02T15:00:00.000Z",
+      end_at: "2026-07-02T16:00:00.000Z",
+      quantity: 2,
+      resource_ids: ["seat-a", "seat-b"],
+    },
+  });
+
+  assert.equal(response.status, 200);
+  assert.deepEqual(repositoryCall, {
+    reservationId: validReservationId(),
+    venueId: "123e4567-e89b-42d3-a456-426614174000",
+    patch: {
+      booking_date: "2026-07-02",
+      start_time: "15:00",
+      end_time: "16:00",
+      seats_booked: 2,
+      seat_labels: ["seat-a", "seat-b"],
+      updated_at: (repositoryCall as { patch: { updated_at: string } }).patch.updated_at,
+    },
+  });
+});
+
+test("resource reschedules fail safely and replay the completed conflict for session-authenticated owners", async () => {
+  let repositoryCall: unknown;
+  let reservationReads = 0;
+  const actorUserId = "223e4567-e89b-42d3-a456-426614174000";
+  const venueId = "123e4567-e89b-42d3-a456-426614174000";
+  const request = {
+    method: "POST",
+    path: `/v1/reservations/${validReservationId()}/reschedule`,
+    headers: {
+      cookie: `reservation_session=${"s".repeat(43)}; reservation_csrf=${"c".repeat(43)}`,
+      origin: authOrigin,
+      "x-csrf-token": "c".repeat(43),
+      "x-reservation-venue-id": venueId,
+      "Idempotency-Key": "idem_resource_reschedule_123",
+    },
     body: {
       date: "2026-07-02",
       start_time: "15:00",
       end_time: "16:00",
       quantity: 1,
-      resource_ids: ["A1"],
+      resource_ids: ["seat-a"],
+      metadata: {
+        expected_status: "confirmed",
+        reschedule_reason: "Customer requested a different seat",
+        changed_by: "owner_console",
+      },
     },
+  } as const;
+  const idempotencyRepository = new InMemoryIdempotencyRepository();
+  const dependencies = {
+    sessionAuth: { repositories: authRepository({
+      async readSession() {
+        return { userId: actorUserId, tenantId: "tenant_1", role: "owner", venueIds: [], expiresAt: "2026-07-15T12:00:00.000Z" };
+      },
+    }), allowedOrigins: [authOrigin] },
+    tenantVenueRepository: tenantVenueRepository(),
+    idempotencyRepository,
+    reservationReadRepository: reservationReadRepository({
+      async readReservationById(reservationId) {
+        reservationReads += 1;
+        return { data: reservationRow({ id: reservationId }) };
+      },
+    }),
+    catalogRepository: catalogRepository(),
+    reservationMutationRepository: reservationMutationRepository({
+      async updateReservation(input) {
+        repositoryCall = input;
+        return { data: reservationRow({ id: input.reservationId, seat_labels: ["seat-a"] }) };
+      },
+      async rescheduleCapacityReservation() {
+        throw new Error("assigned-resource requests must not use the capacity-only operation");
+      },
+    }),
+  };
+  const response = await handleStandaloneApiRequest(request, dependencies);
+  const replay = await handleStandaloneApiRequest(request, dependencies);
+
+  assert.equal(response.status, 409);
+  assert.deepEqual(replay, response);
+  assert.equal(repositoryCall, undefined);
+  assert.equal(reservationReads, 1);
+  assert.equal(idempotencyRepository.records.get("idem_resource_reschedule_123")?.status, "completed");
+});
+
+test("quantity-strategy room reschedules require cancel and rebook", async () => {
+  let mutationCalls = 0;
+  const venueId = "123e4567-e89b-42d3-a456-426614174000";
+  const response = await handleStandaloneApiRequest({
+    method: "POST",
+    path: `/v1/reservations/${validReservationId()}/reschedule`,
+    headers: {
+      cookie: `reservation_session=${"s".repeat(43)}; reservation_csrf=${"c".repeat(43)}`,
+      origin: authOrigin,
+      "x-csrf-token": "c".repeat(43),
+      "x-reservation-venue-id": venueId,
+      "Idempotency-Key": "idem_quantity_room_reschedule_123",
+    },
+    body: { date: "2026-07-02", start_time: "15:00", quantity: 2 },
+  }, {
+    sessionAuth: { repositories: authRepository({
+      async readSession() {
+        return { userId: "223e4567-e89b-42d3-a456-426614174000", tenantId: "tenant_1", role: "owner", venueIds: [], expiresAt: "2026-07-15T12:00:00.000Z" };
+      },
+    }), allowedOrigins: [authOrigin] },
+    tenantVenueRepository: tenantVenueRepository(),
+    idempotencyRepository: new InMemoryIdempotencyRepository(),
+    reservationReadRepository: reservationReadRepository(),
+    catalogRepository: catalogRepository({
+      async getService(id) {
+        return { data: { id, venue_id: venueId, name: "Boardroom", duration_minutes: 60, resource_kind: "room", resource_strategy: "quantity" } };
+      },
+    }),
+    reservationMutationRepository: reservationMutationRepository({
+      async rescheduleCapacityReservation() {
+        mutationCalls += 1;
+        return { data: null, error: { message: "must not be called" } };
+      },
+    }),
   });
 
-  assert.equal(response.status, 200);
-  assert.equal(reservationResponseSchema.safeParse(response.body).success, true);
-  assert.deepEqual(response.body, reservationBody({
-    date: "2026-07-02",
-    start_time: "15:00",
-    end_time: "16:00",
-    quantity: 1,
-    reservation_items: [{ resource_label: "A1", quantity: 1 }],
-    updated_at: (repositoryCall as { patch: { updated_at: string } }).patch.updated_at,
-  }));
-  assert.deepEqual(repositoryCall, {
-    reservationId: validReservationId(),
-    patch: {
-      booking_date: "2026-07-02",
-      start_time: "15:00",
-      end_time: "16:00",
-      seats_booked: 1,
-      seat_labels: ["A1"],
-      updated_at: (repositoryCall as { patch: { updated_at: string } }).patch.updated_at,
-    },
-  });
+  assert.equal(response.status, 409);
+  assert.match((response.body as { error: { message: string } }).error.message, /selected resources/u);
+  assert.equal(mutationCalls, 0);
 });
 
 test("reservation cancel route validates input but uses the existing cancel service patch shape", async () => {
@@ -5686,6 +6339,12 @@ test("authenticated staff appointment routes pass the session actor to atomic op
       date: "2026-07-20", start_time: "09:00", end_time: "10:00", quantity: 1,
       customer: { name: "Alex", email: "alex@example.com" },
     } }, dependencies),
+    await handleStandaloneApiRequest({ method: "POST", path: "/v1/reservations/staff", headers: { ...headers, "idempotency-key": "staff-capacity-create-route-123" }, body: {
+      service_id: "44444444-4444-4444-8444-444444444444",
+      date: "2026-07-20", start_time: "11:00", end_time: "12:00", quantity: 3,
+      source: "simulation",
+      customer: { name: "Taylor", email: "taylor@example.com" },
+    } }, dependencies),
     await handleStandaloneApiRequest({ method: "POST", path: `/v1/reservations/${bookingId}/transition`, headers: { ...headers, "idempotency-key": "staff-transition-route-123" }, body: {
       expected_status: "confirmed", target_status: "no_show", reason: "Customer did not arrive",
     } }, dependencies),
@@ -5695,13 +6354,17 @@ test("authenticated staff appointment routes pass the session actor to atomic op
     } }, dependencies),
   ];
 
-  assert.deepEqual(responses.map((response) => response.status), [200, 200, 200]);
+  assert.deepEqual(responses.map((response) => response.status), [200, 200, 200, 200]);
   for (const [, input] of calls as Array<[string, { tenantId: string; venueId: string; actorUserId: string }]>) {
     assert.deepEqual({ tenantId: input.tenantId, venueId: input.venueId, actorUserId: input.actorUserId }, {
       tenantId: "tenant-1", venueId, actorUserId,
     });
   }
   assert.equal((calls[0] as [string, { reservation: { channel?: string } }])[1].reservation.channel, "staff");
+  const capacityReservation = (calls[1] as [string, { reservation: { staff_id?: string; channel?: string; quantity: number } }])[1].reservation;
+  assert.equal(capacityReservation.staff_id, undefined);
+  assert.equal(capacityReservation.channel, "staff");
+  assert.equal(capacityReservation.quantity, 3);
 });
 
 test("reservation lifecycle routes require idempotency before id, body, or repository work", async () => {
@@ -6380,6 +7043,10 @@ class InMemoryIdempotencyRepository implements IdempotencyRepository {
 
   storeCompleted(record: IdempotencyCommitRecord) {
     this.records.set(record.key, record);
+  }
+
+  releaseInProgress(token: { key: string }) {
+    this.records.delete(token.key);
   }
 }
 

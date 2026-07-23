@@ -366,7 +366,7 @@ export function createStandaloneSupabaseDependencies(
     ...(systemOperationsRepository ? { systemStatus: {
       repository: systemOperationsRepository,
       releaseVersion: options.releaseVersion?.trim() || "development",
-      migrationVersion: options.migrationVersion?.trim() || "000040",
+      migrationVersion: options.migrationVersion?.trim() || "000043",
       diskProbe: readRootDiskUsage,
     }, rateLimitRepository: systemOperationsRepository, operationalEventSink: systemOperationsRepository } : {}),
     ...(managedConversationOrchestrator ? { conversationOrchestrator: managedConversationOrchestrator } : conversationOrchestrator ? { conversationOrchestrator } : {}),

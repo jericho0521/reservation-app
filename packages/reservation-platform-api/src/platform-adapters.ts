@@ -401,6 +401,7 @@ export function hasMovementPatchFields(input: unknown) {
 
 export function toPlatformReservation(row: unknown): ReservationResponse {
   const record = asRecord(row);
+  const storedChannel = reservationChannelFrom(record.channel);
   return {
     reservation_id: stringValue(record.id) ?? stringValue(record.reservation_id) ?? "",
     status: appointmentStatusValue(record.status),
@@ -423,12 +424,26 @@ export function toPlatformReservation(row: unknown): ReservationResponse {
     metadata: mergeMetadata(
       metadataFrom(record),
       legacyServiceNameFrom(record) ? { service_name: legacyServiceNameFrom(record) ?? null } : undefined,
-      stringValue(record.interface_type) ? { channel_origin: record.interface_type === "chat" ? "web_chat" : "web_booking" } : undefined,
+      storedChannel
+        ? { channel_origin: storedChannel }
+        : stringValue(record.interface_type)
+          ? { channel_origin: record.interface_type === "chat" ? "web_chat" : "web_booking" }
+          : undefined,
       primitiveObjectFrom(record, ["cancellation_reason", "cancelled_by", "cancelled_at"]),
     ),
     created_at: stringValue(record.created_at),
     updated_at: stringValue(record.updated_at),
   };
+}
+
+function reservationChannelFrom(value: unknown) {
+  return value === "web_booking"
+    || value === "web_chat"
+    || value === "whatsapp"
+    || value === "staff"
+    || value === "simulation"
+    ? value
+    : undefined;
 }
 
 export function toPlatformReservationsResponse(

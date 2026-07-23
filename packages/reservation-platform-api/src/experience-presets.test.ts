@@ -7,9 +7,18 @@ import {
   validateExperienceDraft,
 } from "./experience-presets.js";
 
-test("registry contains exactly eight unique presets", () => {
-  assert.equal(experiencePresets.length, 8);
-  assert.equal(new Set(experiencePresets.map((preset) => preset.preset_id)).size, 8);
+test("registry contains exactly nine unique presets", () => {
+  assert.equal(experiencePresets.length, 9);
+  assert.equal(new Set(experiencePresets.map((preset) => preset.preset_id)).size, 9);
+});
+
+test("seat-capacity preset creates a quantity-based reservation draft", () => {
+  assert.deepEqual(createExperienceDraftFromPreset("seat_capacity"), {
+    preset_id: "seat_capacity",
+    branding: { brand_name: "Seat Capacity", primary_color: "#2563eb" },
+    terminology: { customer: "Customer", resource: "Seat", booking: "Reservation" },
+    channels: { web_booking: true, web_chat: false, whatsapp: false },
+  });
 });
 
 test("racing preset creates an assigned-resource draft", () => {

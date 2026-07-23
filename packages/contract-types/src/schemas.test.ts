@@ -37,6 +37,7 @@ import {
   platformErrorBodySchema,
   platformErrorCodeSchema,
   metadataRecordSchema,
+  operationsOverviewDataSchema,
   platformErrorResponseSchema,
   publicContractOperations,
   publicExperienceResponseSchema,
@@ -67,6 +68,24 @@ test("analytics response validates bounded appointment operations breakdowns", (
     automation: { automated_conversations: 0, staff_takeovers: 0, containment_rate: 0, takeover_rate: 0 },
   });
   assert.equal(result.success, true);
+});
+
+test("operations and managed-reschedule contracts support staff-created and capacity reservations", () => {
+  assert.equal(rescheduleManagedReservationInputSchema.safeParse({
+    date: "2026-08-02",
+    start_time: "10:00",
+  }).success, true);
+  assert.equal(operationsOverviewDataSchema.safeParse({
+    generated_at: "2026-08-02T00:00:00.000Z",
+    timezone: "UTC",
+    local_date: "2026-08-02",
+    reservations: {
+      today: 1, pending: 0, confirmed: 1, completed: 0, cancelled: 0,
+      timeline: [{ reservation_id: "reservation_1", service_name: "Seat session", customer_name: "Alex", start_time: "10:00", end_time: "11:00", quantity: 2, status: "confirmed", channel: "staff" }],
+    },
+    resources: { total: 0, available: 0, maintenance: 0 },
+    conversations: { open: 0, staff_takeover: 0 },
+  }).success, true);
 });
 
 test("authentication contracts validate setup, sessions, staff, and password resets", () => {

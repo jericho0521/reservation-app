@@ -173,6 +173,7 @@ export interface ListInstallationLocationsResponse {
 }
 
 export type ExperiencePresetId =
+  | "seat_capacity"
   | "racing_gaming"
   | "rooms_facilities"
   | "appointments_salon"
@@ -474,7 +475,7 @@ export interface ExperienceChannelSettingsResponse {
   };
 }
 
-export type OperationsReservationChannel = "web_booking" | "web_chat" | "whatsapp" | "simulation";
+export type OperationsReservationChannel = "web_booking" | "web_chat" | "whatsapp" | "staff" | "simulation";
 
 export interface OperationsTimelineReservation {
   reservation_id: string;
@@ -553,7 +554,7 @@ export interface AnalyticsResponse {
   reservations_by_day: Array<{ date: string; total: number; confirmed: number; completed: number; cancelled: number }>;
   reservations_by_status: Array<{ status: string; count: number }>;
   reservations_by_channel: Array<{ channel: OperationsReservationChannel; count: number }>;
-  channel_performance: Array<{ channel: Exclude<OperationsReservationChannel, "web_booking">; conversations_started: number; proposal_shown: number; confirmation_requested: number; reservations_created: number; conversion_rate: number }>;
+  channel_performance: Array<{ channel: ConversationChannel; conversations_started: number; proposal_shown: number; confirmation_requested: number; reservations_created: number; conversion_rate: number }>;
   reservations_by_service: Array<{ service_id: string; service_name: string; count: number }>;
   popular_slots: Array<{ day_of_week: number; start_time: string; count: number }>;
   practitioner_utilization: Array<{ staff_id: string; display_name: string; booked_minutes: number; available_minutes: number; utilization_rate: number }>;
@@ -881,7 +882,7 @@ export interface StaffRescheduleAppointmentInput {
 export interface RescheduleManagedReservationInput {
   date: string;
   start_time: string;
-  staff_id: string;
+  staff_id?: string;
 }
 
 export interface ListReservationsQuery {

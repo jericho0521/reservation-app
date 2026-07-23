@@ -413,7 +413,7 @@ export const publicJsonSchemaDefinitions: Record<string, JsonSchema> = {
       whatsapp: ref("ExperienceChannelReadiness"),
     }, ["web_booking", "web_chat", "whatsapp"]),
   }, ["channels", "readiness"]),
-  OperationsReservationChannel: { type: "string", enum: ["web_booking", "web_chat", "whatsapp", "simulation"] },
+  OperationsReservationChannel: { type: "string", enum: ["web_booking", "web_chat", "whatsapp", "staff", "simulation"] },
   OperationsTimelineReservation: objectSchema({
     reservation_id: stringSchema,
     service_name: stringSchema,
@@ -462,7 +462,7 @@ export const publicJsonSchemaDefinitions: Record<string, JsonSchema> = {
     totals: objectSchema({ reservations: nonNegativeIntegerSchema, cancelled: nonNegativeIntegerSchema, cancellation_rate: { type: "number", minimum: 0, maximum: 1 } }, ["reservations", "cancelled", "cancellation_rate"]),
     reservations_by_day: { type: "array", maxItems: 366, items: objectSchema({ date: stringSchema, total: nonNegativeIntegerSchema, confirmed: nonNegativeIntegerSchema, completed: nonNegativeIntegerSchema, cancelled: nonNegativeIntegerSchema }, ["date", "total", "confirmed", "completed", "cancelled"]) },
     reservations_by_status: { type: "array", maxItems: 20, items: objectSchema({ status: stringSchema, count: nonNegativeIntegerSchema }, ["status", "count"]) },
-    reservations_by_channel: { type: "array", maxItems: 4, items: objectSchema({ channel: ref("OperationsReservationChannel"), count: nonNegativeIntegerSchema }, ["channel", "count"]) },
+    reservations_by_channel: { type: "array", maxItems: 5, items: objectSchema({ channel: ref("OperationsReservationChannel"), count: nonNegativeIntegerSchema }, ["channel", "count"]) },
     channel_performance: { type: "array", maxItems: 3, items: objectSchema({ channel: ref("ConversationChannel"), conversations_started: nonNegativeIntegerSchema, proposal_shown: nonNegativeIntegerSchema, confirmation_requested: nonNegativeIntegerSchema, reservations_created: nonNegativeIntegerSchema, conversion_rate: { type: "number", minimum: 0, maximum: 1 } }, ["channel", "conversations_started", "proposal_shown", "confirmation_requested", "reservations_created", "conversion_rate"]) },
     reservations_by_service: { type: "array", maxItems: 20, items: objectSchema({ service_id: stringSchema, service_name: stringSchema, count: nonNegativeIntegerSchema }, ["service_id", "service_name", "count"]) },
     popular_slots: { type: "array", maxItems: 20, items: objectSchema({ day_of_week: { type: "integer", minimum: 1, maximum: 7 }, start_time: stringSchema, count: nonNegativeIntegerSchema }, ["day_of_week", "start_time", "count"]) },
@@ -698,7 +698,7 @@ export const publicJsonSchemaDefinitions: Record<string, JsonSchema> = {
     date: { type: "string", format: "date" },
     start_time: { type: "string", pattern: "^(?:[01]\\d|2[0-3]):[0-5]\\d$" },
     staff_id: { type: "string", format: "uuid" },
-  }, ["date", "start_time", "staff_id"]),
+  }, ["date", "start_time"]),
   ListResourceMaintenanceQuery: objectSchema({
     venue_id: stringSchema,
     service_id: stringSchema,
@@ -803,7 +803,7 @@ export const publicJsonSchemaDefinitions: Record<string, JsonSchema> = {
   }),
   ExperiencePresetId: {
     type: "string",
-    enum: ["racing_gaming", "rooms_facilities", "appointments_salon", "sports_courts", "restaurant_tables", "cinema_events", "equipment_rental", "classes_workshops"],
+    enum: ["seat_capacity", "racing_gaming", "rooms_facilities", "appointments_salon", "sports_courts", "restaurant_tables", "cinema_events", "equipment_rental", "classes_workshops"],
   },
   ExperienceConfigurationState: {
     type: "string",

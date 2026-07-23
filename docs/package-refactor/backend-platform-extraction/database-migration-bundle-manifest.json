@@ -452,6 +452,39 @@
       ]
     },
     {
+      "kind": "core-migration",
+      "order": 41,
+      "targetPath": "packages/database/migrations/supabase/000041_capacity_booking_default.sql",
+      "sourceAssets": [
+        {
+          "path": "packages/database/migrations/supabase/000041_capacity_booking_default.sql",
+          "section": "Default pooled seat-capacity onboarding with appointment compatibility"
+        }
+      ]
+    },
+    {
+      "kind": "core-migration",
+      "order": 42,
+      "targetPath": "packages/database/migrations/supabase/000042_capacity_reschedule_safety.sql",
+      "sourceAssets": [
+        {
+          "path": "packages/database/migrations/supabase/000042_capacity_reschedule_safety.sql",
+          "section": "Atomic availability-aware pooled-capacity rescheduling and audit persistence"
+        }
+      ]
+    },
+    {
+      "kind": "core-migration",
+      "order": 43,
+      "targetPath": "packages/database/migrations/supabase/000043_capacity_booking_concurrency.sql",
+      "sourceAssets": [
+        {
+          "path": "packages/database/migrations/supabase/000043_capacity_booking_concurrency.sql",
+          "section": "Deadlock-safe staff creation and overlap-safe labeled resource allocation for pooled, assigned, and hybrid services"
+        }
+      ]
+    },
+    {
       "kind": "optional-ai-retrieval",
       "targetPath": "packages/database/migrations/supabase/optional/ai-retrieval/000001_knowledge_chunks.sql",
       "sourceAssets": [

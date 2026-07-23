@@ -10,6 +10,7 @@ import {
   beginIdempotentMutation,
   cancelReservation,
   commitIdempotentMutation,
+  releaseIdempotentMutation,
   createJsonRequestFingerprint,
   createPlatformResource,
   createPlatformService,
@@ -29,8 +30,8 @@ import {
   handlePlatformCatalogRequest,
   platformErrorBody,
   prepareAvailabilityQuery,
-  prepareLegacyReservationReschedule,
   prepareLegacyReservationCreate,
+  prepareLegacyReservationReschedule,
   prepareReservationCancelInput,
   prepareReservationCreateInput,
   prepareReservationRescheduleInput,
@@ -38,6 +39,7 @@ import {
   readPlatformRequestContext,
   requireIdempotencyKey,
   requirePlatformBearerToken,
+  getPlatformService,
   getPlatformMetadata,
   handleConversationInbound,
   listExperiencePresets,
@@ -63,7 +65,7 @@ import {
   transitionAppointment,
   staffRescheduleAppointment,
   staffCreateAppointment,
-  rescheduleReservationWithLegacyPatch,
+  rescheduleCapacityReservation,
   saveExperienceDraft,
   updateExperienceIdentity,
   updateConversationAutomation,
@@ -87,6 +89,7 @@ import {
   type AnalyticsRepository,
   type AuthenticatedPlatformPrincipal,
   type IdempotencyRepository,
+  type IdempotentMutationToken,
   type ExperienceStudioRepository,
   type ExperienceKnowledgeRepository,
   type KnowledgeSourceRepository,
@@ -2837,7 +2840,8 @@ async function handleReservationCreateRequest(
     return jsonResponse(preparedInput.status, preparedInput.error);
   }
 
-  const preparedLegacy = prepareLegacyReservationCreate(preparedInput.input);
+  const trustedInput = { ...preparedInput.input, source: "web_booking" as const };
+  const preparedLegacy = prepareLegacyReservationCreate(trustedInput);
 
   if (!dependencies.idempotencyRepository) {
     return platformError(503, "bad_request", "Idempotency repository is not configured.");
@@ -3503,7 +3507,146 @@ async function handleReservationRescheduleRequest(
     return jsonResponse(preparedInput.status, preparedInput.error);
   }
 
-  const preparedLegacy = prepareLegacyReservationReschedule(preparedInput.input);
+  const principal = request.authenticatedPrincipal;
+  const venueId = getHeader(request.headers, "X-Reservation-Venue-Id");
+  if (!principal) {
+    const preparedLegacy = prepareLegacyReservationReschedule(preparedInput.input);
+    return handleIdempotentReservationMutation({
+      request,
+      dependencies,
+      idempotencyKey: requiredKey.key,
+      path: `/v1/reservations/${reservationId}/reschedule`,
+      fingerprintValue: preparedInput.input as unknown as JsonValue,
+      mutate: (repository) => updateReservationWithLegacyPatch({
+        repository,
+        reservationId,
+        legacyPatch: preparedLegacy.legacyInput,
+        ...(venueId ? { venueId } : {}),
+      }),
+    });
+  }
+
+  if (!dependencies.idempotencyRepository) {
+    return platformError(503, "bad_request", "Idempotency repository is not configured.");
+  }
+
+  if (!dependencies.reservationMutationRepository) {
+    return platformError(503, "bad_request", "Reservation mutation repository is not configured.");
+  }
+
+  if (!venueId || !dependencies.reservationReadRepository || !dependencies.catalogRepository) {
+    return platformError(503, "internal_error", "Reservation mode could not be verified.");
+  }
+
+  const idempotencyBegin = await beginIdempotentMutation(dependencies.idempotencyRepository, {
+    key: requiredKey.key,
+    tenantId: principal.tenantId,
+    method: request.method,
+    path: `/v1/reservations/${reservationId}/reschedule`,
+    fingerprint: createJsonRequestFingerprint(preparedInput.input as unknown as JsonValue),
+  });
+  if (idempotencyBegin.action === "replay" || idempotencyBegin.action === "reject") {
+    return jsonResponse(idempotencyBegin.status, idempotencyBegin.body);
+  }
+
+  const storedReservationResult = await readReservationById({
+    repository: dependencies.reservationReadRepository,
+    reservationId,
+    venueId,
+  });
+  if (storedReservationResult.status !== 200) {
+    return completeClaimedReservationResponse(
+      dependencies,
+      idempotencyBegin.token,
+      jsonResponse(storedReservationResult.status, storedReservationResult.body),
+    );
+  }
+
+  const storedReservation = storedReservationResult.body as ReservationResponse;
+  const storedServiceResult = await getPlatformService(
+    dependencies.catalogRepository,
+    storedReservation.service_id,
+    { includeInactive: true },
+  );
+  if (storedServiceResult.status !== 200 || "error" in storedServiceResult.body) {
+    return completeClaimedReservationResponse(
+      dependencies,
+      idempotencyBegin.token,
+      jsonResponse(storedServiceResult.status, storedServiceResult.body),
+    );
+  }
+
+  const storedService = storedServiceResult.body;
+  const isCapacityReservation = storedService.resource_strategy !== "assigned_resource"
+    && storedService.resource_strategy !== "hybrid"
+    && storedService.resource_kind !== "room"
+    && storedService.booking_mode !== "appointment"
+    && storedReservation.staff_id === undefined;
+
+  if (!isCapacityReservation) {
+    return completeClaimedReservationResponse(
+      dependencies,
+      idempotencyBegin.token,
+      platformError(
+        409,
+        "conflict",
+        "Reservations with selected resources must be cancelled and rebooked with an available resource.",
+      ),
+    );
+  }
+
+  if (preparedInput.input.resource_ids?.length || preparedInput.input.reservation_items?.length) {
+    return completeClaimedReservationResponse(
+      dependencies,
+      idempotencyBegin.token,
+      platformError(
+        400,
+        "validation_failed",
+        "Pooled-capacity reservations cannot change assigned resources.",
+      ),
+    );
+  }
+
+  if (storedReservation.status !== "pending" && storedReservation.status !== "confirmed") {
+    return completeClaimedReservationResponse(
+      dependencies,
+      idempotencyBegin.token,
+      platformError(409, "conflict", "Only active reservations can be rescheduled."),
+    );
+  }
+
+  const metadata = preparedInput.input.metadata;
+  const requestedExpectedStatus = metadata?.expected_status;
+  const expectedStatus = requestedExpectedStatus === "pending" || requestedExpectedStatus === "confirmed"
+    ? requestedExpectedStatus
+    : storedReservation.status;
+  const requestedReason = metadata?.reschedule_reason;
+  const auditReason = typeof requestedReason === "string" && requestedReason.trim().length > 0
+    ? requestedReason.trim()
+    : "Reservation rescheduled through authenticated API.";
+  const date = preparedInput.input.date
+    ?? preparedInput.input.start_at?.slice(0, 10)
+    ?? storedReservation.date;
+  const startTime = preparedInput.input.start_time
+    ?? preparedInput.input.start_at?.slice(11, 16)
+    ?? storedReservation.start_time;
+  const requestedEndTime = preparedInput.input.end_time
+    ?? preparedInput.input.end_at?.slice(11, 16);
+  const startWasProvided = preparedInput.input.start_time !== undefined
+    || preparedInput.input.start_at !== undefined;
+  const endTime = requestedEndTime
+    ?? (startWasProvided
+      ? addMinutesToSameDayTime(startTime, storedService.duration_minutes)
+      : storedReservation.end_time);
+  const quantity = preparedInput.input.quantity ?? storedReservation.quantity;
+
+  if (!date || !startTime || !endTime) {
+    return completeClaimedReservationResponse(
+      dependencies,
+      idempotencyBegin.token,
+      platformError(409, "conflict", "The reservation does not contain a complete time range."),
+    );
+  }
 
   return handleIdempotentReservationMutation({
     request,
@@ -3511,15 +3654,32 @@ async function handleReservationRescheduleRequest(
     idempotencyKey: requiredKey.key,
     path: `/v1/reservations/${reservationId}/reschedule`,
     fingerprintValue: preparedInput.input as unknown as JsonValue,
-    mutate: (repository) => rescheduleReservationWithLegacyPatch({
+    idempotencyToken: idempotencyBegin.token,
+    mutate: (repository) => rescheduleCapacityReservation({
       repository,
+      tenantId: principal.tenantId,
+      venueId,
+      actorUserId: principal.userId,
       reservationId,
-      legacyPatch: preparedLegacy.legacyInput,
-      ...(getHeader(request.headers, "X-Reservation-Venue-Id")
-        ? { venueId: getHeader(request.headers, "X-Reservation-Venue-Id") }
-        : {}),
+      expectedStatus,
+      date,
+      startTime,
+      endTime,
+      quantity,
+      reason: auditReason,
     }),
   });
+}
+
+function addMinutesToSameDayTime(startTime: string | undefined, durationMinutes: number | undefined) {
+  const match = /^(\d{2}):(\d{2})$/u.exec(startTime ?? "");
+  if (!match || !Number.isInteger(durationMinutes) || (durationMinutes ?? 0) <= 0) return undefined;
+  const hours = Number(match[1]);
+  const minutes = Number(match[2]);
+  if (hours > 23 || minutes > 59) return undefined;
+  const end = hours * 60 + minutes + (durationMinutes ?? 0);
+  if (end >= 24 * 60) return undefined;
+  return `${String(Math.floor(end / 60)).padStart(2, "0")}:${String(end % 60).padStart(2, "0")}`;
 }
 
 async function handleAppointmentTransitionRequest(request: StandaloneApiRequest, reservationId: string, dependencies: StandaloneApiDependencies) {
@@ -3645,6 +3805,7 @@ async function handleIdempotentReservationMutation(input: {
   idempotencyKey: string;
   path: string;
   fingerprintValue: JsonValue;
+  idempotencyToken?: IdempotentMutationToken;
   mutate: (repository: ReservationMutationRepositoryPort) => Promise<{
     status: number;
     body: unknown;
@@ -3658,13 +3819,15 @@ async function handleIdempotentReservationMutation(input: {
     return platformError(503, "bad_request", "Reservation mutation repository is not configured.");
   }
 
-  const begin = await beginIdempotentMutation(input.dependencies.idempotencyRepository, {
-    key: input.idempotencyKey,
-    tenantId: getHeader(input.request.headers, "X-Reservation-Tenant-Id"),
-    method: input.request.method,
-    path: input.path,
-    fingerprint: createJsonRequestFingerprint(input.fingerprintValue),
-  });
+  const begin = input.idempotencyToken
+    ? { action: "proceed" as const, token: input.idempotencyToken }
+    : await beginIdempotentMutation(input.dependencies.idempotencyRepository, {
+      key: input.idempotencyKey,
+      tenantId: getHeader(input.request.headers, "X-Reservation-Tenant-Id"),
+      method: input.request.method,
+      path: input.path,
+      fingerprint: createJsonRequestFingerprint(input.fingerprintValue),
+    });
 
   if (begin.action === "replay" || begin.action === "reject") {
     return jsonResponse(begin.status, begin.body);
@@ -3672,7 +3835,10 @@ async function handleIdempotentReservationMutation(input: {
 
   const result = await input.mutate(input.dependencies.reservationMutationRepository);
 
-  if (result.status >= 200 && result.status < 300) {
+  // Once repository work has been dispatched, a transport or storage failure is
+  // ambiguous: the mutation may have committed even though its response was lost.
+  // Retain the in-progress claim so a retry cannot execute the mutation twice.
+  if (result.status < 500) {
     await commitIdempotentMutation(input.dependencies.idempotencyRepository, begin.token, {
       status: result.status,
       body: result.body,
@@ -3680,6 +3846,23 @@ async function handleIdempotentReservationMutation(input: {
   }
 
   return jsonResponse(result.status, result.body);
+}
+
+async function completeClaimedReservationResponse(
+  dependencies: StandaloneApiDependencies,
+  token: IdempotentMutationToken,
+  response: StandaloneApiResponse,
+) {
+  if (!dependencies.idempotencyRepository) return response;
+  if (response.status >= 500) {
+    await releaseIdempotentMutation(dependencies.idempotencyRepository, token);
+  } else {
+    await commitIdempotentMutation(dependencies.idempotencyRepository, token, {
+      status: response.status,
+      body: response.body,
+    });
+  }
+  return response;
 }
 
 async function handleReservationListRequest(

@@ -54,10 +54,12 @@ describe("reservation domain legacy adapters", () => {
       seats_booked: 2,
       seat_labels: ["RS1", "RS2"],
       interface_type: "form",
+      channel: "staff",
     });
 
     assert.equal(reservation.customer_name, "Ada Lovelace");
     assert.equal(reservation.quantity, 2);
+    assert.equal(reservation.channel, "staff");
     assert.deepEqual(reservation.seat_labels, ["RS1", "RS2"]);
     assert.deepEqual(
       reservation.items.map((item) => item.resource_label),

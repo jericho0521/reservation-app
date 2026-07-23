@@ -14,6 +14,7 @@ import {
 import { createExperiencePreviewConfig } from "../../packages/reservation-ui/src/config.ts";
 
 const expectedPresetIds: ExperiencePresetId[] = [
+  "seat_capacity",
   "racing_gaming",
   "rooms_facilities",
   "appointments_salon",
@@ -24,7 +25,7 @@ const expectedPresetIds: ExperiencePresetId[] = [
   "classes_workshops",
 ];
 
-test("all eight presets create, validate, preview, and publish through shared platform paths", async () => {
+test("all nine presets create, validate, preview, and publish through shared platform paths", async () => {
   const presets = listExperiencePresets().presets;
   assert.deepEqual(presets.map((preset) => preset.preset_id), expectedPresetIds);
 
@@ -80,7 +81,11 @@ test("only flagship presets define catalog defaults; remaining industries need n
   assert.ok(getExperiencePresetCatalogDefaults("racing_gaming"));
   assert.ok(getExperiencePresetCatalogDefaults("rooms_facilities"));
   assert.ok(getExperiencePresetCatalogDefaults("appointments_salon"));
-  for (const presetId of expectedPresetIds.slice(3)) {
+  for (const presetId of expectedPresetIds.filter((presetId) => ![
+    "racing_gaming",
+    "rooms_facilities",
+    "appointments_salon",
+  ].includes(presetId))) {
     assert.equal(getExperiencePresetCatalogDefaults(presetId), undefined, presetId);
     assert.equal(validateExperienceDraft(createExperienceDraftFromPreset(presetId)).valid, true, presetId);
   }

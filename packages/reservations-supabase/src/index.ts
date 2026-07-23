@@ -72,6 +72,7 @@ export const RESERVATION_SUPABASE_TABLES = {
   reservationItems: "reservation_items",
   serviceSeatMaintenance: "service_seat_maintenance",
   serviceAvailabilityRules: "service_availability_rules",
+  platformIdempotencyRecords: "platform_idempotency_records",
 } as const;
 
 export const RESERVATION_SUPABASE_SELECTS = {
@@ -89,7 +90,7 @@ export const RESERVATION_SUPABASE_SELECTS = {
   service:
     "id, name, description, total_seats, created_at, resource_kind, selection_mode, reservation_policy, duration_minutes, buffer_before_minutes, buffer_after_minutes",
   booking:
-    "id, service_id, user_name, user_email, user_phone, booking_date, start_time, end_time, seats_booked, seat_labels, status, interface_type, staff_id",
+    "id, service_id, user_name, user_email, user_phone, booking_date, start_time, end_time, seats_booked, seat_labels, status, interface_type, channel, staff_id",
   reservationCompatibility: "*, services(name)",
   availabilityResource:
     "id, service_id, label, resource_kind, status, capacity, metadata",
@@ -258,6 +259,7 @@ interface SupabaseQueryBuilder {
   insert(rows: unknown[]): SupabaseQueryBuilder;
   upsert(row: unknown, options?: Record<string, unknown>): SupabaseQueryBuilder;
   update(row: unknown): SupabaseQueryBuilder;
+  delete(): SupabaseQueryBuilder;
   single(): Promise<QueryResult<unknown>>;
   maybeSingle(): Promise<QueryResult<unknown>>;
   then(resolve: (value: QueryResult<unknown>) => unknown): Promise<unknown>;
@@ -524,13 +526,13 @@ export function createSupabasePlatformCatalogRepository(
       return toCatalogListResult(result);
     },
 
-    async getService(id) {
+    async getService(id, options = {}) {
       const result = await fromTable(publicClient, RESERVATION_SUPABASE_TABLES.services)
         .select(RESERVATION_SUPABASE_SELECTS.catalogServiceWithResources)
         .eq("id", id)
         .single() as QueryResult<unknown>;
 
-      return !result.error && result.data && !isActiveServiceRow(result.data)
+      return !result.error && result.data && !options.includeInactive && !isActiveServiceRow(result.data)
         ? { data: null }
         : toCatalogReadResult(result);
     },
@@ -973,6 +975,15 @@ export function createSupabaseReservationMutationRepository(
         p_date: input.date, p_start_time: input.startTime, p_staff_id: input.staffId, p_reason: input.reason,
       }));
     },
+    async rescheduleCapacityReservation(input) {
+      if (!client.rpc) throw new Error("Supabase client does not support capacity reservation operations");
+      return scopedMutationResult(await client.rpc("platform_staff_reschedule_capacity_reservation", {
+        p_tenant_id: input.tenantId, p_venue_id: input.venueId, p_actor_user_id: input.actorUserId,
+        p_booking_id: input.reservationId, p_expected_status: input.expectedStatus,
+        p_date: input.date, p_start_time: input.startTime, p_end_time: input.endTime,
+        p_quantity: input.quantity, p_reason: input.reason,
+      }));
+    },
     async updateReservation({ reservationId, patch, venueId }) {
       if (venueId) {
         if (!client.rpc) throw new Error("Supabase client does not support scoped reservation mutations");
@@ -1056,6 +1067,20 @@ export function createSupabaseIdempotencyRepository(
           p_response_body: record.response.body,
         }),
         "Failed to store completed idempotency record",
+      );
+    },
+
+    async releaseInProgress(token) {
+      assertNoSupabaseError(
+        await fromTable(client, RESERVATION_SUPABASE_TABLES.platformIdempotencyRecords)
+          .delete()
+          .eq("tenant_id", token.tenantId ?? IDEMPOTENCY_UNSCOPED_TENANT)
+          .eq("key", token.key)
+          .eq("method", token.method)
+          .eq("path", token.path)
+          .eq("fingerprint", token.fingerprint)
+          .eq("status", "in_progress") as QueryResult<unknown>,
+        "Failed to release in-progress idempotency record",
       );
     },
   };
@@ -1212,6 +1237,7 @@ function reservationToBookingInsert(reservation: Reservation) {
 }
 
 function bookingRowToLegacyBooking(booking: Record<string, unknown>) {
+  const channel = booking.channel;
   return {
     id: getString(booking.id) ?? undefined,
     service_id: getString(booking.service_id) ?? "",
@@ -1227,6 +1253,13 @@ function bookingRowToLegacyBooking(booking: Record<string, unknown>) {
       : [],
     status: getString(booking.status) ?? "confirmed",
     interface_type: booking.interface_type === "chat" ? "chat" : "form",
+    ...(channel === "web_booking"
+      || channel === "web_chat"
+      || channel === "whatsapp"
+      || channel === "staff"
+      || channel === "simulation"
+      ? { channel }
+      : {}),
     staff_id: getString(booking.staff_id) ?? undefined,
     buffer_before_minutes: getNumber(booking.buffer_before_minutes) ?? undefined,
     buffer_after_minutes: getNumber(booking.buffer_after_minutes) ?? undefined,

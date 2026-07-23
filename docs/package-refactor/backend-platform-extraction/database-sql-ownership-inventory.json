@@ -417,6 +417,36 @@
       "notes": [
         "Backend-owned tenant- and venue-scoped hybrid FAQ, text, and PDF retrieval with pgvector and durable indexing."
       ]
+    },
+    {
+      "path": "packages/database/migrations/supabase/000041_capacity_booking_default.sql",
+      "classification": "core-platform",
+      "intendedBackendDestination": [
+        "packages/database/migrations/supabase/000041_capacity_booking_default.sql"
+      ],
+      "notes": [
+        "Backend-owned default pooled seat-capacity onboarding with compatibility for configured appointment businesses."
+      ]
+    },
+    {
+      "path": "packages/database/migrations/supabase/000042_capacity_reschedule_safety.sql",
+      "classification": "core-platform",
+      "intendedBackendDestination": [
+        "packages/database/migrations/supabase/000042_capacity_reschedule_safety.sql"
+      ],
+      "notes": [
+        "Backend-owned atomic pooled-capacity rescheduling with availability enforcement and actor-scoped audit history."
+      ]
+    },
+    {
+      "path": "packages/database/migrations/supabase/000043_capacity_booking_concurrency.sql",
+      "classification": "core-platform",
+      "intendedBackendDestination": [
+        "packages/database/migrations/supabase/000043_capacity_booking_concurrency.sql"
+      ],
+      "notes": [
+        "Backend-owned concurrency hardening for staff-created resource bookings and labeled allocations across overlapping time ranges, including assigned and hybrid services."
+      ]
     }
   ]
 }

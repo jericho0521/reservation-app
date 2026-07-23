@@ -401,7 +401,7 @@
               ],
               "type": "object"
             },
-            "maxItems": 4,
+            "maxItems": 5,
             "type": "array"
           },
           "reservations_by_day": {
@@ -1845,6 +1845,7 @@
       },
       "ExperiencePresetId": {
         "enum": [
+          "seat_capacity",
           "racing_gaming",
           "rooms_facilities",
           "appointments_salon",
@@ -2938,6 +2939,7 @@
           "web_booking",
           "web_chat",
           "whatsapp",
+          "staff",
           "simulation"
         ],
         "type": "string"
@@ -3287,8 +3289,7 @@
         },
         "required": [
           "date",
-          "start_time",
-          "staff_id"
+          "start_time"
         ],
         "type": "object"
       },

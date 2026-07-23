@@ -131,6 +131,29 @@ test("managed reschedule validates date, time, and staff before repository acces
   assert.equal(called, false);
 });
 
+test("managed capacity reschedule omits the practitioner at the repository boundary", async () => {
+  let rescheduleInput: unknown;
+  const result = await rescheduleManagedReservation({
+    repository: repository({
+      reschedule: async (input) => {
+        rescheduleInput = input;
+        return { data: { ok: true, booking: booking({ seats_booked: 2 }) } };
+      },
+    }),
+    publicSlug: "seat-business",
+    token,
+    input: { date: "2026-08-02", start_time: "10:30" },
+  });
+
+  assert.equal(result.status, 200);
+  assert.deepEqual(rescheduleInput, {
+    publicSlug: "seat-business",
+    tokenHash: await hashReservationManagementToken(token),
+    date: "2026-08-02",
+    startTime: "10:30",
+  });
+});
+
 test("malformed tokens are rejected before repository access", async () => {
   let called = false;
   const result = await readManagedReservation({

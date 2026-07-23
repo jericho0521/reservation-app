@@ -32,6 +32,28 @@ test("operations overview preserves bounded empty aggregates and readiness", asy
   assert.deepEqual("channel_readiness" in result.body ? result.body.channel_readiness : null, readiness);
 });
 
+test("operations overview accepts staff-created reservations in today's timeline", async () => {
+  const now = new Date("2026-08-05T00:00:00.000Z");
+  const data = emptyOperationsOverviewData({ now, timezone: "UTC", localDate: "2026-08-05" });
+  data.reservations.timeline.push({
+    reservation_id: "reservation_1",
+    service_name: "Seat session",
+    customer_name: "Alex",
+    start_time: "10:00",
+    end_time: "11:00",
+    quantity: 2,
+    status: "confirmed",
+    channel: "staff",
+  });
+  const result = await readOperationsOverview({
+    scope: { tenantId: "tenant_1", venueId: "venue_1" }, now, channelReadiness: readiness,
+    repository: { async read() { return { data }; } },
+  });
+
+  assert.equal(result.status, 200);
+  assert.equal("reservations" in result.body ? result.body.reservations.timeline[0]?.channel : undefined, "staff");
+});
+
 test("operations overview rejects unbounded or malformed storage responses", async () => {
   const result = await readOperationsOverview({
     scope: { tenantId: "tenant_1", venueId: "venue_1" }, channelReadiness: readiness,

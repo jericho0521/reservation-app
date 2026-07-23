@@ -13,7 +13,7 @@ import {
 
 const indexPath = new URL("../migrations/supabase/migration-index.json", import.meta.url);
 
-test("core plan includes exactly 000001 through 000040 in order", async () => {
+test("core plan includes exactly 000001 through 000043 in order", async () => {
   const index = await readActualIndex();
   const plan = buildSupabaseMigrationPlan(index);
 
@@ -60,10 +60,79 @@ test("core plan includes exactly 000001 through 000040 in order", async () => {
       "000038_strict_reservation_availability.sql",
       "000039_appointment_practitioner_lifecycle.sql",
       "000040_ai_knowledge_retrieval.sql",
+      "000041_capacity_booking_default.sql",
+      "000042_capacity_reschedule_safety.sql",
+      "000043_capacity_booking_concurrency.sql",
     ],
   );
-  assert.equal(plan.migrations.length, 40);
+  assert.equal(plan.migrations.length, 43);
   assert.equal(plan.seeds.length, 0);
+});
+
+test("resource creation serializes writes and rejects quantity, assigned, and hybrid overlaps", async () => {
+  const sql = (await readFile(new URL("../migrations/supabase/000043_capacity_booking_concurrency.sql", import.meta.url), "utf8")).toLowerCase();
+
+  assert.match(sql, /rename to create_reservation_atomic_legacy_without_overlapping_resource_conflicts/);
+  assert.match(sql, /create or replace function public\.create_reservation_atomic_legacy_without_channel/);
+  assert.match(sql, /select service\.\*[\s\S]*for update of service/);
+  assert.doesNotMatch(sql, /v_service\.selection_mode <> 'quantity'/);
+  assert.match(sql, /existing\.status in \('pending', 'confirmed'\)[\s\S]*existing\.start_time < v_end_time[\s\S]*existing\.end_time > v_start_time/);
+  assert.match(sql, /coalesce\([\s\S]*item ->> 'resource_label'[\s\S]*requested_resource\.label[\s\S]*requested_resource\.id::text = nullif\(item ->> 'resource_id', ''\)/);
+  assert.match(sql, /jsonb_array_elements_text\(payload -> 'seat_labels'\)[\s\S]*requested_resource\.id::text = requested\.value/);
+  assert.match(sql, /join public\.reservation_items as item[\s\S]*booking\.start_time < v_end_time[\s\S]*booking\.end_time > v_start_time/);
+  assert.match(sql, /when v_service\.selection_mode = 'quantity'[\s\S]*resource\.resource_kind <> 'room'[\s\S]*requested\.requested_quantity \+ coalesce\(existing\.quantity, 0\) > resource\.capacity[\s\S]*else coalesce\(existing\.quantity, 0\) > 0/);
+  assert.match(sql, /'error_code', 'resource_conflict'/);
+  assert.match(sql, /create or replace function public\.platform_staff_create_appointment/);
+  assert.match(sql, /join public\.venues as venue[\s\S]*for update of service/);
+  assert.doesNotMatch(sql, /for share of service/);
+  assert.match(sql, /grant execute on function public\.platform_staff_create_appointment[^;]+to service_role/);
+});
+
+test("capacity rescheduling is availability-aware and records the actor and reason atomically", async () => {
+  const sql = (await readFile(new URL("../migrations/supabase/000042_capacity_reschedule_safety.sql", import.meta.url), "utf8")).toLowerCase();
+  assert.match(sql, /rename to create_reservation_atomic_legacy_without_channel/);
+  assert.match(sql, /set channel = v_channel/);
+  assert.match(sql, /v_channel is null[\s\S]*v_channel not in \('web_booking', 'web_chat', 'whatsapp', 'staff', 'simulation'\)/);
+  assert.match(sql, /create or replace function public\.read_platform_analytics/);
+  assert.match(sql, /when booking\.channel in \('web_booking', 'web_chat', 'whatsapp', 'staff', 'simulation'\) then booking\.channel/);
+  assert.match(sql, /p_include_simulation or coalesce\(conversation\.channel, booking\.channel, ''\) <> 'simulation'/);
+  assert.match(sql, /create or replace function public\.platform_staff_reschedule_capacity_reservation/);
+  assert.match(sql, /select service\.\*[\s\S]*for update of service[\s\S]*select booking\.\*[\s\S]*for update/);
+  assert.match(sql, /platform_appointment_slot_is_allowed/);
+  assert.match(sql, /existing\.id <> v_booking\.id/);
+  assert.equal([...sql.matchAll(/existing\.status in \('pending', 'confirmed'\)/g)].length, 4);
+  assert.doesNotMatch(sql, /existing\.status = 'confirmed'/);
+  assert.match(sql, /existing\.start_time < p_end_time[\s\S]*existing\.end_time > p_start_time/);
+  assert.match(sql, /p_quantity > v_available_quantity/);
+  assert.match(sql, /resource\.resource_kind <> 'capacity_bucket'/);
+  assert.match(sql, /v_capacity_bucket_id[\s\S]*insert into public\.reservation_items/);
+  assert.match(sql, /'not_enough_capacity'/);
+  assert.match(sql, /insert into public\.platform_audit_events/);
+  assert.match(sql, /p_actor_user_id/);
+  assert.match(sql, /trim\(p_reason\)/);
+  assert.match(sql, /'reservation\.capacity_rescheduled'/);
+  assert.match(sql, /create or replace function public\.reschedule_managed_capacity_reservation/);
+  assert.match(sql, /select service\.\*[\s\S]*for update of service[\s\S]*select booking\.\*[\s\S]*for update/);
+  assert.match(sql, /v_booking\.seats_booked > v_available_quantity/);
+  assert.match(sql, /existing\.status in \('pending', 'confirmed'\)[\s\S]*existing\.id <> v_booking\.id/);
+  assert.match(sql, /'reservation\.customer_rescheduled'/);
+  assert.match(sql, /grant execute on function public\.reschedule_managed_capacity_reservation/);
+});
+
+test("capacity booking becomes the safe default without rewriting configured appointment businesses", async () => {
+  const sql = (await readFile(new URL("../migrations/supabase/000041_capacity_booking_default.sql", import.meta.url), "utf8")).toLowerCase();
+  assert.match(sql, /rename to create_reservation_atomic_legacy_exact_start/);
+  assert.match(sql, /for update[\s\S]*existing\.start_time < v_end_time[\s\S]*existing\.end_time > v_start_time/);
+  assert.equal([...sql.matchAll(/existing\.status in \('pending', 'confirmed'\)/g)].length, 2);
+  assert.doesNotMatch(sql, /existing\.status = 'confirmed'/);
+  assert.match(sql, /sum\(existing\.seats_booked\)[\s\S]*existing\.start_time < v_end_time[\s\S]*existing\.end_time > v_start_time/);
+  assert.match(sql, /p_public_slug, 'seat_capacity', 'draft'/);
+  assert.match(sql, /'resource', 'seat'/);
+  assert.match(sql, /business\.preset_id = 'appointments_salon'/);
+  assert.match(sql, /business\.status = 'draft'/);
+  assert.match(sql, /not exists[\s\S]*from public\.services/);
+  assert.match(sql, /not exists[\s\S]*state = 'published'/);
+  assert.doesNotMatch(sql, /set booking_mode = 'appointment'/);
 });
 
 test("hybrid knowledge retrieval is scoped, exact, restart-safe, and service-role only", async () => {
@@ -348,7 +417,7 @@ test("bundled core migration loader follows an extended validated index", async 
   const rawIndex = await readActualRawIndex();
   rawIndex.coreMigrations.push({
     order: rawIndex.coreMigrations.length + 1,
-    path: "packages/database/migrations/supabase/000041_runtime_readiness_test.sql",
+    path: "packages/database/migrations/supabase/000044_runtime_readiness_test.sql",
     module: "core",
     scope: "reservation-platform",
     sha256: "a".repeat(64),
@@ -361,9 +430,9 @@ test("bundled core migration loader follows an extended validated index", async 
 
   const plan = await loadBundledCoreMigrationPlan(pathToFileURL(extendedIndexPath));
 
-  assert.equal(plan.length, 41);
+  assert.equal(plan.length, 44);
   assert.deepEqual(plan.at(-1), {
-    path: "packages/database/migrations/supabase/000041_runtime_readiness_test.sql",
+    path: "packages/database/migrations/supabase/000044_runtime_readiness_test.sql",
     sha256: "a".repeat(64),
   });
 });

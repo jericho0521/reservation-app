@@ -230,6 +230,19 @@ test("platform reservation adapter maps legacy booking customer and resources", 
   });
 });
 
+test("platform reservation adapter prefers the persisted channel over interface fallback", () => {
+  const reservation = toPlatformReservation({
+    id: "booking_staff",
+    service_id: "svc_123",
+    seats_booked: 1,
+    status: "confirmed",
+    interface_type: "form",
+    channel: "staff",
+  });
+
+  assert.equal(reservation.metadata?.channel_origin, "staff");
+});
+
 test("platform reservation create adapter maps SDK input to legacy booking input", () => {
   assert.deepEqual(toLegacyBookingCreateInput({
     service_id: "svc_123",

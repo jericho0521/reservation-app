@@ -408,12 +408,16 @@ test("catalog repository hides archived services from public reads but exposes t
     [RESERVATION_SUPABASE_TABLES.services]: [
       { data: structuredClone(rows), error: null },
       { data: structuredClone(rows), error: null },
+      { data: structuredClone(rows[1]), error: null },
+      { data: structuredClone(rows[1]), error: null },
     ],
   }, calls);
   const repository = createSupabasePlatformCatalogRepository(client);
 
   assert.deepEqual((await repository.listServices()).data, [rows[0]]);
   assert.deepEqual((await repository.listServices({ includeInactive: true })).data, rows);
+  assert.equal((await repository.getService("service-archived")).data, null);
+  assert.deepEqual((await repository.getService("service-archived", { includeInactive: true })).data, rows[1]);
 });
 
 test("catalog mutations preserve scoped service rows and archive instead of deleting", async () => {
@@ -1424,6 +1428,12 @@ test("appointment mutations use actor-scoped atomic RPCs", async () => {
     expectedStatus: "confirmed", date: "2026-07-20", startTime: "10:00",
     staffId: "44444444-4444-4444-8444-444444444444", reason: "Customer requested later",
   });
+  await repository.rescheduleCapacityReservation?.({
+    tenantId: "tenant-a", venueId: "11111111-1111-4111-8111-111111111111",
+    actorUserId: "22222222-2222-4222-8222-222222222222", reservationId: "33333333-3333-4333-8333-333333333333",
+    expectedStatus: "confirmed", date: "2026-07-20", startTime: "10:00", endTime: "11:00",
+    quantity: 3, reason: "Customer requested later",
+  });
 
   assert.deepEqual(rpcCalls, [
     { fn: "platform_transition_appointment", params: {
@@ -1436,6 +1446,12 @@ test("appointment mutations use actor-scoped atomic RPCs", async () => {
       p_actor_user_id: "22222222-2222-4222-8222-222222222222", p_booking_id: "33333333-3333-4333-8333-333333333333",
       p_expected_status: "confirmed", p_date: "2026-07-20", p_start_time: "10:00",
       p_staff_id: "44444444-4444-4444-8444-444444444444", p_reason: "Customer requested later",
+    } },
+    { fn: "platform_staff_reschedule_capacity_reservation", params: {
+      p_tenant_id: "tenant-a", p_venue_id: "11111111-1111-4111-8111-111111111111",
+      p_actor_user_id: "22222222-2222-4222-8222-222222222222", p_booking_id: "33333333-3333-4333-8333-333333333333",
+      p_expected_status: "confirmed", p_date: "2026-07-20", p_start_time: "10:00", p_end_time: "11:00",
+      p_quantity: 3, p_reason: "Customer requested later",
     } },
   ]);
 });
@@ -2055,6 +2071,7 @@ test("repository maps venue-scoped atomic RPC payload and successful booking res
             seat_labels: ["Room A"],
             status: "confirmed",
             interface_type: "form",
+            channel: "staff",
             staff_id: "staff-1",
           },
           validation: { ok: true },
@@ -2077,6 +2094,7 @@ test("repository maps venue-scoped atomic RPC payload and successful booking res
       quantity: 2,
       items: [{ resource_label: "Room A", quantity: 2 }],
       interface_type: "form",
+      channel: "staff",
       staff_id: "staff-1",
       seats_booked: 2,
       seat_labels: ["Room A"],
@@ -2105,6 +2123,7 @@ test("repository maps venue-scoped atomic RPC payload and successful booking res
       ],
       status: "confirmed",
       interface_type: "form",
+      channel: "staff",
       staff_id: "staff-1",
     },
   });
@@ -2115,6 +2134,7 @@ test("repository maps venue-scoped atomic RPC payload and successful booking res
     assert.equal(result.booking.id, "booking-atomic");
     assert.equal(result.reservation.id, "booking-atomic");
     assert.equal(result.reservation.quantity, 2);
+    assert.equal(result.reservation.channel, "staff");
     assert.equal(result.reservation.staff_id, "staff-1");
     assert.equal(result.validation.ok, true);
   }
@@ -2296,6 +2316,59 @@ test("idempotency repository stores completed responses through RPC", async () =
       },
     },
   ]);
+});
+
+test("idempotency repository releases only the matching in-progress claim", async () => {
+  const calls: Array<{
+    table: string;
+    deleted: boolean;
+    filters: Array<{ column: string; value: unknown }>;
+  }> = [];
+  const client = {
+    from(table: string) {
+      const call = { table, deleted: false, filters: [] as Array<{ column: string; value: unknown }> };
+      calls.push(call);
+      const result = Promise.resolve({ data: null, error: null });
+      return {
+        delete() {
+          call.deleted = true;
+          return this;
+        },
+        eq(column: string, value: unknown) {
+          call.filters.push({ column, value });
+          return this;
+        },
+        then(resolve: (value: { data: null; error: null }) => unknown) {
+          return result.then(resolve);
+        },
+      };
+    },
+    async rpc() {
+      throw new Error("rpc() should not be called when releasing a claim");
+    },
+  };
+  const repository = createSupabaseIdempotencyRepository(client);
+
+  await repository.releaseInProgress({
+    tenantId: "tenant-1",
+    key: "idem-1",
+    method: "POST",
+    path: "/v1/reservations",
+    fingerprint: "{\"service_id\":\"service-1\"}",
+  });
+
+  assert.deepEqual(calls, [{
+    table: RESERVATION_SUPABASE_TABLES.platformIdempotencyRecords,
+    deleted: true,
+    filters: [
+      { column: "tenant_id", value: "tenant-1" },
+      { column: "key", value: "idem-1" },
+      { column: "method", value: "POST" },
+      { column: "path", value: "/v1/reservations" },
+      { column: "fingerprint", value: "{\"service_id\":\"service-1\"}" },
+      { column: "status", value: "in_progress" },
+    ],
+  }]);
 });
 
 test("idempotency repository surfaces store identity mismatch errors", async () => {

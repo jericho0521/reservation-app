@@ -20,7 +20,7 @@ export interface ReservationManagementRepository {
     tokenHash: string;
     date: string;
     startTime: string;
-    staffId: string;
+    staffId?: string;
   }): Promise<ReservationManagementRepositoryResult>;
 }
 
@@ -117,7 +117,7 @@ async function runManagedReservationOperation(
           tokenHash,
           date: input.reschedule!.date,
           startTime: input.reschedule!.start_time,
-          staffId: input.reschedule!.staff_id,
+          ...(input.reschedule!.staff_id ? { staffId: input.reschedule!.staff_id } : {}),
         })
       : await input.repository[operation]({ publicSlug, tokenHash });
     if (result.error) throw result.error;

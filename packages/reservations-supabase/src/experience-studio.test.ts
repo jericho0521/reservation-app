@@ -74,6 +74,20 @@ test("experience repository scopes workspace reads to tenant and venue", async (
   assert.equal(workspace?.published?.configuration_id, "published_1");
 });
 
+test("experience repository accepts the default seat-capacity preset", async () => {
+  const profile = { ...profileRow(), preset_id: "seat_capacity" };
+  const configuration = { ...configurationRow(), preset_id: "seat_capacity" };
+  const repository = createSupabaseExperienceStudioRepository(fakeClient([], [
+    { data: profile, error: null },
+    { data: [configuration], error: null },
+  ]));
+
+  const workspace = await repository.readWorkspace({ tenantId: "tenant_1", venueId: "venue_1" });
+
+  assert.equal(workspace?.profile.preset_id, "seat_capacity");
+  assert.equal(workspace?.draft?.preset_id, "seat_capacity");
+});
+
 test("publish uses the atomic scoped RPC", async () => {
   const rpcCalls: unknown[] = [];
   const tableCalls: Array<[string, unknown]> = [];

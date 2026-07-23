@@ -105,6 +105,7 @@
     },
     "ExperiencePresetId": {
       "enum": [
+        "seat_capacity",
         "racing_gaming",
         "rooms_facilities",
         "appointments_salon",

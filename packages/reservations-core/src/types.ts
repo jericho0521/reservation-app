@@ -117,6 +117,7 @@ export interface LegacyBookingShape {
   seat_labels?: string[];
   status?: string;
   interface_type: "form" | "chat";
+  channel?: "web_booking" | "web_chat" | "whatsapp" | "staff" | "simulation";
   staff_id?: string;
   buffer_before_minutes?: number;
   buffer_after_minutes?: number;
@@ -289,6 +290,7 @@ export function adaptLegacyBooking(booking: LegacyBookingShape): Reservation {
         : [{ quantity: booking.seats_booked }],
     status: booking.status,
     interface_type: booking.interface_type,
+    ...(booking.channel ? { channel: booking.channel } : {}),
     ...(booking.staff_id ? { staff_id: booking.staff_id } : {}),
     ...(booking.buffer_before_minutes !== undefined ? { buffer_before_minutes: booking.buffer_before_minutes } : {}),
     ...(booking.buffer_after_minutes !== undefined ? { buffer_after_minutes: booking.buffer_after_minutes } : {}),

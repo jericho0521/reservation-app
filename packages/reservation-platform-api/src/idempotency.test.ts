@@ -4,6 +4,7 @@ import {
   beginIdempotentMutation,
   commitIdempotentMutation,
   createJsonRequestFingerprint,
+  releaseIdempotentMutation,
   requireIdempotencyKey,
   type IdempotencyRecord,
   type IdempotencyRepository,
@@ -23,6 +24,10 @@ class InMemoryIdempotencyRepository implements IdempotencyRepository {
 
   storeCompleted(record: IdempotencyRecord) {
     this.records.set(record.key, record);
+  }
+
+  releaseInProgress(token: { key: string }) {
+    this.records.delete(token.key);
   }
 }
 
@@ -83,6 +88,9 @@ test("idempotent mutation treats duplicate claim winners as existing in-progress
     },
     storeCompleted() {
       throw new Error("should not store completed response");
+    },
+    releaseInProgress() {
+      throw new Error("should not release in-progress response");
     },
   };
 
@@ -170,6 +178,17 @@ test("idempotent mutation rejects a matching in-progress request", async () => {
   assert.equal(result.action, "reject");
   assert.equal(result.status, 409);
   assert.equal(result.body.error.code, "conflict");
+});
+
+test("releasing an in-progress mutation allows the same request to be claimed again", async () => {
+  const repository = new InMemoryIdempotencyRepository();
+  const first = await beginIdempotentMutation(repository, baseInput);
+  assert.equal(first.action, "proceed");
+
+  await releaseIdempotentMutation(repository, first.token);
+  const retry = await beginIdempotentMutation(repository, baseInput);
+
+  assert.equal(retry.action, "proceed");
 });
 
 test("JSON request fingerprints canonicalize object key order while preserving array order", () => {

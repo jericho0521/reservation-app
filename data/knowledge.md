@@ -10,8 +10,15 @@ Project Play By CW is Bandar Sunway's sim racing and gaming hub. We offer Racing
 
 ## Contact Information
 - **Phone:** +60 11-1628 1524
+- **WhatsApp:** +60 11-1628 1524
+- **WhatsApp chat:** https://wa.me/601116281524
 - **Website:** https://ppbycw.com
 - **Instagram:** @projectplaybycw
+
+### Speaking with a person
+- Customers who ask for a person, human, staff member, customer support, or WhatsApp should be directed to the Project Play By CW team on WhatsApp at +60 11-1628 1524.
+- The chat interface provides a button that opens a pre-filled WhatsApp conversation.
+- Human support is also appropriate for group bookings, parties, tournaments, corporate events, price confirmation, and questions the booking assistant cannot resolve.
 
 ## Operating Hours
 - **Daily:** 12:00 PM - 2:00 AM Malaysia time
@@ -76,6 +83,9 @@ Availability changes constantly. Use the booking assistant or website booking fl
 
 ### How much does it cost?
 Pricing can change and should be confirmed through the website, booking flow, or by contacting Project Play By CW directly.
+
+### Can I speak with a person?
+Yes. Ask the booking assistant for a person, staff member, customer support, or WhatsApp. It will provide a button that opens a chat with the Project Play By CW team at +60 11-1628 1524.
 
 ## Policies
 

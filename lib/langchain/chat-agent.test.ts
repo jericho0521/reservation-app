@@ -1,7 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { AIMessage, HumanMessage, ToolMessage } from "@langchain/core/messages";
-import { extractPreparedBookingAction, getChatDomainGuardResponse, getLocationDirectionsAction } from "./chat-agent";
+import {
+  extractPreparedBookingAction,
+  getChatDomainGuardResponse,
+  getHumanSupportAction,
+  getLocationDirectionsAction,
+} from "./chat-agent";
 
 const preparedBookingPayload = {
   ready_for_confirmation: true,
@@ -99,4 +104,24 @@ test("getLocationDirectionsAction returns a Waze-ready location card", () => {
 
 test("getLocationDirectionsAction ignores unrelated booking questions", () => {
   assert.equal(getLocationDirectionsAction("Can I book PS5 tomorrow?"), null);
+});
+
+test("getHumanSupportAction returns a click-to-chat card for staff requests", () => {
+  for (const message of [
+    "Can I talk to a real person?",
+    "I do not want AI; let me speak to a real agent",
+    "I need customer support",
+    "What is your WhatsApp?",
+  ]) {
+    const action = getHumanSupportAction(message);
+
+    assert.equal(action?.type, "whatsapp_contact");
+    assert.equal(action?.data.phone, "+60 11-1628 1524");
+    assert.match(action?.data.whatsappUrl || "", /^https:\/\/wa\.me\/601116281524\?text=/);
+  }
+});
+
+test("getHumanSupportAction ignores ordinary business questions", () => {
+  assert.equal(getHumanSupportAction("Can I book PS5 tomorrow?"), null);
+  assert.equal(getHumanSupportAction("What games do you have?"), null);
 });

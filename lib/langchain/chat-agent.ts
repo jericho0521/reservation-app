@@ -14,6 +14,10 @@ import { supabaseAdmin } from "@/lib/supabase-admin";
 import { getEndTime, generateTimeSlots } from "@/lib/availability";
 import { getAvailableSeatsWithMaintenance } from "@/lib/reservation-capacity";
 import { sendBookingConfirmationEmail } from "@/lib/booking-confirmation-email";
+import {
+  HUMAN_SUPPORT_CONTACT,
+  type WhatsAppContactData,
+} from "@/lib/business-contact";
 import { createOpenRouterChat } from "./models";
 import { buildBookingSystemPromptWithContext } from "./prompts";
 
@@ -59,7 +63,12 @@ export interface LocationDirectionsAction {
   };
 }
 
-export type ChatAction = BookingAction | LocationDirectionsAction;
+export interface WhatsAppContactAction {
+  type: "whatsapp_contact";
+  data: WhatsAppContactData;
+}
+
+export type ChatAction = BookingAction | LocationDirectionsAction | WhatsAppContactAction;
 
 export interface ChatAgentResult {
   content: string;
@@ -97,6 +106,7 @@ const blockedChatTopics = [
 const allowedChatTopics = [
   /\b(book|booking|reserve|reservation|slot|availability|available|time|date|seat|session)\b/i,
   /\b(service|racing|simulator|playstation|ps5|game|games|equipment|price|pricing|cost|policy|policies|rule|rules|faq|location|open|hours|contact|project\s+play)\b/i,
+  /\b(whats\s*app|whatsapp|customer\s+(service|support)|real\s+(person|agent)|human|staff|team|representative|manager|owner)\b/i,
 ];
 
 export function getChatDomainGuardResponse(message: string): string | null {
@@ -129,6 +139,27 @@ export function getLocationDirectionsAction(message: string): LocationDirections
     ? {
         type: "location_directions",
         data: PROJECT_PLAY_LOCATION,
+      }
+    : null;
+}
+
+export function getHumanSupportAction(message: string): WhatsAppContactAction | null {
+  const normalizedMessage = message.trim();
+
+  if (!normalizedMessage) {
+    return null;
+  }
+
+  const requestsWhatsApp = /\b(whats\s*app|whatsapp)\b/i.test(normalizedMessage);
+  const requestsCustomerSupport = /\bcustomer\s+(service|support)\b/i.test(normalizedMessage);
+  const requestsPerson =
+    /\b(talk|speak|chat|contact|reach)\b.{0,30}\b(real\s+(person|agent)|support\s+agent|person|human|staff|team|someone|representative|manager|owner)\b/i.test(normalizedMessage) ||
+    /\b(real\s+(person|agent)|support\s+agent|person|human|staff|team|someone|representative|manager|owner)\b.{0,30}\b(talk|speak|chat|contact|reach)\b/i.test(normalizedMessage);
+
+  return requestsWhatsApp || requestsCustomerSupport || requestsPerson
+    ? {
+        type: "whatsapp_contact",
+        data: HUMAN_SUPPORT_CONTACT,
       }
     : null;
 }

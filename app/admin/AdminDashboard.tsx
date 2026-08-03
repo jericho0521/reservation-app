@@ -5,7 +5,8 @@ import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase-browser';
 import { Check, X, RotateCcw, LogOut, RefreshCw, Search, XCircle } from 'lucide-react';
 import { Sidebar } from '@/components/admin/Sidebar';
-import { ADMIN_BOOKINGS_SELECT, filterBookings, formatRefreshTime, getBookingSummary, getServiceName, type AdminBooking, type AdminFilter } from './dashboard-data';
+import { filterBookings, formatRefreshTime, getBookingSummary, getServiceName, type AdminBooking, type AdminFilter } from './dashboard-data';
+import { loadAllAdminBookings } from './admin-bookings';
 
 interface AdminDashboardProps {
     bookings: AdminBooking[];
@@ -72,12 +73,7 @@ export default function AdminDashboard({ bookings: initialBookings, todayCount, 
         const supabase = getSupabase();
 
         const [bookingsResult, todayCountResult] = await Promise.all([
-            supabase
-                .from('bookings')
-                .select(ADMIN_BOOKINGS_SELECT)
-                .order('booking_date', { ascending: false })
-                .order('start_time', { ascending: false })
-                .limit(50),
+            loadAllAdminBookings(supabase),
             supabase
                 .from('bookings')
                 .select('*', { count: 'exact', head: true })

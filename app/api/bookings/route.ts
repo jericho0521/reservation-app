@@ -38,7 +38,8 @@ export async function GET(request: NextRequest) {
         let query = auth.supabase
             .from('bookings')
             .select('*, services(name)')
-            .order('booking_date', { ascending: false });
+            .order('created_at', { ascending: false })
+            .order('id', { ascending: false });
 
         if (search) {
             query = query

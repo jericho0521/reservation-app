@@ -12,6 +12,7 @@ const bookings: AdminBooking[] = [
         end_time: '13:00',
         seats_booked: 2,
         status: 'confirmed',
+        created_at: '2026-03-11T04:00:00.000Z',
         services: { name: 'Racing Simulator' },
     },
     {
@@ -23,6 +24,7 @@ const bookings: AdminBooking[] = [
         end_time: '15:00',
         seats_booked: 1,
         status: 'completed',
+        created_at: '2026-03-11T03:00:00.000Z',
         services: { name: 'Playstation 5' },
     },
     {
@@ -34,6 +36,7 @@ const bookings: AdminBooking[] = [
         end_time: '19:00',
         seats_booked: 4,
         status: 'cancelled',
+        created_at: '2026-03-11T02:00:00.000Z',
         services: { name: 'Racing Simulator' },
     },
     {
@@ -45,6 +48,7 @@ const bookings: AdminBooking[] = [
         end_time: '21:00',
         seats_booked: 3,
         status: 'pending',
+        created_at: '2026-03-11T01:00:00.000Z',
         services: { name: 'Racing Simulator' },
     },
 ];
@@ -60,7 +64,7 @@ test('getBookingSummary counts status buckets once', () => {
 test('filterBookings applies admin filters deterministically', () => {
     assert.deepEqual(
         filterBookings(bookings, 'all', '2026-03-11').map(booking => booking.id),
-        ['1', '4'],
+        ['1', '2', '3', '4'],
     );
 
     assert.deepEqual(

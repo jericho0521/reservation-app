@@ -9,6 +9,7 @@ export const ADMIN_BOOKINGS_SELECT = `
     seats_booked,
     seat_labels,
     status,
+    created_at,
     services (name)
 `;
 
@@ -27,6 +28,7 @@ export interface AdminBooking {
     seats_booked: number;
     seat_labels?: string[];
     status: string;
+    created_at: string;
     services: AdminServiceRelation;
 }
 
@@ -91,7 +93,7 @@ export function filterBookings(
             return booking.status === 'cancelled';
         }
 
-        return booking.status === 'confirmed' || booking.status === 'pending';
+        return true;
     });
 }
 

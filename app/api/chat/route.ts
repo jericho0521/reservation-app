@@ -3,6 +3,7 @@ import { getRelevantContext } from "@/lib/knowledge";
 import { getBookingConfirmationContent } from "./booking-confirmation-response";
 import {
   getChatDomainGuardResponse,
+  getHumanSupportAction,
   getLocationDirectionsAction,
   runChatAgent,
   createBooking,
@@ -67,6 +68,15 @@ export async function POST(req: Request) {
 
     const latestUserMessage =
       [...messages].reverse().find((m) => m.role === "user")?.content || "";
+    const humanSupportAction = getHumanSupportAction(latestUserMessage);
+    if (humanSupportAction) {
+      return Response.json({
+        content: "You can talk directly with the Project Play by CW team on WhatsApp. Tap below to open a pre-filled chat.",
+        action: humanSupportAction,
+        threadId: threadId || crypto.randomUUID(),
+      });
+    }
+
     const guardResponse = getChatDomainGuardResponse(latestUserMessage);
     if (guardResponse) {
       return Response.json({

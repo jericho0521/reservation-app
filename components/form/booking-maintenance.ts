@@ -1,7 +1,8 @@
 import type { Service } from '@/types';
+import { buildWhatsAppUrl } from '@/lib/business-contact';
 
 export const BOOKING_WHATSAPP_URL =
-    'https://wa.me/601116281524?text=Hi%20Project%20Play%20By%20CW%2C%20I%20would%20like%20to%20make%20a%20booking.';
+    buildWhatsAppUrl('Hi Project Play By CW, I would like to make a booking.');
 
 export function shouldShowBookingMaintenanceFallback(
     services: Service[] | undefined,

@@ -6,6 +6,7 @@ import { useChat } from './useChat';
 import MessageBubble from './MessageBubble';
 import BookingCard from './BookingCard';
 import LocationDirectionsCard from './LocationDirectionsCard';
+import WhatsAppContactCard from './WhatsAppContactCard';
 import type { BookingData, Message } from './chat-types';
 
 const FloatingChatMessageItem = memo(function FloatingChatMessageItem({
@@ -38,6 +39,10 @@ const FloatingChatMessageItem = memo(function FloatingChatMessageItem({
 
     if (message.action?.type === 'location_directions') {
         return <LocationDirectionsCard data={message.action.data} />;
+    }
+
+    if (message.action?.type === 'whatsapp_contact') {
+        return <WhatsAppContactCard data={message.action.data} />;
     }
 
     return (

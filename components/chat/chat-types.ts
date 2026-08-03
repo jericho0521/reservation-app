@@ -1,3 +1,5 @@
+import type { WhatsAppContactData } from '@/lib/business-contact';
+
 export interface BookingData {
     service: string;
     date: string;
@@ -31,6 +33,10 @@ export type MessageAction =
     | {
         type: 'location_directions';
         data: LocationDirectionsData;
+    }
+    | {
+        type: 'whatsapp_contact';
+        data: WhatsAppContactData;
     };
 
 

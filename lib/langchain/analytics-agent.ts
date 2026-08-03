@@ -7,6 +7,7 @@ import {
 import { buildAnalyticsCatalogPrompt } from "@/components/analytics/renderer/catalog";
 import { extractSpecAndFallback } from "@/components/analytics/spec-adapter";
 import type { AnalyticsSpec } from "@/components/analytics/renderer/spec-types";
+import { getAppUrl } from "@/lib/app-url";
 
 const DASHBOARD_SYSTEM_PROMPT = `${buildAnalyticsCatalogPrompt()}
 
@@ -255,7 +256,7 @@ async function requestAICompletion({
     headers: {
       Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
       "Content-Type": "application/json",
-      "HTTP-Referer": "http://localhost:3000",
+      "HTTP-Referer": getAppUrl(),
     },
     body: JSON.stringify({
       model: "google/gemini-2.5-flash",

@@ -500,7 +500,7 @@ The workflow includes placeholder fallbacks so verification can run before real 
 
 ```mermaid
 gitGraph
-    commit id: "master"
+    commit id: "main"
     branch staging
     checkout staging
     commit id: "staging baseline"
@@ -511,7 +511,7 @@ gitGraph
     checkout staging
     merge feature id: "PR to staging"
     commit id: "staging deploy skeleton"
-    checkout master
+    checkout main
     merge staging id: "release PR"
     commit id: "production deploy skeleton"
 ```
@@ -520,7 +520,7 @@ Branch rules:
 
 - Feature branches run CI on push and pull request.
 - `staging` runs CI plus the staging deploy skeleton in `.github/workflows/deploy.yml`.
-- `master` runs CI plus the production deploy skeleton in `.github/workflows/deploy.yml`.
+- `main` runs CI plus the production deploy skeleton in `.github/workflows/deploy.yml`.
 
 Recommended GitHub setup:
 
@@ -541,13 +541,13 @@ pnpm pr
 Default branch flow:
 
 - Feature branches -> `staging`
-- `staging` -> `master`
+- `staging` -> `main`
 
 Useful options:
 
 ```bash
 pnpm pr -- --base staging
-pnpm pr -- --base master
+pnpm pr -- --base main
 pnpm pr -- --dry-run
 ```
 

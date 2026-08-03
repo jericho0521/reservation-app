@@ -21,7 +21,7 @@ flowchart LR
     User -->|Visits app| Vercel
     User -->|Existing site traffic| Amplify
     Vercel -->|Supabase API calls| CF
-    CF -->|Tunnel route supabase.ppbycw.com| Tunnel
+    CF -->|Tunnel route supabase.jerichofoong.com| Tunnel
     Tunnel -->|Forwards to http://localhost:8000| Kong
     Kong --> Auth
     Kong --> Rest
@@ -66,16 +66,20 @@ sequenceDiagram
 flowchart TD
     Registrar[GoDaddy Registrar]
     Nameservers[Cloudflare Nameservers]
+    SiteZone[ppbycw.com zone]
+    ApiZone[jerichofoong.com zone]
     Root[ppbycw.com]
     WWW[www.ppbycw.com]
-    SupabaseSub[supabase.ppbycw.com]
+    SupabaseSub[supabase.jerichofoong.com]
     Amplify[AWS Amplify]
     Tunnel[Cloudflare Tunnel]
 
     Registrar -->|Nameservers point to| Nameservers
-    Nameservers --> Root
-    Nameservers --> WWW
-    Nameservers --> SupabaseSub
+    Nameservers --> SiteZone
+    Nameservers --> ApiZone
+    SiteZone --> Root
+    SiteZone --> WWW
+    ApiZone --> SupabaseSub
     Root -->|A/CNAME records| Amplify
     WWW -->|CNAME record| Amplify
     SupabaseSub -->|Tunnel route| Tunnel
@@ -112,7 +116,7 @@ flowchart TB
 ```mermaid
 flowchart LR
     AppLogin[/Vercel app /admin/login/]
-    SupabasePublic[/https://supabase.ppbycw.com/]
+    SupabasePublic[/https://supabase.jerichofoong.com/]
     SupabaseLocal[/http://localhost:8000/]
     StudioLocal[/http://localhost:3000/]
     NextLocal[/http://localhost:4000/]

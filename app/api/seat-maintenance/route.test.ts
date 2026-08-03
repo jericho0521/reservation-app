@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { GET, isSeatMaintenanceSupportedService } from "./route";
+import { GET } from "./route";
+import { isSeatMaintenanceSupportedService } from "./service-support";
 
 test("GET /api/seat-maintenance returns 400 without service_id", async () => {
   const response = await GET(new Request("http://localhost/api/seat-maintenance"));

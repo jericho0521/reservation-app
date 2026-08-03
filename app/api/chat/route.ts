@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { z } from "zod";
 import { getRelevantContext } from "@/lib/knowledge";
 import {
   getChatDomainGuardResponse,
@@ -9,28 +8,12 @@ import {
   type ChatMessage,
   type ChatAction,
 } from "@/lib/langchain/chat-agent";
-
-const confirmBookingSchema = z.object({
-  service: z.string().trim().min(1),
-  date: z.string().trim().min(1),
-  time: z.string().trim().min(1),
-  seats: z.number().int().positive(),
-  name: z.string().trim().min(1),
-  email: z.string().trim().email(),
-  phone: z.string().trim().min(1),
-});
+import { parseConfirmBookingPayload } from "./confirm-booking";
 
 interface ChatRequestBody {
   messages?: unknown;
   confirmBooking?: unknown;
   threadId?: unknown;
-}
-
-type ConfirmBookingPayload = z.infer<typeof confirmBookingSchema>;
-
-export function parseConfirmBookingPayload(value: unknown): ConfirmBookingPayload | null {
-  const result = confirmBookingSchema.safeParse(value);
-  return result.success ? result.data : null;
 }
 
 function getChatRequestBody(value: unknown): ChatRequestBody {

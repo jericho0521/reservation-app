@@ -1,5 +1,15 @@
 packages:
   - .
-ignoredBuiltDependencies:
-  - sharp
-  - unrs-resolver
+
+overrides:
+  langsmith: ^0.6.0
+  postcss: ^8.5.18
+  sharp: 0.35.3
+  undici: ^7.28.0
+  ws: ^8.21.0
+  zod: ^3.24.0
+
+allowBuilds:
+  esbuild: true
+  sharp: true
+  unrs-resolver: true

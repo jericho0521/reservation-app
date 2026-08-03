@@ -66,7 +66,7 @@ Knowledge base is seeded from `data/knowledge.md` via `pnpm seed:knowledge`. Re-
 
 ### Branching
 
-Feature branches → `staging` → `master`. PRs from feature branches target `staging`.
+Feature branches → `staging` → `main`. PRs from feature branches target `staging`.
 
 ## Coding Conventions
 

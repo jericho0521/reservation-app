@@ -160,6 +160,23 @@ to authenticated
 using (public.is_admin())
 with check (public.is_admin());
 
+do $$
+begin
+  if exists (
+    select 1
+    from pg_publication
+    where pubname = 'supabase_realtime'
+  ) and not exists (
+    select 1
+    from pg_publication_tables
+    where pubname = 'supabase_realtime'
+      and schemaname = 'public'
+      and tablename = 'bookings'
+  ) then
+    alter publication supabase_realtime add table public.bookings;
+  end if;
+end $$;
+
 drop policy if exists "Authenticated admins can manage seat maintenance" on public.service_seat_maintenance;
 create policy "Authenticated admins can manage seat maintenance"
 on public.service_seat_maintenance

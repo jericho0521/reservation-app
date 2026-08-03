@@ -1,7 +1,7 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
 # dependencies
-/node_modules
+**/node_modules/
 /.pnp
 .pnp.*
 .yarn/*
@@ -12,13 +12,17 @@
 
 # testing
 /coverage
+/test-results/
 
 # next.js
-/.next/
+**/.next/
 /out/
 
 # production
 /build
+**/dist/
+/dist-packages/
+/output/
 
 # misc
 .DS_Store
@@ -39,6 +43,11 @@ yarn-error.log*
 
 # vercel
 .vercel
+
+# local tooling and generated evidence
+/.pnpm-store/
+/supabase/.temp/
+/tmp/
 
 # typescript
 *.tsbuildinfo

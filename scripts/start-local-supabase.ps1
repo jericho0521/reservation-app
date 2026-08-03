@@ -2,7 +2,7 @@ param(
   [string]$SupabaseDockerPath = "~/self-hosted/supabase/docker",
   [string]$TunnelName = "local-supabase",
   [string]$LocalSupabaseUrl = "http://localhost:8000",
-  [string]$PublicSupabaseUrl = "https://supabase.ppbycw.com"
+  [string]$PublicSupabaseUrl = "https://supabase.jerichofoong.com"
 )
 
 $ErrorActionPreference = "Stop"

@@ -1,0 +1,10 @@
+tunnel: <TUNNEL_UUID>
+credentials-file: <HOME>/.cloudflared/<TUNNEL_UUID>.json
+
+ingress:
+  - hostname: supabase.jerichofoong.com
+    path: ^/(auth|rest|storage|realtime|functions|graphql)/v1(/.*)?$
+    service: http://127.0.0.1:8000
+  - hostname: supabase.jerichofoong.com
+    service: http_status:404
+  - service: http_status:404

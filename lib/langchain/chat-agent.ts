@@ -13,6 +13,7 @@ import { supabase } from "@/lib/supabase";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { getEndTime, generateTimeSlots } from "@/lib/availability";
 import { getAvailableSeatsWithMaintenance } from "@/lib/reservation-capacity";
+import { sendBookingConfirmationEmail } from "@/lib/booking-confirmation-email";
 import { createOpenRouterChat } from "./models";
 import { buildBookingSystemPromptWithContext } from "./prompts";
 
@@ -37,6 +38,8 @@ export interface BookingAction {
     name: string;
     email: string;
     phone: string;
+    bookingId?: string;
+    emailSent?: boolean;
   };
 }
 
@@ -413,9 +416,24 @@ export async function createBooking(
       .single();
 
     if (error) return { success: false, error: error.message };
+
+    const emailResult = await sendBookingConfirmationEmail({
+      bookingId: booking.id,
+      interfaceType: "chat",
+      customerName: userName,
+      customerEmail: userEmail,
+      customerPhone: userPhone,
+      serviceName: service.name,
+      bookingDate: date,
+      startTime,
+      endTime,
+      seatsBooked: seats,
+    });
+
     return {
       success: true,
       booking_id: booking.id,
+      email_sent: emailResult.sent,
       message: `Booking confirmed! ${seats} seat(s) on ${date} at ${startTime}.`,
     };
   } catch (error) {

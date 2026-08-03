@@ -1,39 +1,7 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState } from 'react';
 import { Calendar, Clock, Users, User, Mail, Phone, Trophy } from 'lucide-react';
-
-function hashSeed(seed: string) {
-    let hash = 0;
-
-    for (const character of seed) {
-        hash = (hash * 31 + character.charCodeAt(0)) >>> 0;
-    }
-
-    return hash;
-}
-
-function buildQrPattern(seed: string) {
-    const pattern = [];
-    let value = hashSeed(seed) || 1;
-
-    for (let i = 0; i < 49; i++) {
-        const isCorner = (i < 7 && (i % 7 < 3 || i < 3)) ||
-            (i >= 42 && i % 7 < 3) ||
-            (i < 7 && i >= 4) ||
-            (i % 7 === 0 && i < 21) ||
-            (i % 7 === 6 && i < 21);
-
-        value = (value * 1664525 + 1013904223) >>> 0;
-        pattern.push(isCorner || (value & 1) === 0);
-    }
-
-    return pattern;
-}
-
-function buildReference(seed: string) {
-    return `PP${hashSeed(seed).toString().padStart(8, '0').slice(-8)}`;
-}
 
 interface Props {
     service: string;
@@ -44,6 +12,7 @@ interface Props {
     email: string;
     phone?: string;
     bookingId?: string;
+    emailSent: boolean;
 }
 
 export default function BookingTicket({
@@ -54,13 +23,10 @@ export default function BookingTicket({
     name,
     email,
     phone,
-    bookingId
+    bookingId,
+    emailSent,
 }: Props) {
     const [isVisible, setIsVisible] = useState(false);
-    const seed = `${service}|${date}|${time}|${seats}|${name}|${email}|${phone || ''}|${bookingId || ''}`;
-
-    const qrPattern = useMemo(() => buildQrPattern(seed), [seed]);
-    const reference = useMemo(() => bookingId || buildReference(seed), [bookingId, seed]);
 
     useEffect(() => {
         const timer = setTimeout(() => setIsVisible(true), 100);
@@ -143,11 +109,21 @@ export default function BookingTicket({
                         </div>
 
                         {/* Email */}
-                        <div className="flex items-center gap-3 p-3 bg-white/5 rounded-lg border border-white/5">
-                            <Mail className="w-4 h-4 text-neon flex-shrink-0" />
+                        <div className={`flex items-center gap-3 p-3 rounded-lg border ${emailSent
+                            ? 'bg-white/5 border-white/5'
+                            : 'bg-amber-500/10 border-amber-500/30'
+                            }`}>
+                            <Mail className={`w-4 h-4 flex-shrink-0 ${emailSent ? 'text-neon' : 'text-amber-300'}`} />
                             <div className="min-w-0">
-                                <p className="text-[10px] text-gray-500 uppercase tracking-wide">Confirmation sent to</p>
+                                <p className={`text-[10px] uppercase tracking-wide ${emailSent ? 'text-gray-500' : 'text-amber-300'}`}>
+                                    {emailSent ? 'Confirmation sent to' : 'Email confirmation could not be sent'}
+                                </p>
                                 <p className="text-sm font-medium text-white truncate">{email}</p>
+                                {!emailSent && (
+                                    <p className="mt-1 text-xs text-amber-100/80">
+                                        Your booking is still confirmed. Please save the reference below or contact Project Play.
+                                    </p>
+                                )}
                             </div>
                         </div>
 
@@ -162,24 +138,12 @@ export default function BookingTicket({
                             </div>
                         )}
 
-                        {/* QR Code */}
-                        <div className="flex justify-center pt-2">
-                            <div className="p-3 bg-white rounded-lg shadow-inner">
-                                <div className="w-20 h-20 grid grid-cols-7 gap-0.5">
-                                    {qrPattern.map((filled, i) => (
-                                        <div
-                                            key={i}
-                                            className={filled ? 'bg-racing-dark' : 'bg-white'}
-                                        />
-                                    ))}
-                                </div>
-                            </div>
-                        </div>
-
                         {/* Booking Reference */}
-                        <p className="text-center text-xs text-gray-500 pt-1">
-                            Reference: {reference}
-                        </p>
+                        {bookingId && (
+                            <p className="text-center text-xs text-gray-500 pt-1 break-all">
+                                Reference: {bookingId}
+                            </p>
+                        )}
                     </div>
                 </div>
             </div>

@@ -304,6 +304,8 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=
 SUPABASE_SERVICE_ROLE_KEY=
 GOOGLE_GENERATIVE_AI_API_KEY=
 OPENROUTER_API_KEY=
+RESEND_API_KEY=
+BOOKING_EMAIL_FROM=Project Play by CW <bookings@jerichofoong.com>
 ```
 
 Optional values:
@@ -315,6 +317,8 @@ GOOGLE_GENERATIVE_AI_MODEL=gemini-2.5-flash
 ```
 
 `SUPABASE_SERVICE_ROLE_KEY` is server-only. Never prefix it with `NEXT_PUBLIC_`, never expose it to client components, and do not commit real credentials.
+
+`RESEND_API_KEY` and `BOOKING_EMAIL_FROM` are also server-only. The Resend Vercel Marketplace integration provisions `RESEND_API_KEY`; configure `BOOKING_EMAIL_FROM` separately after the sender domain has been verified in Resend. Booking creation remains successful if email delivery is temporarily unavailable, and the customer-facing confirmation reports that delivery failure accurately.
 
 ## Supabase Setup
 

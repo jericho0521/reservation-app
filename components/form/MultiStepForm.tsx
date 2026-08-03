@@ -21,10 +21,15 @@ interface FormData extends Partial<Booking> {
     selected_seat_labels?: string[];
 }
 
+interface BookingConfirmation {
+    bookingId?: string;
+    emailSent: boolean;
+}
+
 export default function MultiStepForm() {
     const [currentStep, setCurrentStep] = useState(1);
     const [isSubmitting, setIsSubmitting] = useState(false);
-    const [isSuccess, setIsSuccess] = useState(false);
+    const [confirmation, setConfirmation] = useState<BookingConfirmation | null>(null);
     const [availableSeats, setAvailableSeats] = useState(0);
     const [takenSeatLabels, setTakenSeatLabels] = useState<string[]>([]);
     const [maintenanceSeatLabels, setMaintenanceSeatLabels] = useState<string[]>([]);
@@ -69,7 +74,11 @@ export default function MultiStepForm() {
             });
 
             if (response.ok) {
-                setIsSuccess(true);
+                const booking = await response.json();
+                setConfirmation({
+                    bookingId: typeof booking.id === 'string' ? booking.id : undefined,
+                    emailSent: booking.email_sent === true,
+                });
             } else {
                 const error = await response.json();
                 alert(error.error || 'Booking failed. Please try again.');
@@ -82,7 +91,7 @@ export default function MultiStepForm() {
         }
     };
 
-    if (isSuccess) {
+    if (confirmation) {
         return (
             <div className="relative min-h-[80vh] flex flex-col items-center justify-center p-8">
                 {/* Confetti Animation */}
@@ -97,12 +106,14 @@ export default function MultiStepForm() {
                     name={formData.user_name || ''}
                     email={formData.user_email || ''}
                     phone={formData.user_phone || ''}
+                    bookingId={confirmation.bookingId}
+                    emailSent={confirmation.emailSent}
                 />
 
                 {/* Make Another Booking Button */}
                 <button
                     onClick={() => {
-                        setIsSuccess(false);
+                        setConfirmation(null);
                         setCurrentStep(1);
                         setAvailableSeats(0);
                         setMaintenanceSeatLabels([]);

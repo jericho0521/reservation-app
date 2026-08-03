@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getRelevantContext } from "@/lib/knowledge";
+import { getBookingConfirmationContent } from "./booking-confirmation-response";
 import {
   getChatDomainGuardResponse,
   getLocationDirectionsAction,
@@ -50,11 +51,16 @@ export async function POST(req: Request) {
       );
 
       return Response.json({
-        content: result.success
-          ? `Great! Your booking is confirmed! 🎉 You've booked ${confirmBooking.seats} seat(s) for ${confirmBooking.service} on ${confirmBooking.date} at ${confirmBooking.time}. A confirmation will be sent to ${confirmBooking.email}.`
-          : `Sorry, there was an issue: ${result.error}`,
+        content: getBookingConfirmationContent(confirmBooking, result),
         action: result.success
-          ? ({ type: "booking_success", data: confirmBooking } as ChatAction)
+          ? ({
+              type: "booking_success",
+              data: {
+                ...confirmBooking,
+                bookingId: result.booking_id,
+                emailSent: result.email_sent,
+              },
+            } as ChatAction)
           : null,
       });
     }

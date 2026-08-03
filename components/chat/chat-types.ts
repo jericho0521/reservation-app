@@ -6,6 +6,8 @@ export interface BookingData {
     name: string;
     email: string;
     phone: string;
+    bookingId?: string;
+    emailSent?: boolean;
 }
 
 export interface LocationDirectionsData {

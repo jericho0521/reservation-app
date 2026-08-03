@@ -7,6 +7,7 @@ import {
     getConflictingSeatLabels,
 } from '@/lib/reservation-capacity';
 import { getMaintenanceSeatConflicts } from '@/lib/seat-maintenance';
+import { sendBookingConfirmationEmail } from '@/lib/booking-confirmation-email';
 import { jsonError, requireAuthenticatedSupabase, supabaseErrorStatus } from '@/app/api/api-utils';
 import { buildBookingSearchFilter, normalizeBookingSearchTerm } from './search-utils';
 import { z } from 'zod';
@@ -64,7 +65,7 @@ export async function POST(request: Request) {
         // Get service to check total seats
         const { data: service, error: serviceError } = await supabase()
             .from('services')
-            .select('total_seats')
+            .select('name, total_seats')
             .eq('id', validatedData.service_id)
             .single();
 
@@ -156,7 +157,24 @@ export async function POST(request: Request) {
 
         if (error) throw error;
 
-        return NextResponse.json(data, { status: 201 });
+        const emailResult = await sendBookingConfirmationEmail({
+            bookingId: data.id,
+            interfaceType: data.interface_type,
+            customerName: data.user_name,
+            customerEmail: data.user_email,
+            customerPhone: data.user_phone,
+            serviceName: service.name,
+            bookingDate: data.booking_date,
+            startTime: data.start_time,
+            endTime: data.end_time,
+            seatsBooked: data.seats_booked,
+            seatLabels: data.seat_labels,
+        });
+
+        return NextResponse.json({
+            ...data,
+            email_sent: emailResult.sent,
+        }, { status: 201 });
     } catch (error) {
         if (error instanceof z.ZodError) {
             return jsonError('Invalid booking data', 400, { details: error.issues });

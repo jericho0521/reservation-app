@@ -42,11 +42,18 @@ export function useChat() {
                 }),
             });
 
+            if (!response.ok) {
+                throw new Error('Failed to confirm booking');
+            }
+
             const result = await response.json();
+            const bookingSucceeded = result.action?.type === 'booking_success';
 
             setMessages(prev => {
                 const updated = prev.map(m =>
-                    m.id === messageId ? { ...m, actionStatus: 'confirmed' as const } : m
+                    m.id === messageId
+                        ? { ...m, actionStatus: bookingSucceeded ? 'confirmed' as const : 'pending' as const }
+                        : m
                 );
                 return [
                     ...updated,

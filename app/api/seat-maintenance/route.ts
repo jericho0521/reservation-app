@@ -2,18 +2,13 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { jsonError, requireAuthenticatedSupabase, supabaseErrorStatus } from "@/app/api/api-utils";
 import { normalizeSeatLabel, normalizeSeatLabels } from "@/lib/seat-maintenance";
-
-const RACING_SIMULATOR_SEAT_COUNT = 16;
+import { isSeatMaintenanceSupportedService } from "./service-support";
 
 const updateSeatMaintenanceSchema = z.object({
   service_id: z.string().uuid(),
   seat_labels: z.array(z.string()),
   reason: z.string().trim().optional(),
 });
-
-export function isSeatMaintenanceSupportedService(service: { total_seats: number } | null | undefined) {
-  return service?.total_seats === RACING_SIMULATOR_SEAT_COUNT;
-}
 
 function getUserId(user: unknown) {
   const id = typeof user === "object" && user !== null && "id" in user

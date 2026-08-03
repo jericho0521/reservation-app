@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { parseConfirmBookingPayload } from "./route";
+import { parseConfirmBookingPayload } from "./confirm-booking";
 
 test("parseConfirmBookingPayload requires a phone number", () => {
   assert.equal(parseConfirmBookingPayload({

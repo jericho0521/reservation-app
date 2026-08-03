@@ -2,14 +2,19 @@
   "name": "reservation-app",
   "version": "0.1.0",
   "private": true,
+  "packageManager": "pnpm@11.10.0",
+  "engines": {
+    "node": ">=20.9.0"
+  },
   "scripts": {
     "dev": "next dev -p 4000",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "node --import tsx --test app/api/api-utils.test.ts app/api/availability/route.test.ts app/api/bookings/route.test.ts app/api/seat-maintenance/route.test.ts app/api/chat/chat-config.test.ts app/api/chat/route.test.ts app/api/chat/tool-loop.test.ts app/api/analytics-chat/snapshot.test.ts lib/blogs.test.ts lib/langchain/chat-agent.test.ts lib/sales-reports.test.ts lib/gemini-embeddings.test.ts lib/reservation-capacity.test.ts lib/supabase-admin.test.ts lib/availability.test.ts lib/seat-maintenance.test.ts components/form/booking-maintenance.test.ts components/form/SeatMap.test.ts components/analytics/dashboard-to-spec.test.ts app/admin/dashboard-data.test.ts components/analytics/renderer/spec.test.ts components/analytics/renderer/renderer.test.tsx",
-    "local:supabase:start": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/start-local-supabase.ps1",
-    "local:supabase:stop": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/stop-local-supabase.ps1",
+    "test": "node --import tsx --test app/api/api-utils.test.ts app/api/availability/route.test.ts app/api/bookings/route.test.ts app/api/seat-maintenance/route.test.ts app/api/chat/chat-config.test.ts app/api/chat/route.test.ts app/api/chat/tool-loop.test.ts app/api/analytics-chat/snapshot.test.ts lib/blogs.test.ts lib/knowledge.test.ts lib/langchain/chat-agent.test.ts lib/sales-reports.test.ts lib/gemini-embeddings.test.ts lib/reservation-capacity.test.ts lib/supabase-admin.test.ts lib/availability.test.ts lib/seat-maintenance.test.ts components/form/booking-maintenance.test.ts components/form/SeatMap.test.ts components/analytics/dashboard-to-spec.test.ts app/admin/dashboard-data.test.ts components/analytics/renderer/spec.test.ts components/analytics/renderer/renderer.test.tsx",
+    "local:supabase:start": "node scripts/local-supabase.mjs start",
+    "local:supabase:stop": "node scripts/local-supabase.mjs stop",
+    "local:supabase:status": "node scripts/local-supabase.mjs status",
     "sandbox:smoke": "tsx scripts/vercel-sandbox-smoke.ts",
     "sandbox:docker": "tsx scripts/vercel-sandbox-docker-smoke.ts",
     "sandbox:supabase": "tsx scripts/vercel-sandbox-supabase.ts",
@@ -24,9 +29,8 @@
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
     "@google/generative-ai": "^0.24.1",
-    "@langchain/community": "^1.1.27",
-    "@langchain/core": "^1.1.41",
-    "@langchain/google-genai": "^2.1.7",
+    "@langchain/core": "1.1.47",
+    "@langchain/google-genai": "2.1.31",
     "@langchain/langgraph": "^1.2.9",
     "@langchain/langgraph-checkpoint-postgres": "^1.0.1",
     "@langchain/openai": "^1.4.4",
@@ -37,12 +41,13 @@
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
     "lucide-react": "^0.562.0",
-    "next": "16.1.1",
+    "next": "16.2.11",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-markdown": "^10.1.0",
     "recharts": "^3.8.0",
     "remark-gfm": "^4.0.1",
+    "sharp": "0.35.3",
     "swr": "^2.3.8",
     "tailwind-merge": "^3.4.0",
     "zod": "^3.24.0",
@@ -55,15 +60,10 @@
     "@types/react-dom": "^19",
     "dotenv": "^17.2.3",
     "eslint": "^9",
-    "eslint-config-next": "16.1.1",
+    "eslint-config-next": "16.2.11",
     "tailwindcss": "^4",
     "ts-node": "^10.9.2",
     "tsx": "^4.21.0",
     "typescript": "^5"
-  },
-  "pnpm": {
-    "overrides": {
-      "zod": "^3.24.0"
-    }
   }
 }

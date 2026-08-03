@@ -1,15 +1,57 @@
-import { createKnowledgeRetriever } from "@/lib/langchain/vector-store";
+import { generateGeminiEmbedding } from "@/lib/gemini-embeddings";
+import { supabase } from "@/lib/supabase";
 
-export async function searchKnowledge(query: string, matchCount: number = 3): Promise<string[]> {
+interface KnowledgeMatchRow {
+  content?: unknown;
+}
+
+interface KnowledgeSearchDependencies {
+  embedQuery(query: string): Promise<number[]>;
+  matchKnowledge(params: {
+    query_embedding: number[];
+    filter: Record<string, never>;
+    match_threshold: number;
+    match_count: number;
+  }): Promise<{
+    data: KnowledgeMatchRow[] | null;
+    error: { message?: string } | null;
+  }>;
+}
+
+export async function searchKnowledgeWithDependencies(
+  query: string,
+  matchCount: number,
+  dependencies: KnowledgeSearchDependencies,
+): Promise<string[]> {
   try {
-    const retriever = createKnowledgeRetriever(matchCount);
-    const docs = await retriever.invoke(query);
+    const queryEmbedding = await dependencies.embedQuery(query);
+    const { data, error } = await dependencies.matchKnowledge({
+      query_embedding: queryEmbedding,
+      filter: {},
+      match_threshold: 0.3,
+      match_count: matchCount,
+    });
 
-    return docs.map((doc) => doc.pageContent);
+    if (error) {
+      throw new Error(error.message || "Knowledge search RPC failed");
+    }
+
+    return (data ?? [])
+      .map((row) => row.content)
+      .filter((content): content is string => typeof content === "string");
   } catch (error) {
     console.error("Knowledge search failed:", error);
     return [];
   }
+}
+
+export async function searchKnowledge(query: string, matchCount: number = 3): Promise<string[]> {
+  return searchKnowledgeWithDependencies(query, matchCount, {
+    embedQuery: generateGeminiEmbedding,
+    async matchKnowledge(params) {
+      return supabase().rpc("match_knowledge", params);
+    },
+  });
 }
 
 export async function getRelevantContext(userMessage: string): Promise<string> {

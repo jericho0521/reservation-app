@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - staging
-      - master
+      - main
   workflow_dispatch:
     inputs:
       environment:
@@ -44,12 +44,12 @@ jobs:
       - name: Set up pnpm
         uses: pnpm/action-setup@v4
         with:
-          version: 10
+          version: 11.10.0
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
           cache: pnpm
           cache-dependency-path: pnpm-lock.yaml
 
@@ -61,6 +61,9 @@ jobs:
 
       - name: Run linter
         run: pnpm lint
+
+      - name: Audit production dependencies
+        run: pnpm audit --prod --audit-level high
 
       - name: Build application
         run: pnpm build
@@ -79,7 +82,7 @@ jobs:
           echo "Add your staging deploy command here, for example a Vercel, Docker, or SSH deploy step."
 
   deploy-production:
-    if: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/master') || (github.event_name == 'workflow_dispatch' && inputs.environment == 'production') }}
+    if: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'workflow_dispatch' && inputs.environment == 'production') }}
     needs: verify
     runs-on: ubuntu-latest
     environment:

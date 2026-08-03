@@ -1,5 +1,6 @@
 import { ChatOpenAI } from "@langchain/openai";
 import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
+import { getAppUrl } from "@/lib/app-url";
 
 const DEFAULT_CHAT_MODEL = "google/gemini-2.5-flash";
 
@@ -16,7 +17,7 @@ export function createOpenRouterChat(modelName?: string) {
     configuration: {
       baseURL: "https://openrouter.ai/api/v1",
       defaultHeaders: {
-        "HTTP-Referer": "http://localhost:3000",
+        "HTTP-Referer": getAppUrl(),
       },
     },
   });
@@ -31,7 +32,7 @@ export function createAnalyticsChat(modelName?: string) {
     configuration: {
       baseURL: "https://openrouter.ai/api/v1",
       defaultHeaders: {
-        "HTTP-Referer": "http://localhost:3000",
+        "HTTP-Referer": getAppUrl(),
       },
     },
   });
@@ -55,7 +56,7 @@ export function createStructredOutputModel() {
     configuration: {
       baseURL: "https://openrouter.ai/api/v1",
       defaultHeaders: {
-        "HTTP-Referer": "http://localhost:3000",
+        "HTTP-Referer": getAppUrl(),
       },
     },
   });

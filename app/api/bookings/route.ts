@@ -8,6 +8,7 @@ import {
 } from '@/lib/reservation-capacity';
 import { getMaintenanceSeatConflicts } from '@/lib/seat-maintenance';
 import { jsonError, requireAuthenticatedSupabase, supabaseErrorStatus } from '@/app/api/api-utils';
+import { buildBookingSearchFilter, normalizeBookingSearchTerm } from './search-utils';
 import { z } from 'zod';
 
 const bookingSchema = z.object({
@@ -22,26 +23,6 @@ const bookingSchema = z.object({
     seat_labels: z.array(z.string()).optional(),
     interface_type: z.enum(['form', 'chat'])
 });
-
-const MAX_SEARCH_LENGTH = 100;
-
-function quotePostgrestValue(value: string) {
-    return `"${value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
-}
-
-function escapeLikeTerm(value: string) {
-    return value.replace(/[\\%_]/g, '\\$&');
-}
-
-export function normalizeBookingSearchTerm(search: string | null) {
-    const normalized = search?.trim().slice(0, MAX_SEARCH_LENGTH) ?? '';
-    return normalized.length > 0 ? normalized : null;
-}
-
-export function buildBookingSearchFilter(search: string) {
-    const term = quotePostgrestValue(`%${escapeLikeTerm(search)}%`);
-    return `user_name.ilike.${term},user_email.ilike.${term},user_phone.ilike.${term}`;
-}
 
 export async function GET(request: NextRequest) {
     try {

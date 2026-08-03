@@ -22,15 +22,15 @@ function printHelp() {
   console.log('');
   console.log('Default branch flow:');
   console.log('  feature/* -> staging');
-  console.log('  staging -> master');
+  console.log('  staging -> main');
 }
 
 function getDefaultBaseBranch(currentBranch) {
   if (currentBranch === 'staging') {
-    return 'master';
+    return 'main';
   }
 
-  if (currentBranch === 'master') {
+  if (currentBranch === 'main') {
     return '';
   }
 
@@ -68,8 +68,8 @@ if (!baseBranch) {
   baseBranch = getDefaultBaseBranch(currentBranch);
 }
 
-if (currentBranch === 'master') {
-  console.error('Refusing to open a PR from master. Create release PRs from staging to master instead.');
+if (currentBranch === 'main') {
+  console.error('Refusing to open a PR from main. Create release PRs from staging to main instead.');
   process.exit(1);
 }
 

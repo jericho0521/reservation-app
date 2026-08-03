@@ -18,7 +18,7 @@ Cloudflare does not host your Supabase database. It only forwards public traffic
 | --- | --- | --- | --- |
 | `https://your-vercel-app.vercel.app` | Public Next.js app | Vercel | Customers/admin users |
 | `https://your-vercel-app.vercel.app/admin/login` | Admin login page | Vercel | You/admin users |
-| `https://supabase.ppbycw.com` | Public Supabase API endpoint | Cloudflare Tunnel to your PC | The Vercel app and browser Supabase client |
+| `https://supabase.jerichofoong.com` | Public Supabase API endpoint | Cloudflare Tunnel to your PC | The Vercel app and browser Supabase client |
 | `http://localhost:8000` | Local Supabase API endpoint | Your PC Docker | Your local app and Cloudflare Tunnel |
 | `http://localhost:3000` | Supabase Studio dashboard, if exposed in Docker Compose | Your PC Docker | You only |
 | `http://localhost:4000` | Local Next.js development app | Your PC | You during development |
@@ -50,7 +50,7 @@ Do not use the Supabase API URL as the admin login page.
 Current testing URL:
 
 ```text
-https://supabase.ppbycw.com
+https://supabase.jerichofoong.com
 ```
 
 This is not a website dashboard. It is the public API address for your local Supabase.
@@ -58,7 +58,7 @@ This is not a website dashboard. It is the public API address for your local Sup
 The Vercel app uses this value as:
 
 ```env
-NEXT_PUBLIC_SUPABASE_URL=https://supabase.ppbycw.com
+NEXT_PUBLIC_SUPABASE_URL=https://supabase.jerichofoong.com
 ```
 
 This URL forwards traffic through Cloudflare Tunnel to:
@@ -103,7 +103,7 @@ studio:
     - "3000:3000"
 ```
 
-Keep Studio local. Do not expose it publicly through `supabase.ppbycw.com` unless you add proper access protection.
+Keep Studio local. Do not expose it publicly through `supabase.jerichofoong.com` unless you add proper access protection.
 
 ## What Is Hosted Where
 
@@ -139,8 +139,8 @@ If your PC is off, local Supabase is offline.
 
 Cloudflare hosts:
 
-- DNS for `ppbycw.com`, once nameservers are active
-- Tunnel routing for `supabase.ppbycw.com`
+- DNS for the `ppbycw.com` website and `jerichofoong.com` Supabase API zones
+- Tunnel routing for `supabase.jerichofoong.com`
 - HTTPS edge endpoint for the Supabase API URL
 
 Cloudflare does not store your database data in this setup.
@@ -159,7 +159,7 @@ www.ppbycw.com   -> AWS Amplify
 The Supabase tunnel should use only a subdomain:
 
 ```text
-supabase.ppbycw.com
+supabase.jerichofoong.com
 ```
 
 ## Vercel Environment Variables
@@ -167,7 +167,7 @@ supabase.ppbycw.com
 For Vercel to use local Docker Supabase through Cloudflare Tunnel, set:
 
 ```env
-NEXT_PUBLIC_SUPABASE_URL=https://supabase.ppbycw.com
+NEXT_PUBLIC_SUPABASE_URL=https://supabase.jerichofoong.com
 NEXT_PUBLIC_SUPABASE_ANON_KEY=<local Supabase anon key>
 SUPABASE_SERVICE_ROLE_KEY=<local Supabase service role key>
 ```
@@ -215,7 +215,7 @@ If any of these stop, the deployed Vercel app may fail to log in, load data, or 
 
 ## Common Confusions
 
-### `https://supabase.ppbycw.com` is not the admin login page
+### `https://supabase.jerichofoong.com` is not the admin login page
 
 It is the Supabase API endpoint.
 
@@ -260,7 +260,7 @@ You only update Vercel when you rotate keys or change the public Supabase URL.
 4. Confirm public Supabase URL is reachable:
 
    ```text
-   https://supabase.ppbycw.com
+   https://supabase.jerichofoong.com
    ```
 
 5. Confirm Vercel env vars point to the public Supabase URL.

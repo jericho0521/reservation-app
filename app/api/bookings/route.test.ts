@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildBookingSearchFilter, normalizeBookingSearchTerm, POST } from "./route";
+import { POST } from "./route";
+import { buildBookingSearchFilter, normalizeBookingSearchTerm } from "./search-utils";
 
 test("POST /api/bookings returns 400 for invalid booking payloads", async () => {
   const response = await POST(new Request("http://localhost/api/bookings", {

@@ -26,6 +26,7 @@ const FILTER_OPTIONS: AdminFilter[] = ['all', 'today', 'upcoming', 'completed', 
 
 export default function AdminDashboard({ bookings: initialBookings, todayCount, userEmail, today, loadError }: AdminDashboardProps) {
     const [bookings, setBookings] = useState(initialBookings);
+    const [currentTodayCount, setCurrentTodayCount] = useState(todayCount);
     const [filter, setFilter] = useState<AdminFilter>('all');
     const [isUpdating, setIsUpdating] = useState<string | null>(null);
     const router = useRouter();
@@ -70,26 +71,35 @@ export default function AdminDashboard({ bookings: initialBookings, todayCount, 
         setIsRefreshing(true);
         const supabase = getSupabase();
 
-        const { data, error } = await supabase
-            .from('bookings')
-            .select(ADMIN_BOOKINGS_SELECT)
-            .order('booking_date', { ascending: false })
-            .order('start_time', { ascending: false })
-            .limit(50);
+        const [bookingsResult, todayCountResult] = await Promise.all([
+            supabase
+                .from('bookings')
+                .select(ADMIN_BOOKINGS_SELECT)
+                .order('booking_date', { ascending: false })
+                .order('start_time', { ascending: false })
+                .limit(50),
+            supabase
+                .from('bookings')
+                .select('*', { count: 'exact', head: true })
+                .eq('booking_date', today)
+                .eq('status', 'confirmed'),
+        ]);
 
-        if (error) {
-            console.error('Failed to refresh bookings:', error);
-            alert(`Failed to refresh bookings: ${error.message}`);
+        const refreshError = bookingsResult.error ?? todayCountResult.error;
+        if (refreshError) {
+            console.error('Failed to refresh bookings:', refreshError);
+            alert(`Failed to refresh bookings: ${refreshError.message}`);
             setIsRefreshing(false);
             return;
         }
 
-        if (data && !searchTermRef.current.trim()) {
-            setBookings(data);
+        setCurrentTodayCount(todayCountResult.count ?? 0);
+        if (bookingsResult.data && !searchTermRef.current.trim()) {
+            setBookings(bookingsResult.data as AdminBooking[]);
             setLastRefresh(new Date());
         }
         setIsRefreshing(false);
-    }, [getSupabase]);
+    }, [getSupabase, today]);
 
     const performSearch = useCallback(async (term: string) => {
         searchRequestIdRef.current += 1;
@@ -145,6 +155,25 @@ export default function AdminDashboard({ bookings: initialBookings, todayCount, 
         const interval = setInterval(refreshBookings, 30000);
         return () => clearInterval(interval);
     }, [refreshBookings, searchTerm]);
+
+    // Refresh immediately when the database reports a booking change.
+    useEffect(() => {
+        const supabase = getSupabase();
+        const channel = supabase
+            .channel('admin-bookings-updates')
+            .on(
+                'postgres_changes',
+                { event: '*', schema: 'public', table: 'bookings' },
+                () => {
+                    void refreshBookings();
+                },
+            )
+            .subscribe();
+
+        return () => {
+            void supabase.removeChannel(channel);
+        };
+    }, [getSupabase, refreshBookings]);
 
     // Debounced search
     useEffect(() => {
@@ -249,7 +278,7 @@ export default function AdminDashboard({ bookings: initialBookings, todayCount, 
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                         <div className="glass-panel p-4 rounded-xl border border-white/10">
                             <p className="text-xs text-gray-400 mb-1">Today</p>
-                            <p className="text-2xl font-bold text-neon">{todayCount}</p>
+                            <p className="text-2xl font-bold text-neon">{currentTodayCount}</p>
                         </div>
                         <div className="glass-panel p-4 rounded-xl border border-white/10">
                             <p className="text-xs text-gray-400 mb-1">Confirmed</p>

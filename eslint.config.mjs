@@ -8,9 +8,17 @@ const eslintConfig = defineConfig([
   // Override default ignores of eslint-config-next.
   globalIgnores([
     // Default ignores of eslint-config-next:
-    ".next/**",
+    "**/.next/**",
+    "**/node_modules/**",
+    "**/dist/**",
     "out/**",
     "build/**",
+    ".pnpm-store/**",
+    "dist-packages/**",
+    "output/**",
+    "supabase/.temp/**",
+    "test-results/**",
+    "tmp/**",
     "next-env.d.ts",
   ]),
 ]);

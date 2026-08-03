@@ -5,7 +5,7 @@ This guide explains how to host your self-hosted Supabase setup on your own Wind
 Use this when you want this flow:
 
 ```text
-Vercel app -> https://supabase.ppbycw.com -> Cloudflare Tunnel -> your Windows server -> Supabase Docker containers
+Vercel app -> https://supabase.jerichofoong.com -> Cloudflare Tunnel -> your Windows server -> Supabase Docker containers
 ```
 
 The server replaces your current PC as the machine running Supabase.
@@ -50,7 +50,7 @@ Vercel will continue to host the Next.js app.
 
 | URL | Purpose | Hosted Where |
 | --- | --- | --- |
-| `https://supabase.ppbycw.com` | Public Supabase API URL | Cloudflare Tunnel to your server |
+| `https://supabase.jerichofoong.com` | Public Supabase API URL | Cloudflare Tunnel to your server |
 | `http://localhost:8000` | Supabase API from inside the server | Server Docker |
 | `http://localhost:3000` | Supabase Studio, if exposed | Server Docker |
 | `https://your-vercel-app.vercel.app` | Reservation app frontend/API routes | Vercel |
@@ -118,7 +118,7 @@ Set strong values for:
 POSTGRES_PASSWORD=<strong database password>
 JWT_SECRET=<long random jwt secret>
 SITE_URL=https://your-vercel-app.vercel.app
-API_EXTERNAL_URL=https://supabase.ppbycw.com
+API_EXTERNAL_URL=https://supabase.jerichofoong.com
 ```
 
 Generate local anon and service role keys from the same `JWT_SECRET`, then set:
@@ -193,7 +193,7 @@ Do not run `supabase/reservations-rls.sql` before `supabase/base-schema.sql` suc
 On your development PC, point `.env` to the server public URL after the tunnel is ready:
 
 ```env
-NEXT_PUBLIC_SUPABASE_URL=https://supabase.ppbycw.com
+NEXT_PUBLIC_SUPABASE_URL=https://supabase.jerichofoong.com
 NEXT_PUBLIC_SUPABASE_ANON_KEY=<server anon key>
 GOOGLE_GENERATIVE_AI_API_KEY=<your existing key>
 ```
@@ -235,7 +235,7 @@ cloudflared tunnel create local-supabase
 Route the DNS name:
 
 ```powershell
-cloudflared tunnel route dns local-supabase supabase.ppbycw.com
+cloudflared tunnel route dns local-supabase supabase.jerichofoong.com
 ```
 
 ## Step 8: Run Cloudflare Tunnel As A Service
@@ -263,7 +263,7 @@ tunnel: local-supabase
 credentials-file: C:\Windows\System32\config\systemprofile\.cloudflared\<tunnel-id>.json
 
 ingress:
-  - hostname: supabase.ppbycw.com
+  - hostname: supabase.jerichofoong.com
     service: http://localhost:8000
   - service: http_status:404
 ```
@@ -283,7 +283,7 @@ Get-Service cloudflared
 Test public URL:
 
 ```powershell
-Invoke-WebRequest -Uri "https://supabase.ppbycw.com/auth/v1/health" -UseBasicParsing
+Invoke-WebRequest -Uri "https://supabase.jerichofoong.com/auth/v1/health" -UseBasicParsing
 ```
 
 If you get a response, the tunnel is reachable.
@@ -293,7 +293,7 @@ If you get a response, the tunnel is reachable.
 In Vercel project settings, set:
 
 ```env
-NEXT_PUBLIC_SUPABASE_URL=https://supabase.ppbycw.com
+NEXT_PUBLIC_SUPABASE_URL=https://supabase.jerichofoong.com
 NEXT_PUBLIC_SUPABASE_ANON_KEY=<server anon key>
 SUPABASE_SERVICE_ROLE_KEY=<server service role key>
 ```
@@ -325,7 +325,7 @@ Your app login page is still:
 https://your-vercel-app.vercel.app/admin/login
 ```
 
-Do not use `https://supabase.ppbycw.com` as the login page. That is the backend API URL.
+Do not use `https://supabase.jerichofoong.com` as the login page. That is the backend API URL.
 
 ## Step 11: Backup Plan
 
@@ -385,7 +385,7 @@ docker compose up -d
 Test:
 
 ```powershell
-Invoke-WebRequest -Uri "https://supabase.ppbycw.com/auth/v1/health" -UseBasicParsing
+Invoke-WebRequest -Uri "https://supabase.jerichofoong.com/auth/v1/health" -UseBasicParsing
 ```
 
 Then test the Vercel app login page.
@@ -452,11 +452,11 @@ Check in order:
 2. Is Docker running?
 3. Are Supabase containers running?
 4. Is the `cloudflared` service running?
-5. Does `https://supabase.ppbycw.com/auth/v1/health` respond?
+5. Does `https://supabase.jerichofoong.com/auth/v1/health` respond?
 6. Did Vercel get redeployed after env var changes?
 7. Does the Auth user exist in the server Supabase database?
 
-### `supabase.ppbycw.com` Does Not Respond
+### `supabase.jerichofoong.com` Does Not Respond
 
 Check Cloudflare Tunnel:
 
@@ -502,7 +502,7 @@ If a policy says `public.services`, `public.venues`, or `public.bookings` does n
 ```mermaid
 flowchart LR
     User[User or Admin Browser] --> Vercel[Vercel Next.js App]
-    Vercel --> SupabaseUrl[https://supabase.ppbycw.com]
+    Vercel --> SupabaseUrl[https://supabase.jerichofoong.com]
     SupabaseUrl --> Cloudflare[Cloudflare Tunnel]
     Cloudflare --> Server[Windows Server]
     Server --> Kong[Supabase Kong on localhost:8000]

@@ -8,7 +8,7 @@ Use this when:
 - Your PC restarted.
 - WSL was closed.
 - Cloudflare Tunnel was stopped.
-- Vercel needs to connect again to your local Supabase through `https://supabase.ppbycw.com`.
+- Vercel needs to connect again to your local Supabase through `https://supabase.jerichofoong.com`.
 
 ## What Needs To Be Running
 
@@ -36,7 +36,7 @@ This helper script will:
 - Start the self-hosted Supabase Docker containers through WSL.
 - Check `http://localhost:8000`.
 - Open a new PowerShell window for Cloudflare Tunnel.
-- Check `https://supabase.ppbycw.com`.
+- Check `https://supabase.jerichofoong.com`.
 
 Keep the Cloudflare Tunnel PowerShell window open while testing.
 
@@ -101,7 +101,7 @@ These scripts do not delete your local database or storage volumes. They use `do
 | URL | Purpose |
 | --- | --- |
 | `http://localhost:8000` | Local Supabase API on your PC |
-| `https://supabase.ppbycw.com` | Public Supabase API through Cloudflare Tunnel |
+| `https://supabase.jerichofoong.com` | Public Supabase API through Cloudflare Tunnel |
 | `http://localhost:3000` | Local Supabase Studio dashboard, if exposed |
 | `http://localhost:4000` | Local Next.js development app |
 | `https://your-vercel-app.vercel.app/admin/login` | Deployed admin login page |
@@ -224,7 +224,7 @@ Registered tunnel connection
 Open this in your browser:
 
 ```text
-https://supabase.ppbycw.com
+https://supabase.jerichofoong.com
 ```
 
 You may see an authorization error or API response. That is okay.
@@ -234,7 +234,7 @@ The important part is that the domain responds.
 This public URL is what Vercel uses as:
 
 ```env
-NEXT_PUBLIC_SUPABASE_URL=https://supabase.ppbycw.com
+NEXT_PUBLIC_SUPABASE_URL=https://supabase.jerichofoong.com
 ```
 
 ## Step 9: Start Local Next.js App If Needed
@@ -316,7 +316,7 @@ Use this checklist when starting from stopped state:
 8. Test:
 
    ```text
-   https://supabase.ppbycw.com
+   https://supabase.jerichofoong.com
    ```
 
 9. Test the Vercel app login page.
@@ -367,7 +367,7 @@ Check these in order:
 4. Does this URL respond?
 
    ```text
-   https://supabase.ppbycw.com
+   https://supabase.jerichofoong.com
    ```
 
 5. Did Vercel get redeployed after environment variable changes?

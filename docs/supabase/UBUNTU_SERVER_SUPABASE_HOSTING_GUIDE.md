@@ -5,7 +5,7 @@ This guide explains how to host your self-hosted Supabase on an Ubuntu server an
 Use this setup:
 
 ```text
-Vercel app -> https://supabase.ppbycw.com -> Cloudflare Tunnel -> Ubuntu server -> Supabase Docker
+Vercel app -> https://supabase.jerichofoong.com -> Cloudflare Tunnel -> Ubuntu server -> Supabase Docker
 ```
 
 ## What This Replaces
@@ -18,8 +18,8 @@ You still need the server to stay online.
 
 - Ubuntu installed on the server.
 - SSH access to the server.
-- A Cloudflare account with `ppbycw.com` active.
-- `supabase.ppbycw.com` reserved for Supabase API traffic.
+- A Cloudflare account with `jerichofoong.com` active.
+- `supabase.jerichofoong.com` reserved for Supabase API traffic.
 - Your local Supabase `.env` values or new production-like values.
 - Your app repo available on your development PC.
 
@@ -27,7 +27,7 @@ You still need the server to stay online.
 
 | URL | Purpose |
 | --- | --- |
-| `https://supabase.ppbycw.com` | Public Supabase API for Vercel and browser clients |
+| `https://supabase.jerichofoong.com` | Public Supabase API for Vercel and browser clients |
 | `http://localhost:8000` | Supabase API inside the Ubuntu server |
 | `http://localhost:3000` | Supabase Studio on the Ubuntu server, if exposed locally |
 | `https://your-vercel-app.vercel.app` | Your deployed Next.js app |
@@ -164,7 +164,7 @@ Set strong values:
 POSTGRES_PASSWORD=<strong database password>
 JWT_SECRET=<long random jwt secret>
 SITE_URL=https://your-vercel-app.vercel.app
-API_EXTERNAL_URL=https://supabase.ppbycw.com
+API_EXTERNAL_URL=https://supabase.jerichofoong.com
 ```
 
 Set your generated Supabase keys:
@@ -423,7 +423,7 @@ Run this from your app project folder on your development PC, not from the Ubunt
 Set your app `.env` to point to the server Supabase URL:
 
 ```env
-NEXT_PUBLIC_SUPABASE_URL=https://supabase.ppbycw.com
+NEXT_PUBLIC_SUPABASE_URL=https://supabase.jerichofoong.com
 NEXT_PUBLIC_SUPABASE_ANON_KEY=<server anon key>
 GOOGLE_GENERATIVE_AI_API_KEY=<your Gemini key>
 ```
@@ -463,7 +463,7 @@ cloudflared tunnel create local-supabase
 Route DNS:
 
 ```bash
-cloudflared tunnel route dns local-supabase supabase.ppbycw.com
+cloudflared tunnel route dns local-supabase supabase.jerichofoong.com
 ```
 
 ## Step 10: Configure Cloudflare Tunnel
@@ -493,7 +493,7 @@ tunnel: <your-tunnel-id>
 credentials-file: /home/<your-user>/.cloudflared/<your-tunnel-id>.json
 
 ingress:
-  - hostname: supabase.ppbycw.com
+  - hostname: supabase.jerichofoong.com
     service: http://localhost:8000
   - service: http_status:404
 ```
@@ -512,7 +512,7 @@ cloudflared tunnel run local-supabase
 Leave it running, then from another terminal or your PC test:
 
 ```bash
-curl -i https://supabase.ppbycw.com/auth/v1/health
+curl -i https://supabase.jerichofoong.com/auth/v1/health
 ```
 
 If it responds, press `Ctrl + C` in the tunnel terminal and continue to service setup.
@@ -542,7 +542,7 @@ tunnel: <your-tunnel-id>
 credentials-file: /etc/cloudflared/<your-tunnel-id>.json
 
 ingress:
-  - hostname: supabase.ppbycw.com
+  - hostname: supabase.jerichofoong.com
     service: http://localhost:8000
   - service: http_status:404
 ```
@@ -558,7 +558,7 @@ sudo systemctl status cloudflared
 Test public API:
 
 ```bash
-curl -i https://supabase.ppbycw.com/auth/v1/health
+curl -i https://supabase.jerichofoong.com/auth/v1/health
 ```
 
 ## Step 12: Configure Firewall
@@ -587,7 +587,7 @@ Do not publicly expose Supabase Studio unless protected.
 In Vercel project settings, set:
 
 ```env
-NEXT_PUBLIC_SUPABASE_URL=https://supabase.ppbycw.com
+NEXT_PUBLIC_SUPABASE_URL=https://supabase.jerichofoong.com
 NEXT_PUBLIC_SUPABASE_ANON_KEY=<server anon key>
 SUPABASE_SERVICE_ROLE_KEY=<server service role key>
 ```
@@ -622,7 +622,7 @@ https://your-vercel-app.vercel.app/admin/login
 Not this:
 
 ```text
-https://supabase.ppbycw.com
+https://supabase.jerichofoong.com
 ```
 
 The Supabase URL is an API endpoint, not the app login page.
@@ -733,7 +733,7 @@ After reboot:
 docker ps
 sudo systemctl status cloudflared
 curl -i http://localhost:8000
-curl -i https://supabase.ppbycw.com/auth/v1/health
+curl -i https://supabase.jerichofoong.com/auth/v1/health
 ```
 
 Then test your Vercel app login page.
@@ -751,7 +751,7 @@ exit
 
 SSH back in and try again.
 
-### `supabase.ppbycw.com` Does Not Respond
+### `supabase.jerichofoong.com` Does Not Respond
 
 Check local Supabase first:
 
@@ -776,7 +776,7 @@ sudo systemctl restart cloudflared
 
 Check:
 
-1. Vercel env `NEXT_PUBLIC_SUPABASE_URL` is `https://supabase.ppbycw.com`.
+1. Vercel env `NEXT_PUBLIC_SUPABASE_URL` is `https://supabase.jerichofoong.com`.
 2. Vercel anon key matches this server's `ANON_KEY`.
 3. Vercel service role key matches this server's `SERVICE_ROLE_KEY`.
 4. Vercel was redeployed after env changes.
@@ -799,7 +799,7 @@ Studio may not be exposed to the host.
 
 The API can still work through port `8000` even if Studio is unavailable.
 
-Keep Studio private. Do not route it through `supabase.ppbycw.com` unless you add proper access protection.
+Keep Studio private. Do not route it through `supabase.jerichofoong.com` unless you add proper access protection.
 
 ## Security Checklist
 
@@ -819,7 +819,7 @@ Keep Studio private. Do not route it through `supabase.ppbycw.com` unless you ad
 ```mermaid
 flowchart LR
     Browser[User or Admin Browser] --> Vercel[Vercel Next.js App]
-    Vercel --> PublicSupabase[https://supabase.ppbycw.com]
+    Vercel --> PublicSupabase[https://supabase.jerichofoong.com]
     PublicSupabase --> Cloudflare[Cloudflare Tunnel]
     Cloudflare --> Ubuntu[Ubuntu Server]
     Ubuntu --> Kong[Supabase Kong localhost:8000]
@@ -838,7 +838,7 @@ flowchart LR
 1. Finish Docker and Supabase setup on the Ubuntu server.
 2. Confirm `http://localhost:8000` works on the server.
 3. Configure Cloudflare Tunnel as a service.
-4. Confirm `https://supabase.ppbycw.com/auth/v1/health` responds.
+4. Confirm `https://supabase.jerichofoong.com/auth/v1/health` responds.
 5. Update Vercel env vars.
 6. Redeploy Vercel.
 7. Create or migrate Auth users.

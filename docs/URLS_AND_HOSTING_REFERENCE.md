@@ -9,7 +9,7 @@ This file lists the URLs and machines used by the Project Play reservation app a
 | Public website | `https://ppbycw.com` | Current public hosting | Main customer-facing domain. Keep existing DNS records unless moving the app. |
 | Vercel app | `https://<your-vercel-app>.vercel.app` | Vercel | Replace this placeholder with the actual Vercel deployment URL after deployment. |
 | Local app dev | `http://localhost:4000` | Your Windows PC | Started from this repo with `pnpm dev`. |
-| Public Supabase API | `https://supabase.ppbycw.com` | Cloudflare Tunnel to Ubuntu server | Use this in Vercel env vars. |
+| Public Supabase API | `https://supabase.jerichofoong.com` | Cloudflare Tunnel to Ubuntu server | Use this in Vercel env vars. |
 | Local Supabase API on server | `http://localhost:8000` | Ubuntu server | Only works from inside the Ubuntu server. Kong/API gateway. |
 | Supabase Studio dashboard | `http://192.168.100.158:3000` | Ubuntu server | Requires Studio port mapping: `3000:3000`. |
 | Server SSH | `ssh jericho@192.168.100.158` | Ubuntu server | Use this to manage Docker, Supabase, and Cloudflare Tunnel. |
@@ -26,15 +26,15 @@ This file lists the URLs and machines used by the Project Play reservation app a
 | Supabase REST | Ubuntu server Docker | `supabase-rest` container | behind Kong/API gateway |
 | Supabase Storage | Ubuntu server Docker | `supabase-storage` container | behind Kong/API gateway |
 | Supabase Studio | Ubuntu server Docker | `supabase-studio` container | `http://192.168.100.158:3000` if mapped |
-| Cloudflare Tunnel | Ubuntu server systemd or foreground process | `cloudflared` | routes `supabase.ppbycw.com` to `localhost:8000` |
-| DNS | Cloudflare | `ppbycw.com` zone | `supabase` CNAME routes to tunnel |
+| Cloudflare Tunnel | Ubuntu server systemd or foreground process | `cloudflared` | routes `supabase.jerichofoong.com` to `localhost:8000` |
+| DNS | Cloudflare | `jerichofoong.com` zone | `supabase` CNAME routes to tunnel |
 
 ## Traffic Flow
 
 ```text
 Customer browser
   -> Vercel app
-  -> https://supabase.ppbycw.com
+  -> https://supabase.jerichofoong.com
   -> Cloudflare network
   -> cloudflared on Ubuntu server
   -> http://localhost:8000
@@ -46,7 +46,7 @@ Customer browser
 Set these in Vercel for the deployed app:
 
 ```env
-NEXT_PUBLIC_SUPABASE_URL=https://supabase.ppbycw.com
+NEXT_PUBLIC_SUPABASE_URL=https://supabase.jerichofoong.com
 NEXT_PUBLIC_SUPABASE_ANON_KEY=<local Supabase anon key>
 SUPABASE_SERVICE_ROLE_KEY=<local Supabase service role key>
 ```
@@ -134,7 +134,7 @@ sudo systemctl enable cloudflared
 Test public Supabase through Cloudflare:
 
 ```powershell
-curl.exe -i https://supabase.ppbycw.com/auth/v1/health
+curl.exe -i https://supabase.jerichofoong.com/auth/v1/health
 ```
 
 Good result:
@@ -200,13 +200,13 @@ pnpm seed:knowledge
 Before running it, make sure `.env` points to the public server Supabase URL:
 
 ```env
-NEXT_PUBLIC_SUPABASE_URL=https://supabase.ppbycw.com
+NEXT_PUBLIC_SUPABASE_URL=https://supabase.jerichofoong.com
 ```
 
 Also make sure `cloudflared` is running and this succeeds:
 
 ```powershell
-curl.exe -i https://supabase.ppbycw.com/auth/v1/health
+curl.exe -i https://supabase.jerichofoong.com/auth/v1/health
 ```
 
 ## Restart Checklist
@@ -223,5 +223,5 @@ curl -i http://localhost:8000/auth/v1/health
 From Windows:
 
 ```powershell
-curl.exe -i https://supabase.ppbycw.com/auth/v1/health
+curl.exe -i https://supabase.jerichofoong.com/auth/v1/health
 ```

@@ -30,6 +30,7 @@ import {
 import { createOpenRouterChat } from "./models";
 import type { BookingConfirmationData } from "@/types";
 import { buildBookingSystemPromptWithContext } from "./prompts";
+import { toPlainChatText } from "@/lib/chat-plain-text";
 
 export interface ChatMessage {
   role: "user" | "assistant";
@@ -466,7 +467,7 @@ export async function runChatAgent(
 
     const action = extractPreparedBookingAction(resultMessages);
 
-    return { content, action };
+    return { content: toPlainChatText(content), action };
   } catch (error) {
     console.error("Chat agent error:", error);
     const errorText = error instanceof Error ? error.message : String(error);

@@ -2,6 +2,8 @@
 
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
+import useSWR from 'swr';
+import type { AdminBookingCounts } from '@/app/admin/admin-booking-counts';
 import {
     LayoutDashboard,
     Calendar,
@@ -28,7 +30,7 @@ interface NavItem {
 
 interface SubmenuItem {
     label: string;
-    count?: number;
+    countKey?: keyof AdminBookingCounts;
     path?: string;
 }
 
@@ -56,10 +58,10 @@ const navItems: NavItem[] = [
         label: 'Bookings',
         actionIcon: Plus,
         submenu: [
-            { label: 'All Bookings', count: 50, path: '/admin' },
-            { label: 'Today', count: 10, path: '/admin' },
-            { label: 'Upcoming', count: 25, path: '/admin' },
-            { label: 'Completed', count: 15, path: '/admin' },
+            { label: 'All Bookings', countKey: 'all', path: '/admin' },
+            { label: 'Today', countKey: 'today', path: '/admin' },
+            { label: 'Upcoming', countKey: 'upcoming', path: '/admin' },
+            { label: 'Completed', countKey: 'completed', path: '/admin' },
             { label: 'Seat Maintenance', path: '/admin/seat-maintenance' },
         ],
     },
@@ -140,30 +142,36 @@ const SidebarHeader = ({ title, subtitle }: SidebarHeaderProps) => (
 
 interface SubmenuProps {
     items: SubmenuItem[];
+    bookingCounts?: AdminBookingCounts;
     onNavigate: (path: string) => void;
 }
 
-const Submenu = ({ items, onNavigate }: SubmenuProps) => (
+const Submenu = ({ items, bookingCounts, onNavigate }: SubmenuProps) => (
     <ul className="sidebar-submenu">
-        {items.map((item) => (
-            <li key={item.label} onClick={() => item.path && onNavigate(item.path)}>
-                {item.label}
-                {item.count !== undefined && (
-                    <span className="sidebar-badge">{item.count}</span>
-                )}
-            </li>
-        ))}
+        {items.map((item) => {
+            const count = item.countKey ? bookingCounts?.[item.countKey] : undefined;
+
+            return (
+                <li key={item.label} onClick={() => item.path && onNavigate(item.path)}>
+                    {item.label}
+                    {count !== undefined && (
+                        <span className="sidebar-badge">{count}</span>
+                    )}
+                </li>
+            );
+        })}
     </ul>
 );
 
 interface NavItemProps {
     item: NavItem;
+    bookingCounts?: AdminBookingCounts;
     expanded: boolean;
     onToggle: () => void;
     onNavigate: (path: string) => void;
 }
 
-const NavItemComponent = ({ item, expanded, onToggle, onNavigate }: NavItemProps) => {
+const NavItemComponent = ({ item, bookingCounts, expanded, onToggle, onNavigate }: NavItemProps) => {
     const Icon = item.icon;
     const ActionIcon = item.actionIcon;
 
@@ -188,7 +196,11 @@ const NavItemComponent = ({ item, expanded, onToggle, onNavigate }: NavItemProps
             </button>
 
             {item.submenu && expanded && (
-                <Submenu items={item.submenu} onNavigate={onNavigate} />
+                <Submenu
+                    items={item.submenu}
+                    bookingCounts={bookingCounts}
+                    onNavigate={onNavigate}
+                />
             )}
         </div>
     );
@@ -198,7 +210,22 @@ interface NavigationProps {
     onNavigate: (path: string) => void;
 }
 
+const fetchBookingCounts = async (url: string): Promise<AdminBookingCounts> => {
+    const response = await fetch(url);
+
+    if (!response.ok) {
+        throw new Error('Failed to load booking counts');
+    }
+
+    return response.json();
+};
+
 const Navigation = ({ onNavigate }: NavigationProps) => {
+    const { data: bookingCounts } = useSWR<AdminBookingCounts>(
+        '/api/admin/booking-counts',
+        fetchBookingCounts,
+        { refreshInterval: 30_000 },
+    );
     const [expandedItems, setExpandedItems] = useState<Record<string, boolean>>({
         'Bookings': true,
     });
@@ -216,6 +243,7 @@ const Navigation = ({ onNavigate }: NavigationProps) => {
                 <NavItemComponent
                     key={item.label}
                     item={item}
+                    bookingCounts={bookingCounts}
                     expanded={!!expandedItems[item.label]}
                     onToggle={() => toggleItem(item.label)}
                     onNavigate={onNavigate}

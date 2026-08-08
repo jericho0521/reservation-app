@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase-server';
 import { getAdminBookingsLoadError, type AdminBooking } from './dashboard-data';
 import { loadAllAdminBookings } from './admin-bookings';
 import AdminDashboard from './AdminDashboard';
+import { getBookingDateBounds } from '@/lib/booking-schedule';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,7 +16,7 @@ export default async function AdminPage() {
         redirect('/admin/login');
     }
 
-    const today = new Date().toISOString().split('T')[0];
+    const today = getBookingDateBounds().minDate;
     const [bookingsResult, todayCountResult] = await Promise.all([
         loadAllAdminBookings(supabase),
         supabase

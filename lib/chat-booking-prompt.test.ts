@@ -9,6 +9,8 @@ test('booking prompt preserves multi-hour duration as one reservation', () => {
     assert.match(prompt, /Preserve the duration the user requested/);
     assert.match(prompt, /Never split it into separate one-hour bookings/);
     assert.match(prompt, /final booking is created only after the user presses the confirmation button/);
+    assert.match(prompt, /plain text only/i);
+    assert.match(prompt, /Do not use Markdown/i);
 });
 
 test('booking prompt includes retrieved business context', () => {

@@ -6,6 +6,7 @@ const booking = {
   service: "Racing Simulator",
   date: "2026-08-10",
   time: "14:00",
+  endTime: "16:00",
   seats: 2,
   email: "alex@example.com",
 };
@@ -17,6 +18,7 @@ test("getBookingConfirmationContent reports successful email delivery", () => {
   });
 
   assert.match(content, /booking is confirmed/);
+  assert.match(content, /from 14:00 to 16:00/);
   assert.match(content, /confirmation email has been sent to alex@example.com/);
 });
 

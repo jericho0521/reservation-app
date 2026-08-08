@@ -9,7 +9,7 @@ test("getSupabaseAdminConfig requires SUPABASE_SERVICE_ROLE_KEY", () => {
   assert.throws(
     () => getSupabaseAdminConfig({
       NEXT_PUBLIC_SUPABASE_URL: "https://example.supabase.co",
-    } as NodeJS.ProcessEnv),
+    }),
     MissingSupabaseServiceRoleKeyError,
   );
 });
@@ -19,7 +19,7 @@ test("getSupabaseAdminConfig returns server-only Supabase admin config", () => {
     getSupabaseAdminConfig({
       NEXT_PUBLIC_SUPABASE_URL: "https://example.supabase.co",
       SUPABASE_SERVICE_ROLE_KEY: "service-role-key",
-    } as NodeJS.ProcessEnv),
+    }),
     {
       supabaseUrl: "https://example.supabase.co",
       serviceRoleKey: "service-role-key",

@@ -2,6 +2,7 @@ interface ConfirmedBookingDetails {
   service: string;
   date: string;
   time: string;
+  endTime: string;
   seats: number;
   email: string;
 }
@@ -20,7 +21,7 @@ export function getBookingConfirmationContent(
     return `Sorry, there was an issue: ${result.error}`;
   }
 
-  const bookingSummary = `Great! Your booking is confirmed! 🎉 You've booked ${booking.seats} seat(s) for ${booking.service} on ${booking.date} at ${booking.time}.`;
+  const bookingSummary = `Great! Your booking is confirmed! 🎉 You've booked ${booking.seats} seat(s) for ${booking.service} on ${booking.date} from ${booking.time} to ${booking.endTime}.`;
 
   return result.email_sent
     ? `${bookingSummary} A confirmation email has been sent to ${booking.email}.`

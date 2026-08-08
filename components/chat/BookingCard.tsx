@@ -7,6 +7,7 @@ interface BookingCardProps {
     service: string;
     date: string;
     time: string;
+    endTime: string;
     seats: number;
     name: string;
     email: string;
@@ -42,6 +43,7 @@ export default function BookingCard({
     service,
     date,
     time,
+    endTime,
     seats,
     name,
     email,
@@ -64,7 +66,7 @@ export default function BookingCard({
             <BookingDetail
                 icon={<Clock className="w-5 h-5 text-neon" />}
                 label="Time"
-                value={time}
+                value={`${time} - ${endTime}`}
             />
             <BookingDetail
                 icon={<Users className="w-5 h-5 text-neon" />}

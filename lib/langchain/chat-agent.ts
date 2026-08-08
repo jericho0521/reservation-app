@@ -10,22 +10,26 @@ import {
   ToolMessage,
 } from "@langchain/core/messages";
 import { supabase } from "@/lib/supabase";
-import { supabaseAdmin } from "@/lib/supabase-admin";
-import { getEndTime, generateTimeSlots } from "@/lib/availability";
-import { getAvailableSeatsWithMaintenance } from "@/lib/reservation-capacity";
-import { sendBookingConfirmationEmail } from "@/lib/booking-confirmation-email";
+import { isBookingDateWithinWindow } from "@/lib/booking-schedule";
+import { loadBookableTimeSlots } from "@/lib/booking-availability";
+import {
+  customerEmailSchema,
+  customerNameSchema,
+  customerPhoneSchema,
+} from "@/lib/booking-schema";
+import {
+  BookingCreationError,
+  createConfirmedBooking,
+  validateBookingSchedule,
+  type BookableService,
+} from "@/lib/create-booking";
 import {
   HUMAN_SUPPORT_CONTACT,
   type WhatsAppContactData,
 } from "@/lib/business-contact";
 import { createOpenRouterChat } from "./models";
+import type { BookingConfirmationData } from "@/types";
 import { buildBookingSystemPromptWithContext } from "./prompts";
-
-interface ServiceRecord {
-  id: string;
-  name: string;
-  total_seats: number;
-}
 
 export interface ChatMessage {
   role: "user" | "assistant";
@@ -34,17 +38,7 @@ export interface ChatMessage {
 
 export interface BookingAction {
   type: "booking_confirmation" | "booking_success";
-  data: {
-    service: string;
-    date: string;
-    time: string;
-    seats: number;
-    name: string;
-    email: string;
-    phone: string;
-    bookingId?: string;
-    emailSent?: boolean;
-  };
+  data: BookingConfirmationData;
 }
 
 export interface LocationDirectionsAction {
@@ -164,7 +158,7 @@ export function getHumanSupportAction(message: string): WhatsAppContactAction | 
     : null;
 }
 
-async function getServiceByName(serviceName: string): Promise<ServiceRecord | null> {
+async function getServiceByName(serviceName: string): Promise<BookableService | null> {
   const { data, error } = await supabase()
     .from("services")
     .select("id, name, total_seats")
@@ -196,35 +190,23 @@ const getServicesTool = tool(
 const checkAvailabilityTool = tool(
   async ({ service_name, date }) => {
     try {
+      if (!isBookingDateWithinWindow(date)) {
+        return { error: "Date must be between today and 30 days from today" };
+      }
+
       const service = await getServiceByName(service_name);
       if (!service) return { error: "Service not found" };
 
-      const bookingClient = supabaseAdmin();
-      const { data: bookings, error: bookingsError } = await bookingClient
-        .from("bookings")
-        .select("start_time, seats_booked, seat_labels")
-        .eq("service_id", service.id)
-        .eq("booking_date", date)
-        .eq("status", "confirmed");
-
-      if (bookingsError) throw bookingsError;
-
-      const { data: maintenanceSeats, error: maintenanceError } = await bookingClient
-        .from("service_seat_maintenance")
-        .select("seat_label")
-        .eq("service_id", service.id)
-        .eq("is_active", true);
-
-      if (maintenanceError) throw maintenanceError;
-
-      const maintenanceSeatLabels = (maintenanceSeats || [])
-        .map((seat) => seat.seat_label)
-        .filter((label): label is string => typeof label === "string");
-
-      const slots = generateTimeSlots(service.total_seats, bookings || [], maintenanceSeatLabels)
+      const { timeSlots } = await loadBookableTimeSlots(
+        service.id,
+        service.total_seats,
+        date,
+      );
+      const slots = timeSlots
         .filter((slot) => slot.is_available)
         .map((slot) => ({
-          time: slot.start_time,
+          start_time: slot.start_time,
+          end_time: slot.end_time,
           available_seats: slot.available_seats,
         }));
 
@@ -251,12 +233,13 @@ const checkAvailabilityTool = tool(
 );
 
 const prepareBookingTool = tool(
-  async ({ service_name, date, start_time, seats, user_name, user_email, user_phone }) => {
+  async ({ service_name, date, start_time, end_time, seats, user_name, user_email, user_phone }) => {
     return {
       ready_for_confirmation: true,
       service_name,
       date,
       start_time,
+      end_time,
       seats,
       user_name,
       user_email,
@@ -271,10 +254,11 @@ const prepareBookingTool = tool(
       service_name: z.string().describe("Name of the service (Racing Simulator or Playstation 5)"),
       date: z.string().describe("Date in YYYY-MM-DD format"),
       start_time: z.string().describe("Start time in HH:MM format"),
-      seats: z.number().describe("Number of seats"),
-      user_name: z.string().describe("Customer name"),
-      user_email: z.string().describe("Customer email"),
-      user_phone: z.string().describe("Customer phone number"),
+      end_time: z.string().describe("End time in HH:MM format; may be multiple consecutive hours after start_time"),
+      seats: z.number().int().positive().describe("Number of seats"),
+      user_name: customerNameSchema.describe("Customer name"),
+      user_email: customerEmailSchema.describe("Customer email"),
+      user_phone: customerPhoneSchema.describe("Customer phone number"),
     }),
   }
 );
@@ -320,6 +304,7 @@ function bookingActionFromArgs(args: Record<string, unknown>): BookingAction | n
   const service = args.service_name;
   const date = args.date;
   const time = args.start_time;
+  const endTime = args.end_time;
   const seats = args.seats;
   const name = args.user_name;
   const email = args.user_email;
@@ -329,6 +314,7 @@ function bookingActionFromArgs(args: Record<string, unknown>): BookingAction | n
     typeof service !== "string" ||
     typeof date !== "string" ||
     typeof time !== "string" ||
+    typeof endTime !== "string" ||
     typeof seats !== "number" ||
     typeof name !== "string" ||
     typeof email !== "string" ||
@@ -343,6 +329,7 @@ function bookingActionFromArgs(args: Record<string, unknown>): BookingAction | n
       service,
       date,
       time,
+      endTime,
       seats,
       name,
       email,
@@ -387,6 +374,7 @@ export async function createBooking(
   serviceName: string,
   date: string,
   startTime: string,
+  endTime: string,
   seats: number,
   userName: string,
   userEmail: string,
@@ -396,78 +384,28 @@ export async function createBooking(
   if (!service) return { success: false, error: "Service not found" };
 
   try {
-    const bookingClient = supabaseAdmin();
-    const { data: existing, error: existingError } = await bookingClient
-      .from("bookings")
-      .select("seats_booked, seat_labels")
-      .eq("service_id", service.id)
-      .eq("booking_date", date)
-      .eq("start_time", startTime)
-      .eq("status", "confirmed");
-
-    if (existingError) throw existingError;
-
-    const { data: maintenanceSeats, error: maintenanceError } = await bookingClient
-      .from("service_seat_maintenance")
-      .select("seat_label")
-      .eq("service_id", service.id)
-      .eq("is_active", true);
-
-    if (maintenanceError) throw maintenanceError;
-
-    const maintenanceSeatLabels = (maintenanceSeats || [])
-      .map((seat) => seat.seat_label)
-      .filter((label): label is string => typeof label === "string");
-    const availableSeats = getAvailableSeatsWithMaintenance(
-      service.total_seats,
-      existing || [],
-      maintenanceSeatLabels,
-    );
-    if (seats > availableSeats) {
-      return { success: false, error: `Only ${availableSeats} seats available` };
-    }
-
-    const endTime = getEndTime(startTime);
-
-    const { data: booking, error } = await bookingClient
-      .from("bookings")
-      .insert({
-        service_id: service.id,
-        user_name: userName,
-        user_email: userEmail,
-        user_phone: userPhone,
-        booking_date: date,
-        start_time: startTime,
-        end_time: endTime,
-        seats_booked: seats,
-        status: "confirmed",
-        interface_type: "chat",
-      })
-      .select()
-      .single();
-
-    if (error) return { success: false, error: error.message };
-
-    const emailResult = await sendBookingConfirmationEmail({
-      bookingId: booking.id,
-      interfaceType: "chat",
-      customerName: userName,
-      customerEmail: userEmail,
-      customerPhone: userPhone,
-      serviceName: service.name,
-      bookingDate: date,
-      startTime,
-      endTime,
-      seatsBooked: seats,
-    });
+    const booking = await createConfirmedBooking(service, validateBookingSchedule({
+      user_name: userName,
+      user_email: userEmail,
+      user_phone: userPhone,
+      booking_date: date,
+      start_time: startTime,
+      end_time: endTime,
+      seats_booked: seats,
+      interface_type: "chat",
+    }));
 
     return {
       success: true,
       booking_id: booking.id,
-      email_sent: emailResult.sent,
-      message: `Booking confirmed! ${seats} seat(s) on ${date} at ${startTime}.`,
+      email_sent: booking.email_sent,
+      message: `Booking confirmed! ${seats} seat(s) on ${date} from ${startTime} to ${endTime}.`,
     };
   } catch (error) {
+    if (error instanceof BookingCreationError) {
+      return { success: false, error: error.message };
+    }
+
     console.error("Failed to create chat booking:", error);
     return { success: false, error: "Booking service is temporarily unavailable" };
   }

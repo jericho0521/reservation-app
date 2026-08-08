@@ -1,16 +1,7 @@
 import type { WhatsAppContactData } from '@/lib/business-contact';
+import type { BookingConfirmationData } from '@/types';
 
-export interface BookingData {
-    service: string;
-    date: string;
-    time: string;
-    seats: number;
-    name: string;
-    email: string;
-    phone: string;
-    bookingId?: string;
-    emailSent?: boolean;
-}
+export type BookingData = BookingConfirmationData;
 
 export interface LocationDirectionsData {
     name: string;

@@ -1,3 +1,4 @@
+import { getEndTime, getSlotTimesInRange, normalizeSlotTime } from "./booking-schedule";
 import { normalizeSeatLabels } from "./seat-maintenance";
 
 export interface SeatBooking {
@@ -6,11 +7,21 @@ export interface SeatBooking {
 
 export interface SlotSeatBooking extends SeatBooking {
   start_time: string;
+  end_time: string;
   seat_labels?: string[] | null;
 }
 
-export function normalizeSlotTime(time: string) {
-  return time.slice(0, 5);
+export function getBookingsForRange<T extends SlotSeatBooking>(
+  bookings: T[],
+  startTime: string,
+  endTime: string,
+) {
+  const requestedSlots = new Set(getSlotTimesInRange(startTime, endTime));
+
+  return bookings.filter(booking => {
+    return getSlotTimesInRange(booking.start_time, booking.end_time)
+      .some(slot => requestedSlots.has(slot));
+  });
 }
 
 export function getBookingsForSlot<T extends SlotSeatBooking>(
@@ -18,10 +29,7 @@ export function getBookingsForSlot<T extends SlotSeatBooking>(
   startTime: string,
 ) {
   const normalizedStartTime = normalizeSlotTime(startTime);
-
-  return bookings.filter(
-    (booking) => normalizeSlotTime(booking.start_time) === normalizedStartTime,
-  );
+  return getBookingsForRange(bookings, normalizedStartTime, getEndTime(normalizedStartTime));
 }
 
 export function getBookedSeatLabels(bookings: Pick<SlotSeatBooking, "seat_labels">[]) {
@@ -55,7 +63,7 @@ function getFallbackSeatLabel(seatNumber: number) {
   return `RS${seatNumber}`;
 }
 
-function getUnavailableSeatLabels(
+export function getUnavailableSeatLabels(
   totalSeats: number,
   bookings: Pick<SlotSeatBooking, "seats_booked" | "seat_labels">[],
   maintenanceSeatLabels: string[],
@@ -95,6 +103,27 @@ export function getAvailableSeatsWithMaintenance(
     bookings,
     maintenanceSeatLabels,
   ).size);
+}
+
+export function getAvailableSeatsForRange(
+  totalSeats: number,
+  bookings: SlotSeatBooking[],
+  startTime: string,
+  endTime: string,
+  maintenanceSeatLabels: string[],
+) {
+  const unavailableLabels = new Set(normalizeSeatLabels(maintenanceSeatLabels));
+
+  for (const slot of getSlotTimesInRange(startTime, endTime)) {
+    const slotUnavailableLabels = getUnavailableSeatLabels(
+      totalSeats,
+      getBookingsForSlot(bookings, slot),
+      maintenanceSeatLabels,
+    );
+    slotUnavailableLabels.forEach(label => unavailableLabels.add(label));
+  }
+
+  return Math.max(0, totalSeats - unavailableLabels.size);
 }
 
 export function isOverCapacity(totalSeats: number, bookings: SeatBooking[], requestedSeats: number) {

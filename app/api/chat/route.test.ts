@@ -7,17 +7,32 @@ test("parseConfirmBookingPayload requires a phone number", () => {
     service: "Racing Simulator",
     date: "2026-05-30",
     time: "14:00",
+    endTime: "16:00",
     seats: 2,
     name: "Alex",
     email: "alex@example.com",
   }), null);
 });
 
-test("parseConfirmBookingPayload accepts complete confirmation details", () => {
+test("parseConfirmBookingPayload rejects invalid customer contact details", () => {
+  assert.equal(parseConfirmBookingPayload({
+    service: "Racing Simulator",
+    date: "2026-05-30",
+    time: "14:00",
+    endTime: "16:00",
+    seats: 2,
+    name: "A",
+    email: "not-an-email",
+    phone: "abcdefg",
+  }), null);
+});
+
+test("parseConfirmBookingPayload accepts complete multi-hour confirmation details", () => {
   assert.deepEqual(parseConfirmBookingPayload({
     service: " Racing Simulator ",
     date: "2026-05-30",
     time: "14:00",
+    endTime: "16:00",
     seats: 2,
     name: " Alex ",
     email: "alex@example.com",
@@ -26,6 +41,7 @@ test("parseConfirmBookingPayload accepts complete confirmation details", () => {
     service: "Racing Simulator",
     date: "2026-05-30",
     time: "14:00",
+    endTime: "16:00",
     seats: 2,
     name: "Alex",
     email: "alex@example.com",

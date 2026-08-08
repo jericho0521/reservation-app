@@ -26,6 +26,7 @@ const FloatingChatMessageItem = memo(function FloatingChatMessageItem({
                 service={action.data.service}
                 date={action.data.date}
                 time={action.data.time}
+                endTime={action.data.endTime}
                 seats={action.data.seats}
                 name={action.data.name}
                 email={action.data.email}

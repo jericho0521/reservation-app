@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
-import { supabaseAdmin } from '@/lib/supabase-admin';
-import { generateTimeSlots } from '@/lib/availability';
+import { loadBookableTimeSlots } from '@/lib/booking-availability';
+import { isBookingDateWithinWindow } from '@/lib/booking-schedule';
 import { jsonError, supabaseErrorStatus } from '@/app/api/api-utils';
+import { z } from 'zod';
 
 export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
@@ -11,6 +12,14 @@ export async function GET(request: Request) {
 
     if (!serviceId || !date) {
         return jsonError('service_id and date are required', 400);
+    }
+
+    if (!z.string().uuid().safeParse(serviceId).success) {
+        return jsonError('service_id must be a valid UUID', 400);
+    }
+
+    if (!isBookingDateWithinWindow(date)) {
+        return jsonError('Date must be between today and 30 days from today', 400);
     }
 
     try {
@@ -29,29 +38,7 @@ export async function GET(request: Request) {
         }
 
         const totalSeats = service.total_seats;
-
-        // Get existing bookings for this service and date
-        const { data: bookings, error: bookingsError } = await supabaseAdmin()
-            .from('bookings')
-            .select('start_time, end_time, seats_booked, seat_labels')
-            .eq('service_id', serviceId)
-            .eq('booking_date', date)
-            .eq('status', 'confirmed');
-
-        if (bookingsError) throw bookingsError;
-
-        const { data: maintenanceSeats, error: maintenanceError } = await supabaseAdmin()
-            .from('service_seat_maintenance')
-            .select('seat_label')
-            .eq('service_id', serviceId)
-            .eq('is_active', true);
-
-        if (maintenanceError) throw maintenanceError;
-
-        const maintenanceSeatLabels = (maintenanceSeats || [])
-            .map(seat => seat.seat_label)
-            .filter((label): label is string => typeof label === 'string');
-        const timeSlots = generateTimeSlots(totalSeats, bookings || [], maintenanceSeatLabels);
+        const { timeSlots } = await loadBookableTimeSlots(serviceId, totalSeats, date);
 
         return NextResponse.json({ timeSlots, totalSeats });
     } catch (error) {

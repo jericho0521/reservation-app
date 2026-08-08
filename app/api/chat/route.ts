@@ -45,6 +45,7 @@ export async function POST(req: Request) {
         confirmBooking.service,
         confirmBooking.date,
         confirmBooking.time,
+        confirmBooking.endTime,
         confirmBooking.seats,
         confirmBooking.name,
         confirmBooking.email,

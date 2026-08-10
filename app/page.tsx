@@ -3,6 +3,7 @@ import Footer from '@/components/shared/Footer';
 import Hero from '@/components/landing/Hero';
 import Features from '@/components/landing/Features';
 import Pricing from '@/components/landing/Pricing';
+import AboutCommunity from '@/components/landing/AboutCommunity';
 import CTABanner from '@/components/landing/CTABanner';
 import FloatingChat from '@/components/chat/FloatingChat';
 
@@ -14,6 +15,7 @@ export default function Home() {
                 <Hero />
                 <Features />
                 <Pricing />
+                <AboutCommunity />
                 <CTABanner />
             </main>
             <Footer />

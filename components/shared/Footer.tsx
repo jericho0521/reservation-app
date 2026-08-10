@@ -1,108 +1,73 @@
 import Link from 'next/link';
+import { business } from '@/lib/business-content';
 
 export default function Footer() {
-    return (
-        <footer className="bg-racing-dark border-t border-white/10 py-12">
-            <div className="container mx-auto px-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-8 mb-8">
-                    {/* Brand */}
-                    <div className="lg:col-span-1">
-                        <Link href="/" className="text-xl font-bold font-heading tracking-tighter uppercase italic">
-                            PROJECT PLAY<span className="text-neon"> by CW</span>
-                        </Link>
-                        <p className="text-gray-400 text-sm mt-3">
-                            Bandar Sunway&apos;s premier sim racing and gaming hub.
-                        </p>
-                    </div>
+  return (
+    <footer className="border-t border-white/10 bg-racing-dark py-12">
+      <div className="container mx-auto px-6">
+        <div className="mb-10 grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-5">
+          <div>
+            <Link href="/" className="font-heading text-xl font-bold uppercase italic tracking-tighter">
+              PROJECT PLAY<span className="text-neon"> by CW</span>
+            </Link>
+            <p className="mt-3 text-sm leading-relaxed text-gray-400">{business.description}</p>
+          </div>
 
-                    {/* Quick Links */}
-                    <div>
-                        <h4 className="text-sm font-semibold uppercase tracking-wider mb-4">Quick Links</h4>
-                        <ul className="space-y-2 text-sm text-gray-400">
-                            <li><Link href="/form-booking" className="hover:text-neon transition-colors">Book Now</Link></li>
-                            <li><Link href="/chat-booking" className="hover:text-neon transition-colors">AI Chat Booking</Link></li>
-                            <li><Link href="/#services" className="hover:text-neon transition-colors">Services</Link></li>
-                            <li><Link href="/blog" className="hover:text-neon transition-colors">Blog</Link></li>
-                            <li><Link href="/updates" className="hover:text-neon transition-colors">Updates</Link></li>
-                        </ul>
-                    </div>
+          <div>
+            <h2 className="mb-4 text-sm font-semibold uppercase tracking-wider">Explore</h2>
+            <ul className="space-y-2 text-sm text-gray-400">
+              <li><Link href="/#services" className="hover:text-neon">Services</Link></li>
+              <li><Link href="/#pricing" className="hover:text-neon">Pricing</Link></li>
+              <li><Link href="/about" className="hover:text-neon">About</Link></li>
+              <li><Link href="/events" className="hover:text-neon">Events</Link></li>
+              <li><Link href="/faq" className="hover:text-neon">FAQ</Link></li>
+            </ul>
+          </div>
 
-                    {/* Hours */}
-                    <div>
-                        <h4 className="text-sm font-semibold uppercase tracking-wider mb-4">Hours</h4>
-                        <ul className="space-y-2 text-sm text-gray-400">
-                            <li>Daily: 12:00 PM - 2:00 AM</li>
-                        </ul>
-                    </div>
+          <div>
+            <h2 className="mb-4 text-sm font-semibold uppercase tracking-wider">Book & read</h2>
+            <ul className="space-y-2 text-sm text-gray-400">
+              <li><Link href="/form-booking" className="hover:text-neon">Form Booking</Link></li>
+              <li><Link href="/chat-booking" className="hover:text-neon">AI Chat Booking</Link></li>
+              <li><Link href="/blog" className="hover:text-neon">Blog</Link></li>
+              <li><Link href="/updates" className="hover:text-neon">Updates</Link></li>
+              <li><a href={business.careersUrl} target="_blank" rel="noopener noreferrer" className="hover:text-neon">Join our team</a></li>
+            </ul>
+          </div>
 
-                    {/* Contact */}
-                    <div>
-                        <h4 className="text-sm font-semibold uppercase tracking-wider mb-4">Contact</h4>
-                        <ul className="space-y-2 text-sm text-gray-400">
-                            <li>
-                                <a href="tel:+60111628152" className="hover:text-neon transition-colors">
-                                    +60 11-1628 1524
-                                </a>
-                            </li>
-                            <li>
-                                <a href="https://instagram.com/projectplaybycw" target="_blank" rel="noopener noreferrer" className="hover:text-neon transition-colors">
-                                    @projectplaybycw
-                                </a>
-                            </li>
-                            <li>Bandar Sunway, Subang Jaya</li>
-                        </ul>
-                    </div>
+          <div>
+            <h2 className="mb-4 text-sm font-semibold uppercase tracking-wider">Contact</h2>
+            <ul className="space-y-2 text-sm text-gray-400">
+              <li><a href={business.phoneHref} className="hover:text-neon">{business.phoneDisplay}</a></li>
+              <li><a href={`mailto:${business.email}`} className="hover:text-neon">{business.email}</a></li>
+              <li><a href={business.whatsappUrl} target="_blank" rel="noopener noreferrer" className="hover:text-neon">WhatsApp</a></li>
+              <li><a href={business.instagramUrl} target="_blank" rel="noopener noreferrer" className="hover:text-neon">{business.instagramHandle}</a></li>
+              <li>{business.hoursDays}: {business.hours}</li>
+            </ul>
+          </div>
 
-                    {/* Map */}
-                    <div className="md:col-span-2 lg:col-span-1">
-                        <h4 className="text-sm font-semibold uppercase tracking-wider mb-4">Location</h4>
-                        <div className="rounded-lg overflow-hidden border border-white/10">
-                            <iframe
-                                src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3984.0!2d101.6026114!3d3.0660998!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x31cc4d50f390a0ad%3A0x3a6370b811df68b!2sProject%20Play%20By%20CW!5e0!3m2!1sen!2smy!4v1234567890"
-                                width="100%"
-                                height="150"
-                                style={{ border: 0 }}
-                                allowFullScreen
-                                loading="lazy"
-                                referrerPolicy="no-referrer-when-downgrade"
-                                title="Project Play by CW Location"
-                            />
-                        </div>
-                    </div>
-                </div>
+          <div>
+            <h2 className="mb-4 text-sm font-semibold uppercase tracking-wider">Location</h2>
+            <p className="mb-4 text-sm leading-relaxed text-gray-400">{business.address}</p>
+            <a
+              href="https://maps.google.com/?q=3.0660998,101.6026114"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-heading text-sm uppercase tracking-wider text-neon hover:text-white"
+            >
+              Open in Maps →
+            </a>
+          </div>
+        </div>
 
-                <div className="border-t border-white/10 pt-8 flex flex-col md:flex-row justify-between items-center gap-4">
-                    <div className="text-sm text-gray-400">
-                        © {new Date().getFullYear()} Project Play by CW. All rights reserved.
-                    </div>
-                    <div className="flex gap-6">
-                        <a
-                            href="https://instagram.com/projectplaybycw"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-gray-400 hover:text-neon transition-colors"
-                        >
-                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect>
-                                <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path>
-                                <line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line>
-                            </svg>
-                        </a>
-                        <a
-                            href="https://ppbycw.com"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-gray-400 hover:text-neon transition-colors"
-                        >
-                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <circle cx="12" cy="12" r="10"></circle>
-                                <line x1="2" y1="12" x2="22" y2="12"></line>
-                                <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
-                            </svg>
-                        </a>
-                    </div>
-                </div>
-            </div>
-        </footer>
-    );
+        <div className="flex flex-col items-center justify-between gap-4 border-t border-white/10 pt-8 text-sm text-gray-400 md:flex-row">
+          <p>© {new Date().getFullYear()} {business.name}. All rights reserved.</p>
+          <div className="flex gap-6">
+            <Link href="/privacy" className="hover:text-neon">Privacy</Link>
+            <Link href="/terms" className="hover:text-neon">Terms</Link>
+          </div>
+        </div>
+      </div>
+    </footer>
+  );
 }

@@ -196,6 +196,8 @@
     border: 1px solid rgba(185, 217, 207, 0.2);
     border-radius: 0 0 12px 12px;
     padding: 16px;
+    max-height: calc(100vh - 72px);
+    overflow-y: auto;
 }
 
 .landing-navbar .nav-mobile-menu.open {
@@ -235,7 +237,7 @@
 }
 
 /* Responsive */
-@media (max-width: 768px) {
+@media (max-width: 1180px) {
     .landing-navbar {
         height: 64px;
         padding: 0 16px;

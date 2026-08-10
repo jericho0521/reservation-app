@@ -16,8 +16,11 @@ interface NavItemData {
 }
 
 const navItems: NavItemData[] = [
-    { name: 'Services', href: '/#features' },
+    { name: 'Services', href: '/#services' },
     { name: 'Pricing', href: '/#pricing' },
+    { name: 'About', href: '/about' },
+    { name: 'Events', href: '/events' },
+    { name: 'FAQ', href: '/faq' },
     {
         name: 'Content',
         items: [
@@ -32,7 +35,6 @@ const navItems: NavItemData[] = [
             { name: 'AI Chat Booking', href: '/chat-booking' },
         ],
     },
-    { name: 'About', href: '/#about' },
 ];
 
 interface NavItemProps {
@@ -197,13 +199,6 @@ export default function Navbar() {
                         </Link>
                     )
                 ))}
-                <Link
-                    href="/form-booking"
-                    className="nav-mobile-cta"
-                    onClick={() => setIsMenuOpen(false)}
-                >
-                    Book Session
-                </Link>
             </div>
         </header>
     );

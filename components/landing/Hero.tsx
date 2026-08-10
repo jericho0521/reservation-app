@@ -22,20 +22,20 @@ export default function Hero() {
             {/* Content */}
             <div className="container mx-auto px-6 relative z-10 text-center">
                 <div className="inline-block mb-4 px-4 py-1.5 border border-neon/50 rounded-full bg-neon/5 text-neon text-xs font-heading tracking-[0.2em] uppercase backdrop-blur-md">
-                    Racing Simulation
+                    Bandar Sunway Gaming Hub
                 </div>
 
                 <h1 className="text-5xl md:text-8xl font-black font-heading italic uppercase tracking-tighter mb-8 leading-none">
-                    <span className="block text-transparent bg-clip-text bg-gradient-to-b from-white to-white/50">Adrenaline</span>
-                    <span className="block text-transparent stroke-text text-white/10 relative">
-                        Unleashed
-                        <span className="absolute inset-0 text-neon opacity-20 blur-sm">Unleashed</span>
+                    <span className="block text-transparent bg-clip-text bg-gradient-to-b from-white to-white/50">Where Gamers</span>
+                    <span className="relative block text-neon">
+                        Belong
+                        <span className="absolute inset-0 text-neon opacity-30 blur-sm">Belong</span>
                     </span>
                 </h1>
 
                 <p className="text-gray-400 max-w-2xl mx-auto text-lg md:text-xl mb-12 font-light">
-                    Experience the thrill of professional racing with our high-fidelity motion simulators.
-                    Precision engineering meets immersive virtual reality.
+                    Race, compete, and connect at Project Play By CW. Play on our racing simulators,
+                    high-performance gaming PCs, and PlayStation 5 stations.
                 </p>
 
                 <div className="flex flex-col md:flex-row items-center justify-center gap-4">

@@ -103,7 +103,7 @@ export default function Pricing() {
                                 Join Our Membership Now
                             </h3>
                             <div className="text-center space-y-2">
-                                <p className="text-lg">Registration fee of <span className="text-neon font-bold">RM50</span></p>
+                                <p className="text-lg">Registration fee of <span className="text-neon font-bold">RM100</span></p>
                                 <p className="text-gray-400 text-sm">Enjoy member exclusive rates and packages</p>
                             </div>
                         </div>

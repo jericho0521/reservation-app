@@ -1,3 +1,4 @@
+import Image from 'next/image';
 import Link from 'next/link';
 
 export default function Hero() {
@@ -5,7 +6,7 @@ export default function Hero() {
         <section className="relative min-h-screen flex items-center justify-center overflow-hidden pt-20">
             {/* Background Elements */}
             <video
-                className="absolute inset-0 h-full w-full object-cover opacity-45"
+                className="absolute inset-0 h-full w-full object-cover opacity-45 motion-reduce:hidden"
                 autoPlay
                 muted
                 loop
@@ -16,16 +17,24 @@ export default function Hero() {
                 <source src="/dreamina-hero.mp4" type="video/mp4" />
             </video>
             <div className="absolute inset-0 bg-racing-dark/55 pointer-events-none" />
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-blue-900/20 via-racing-dark to-racing-dark pointer-events-none" />
+            <div className="ambient-pulse pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-blue-900/25 via-racing-dark to-racing-dark" />
             <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px] pointer-events-none" />
 
             {/* Content */}
-            <div className="container mx-auto px-6 relative z-10 text-center">
-                <div className="inline-block mb-4 px-4 py-1.5 border border-neon/50 rounded-full bg-neon/5 text-neon text-xs font-heading tracking-[0.2em] uppercase backdrop-blur-md">
+            <div className="container relative z-10 mx-auto px-5 py-12 text-center sm:px-6">
+                <Image
+                    src="/images/brand/project-play-logo.png"
+                    alt="Project Play By CW"
+                    width={423}
+                    height={125}
+                    priority
+                    className="hero-enter mx-auto mb-5 h-auto w-[min(82vw,380px)] drop-shadow-[0_0_24px_rgba(185,217,207,0.3)]"
+                />
+                <div className="hero-enter hero-enter-delay-1 mb-5 inline-block rounded-full border border-neon/50 bg-neon/5 px-4 py-2 font-heading text-[11px] uppercase tracking-[0.18em] text-neon backdrop-blur-md sm:text-xs sm:tracking-[0.2em]">
                     Bandar Sunway Gaming Hub
                 </div>
 
-                <h1 className="text-5xl md:text-8xl font-black font-heading italic uppercase tracking-tighter mb-8 leading-none">
+                <h1 className="hero-enter hero-enter-delay-2 mb-6 font-heading text-4xl font-black uppercase italic leading-[0.95] tracking-tighter sm:text-5xl md:mb-8 md:text-8xl">
                     <span className="block text-transparent bg-clip-text bg-gradient-to-b from-white to-white/50">Where Gamers</span>
                     <span className="relative block text-neon">
                         Belong
@@ -33,29 +42,29 @@ export default function Hero() {
                     </span>
                 </h1>
 
-                <p className="text-gray-400 max-w-2xl mx-auto text-lg md:text-xl mb-12 font-light">
+                <p className="hero-enter hero-enter-delay-3 mx-auto mb-9 max-w-2xl text-base font-light leading-relaxed text-gray-300 sm:text-lg md:mb-12 md:text-xl">
                     Race, compete, and connect at Project Play By CW. Play on our racing simulators,
                     high-performance gaming PCs, and PlayStation 5 stations.
                 </p>
 
-                <div className="flex flex-col md:flex-row items-center justify-center gap-4">
+                <div className="hero-enter hero-enter-delay-4 flex flex-col items-stretch justify-center gap-3 sm:flex-row sm:items-center sm:gap-4">
                     <Link
                         href="/form-booking"
-                        className="relative z-20 px-8 py-4 bg-neon text-racing-dark font-sans font-black text-lg uppercase tracking-wider hover:bg-white hover:shadow-[0_0_20px_rgba(185,217,207,0.5)] transition-all duration-300 w-full md:w-auto text-center"
+                        className="relative z-20 flex min-h-12 w-full items-center justify-center bg-neon px-7 py-3.5 text-center font-sans text-base font-black uppercase tracking-wider text-racing-dark transition-all duration-300 hover:bg-white hover:shadow-[0_0_20px_rgba(185,217,207,0.5)] sm:w-auto"
                     >
-                        Book Now
+                        Book a Session
                     </Link>
                     <Link
                         href="/chat-booking"
-                        className="relative z-20 px-8 py-4 bg-white/5 border border-neon text-neon font-sans font-bold uppercase tracking-wider hover:bg-neon hover:text-racing-dark transition-all duration-300 w-full md:w-auto text-center"
+                        className="relative z-20 flex min-h-12 w-full items-center justify-center border border-neon bg-white/5 px-7 py-3.5 text-center font-sans font-bold uppercase tracking-wider text-neon transition-all duration-300 hover:bg-neon hover:text-racing-dark sm:w-auto"
                     >
-                        Chat Booking
+                        Book with AI
                     </Link>
                     <Link
                         href="#pricing"
-                        className="relative z-20 px-8 py-4 border border-white/20 hover:border-neon text-white font-sans font-bold uppercase tracking-wider hover:text-neon hover:bg-neon/5 transition-all duration-300 w-full md:w-auto text-center"
+                        className="relative z-20 flex min-h-12 w-full items-center justify-center border border-white/20 px-7 py-3.5 text-center font-sans font-bold uppercase tracking-wider text-white transition-all duration-300 hover:border-neon hover:bg-neon/5 hover:text-neon sm:w-auto"
                     >
-                        View Pricing
+                        View pricing
                     </Link>
                 </div>
             </div>

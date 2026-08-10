@@ -30,7 +30,7 @@ export default function FAQPage() {
         <div className="mt-14 border border-neon/30 bg-neon/5 p-8 text-center">
           <h2 className="mb-3 font-heading text-2xl font-bold uppercase">Still have a question?</h2>
           <p className="mb-6 text-gray-400">Our team is available on WhatsApp at {business.phoneDisplay}.</p>
-          <a href={business.whatsappUrl} target="_blank" rel="noopener noreferrer" className="inline-block bg-neon px-8 py-4 font-bold uppercase tracking-wider text-racing-dark hover:bg-white">
+          <a href={business.whatsappUrl} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-12 w-full items-center justify-center bg-neon px-7 py-3 font-bold uppercase tracking-wider text-racing-dark transition-colors hover:bg-white sm:w-auto">
             Chat with our team
           </a>
         </div>

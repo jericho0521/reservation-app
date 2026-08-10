@@ -16,6 +16,64 @@ body {
     background: var(--background);
     color: var(--foreground);
     font-family: inherit;
+    overflow-x: clip;
+}
+
+a, button, summary {
+    -webkit-tap-highlight-color: transparent;
+}
+
+a:focus-visible,
+button:focus-visible,
+summary:focus-visible {
+    outline: 2px solid var(--color-neon);
+    outline-offset: 3px;
+}
+
+@keyframes hero-enter {
+    from {
+        opacity: 0;
+        transform: translateY(18px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes ambient-pulse {
+    0%, 100% { opacity: 0.35; transform: scale(1); }
+    50% { opacity: 0.6; transform: scale(1.08); }
+}
+
+.hero-enter {
+    animation: hero-enter 0.7s ease-out both;
+}
+
+.hero-enter-delay-1 { animation-delay: 0.08s; }
+.hero-enter-delay-2 { animation-delay: 0.16s; }
+.hero-enter-delay-3 { animation-delay: 0.24s; }
+.hero-enter-delay-4 { animation-delay: 0.32s; }
+
+.ambient-pulse {
+    animation: ambient-pulse 7s ease-in-out infinite;
+}
+
+@media (max-width: 640px) {
+    footer a {
+        display: inline-flex;
+        min-height: 44px;
+        align-items: center;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        scroll-behavior: auto !important;
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
 }
 
 @layer utilities {

@@ -20,7 +20,7 @@ export default function Features() {
 
         <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
           {services.map((service) => (
-            <article key={service.title} className="group overflow-hidden border border-white/10 bg-white/5 transition-colors hover:border-neon">
+            <article key={service.title} className="group overflow-hidden border border-white/10 bg-white/5 transition-all duration-300 hover:-translate-y-1 hover:border-neon hover:shadow-[0_18px_50px_rgba(0,0,0,0.25)]">
               <div className="relative aspect-video overflow-hidden">
                 <Image
                   src={service.image}
@@ -49,7 +49,7 @@ export default function Features() {
         </div>
 
         <div className="mt-10 text-center">
-          <Link href="/faq" className="font-heading text-sm uppercase tracking-widest text-neon hover:text-white">
+          <Link href="/faq" className="inline-flex min-h-12 items-center font-heading text-sm uppercase tracking-widest text-neon transition-colors hover:text-white">
             Learn more in our FAQ →
           </Link>
         </div>

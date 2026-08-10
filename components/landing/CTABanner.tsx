@@ -14,10 +14,10 @@ export default function CTABanner() {
           Reserve a Racing Simulator or PlayStation 5 session online, or ask our team about group events.
         </p>
         <div className="flex flex-col justify-center gap-4 sm:flex-row">
-          <Link href="/form-booking" className="bg-neon px-10 py-5 text-lg font-bold uppercase tracking-wider text-racing-dark transition-all hover:scale-105 hover:bg-white">
+          <Link href="/form-booking" className="flex min-h-12 w-full items-center justify-center bg-neon px-7 py-3.5 font-bold uppercase tracking-wider text-racing-dark transition-all hover:scale-[1.02] hover:bg-white sm:w-auto">
             Book a session
           </Link>
-          <Link href="/events" className="border border-white/20 px-10 py-5 text-lg font-bold uppercase tracking-wider text-white transition-colors hover:border-neon hover:text-neon">
+          <Link href="/events" className="flex min-h-12 w-full items-center justify-center border border-white/20 px-7 py-3.5 font-bold uppercase tracking-wider text-white transition-colors hover:border-neon hover:text-neon sm:w-auto">
             Plan an event
           </Link>
         </div>

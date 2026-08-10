@@ -51,7 +51,7 @@ export default function AboutCommunity() {
             <p className="mb-6 max-w-2xl leading-relaxed text-gray-400">
               Follow Project Play By CW on Instagram for current promotions, community news, and upcoming gaming events.
             </p>
-            <a href="https://www.instagram.com/projectplaybycw/" target="_blank" rel="noopener noreferrer" className="font-heading uppercase tracking-wider text-neon hover:text-white">
+            <a href="https://www.instagram.com/projectplaybycw/" target="_blank" rel="noopener noreferrer" className="inline-flex min-h-12 items-center font-heading uppercase tracking-wider text-neon transition-colors hover:text-white">
               Follow @projectplaybycw →
             </a>
           </div>

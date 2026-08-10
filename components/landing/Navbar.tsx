@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import Link from 'next/link';
 import { useState, useRef, useEffect } from 'react';
 import './Navbar.css';
@@ -44,27 +45,6 @@ interface NavItemProps {
 }
 
 const NavItem = ({ item, onHover, onLeave }: NavItemProps) => {
-    const content = (
-        <>
-            {item.name}
-            {item.items && (
-                <div className="nav-dropdown">
-                    <div className="nav-dropdown-inner">
-                        {item.items.map((subItem) => (
-                            <Link
-                                key={subItem.name}
-                                href={subItem.href}
-                                className="nav-dropdown-item"
-                            >
-                                {subItem.name}
-                            </Link>
-                        ))}
-                    </div>
-                </div>
-            )}
-        </>
-    );
-
     if (item.href) {
         return (
             <Link
@@ -73,19 +53,30 @@ const NavItem = ({ item, onHover, onLeave }: NavItemProps) => {
                 onMouseEnter={onHover}
                 onMouseLeave={onLeave}
             >
-                {content}
+                {item.name}
             </Link>
         );
     }
 
     return (
-        <span
-            className="nav-item"
+        <div
+            className="nav-item nav-item-dropdown"
             onMouseEnter={onHover}
             onMouseLeave={onLeave}
         >
-            {content}
-        </span>
+            <button type="button" className="nav-dropdown-trigger" aria-haspopup="true">
+                {item.name}
+            </button>
+            <div className="nav-dropdown">
+                <div className="nav-dropdown-inner">
+                    {item.items?.map((subItem) => (
+                        <Link key={subItem.name} href={subItem.href} className="nav-dropdown-item">
+                            {subItem.name}
+                        </Link>
+                    ))}
+                </div>
+            </div>
+        </div>
     );
 };
 
@@ -122,8 +113,14 @@ export default function Navbar() {
     return (
         <header className="landing-navbar">
             <div className="nav-end">
-                <Link href="/" className="nav-logo">
-                    PROJECT PLAY<span className="nav-logo-accent"> by CW</span>
+                <Link href="/" className="nav-logo" aria-label="Project Play By CW home">
+                    <Image
+                        src="/images/brand/project-play-logo.png"
+                        alt="Project Play By CW"
+                        width={169}
+                        height={50}
+                        priority
+                    />
                 </Link>
             </div>
 
@@ -157,7 +154,9 @@ export default function Navbar() {
                 <button
                     className="nav-mobile-toggle"
                     onClick={() => setIsMenuOpen(!isMenuOpen)}
-                    aria-label="Toggle menu"
+                    aria-label={isMenuOpen ? 'Close navigation menu' : 'Open navigation menu'}
+                    aria-expanded={isMenuOpen}
+                    aria-controls="mobile-navigation"
                 >
                     {isMenuOpen ? (
                         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -175,7 +174,7 @@ export default function Navbar() {
             </div>
 
             {/* Mobile Menu */}
-            <div className={`nav-mobile-menu ${isMenuOpen ? 'open' : ''}`}>
+            <div id="mobile-navigation" className={`nav-mobile-menu ${isMenuOpen ? 'open' : ''}`}>
                 {navItems.map((item) => (
                     item.items ? (
                         item.items.map((subItem) => (

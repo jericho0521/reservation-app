@@ -31,18 +31,22 @@
 }
 
 .landing-navbar .nav-logo {
-    font-size: 1.25rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: -0.025em;
-    font-style: italic;
-    color: #fff;
+    display: flex;
+    align-items: center;
+    min-height: 48px;
     text-decoration: none;
 }
 
-.landing-navbar .nav-logo-accent {
-    color: #b9d9cf;
-    text-shadow: 0 0 10px rgba(185, 217, 207, 0.5);
+.landing-navbar .nav-logo img {
+    width: 150px;
+    height: auto;
+    filter: drop-shadow(0 0 10px rgba(185, 217, 207, 0.2));
+    transition: filter 0.25s ease, transform 0.25s ease;
+}
+
+.landing-navbar .nav-logo:hover img {
+    filter: drop-shadow(0 0 14px rgba(185, 217, 207, 0.55));
+    transform: translateY(-1px);
 }
 
 .landing-navbar .nav-version {
@@ -80,8 +84,20 @@
     letter-spacing: 0.1em;
 }
 
-.landing-navbar .nav-item:hover {
+.landing-navbar .nav-item:hover,
+.landing-navbar .nav-item:focus-within {
     opacity: 1;
+}
+
+.landing-navbar .nav-dropdown-trigger {
+    height: 100%;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    letter-spacing: inherit;
+    text-transform: inherit;
+    cursor: pointer;
 }
 
 /* Dropdown Container */
@@ -144,12 +160,14 @@
 }
 
 /* Show Dropdown on Hover */
-.landing-navbar .nav-item:hover>.nav-dropdown {
+.landing-navbar .nav-item:hover > .nav-dropdown,
+.landing-navbar .nav-item:focus-within > .nav-dropdown {
     pointer-events: auto;
     visibility: visible;
 }
 
-.landing-navbar .nav-item:hover>.nav-dropdown>.nav-dropdown-inner {
+.landing-navbar .nav-item:hover > .nav-dropdown > .nav-dropdown-inner,
+.landing-navbar .nav-item:focus-within > .nav-dropdown > .nav-dropdown-inner {
     transform: translateY(0);
 }
 
@@ -176,11 +194,16 @@
 /* Mobile Menu Button */
 .landing-navbar .nav-mobile-toggle {
     display: none;
-    padding: 8px;
+    align-items: center;
+    justify-content: center;
+    width: 48px;
+    height: 48px;
+    padding: 0;
     background: transparent;
     border: none;
     color: #fff;
     cursor: pointer;
+    touch-action: manipulation;
 }
 
 /* Mobile Menu */
@@ -252,7 +275,11 @@
     }
 
     .landing-navbar .nav-mobile-toggle {
-        display: block;
+        display: flex;
+    }
+
+    .landing-navbar .nav-logo img {
+        width: 138px;
     }
 
     .landing-navbar .nav-end {

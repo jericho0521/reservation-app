@@ -51,7 +51,7 @@ export default function EventsPage() {
             href={`${business.whatsappUrl}?text=${encodeURIComponent('Hi Project Play By CW, I would like to ask about hosting an event.')}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-block bg-neon px-9 py-4 font-bold uppercase tracking-wider text-racing-dark transition-colors hover:bg-white"
+            className="inline-flex min-h-12 w-full items-center justify-center bg-neon px-7 py-3 font-bold uppercase tracking-wider text-racing-dark transition-colors hover:bg-white sm:w-auto"
           >
             Ask on WhatsApp
           </a>

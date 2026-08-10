@@ -66,9 +66,9 @@ export default function AboutPage() {
       <section className="container mx-auto px-6 py-24 text-center">
         <h2 className="mb-5 font-heading text-4xl font-black uppercase italic">Come play with us</h2>
         <p className="mx-auto mb-8 max-w-2xl text-gray-400">Open every day from 12:00 PM to 2:00 AM in Bandar Sunway.</p>
-        <div className="flex flex-col justify-center gap-4 sm:flex-row">
-          <Link href="/form-booking" className="bg-neon px-8 py-4 font-bold uppercase tracking-wider text-racing-dark hover:bg-white">Book a session</Link>
-          <Link href="/events" className="border border-neon px-8 py-4 font-bold uppercase tracking-wider text-neon hover:bg-neon hover:text-racing-dark">Explore events</Link>
+        <div className="flex flex-col justify-center gap-3 sm:flex-row sm:gap-4">
+          <Link href="/form-booking" className="flex min-h-12 w-full items-center justify-center bg-neon px-7 py-3 font-bold uppercase tracking-wider text-racing-dark transition-colors hover:bg-white sm:w-auto">Book a session</Link>
+          <Link href="/events" className="flex min-h-12 w-full items-center justify-center border border-neon px-7 py-3 font-bold uppercase tracking-wider text-neon transition-colors hover:bg-neon hover:text-racing-dark sm:w-auto">Explore events</Link>
         </div>
       </section>
     </PublicPageLayout>

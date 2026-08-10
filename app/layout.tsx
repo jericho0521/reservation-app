@@ -15,8 +15,11 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: 'Project Play By CW',
-  description: 'Experience the ultimate racing simulation.',
+  title: {
+    default: 'Project Play By CW',
+    template: '%s | Project Play By CW',
+  },
+  description: "Bandar Sunway's gaming hub for racing simulators, PC gaming, PlayStation 5, and community events.",
 };
 
 export default function RootLayout({

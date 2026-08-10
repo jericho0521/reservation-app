@@ -1,107 +1,87 @@
 # Project Play By CW - Knowledge Base
 
 ## About Us
-Project Play By CW is Bandar Sunway's sim racing and gaming hub. We offer Racing Simulator sessions and Playstation 5 gaming stations for casual play, group hangouts, and competitive racing sessions.
+Project Play By CW is a gaming hub founded in 2024 in Bandar Sunway. It is a place for competitors, casual gamers, friends, and families to play and connect.
 
 ## Location
-- **Address:** Project Play By CW, 70, Jalan PJS 11/7, Bandar Sunway, 47500 Subang Jaya, Selangor
+- **Address:** 70, Jalan PJS 11/7, Bandar Sunway, 47500 Subang Jaya, Selangor
 - **Area:** Bandar Sunway
 - **Coordinates:** 3.0660998, 101.6026114
 
 ## Contact Information
-- **Phone:** +60 11-1628 1524
-- **WhatsApp:** +60 11-1628 1524
-- **WhatsApp chat:** https://wa.me/601116281524
+- **Phone and WhatsApp:** +60 11-1628 1524
+- **WhatsApp:** https://wa.me/601116281524
+- **Email:** ppbycw@gmail.com
 - **Website:** https://ppbycw.com
 - **Instagram:** @projectplaybycw
 
-### Speaking with a person
-- Customers who ask for a person, human, staff member, customer support, or WhatsApp should be directed to the Project Play By CW team on WhatsApp at +60 11-1628 1524.
-- The chat interface provides a button that opens a pre-filled WhatsApp conversation.
-- Human support is also appropriate for group bookings, parties, tournaments, corporate events, price confirmation, and questions the booking assistant cannot resolve.
+Customers asking for staff, customer support, group bookings, parties, tournaments, corporate events, or price confirmation should be directed to WhatsApp.
 
 ## Operating Hours
-- **Daily:** 12:00 PM - 2:00 AM Malaysia time
-- Sessions are booked in 1-hour time slots.
+- **Monday to Sunday:** 12:00 PM – 2:00 AM Malaysia time
 
-## Bookable Services
+## Services
 
 ### Racing Simulator
-- **Description:** Professional racing simulator experience.
-- **Capacity:** 16 seats.
-- **Equipment:** Logitech G29 racing wheel and pedal set.
-- **Games:** Only F1 and Gran Turismo 7
-- **Best for:** Sim racing practice, friendly races, group sessions, and racing game fans.
+- PlayStation 5
+- Logitech G29 racing wheel and pedals
+- Dedicated racing seat
+- F1 and Gran Turismo 7
+- Available through online reservation
 
-### Playstation 5
-- **Description:** Premium Playstation 5 gaming stations.
-- **Capacity:** 2 seats.
-- **Games:** Mainstream multiplayer games and latest releases available on site. FC25, UF5, Overcooked, NBA 2k24, Tekken 8 and Mortal Kombat.
-- **Bring your own games:** Customers may bring their own PS5 games.
-- **Best for:** Casual gaming, co-op sessions, and small groups.
+### PC Gaming
+- AMD Ryzen 5 5500
+- MSI GeForce RTX 3070
+- 16GB DDR4 3200MHz RAM
+- 27-inch 165Hz display
+- Not available through online reservation; contact the team or walk in
 
-## Booking Information
-- Advance booking is recommended, especially on weekends.
-- Walk-ins are welcome based on live availability.
-- Customers can book through the website or chat with the AI booking assistant.
-- Live availability, seat counts, and booking confirmation must always be checked through the booking system, not this knowledge base.
+### PlayStation 5
+- FC 25
+- UFC 5
+- Overcooked
+- NBA 2K24
+- Tekken 8
+- Available through online reservation
+
+## Pricing
+
+### Hourly rates
+- PC Gaming: RM8/hour non-member, RM6/hour member
+- Racing Simulator: RM15/hour non-member, RM12/hour member
+- PlayStation 5: RM30/hour non-member, RM25/hour member
+
+### Member packages
+- PC Gaming: RM15/3 hours or RM26/6 hours
+- Racing Simulator: RM30/3 hours or RM50/6 hours
+
+### Membership
+- Registration fee: RM100
+- RM50 reload includes RM5 bonus credit
+- RM100 reload includes RM15 bonus credit
+
+### Birthday benefits
+Members may choose one birthday benefit:
+- Free 1 hour PlayStation 5
+- Free 2 hours Racing Simulator
+- Free 3 hours PC Gaming
+
+## Reservations
+- Online reservations apply only to Racing Simulator and PlayStation 5.
+- Booking ahead is recommended during weekends and peak hours.
+- Live availability and seat counts must always be checked through the booking system.
+- Contact the team on WhatsApp for PC Gaming, events, or group sessions.
 
 ## Frequently Asked Questions
 
-### Where is Project Play By CW located?
-We are located in Bandar Sunway, Subang Jaya, Selangor, Malaysia.
-
-### What time are you open?
-We are open daily from 12:00 PM to 2:00 AM Malaysia time.
-
-### What services can I book?
-You can book Racing Simulator sessions or Playstation 5 sessions.
-
-### What racing simulator equipment do you have?
-We use Logitech G29 racing wheels and pedal sets.
-
-### What games are available?
-Racing Simulator have only F1 and Gran Turismo 7. Playstation 5 sessions include mainstream multiplayer games.
-
 ### Can I bring my own games?
-No you may not. Only on PC where you can install a game that you like that is not available in our PC.
+Customers may not bring their own console games. On PC, they may install a game that is not already available.
 
-### Is there an age restriction?
-All ages are welcome. Children under 12 should be accompanied by an adult.
+### Can I host an event?
+Yes. Project Play welcomes gaming tournaments, birthdays, corporate events, and group bookings. Contact the team on WhatsApp.
 
-### Do you offer group packages?
-Yes. Customers can contact us for group bookings, parties, tournaments, or corporate events.
+### What events have you hosted?
+Past events include Monash Cup 2025, Terminull Brigade Event 2025, and Monash Cup 2024.
 
-### Is food and drinks allowed?
-Light snacks and drinks are welcome, but customers should be careful around the equipment. Food is not allowed in the gaming area.
-
-### Is smoking or vaping allowed?
-Vaping is permitted. Cigarettes are not allowed.
-
-### How do I check availability?
-Availability changes constantly. Use the booking assistant or website booking flow to check available time slots for a specific service and date.
-
-### How much does it cost?
-Pricing can change and should be confirmed through the website, booking flow, or by contacting Project Play By CW directly.
-
-### Can I speak with a person?
-Yes. Ask the booking assistant for a person, staff member, customer support, or WhatsApp. It will provide a button that opens a chat with the Project Play By CW team at +60 11-1628 1524.
-
-## Policies
-
-### Equipment Care
-- Handle all equipment carefully.
-- Report any issues to staff immediately.
-- Damage caused by misuse may result in charges.
-
-### House Rules
-- Be respectful to other players and staff.
-- Keep noise at reasonable levels.
-- Keep the gaming area clean.
-- No food in the gaming area.
-- Vaping is permitted; cigarettes are not allowed.
-
-## Community & Events
-- We host gaming events and tournaments.
-- Join our community for updates on upcoming events.
-- Follow us on Instagram for the latest news.
+## Community and Events
+Project Play hosts gaming events and tournaments. Follow @projectplaybycw on Instagram for current promotions, news, and upcoming events.

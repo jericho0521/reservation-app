@@ -96,6 +96,7 @@ export default function Footer() {
                 loading="lazy"
                 referrerPolicy="no-referrer-when-downgrade"
                 title="Project Play By CW location"
+                suppressHydrationWarning
               />
             </div>
             <div className="mt-4 flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-between">

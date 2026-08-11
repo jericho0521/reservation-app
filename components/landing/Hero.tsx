@@ -25,29 +25,23 @@ export default function Hero() {
                 <Image
                     src="/images/brand/project-play-logo.png"
                     alt="Project Play By CW"
-                    width={423}
-                    height={125}
+                    width={676}
+                    height={199}
                     priority
-                    className="hero-enter mx-auto mb-5 h-auto w-[min(82vw,380px)] drop-shadow-[0_0_24px_rgba(185,217,207,0.3)]"
+                    className="hero-enter mx-auto mb-7 h-auto w-[min(92vw,620px)] drop-shadow-[0_0_30px_rgba(185,217,207,0.38)]"
                 />
+                <h1 className="sr-only">Project Play By CW</h1>
                 <div className="hero-enter hero-enter-delay-1 mb-5 inline-block rounded-full border border-neon/50 bg-neon/5 px-4 py-2 font-heading text-[11px] uppercase tracking-[0.18em] text-neon backdrop-blur-md sm:text-xs sm:tracking-[0.2em]">
                     Bandar Sunway Gaming Hub
                 </div>
 
-                <h1 className="hero-enter hero-enter-delay-2 mb-6 font-heading text-4xl font-black uppercase italic leading-[0.95] tracking-tighter sm:text-5xl md:mb-8 md:text-8xl">
-                    <span className="block text-transparent bg-clip-text bg-gradient-to-b from-white to-white/50">Where Gamers</span>
-                    <span className="relative block text-neon">
-                        Belong
-                        <span className="absolute inset-0 text-neon opacity-30 blur-sm">Belong</span>
-                    </span>
-                </h1>
 
-                <p className="hero-enter hero-enter-delay-3 mx-auto mb-9 max-w-2xl text-base font-light leading-relaxed text-gray-300 sm:text-lg md:mb-12 md:text-xl">
+                <p className="hero-enter hero-enter-delay-2 mx-auto mb-9 max-w-2xl text-base font-light leading-relaxed text-gray-300 sm:text-lg md:mb-12 md:text-xl">
                     Race, compete, and connect at Project Play By CW. Play on our racing simulators,
                     high-performance gaming PCs, and PlayStation 5 stations.
                 </p>
 
-                <div className="hero-enter hero-enter-delay-4 flex flex-col items-stretch justify-center gap-3 sm:flex-row sm:items-center sm:gap-4">
+                <div className="hero-enter hero-enter-delay-3 flex flex-col items-stretch justify-center gap-3 sm:flex-row sm:items-center sm:gap-4">
                     <Link
                         href="/form-booking"
                         className="relative z-20 flex min-h-12 w-full items-center justify-center bg-neon px-7 py-3.5 text-center font-sans text-base font-black uppercase tracking-wider text-racing-dark transition-all duration-300 hover:bg-white hover:shadow-[0_0_20px_rgba(185,217,207,0.5)] sm:w-auto"

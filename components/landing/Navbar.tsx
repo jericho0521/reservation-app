@@ -23,13 +23,6 @@ const navItems: NavItemData[] = [
     { name: 'Events', href: '/events' },
     { name: 'FAQ', href: '/faq' },
     {
-        name: 'Content',
-        items: [
-            { name: 'Blog', href: '/blog' },
-            { name: 'Updates', href: '/updates' },
-        ],
-    },
-    {
         name: 'Book Now',
         items: [
             { name: 'Form Booking', href: '/form-booking' },

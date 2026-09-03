@@ -28,6 +28,7 @@ export function BookingDetailsDrawer({
     onClose,
     onMove,
 }: BookingDetailsDrawerProps) {
+    const drawerRef = useRef<HTMLElement>(null);
     const closeButtonRef = useRef<HTMLButtonElement>(null);
 
     useEffect(() => {
@@ -37,7 +38,26 @@ export function BookingDetailsDrawer({
         closeButtonRef.current?.focus();
 
         const handleKeyDown = (event: KeyboardEvent) => {
-            if (event.key === 'Escape') onClose();
+            if (event.key === 'Escape') {
+                onClose();
+                return;
+            }
+
+            if (event.key !== 'Tab' || !drawerRef.current) return;
+
+            const focusable = Array.from(drawerRef.current.querySelectorAll<HTMLElement>(
+                'a[href], button:not([disabled]), select:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])',
+            ));
+            const first = focusable[0];
+            const last = focusable.at(-1);
+
+            if (event.shiftKey && document.activeElement === first) {
+                event.preventDefault();
+                last?.focus();
+            } else if (!event.shiftKey && document.activeElement === last) {
+                event.preventDefault();
+                first?.focus();
+            }
         };
 
         window.addEventListener('keydown', handleKeyDown);
@@ -65,6 +85,7 @@ export function BookingDetailsDrawer({
                 aria-label="Close booking details"
             />
             <aside
+                ref={drawerRef}
                 className="admin-booking-drawer"
                 role="dialog"
                 aria-modal="true"

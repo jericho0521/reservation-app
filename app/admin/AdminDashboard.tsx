@@ -89,22 +89,18 @@ function BookingCard({
             ref={setNodeRef}
             style={style}
             className={`admin-booking-card ${isDragging ? 'is-dragging' : ''} ${isUpdating ? 'is-updating' : ''}`}
-            onClick={() => onOpen(booking)}
-            onKeyDown={event => {
-                if (event.key === 'Enter' || event.key === ' ') {
-                    event.preventDefault();
-                    onOpen(booking);
-                }
-            }}
-            role="button"
-            tabIndex={0}
-            aria-label={`Open booking for ${booking.user_name}`}
         >
+            <button
+                type="button"
+                className="admin-card-open"
+                onClick={() => onOpen(booking)}
+                aria-label={`Open booking for ${booking.user_name}`}
+            />
             <div className="admin-card-topline">
                 <span className="admin-card-time tabular-nums">
                     {booking.start_time.slice(0, 5)}–{booking.end_time.slice(0, 5)}
                 </span>
-                <div className="admin-card-controls" onClick={event => event.stopPropagation()}>
+                <div className="admin-card-controls">
                     <button
                         type="button"
                         className="admin-card-drag"

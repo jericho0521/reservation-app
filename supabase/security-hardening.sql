@@ -69,6 +69,7 @@ returns table (seat_label text)
 language plpgsql
 set search_path = public, auth
 as $$
+#variable_conflict use_column
 begin
   if not public.is_admin() then
     raise exception 'Admin privileges required' using errcode = '42501';

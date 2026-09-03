@@ -253,6 +253,14 @@
     overflow-x: auto;
     border-top: 1px solid var(--admin-line);
     border-left: 1px solid var(--admin-line);
+    font-family: Arial, Helvetica, sans-serif;
+}
+
+.admin-board h2,
+.admin-board h3,
+.admin-board button,
+.admin-board summary {
+    font-family: Arial, Helvetica, sans-serif;
 }
 
 .admin-board-column {

@@ -117,7 +117,10 @@ export function WalkInBookingForm({ userEmail, today, maxDate }: WalkInBookingFo
                 if (!mounted) return;
 
                 setServices(data);
-                setServiceId(current => current || data[0]?.id || '');
+                // Seat clashes only matter where seats are numbered, so start on
+                // the racing simulator rather than whatever sorts first by name.
+                const racingService = data.find(service => service.total_seats === RACING_SEAT_COUNT);
+                setServiceId(current => current || racingService?.id || data[0]?.id || '');
             } catch {
                 if (mounted) setAvailabilityError('Services could not be loaded. Refresh the page to try again.');
             }
@@ -400,7 +403,7 @@ export function WalkInBookingForm({ userEmail, today, maxDate }: WalkInBookingFo
                                 <div className="admin-seat-picker">
                                     <p className="admin-field-note">
                                         <Armchair aria-hidden="true" />
-                                        Click the seats the customer is using. {seatLabels.length} selected.
+                                        Assign the exact seats the customer is using, just like an online booking. {seatLabels.length} selected.
                                     </p>
                                     <div className="admin-seat-islands">
                                         {SEAT_ISLANDS.map(island => (
@@ -454,6 +457,7 @@ export function WalkInBookingForm({ userEmail, today, maxDate }: WalkInBookingFo
                                         onChange={event => setSeatCount(Math.max(1, Math.min(seatsAvailableInRange, Number(event.target.value) || 1)))}
                                     />
                                     <em><Users aria-hidden="true" />{seatsAvailableInRange} free for this time</em>
+                                    <em>{selectedService?.name} stations are not numbered, so only the count is recorded. Online bookings work the same way.</em>
                                 </label>
                             )}
                         </fieldset>

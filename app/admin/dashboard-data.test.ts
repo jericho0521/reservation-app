@@ -1,6 +1,16 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { filterBookings, formatRefreshTime, getAdminBookingsLoadError, getBookingSummary, type AdminBooking } from './dashboard-data';
+import {
+    filterBookings,
+    filterBookingsForBoard,
+    formatRefreshTime,
+    getAdminBookingsLoadError,
+    getBookingSummary,
+    getStatusForLane,
+    groupBookingsByLane,
+    shiftDate,
+    type AdminBooking,
+} from './dashboard-data';
 
 const bookings: AdminBooking[] = [
     {
@@ -12,6 +22,7 @@ const bookings: AdminBooking[] = [
         end_time: '13:00',
         seats_booked: 2,
         status: 'confirmed',
+        interface_type: 'form',
         created_at: '2026-03-11T04:00:00.000Z',
         services: { name: 'Racing Simulator' },
     },
@@ -24,6 +35,7 @@ const bookings: AdminBooking[] = [
         end_time: '15:00',
         seats_booked: 1,
         status: 'completed',
+        interface_type: 'chat',
         created_at: '2026-03-11T03:00:00.000Z',
         services: { name: 'Playstation 5' },
     },
@@ -36,6 +48,7 @@ const bookings: AdminBooking[] = [
         end_time: '19:00',
         seats_booked: 4,
         status: 'cancelled',
+        interface_type: 'form',
         created_at: '2026-03-11T02:00:00.000Z',
         services: { name: 'Racing Simulator' },
     },
@@ -48,6 +61,7 @@ const bookings: AdminBooking[] = [
         end_time: '21:00',
         seats_booked: 3,
         status: 'in_progress',
+        interface_type: 'chat',
         created_at: '2026-03-11T01:00:00.000Z',
         services: { name: 'Racing Simulator' },
     },
@@ -91,6 +105,32 @@ test('filterBookings applies admin filters deterministically', () => {
 
 test('formatRefreshTime renders a stable placeholder before client hydration', () => {
     assert.equal(formatRefreshTime(null), 'Updated just now');
+});
+
+test('filterBookingsForBoard keeps the selected day and applies search and service filters', () => {
+    assert.deepEqual(
+        filterBookingsForBoard(bookings, {
+            date: '2026-03-11',
+            search: 'a@example',
+            service: 'Racing Simulator',
+        }).map(booking => booking.id),
+        ['1'],
+    );
+});
+
+test('groupBookingsByLane maps database statuses to the four workflow lanes', () => {
+    const grouped = groupBookingsByLane(bookings);
+
+    assert.deepEqual(grouped.upcoming.map(booking => booking.id), ['1']);
+    assert.deepEqual(grouped.in_progress.map(booking => booking.id), ['4']);
+    assert.deepEqual(grouped.done.map(booking => booking.id), ['2']);
+    assert.deepEqual(grouped.cancelled.map(booking => booking.id), ['3']);
+    assert.equal(getStatusForLane('done'), 'completed');
+});
+
+test('shiftDate performs timezone-independent date navigation', () => {
+    assert.equal(shiftDate('2026-03-31', 1), '2026-04-01');
+    assert.equal(shiftDate('2026-03-01', -1), '2026-02-28');
 });
 
 test('formatRefreshTime formats the client refresh timestamp after hydration', () => {

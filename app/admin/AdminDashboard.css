@@ -1,0 +1,813 @@
+.admin-dashboard {
+    min-height: 100vh;
+    padding: 0 28px 36px;
+}
+
+.admin-page-header {
+    display: flex;
+    min-height: 112px;
+    align-items: center;
+    justify-content: space-between;
+    gap: 24px;
+    border-bottom: 1px solid var(--admin-line);
+}
+
+.admin-eyebrow {
+    display: block;
+    color: var(--admin-accent);
+    font-size: 10px;
+    font-weight: 750;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+}
+
+.admin-page-header h1 {
+    margin-top: 6px;
+    font-size: clamp(24px, 3vw, 34px);
+    font-weight: 650;
+    letter-spacing: -0.035em;
+    line-height: 1.05;
+}
+
+.admin-page-header p {
+    margin-top: 8px;
+    color: var(--admin-muted);
+    font-size: 13px;
+}
+
+.admin-secondary-button,
+.admin-date-control button,
+.admin-board-filters select,
+.admin-drawer-actions button,
+.admin-confirm-dialog button {
+    min-height: 38px;
+    border: 1px solid var(--admin-line);
+    border-radius: 6px;
+    color: var(--admin-text);
+    font-size: 12px;
+    font-weight: 600;
+    transition: background-color 140ms ease, border-color 140ms ease, color 140ms ease;
+}
+
+.admin-secondary-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 13px;
+    background: var(--admin-surface);
+}
+
+.admin-secondary-button svg {
+    width: 14px;
+    height: 14px;
+}
+
+.admin-secondary-button:hover,
+.admin-date-control button:hover,
+.admin-drawer-actions button:hover,
+.admin-confirm-dialog button:hover {
+    border-color: var(--admin-line-strong);
+    background: rgba(185, 217, 207, 0.08);
+}
+
+.admin-secondary-button:disabled {
+    cursor: wait;
+    opacity: 0.55;
+}
+
+.admin-board-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 18px 0;
+    border-bottom: 1px solid var(--admin-line);
+}
+
+.admin-date-control,
+.admin-board-filters {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.admin-date-control > button:not(.admin-today-button) {
+    display: grid;
+    width: 38px;
+    place-items: center;
+    background: var(--admin-surface);
+}
+
+.admin-date-control button svg {
+    width: 15px;
+    height: 15px;
+}
+
+.admin-date-control label {
+    position: relative;
+    display: flex;
+    min-height: 38px;
+    min-width: 246px;
+    align-items: center;
+    gap: 9px;
+    padding: 0 12px;
+    border: 1px solid var(--admin-line);
+    border-radius: 6px;
+    background: var(--admin-surface);
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.admin-date-control label svg {
+    width: 15px;
+    height: 15px;
+    color: var(--admin-accent);
+}
+
+.admin-date-control input[type='date'] {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    cursor: pointer;
+    opacity: 0;
+}
+
+.admin-today-button {
+    padding: 0 11px;
+    background: transparent;
+    color: var(--admin-accent) !important;
+}
+
+.admin-search-control {
+    display: flex;
+    width: min(260px, 28vw);
+    min-height: 38px;
+    align-items: center;
+    gap: 8px;
+    padding: 0 10px;
+    border: 1px solid var(--admin-line);
+    border-radius: 6px;
+    background: var(--admin-surface);
+}
+
+.admin-search-control:focus-within,
+.admin-board-filters select:focus,
+.admin-date-control label:focus-within {
+    border-color: var(--admin-accent);
+    outline: 1px solid var(--admin-accent);
+    outline-offset: 1px;
+}
+
+.admin-search-control > svg {
+    width: 14px;
+    height: 14px;
+    color: var(--admin-muted);
+}
+
+.admin-search-control input {
+    min-width: 0;
+    flex: 1;
+    outline: none;
+    background: transparent;
+    color: var(--admin-text);
+    font-size: 12px;
+}
+
+.admin-search-control input::placeholder {
+    color: var(--admin-muted);
+}
+
+.admin-search-control button {
+    color: var(--admin-muted);
+}
+
+.admin-search-control button svg {
+    width: 13px;
+    height: 13px;
+}
+
+.admin-board-filters select {
+    padding: 0 30px 0 11px;
+    background: var(--admin-surface);
+}
+
+.admin-notice {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin-top: 16px;
+    padding: 11px 13px;
+    border: 1px solid var(--admin-line);
+    border-radius: 6px;
+    background: var(--admin-surface);
+    color: var(--admin-text);
+    font-size: 12px;
+}
+
+.admin-notice.is-error {
+    border-left: 2px solid #ef7a86;
+}
+
+.admin-notice.is-success {
+    border-left: 2px solid var(--admin-accent);
+}
+
+.admin-notice button,
+.admin-icon-button {
+    display: grid;
+    place-items: center;
+    color: var(--admin-muted);
+}
+
+.admin-notice button svg,
+.admin-icon-button svg {
+    width: 15px;
+    height: 15px;
+}
+
+.admin-board-context {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    min-height: 52px;
+    color: var(--admin-muted);
+    font-size: 11px;
+}
+
+.admin-board-context span {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+}
+
+.admin-board-context svg {
+    width: 13px;
+    height: 13px;
+}
+
+.admin-board {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(240px, 1fr));
+    min-height: calc(100vh - 300px);
+    overflow-x: auto;
+    border-top: 1px solid var(--admin-line);
+    border-left: 1px solid var(--admin-line);
+}
+
+.admin-board-column {
+    min-width: 0;
+    border-right: 1px solid var(--admin-line);
+    border-bottom: 1px solid var(--admin-line);
+    background: rgba(23, 29, 48, 0.34);
+    transition: background-color 140ms ease;
+}
+
+.admin-board-column.is-over {
+    background: rgba(185, 217, 207, 0.08);
+}
+
+.admin-column-header {
+    min-height: 78px;
+    border-bottom: 1px solid var(--admin-line);
+    padding: 16px;
+}
+
+.admin-column-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.admin-column-title svg {
+    width: 8px;
+    height: 8px;
+    fill: currentColor;
+}
+
+.lane-upcoming .admin-column-title { color: var(--admin-accent); }
+.lane-in_progress .admin-column-title { color: #8db9ec; }
+.lane-done .admin-column-title { color: #91c7a4; }
+.lane-cancelled .admin-column-title { color: #c48b92; }
+
+.admin-column-title h2 {
+    color: var(--admin-text);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+}
+
+.admin-column-title span {
+    display: grid;
+    min-width: 20px;
+    height: 20px;
+    place-items: center;
+    margin-left: auto;
+    border: 1px solid var(--admin-line);
+    border-radius: 999px;
+    color: var(--admin-muted);
+    font-size: 10px;
+}
+
+.admin-column-header p {
+    margin-top: 6px;
+    color: var(--admin-muted);
+    font-size: 10px;
+}
+
+.admin-column-cards {
+    display: flex;
+    min-height: 260px;
+    flex-direction: column;
+    gap: 8px;
+    padding: 10px;
+}
+
+.admin-column-empty {
+    display: grid;
+    min-height: 90px;
+    place-items: center;
+    border: 1px dashed var(--admin-line);
+    border-radius: 6px;
+    color: var(--admin-muted);
+    font-size: 11px;
+    text-align: center;
+}
+
+.admin-booking-card {
+    position: relative;
+    padding: 13px;
+    border: 1px solid var(--admin-line);
+    border-radius: 6px;
+    background: var(--admin-surface);
+    cursor: pointer;
+    touch-action: manipulation;
+    transition: border-color 140ms ease, background-color 140ms ease, opacity 140ms ease;
+}
+
+.admin-booking-card:hover,
+.admin-booking-card:focus-visible {
+    border-color: var(--admin-line-strong);
+    background: var(--admin-surface-raised);
+    outline: none;
+}
+
+.admin-booking-card.is-dragging {
+    z-index: 20;
+    cursor: grabbing;
+    opacity: 0.38;
+}
+
+.admin-booking-card.is-updating {
+    pointer-events: none;
+    opacity: 0.55;
+}
+
+.admin-drag-overlay {
+    width: 248px;
+    cursor: grabbing;
+    border-color: var(--admin-line-strong);
+    box-shadow: 0 18px 42px rgba(0, 0, 0, 0.34);
+}
+
+.admin-card-topline,
+.admin-card-meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.admin-card-time {
+    color: var(--admin-accent);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+}
+
+.admin-card-controls {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+}
+
+.admin-card-drag,
+.admin-card-menu summary {
+    display: grid;
+    width: 28px;
+    height: 28px;
+    cursor: grab;
+    place-items: center;
+    border-radius: 4px;
+    color: var(--admin-muted);
+    list-style: none;
+}
+
+.admin-card-menu summary {
+    cursor: pointer;
+}
+
+.admin-card-menu summary::-webkit-details-marker {
+    display: none;
+}
+
+.admin-card-drag:hover,
+.admin-card-menu summary:hover {
+    background: rgba(185, 217, 207, 0.08);
+    color: var(--admin-text);
+}
+
+.admin-card-drag svg,
+.admin-card-menu summary svg {
+    width: 14px;
+    height: 14px;
+}
+
+.admin-card-menu {
+    position: relative;
+}
+
+.admin-card-menu-popover {
+    position: absolute;
+    top: 32px;
+    right: 0;
+    z-index: 30;
+    width: 138px;
+    padding: 6px;
+    border: 1px solid var(--admin-line-strong);
+    border-radius: 6px;
+    background: #20283c;
+    box-shadow: 0 14px 30px rgba(0, 0, 0, 0.32);
+}
+
+.admin-card-menu-popover span {
+    display: block;
+    padding: 5px 7px;
+    color: var(--admin-muted);
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+}
+
+.admin-card-menu-popover button {
+    width: 100%;
+    padding: 7px;
+    border-radius: 4px;
+    color: var(--admin-text);
+    font-size: 11px;
+    text-align: left;
+}
+
+.admin-card-menu-popover button:hover {
+    background: rgba(185, 217, 207, 0.09);
+}
+
+.admin-booking-card h3 {
+    margin-top: 11px;
+    overflow: hidden;
+    color: var(--admin-text);
+    font-size: 13px;
+    font-weight: 650;
+    letter-spacing: -0.01em;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.admin-card-service {
+    margin-top: 3px;
+    color: var(--admin-muted);
+    font-size: 11px;
+}
+
+.admin-card-meta {
+    margin-top: 14px;
+    color: var(--admin-muted);
+    font-size: 10px;
+}
+
+.admin-card-meta span {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.admin-card-meta svg {
+    width: 12px;
+    height: 12px;
+}
+
+.admin-card-seats {
+    margin-top: 9px;
+    padding-top: 9px;
+    border-top: 1px solid var(--admin-line);
+    color: var(--admin-accent);
+    font-size: 10px;
+}
+
+.admin-drawer-layer,
+.admin-confirm-layer {
+    position: fixed;
+    inset: 0;
+    z-index: 70;
+}
+
+.admin-drawer-scrim {
+    position: absolute;
+    inset: 0;
+    border: 0;
+    background: rgba(3, 6, 12, 0.38);
+}
+
+.admin-booking-drawer {
+    position: absolute;
+    inset: 0 0 0 auto;
+    display: flex;
+    width: min(430px, 100vw);
+    flex-direction: column;
+    border-left: 1px solid var(--admin-line-strong);
+    background: var(--admin-surface);
+    box-shadow: -18px 0 48px rgba(0, 0, 0, 0.28);
+    animation: admin-drawer-enter 220ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes admin-drawer-enter {
+    from { transform: translateX(24px); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+}
+
+.admin-drawer-header {
+    display: flex;
+    min-height: 96px;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    border-bottom: 1px solid var(--admin-line);
+    padding: 22px;
+}
+
+.admin-drawer-header h2 {
+    margin-top: 6px;
+    font-size: 22px;
+    font-weight: 650;
+    letter-spacing: -0.025em;
+}
+
+.admin-icon-button {
+    width: 36px;
+    height: 36px;
+    border: 1px solid var(--admin-line);
+    border-radius: 6px;
+}
+
+.admin-drawer-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 22px;
+}
+
+.admin-status-chip {
+    display: inline-flex;
+    min-height: 26px;
+    align-items: center;
+    padding: 0 9px;
+    border: 1px solid var(--admin-line);
+    border-radius: 999px;
+    color: var(--admin-muted);
+    font-size: 10px;
+    font-weight: 700;
+}
+
+.admin-status-chip.status-confirmed { color: var(--admin-accent); }
+.admin-status-chip.status-in_progress { color: #8db9ec; }
+.admin-status-chip.status-completed { color: #91c7a4; }
+.admin-status-chip.status-cancelled { color: #c48b92; }
+
+.admin-detail-section {
+    margin-top: 28px;
+}
+
+.admin-detail-section h3 {
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--admin-line);
+    color: var(--admin-muted);
+    font-size: 10px;
+    font-weight: 750;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+}
+
+.admin-detail-list > div {
+    display: grid;
+    grid-template-columns: 110px minmax(0, 1fr);
+    gap: 18px;
+    padding: 13px 0;
+    border-bottom: 1px solid var(--admin-line);
+}
+
+.admin-detail-list dt,
+.admin-detail-list dd {
+    font-size: 12px;
+}
+
+.admin-detail-list dt {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--admin-muted);
+}
+
+.admin-detail-list dt svg {
+    width: 13px;
+    height: 13px;
+}
+
+.admin-detail-list dd {
+    color: var(--admin-text);
+    text-align: right;
+}
+
+.admin-contact-list {
+    display: grid;
+    gap: 8px;
+    margin-top: 12px;
+}
+
+.admin-contact-list a {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: 9px;
+    min-height: 40px;
+    padding: 0 11px;
+    border: 1px solid var(--admin-line);
+    border-radius: 6px;
+    color: var(--admin-text);
+    font-size: 12px;
+}
+
+.admin-contact-list a:hover {
+    border-color: var(--admin-line-strong);
+}
+
+.admin-contact-list svg {
+    width: 14px;
+    height: 14px;
+    color: var(--admin-accent);
+}
+
+.admin-contact-list span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.admin-drawer-footer {
+    border-top: 1px solid var(--admin-line);
+    padding: 18px 22px 22px;
+}
+
+.admin-drawer-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.admin-drawer-actions button {
+    padding: 0 10px;
+    background: transparent;
+}
+
+.admin-drawer-actions button.is-danger,
+.admin-confirm-dialog button.is-danger {
+    border-color: rgba(239, 122, 134, 0.4);
+    color: #f3a0a9;
+}
+
+.admin-confirm-layer {
+    display: grid;
+    place-items: center;
+    padding: 20px;
+    background: rgba(3, 6, 12, 0.72);
+}
+
+.admin-confirm-dialog {
+    width: min(420px, 100%);
+    padding: 24px;
+    border: 1px solid var(--admin-line-strong);
+    border-radius: 8px;
+    background: var(--admin-surface);
+    box-shadow: 0 22px 60px rgba(0, 0, 0, 0.38);
+}
+
+.admin-confirm-dialog h2 {
+    margin-top: 9px;
+    font-size: 20px;
+    font-weight: 650;
+    letter-spacing: -0.02em;
+}
+
+.admin-confirm-dialog p {
+    margin-top: 9px;
+    color: var(--admin-muted);
+    font-size: 12px;
+    line-height: 1.6;
+}
+
+.admin-confirm-dialog > div {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 22px;
+}
+
+.admin-confirm-dialog button {
+    padding: 0 13px;
+}
+
+.is-spinning {
+    animation: admin-spin 800ms linear infinite;
+}
+
+@keyframes admin-spin {
+    to { transform: rotate(360deg); }
+}
+
+@media (max-width: 1180px) {
+    .admin-board {
+        grid-template-columns: repeat(4, minmax(255px, 1fr));
+    }
+}
+
+@media (max-width: 767px) {
+    .admin-dashboard {
+        padding: 0 14px 24px;
+    }
+
+    .admin-page-header {
+        min-height: 118px;
+        padding-left: 48px;
+    }
+
+    .admin-page-header p {
+        display: none;
+    }
+
+    .admin-secondary-button {
+        width: 38px;
+        justify-content: center;
+        padding: 0;
+        font-size: 0;
+    }
+
+    .admin-board-toolbar {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .admin-date-control label {
+        min-width: 0;
+        flex: 1;
+    }
+
+    .admin-board-filters {
+        align-items: stretch;
+    }
+
+    .admin-search-control {
+        width: auto;
+        flex: 1;
+    }
+
+    .admin-board-context {
+        gap: 10px;
+        overflow-x: auto;
+        white-space: nowrap;
+    }
+
+    .admin-board {
+        grid-template-columns: repeat(4, 84vw);
+        scroll-snap-type: x proximity;
+    }
+
+    .admin-board-column {
+        scroll-snap-align: start;
+    }
+
+    .admin-drawer-scrim {
+        background: rgba(3, 6, 12, 0.7);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .admin-booking-drawer,
+    .is-spinning {
+        animation: none;
+    }
+
+    .admin-board-column,
+    .admin-booking-card {
+        transition: none;
+    }
+}

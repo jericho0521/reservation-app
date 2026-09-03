@@ -9,6 +9,7 @@ export const ADMIN_BOOKINGS_SELECT = `
     seats_booked,
     seat_labels,
     status,
+    interface_type,
     created_at,
     services (name)
 `;
@@ -24,6 +25,15 @@ export type AdminBookingStatus = typeof ADMIN_BOOKING_STATUSES[number];
 
 export type AdminFilter = 'all' | 'today' | 'upcoming' | 'completed' | 'cancelled';
 
+export const ADMIN_BOARD_LANES = [
+    'upcoming',
+    'in_progress',
+    'done',
+    'cancelled',
+] as const;
+
+export type AdminBoardLane = typeof ADMIN_BOARD_LANES[number];
+
 export type AdminServiceRelation = { name: string } | { name: string }[] | null;
 
 export interface AdminBooking {
@@ -37,8 +47,77 @@ export interface AdminBooking {
     seats_booked: number;
     seat_labels?: string[];
     status: AdminBookingStatus;
+    interface_type: 'form' | 'chat';
     created_at: string;
     services: AdminServiceRelation;
+}
+
+export interface AdminBoardFilters {
+    date: string;
+    search: string;
+    service: string;
+}
+
+const STATUS_TO_LANE: Record<AdminBookingStatus, AdminBoardLane> = {
+    confirmed: 'upcoming',
+    in_progress: 'in_progress',
+    completed: 'done',
+    cancelled: 'cancelled',
+};
+
+const LANE_TO_STATUS: Record<AdminBoardLane, AdminBookingStatus> = {
+    upcoming: 'confirmed',
+    in_progress: 'in_progress',
+    done: 'completed',
+    cancelled: 'cancelled',
+};
+
+export function getBookingLane(status: AdminBookingStatus): AdminBoardLane {
+    return STATUS_TO_LANE[status];
+}
+
+export function getStatusForLane(lane: AdminBoardLane): AdminBookingStatus {
+    return LANE_TO_STATUS[lane];
+}
+
+export function filterBookingsForBoard(
+    bookings: AdminBooking[],
+    filters: AdminBoardFilters,
+): AdminBooking[] {
+    const search = filters.search.trim().toLowerCase();
+
+    return bookings
+        .filter(booking => booking.booking_date === filters.date)
+        .filter(booking => filters.service === 'all' || getServiceName(booking.services) === filters.service)
+        .filter(booking => {
+            if (!search) return true;
+
+            return booking.user_name.toLowerCase().includes(search)
+                || booking.user_email.toLowerCase().includes(search)
+                || booking.user_phone?.toLowerCase().includes(search);
+        })
+        .sort((left, right) => left.start_time.localeCompare(right.start_time) || left.id.localeCompare(right.id));
+}
+
+export function groupBookingsByLane(bookings: AdminBooking[]): Record<AdminBoardLane, AdminBooking[]> {
+    const grouped: Record<AdminBoardLane, AdminBooking[]> = {
+        upcoming: [],
+        in_progress: [],
+        done: [],
+        cancelled: [],
+    };
+
+    for (const booking of bookings) {
+        grouped[getBookingLane(booking.status)].push(booking);
+    }
+
+    return grouped;
+}
+
+export function shiftDate(date: string, amount: number): string {
+    const [year, month, day] = date.split('-').map(Number);
+    const value = new Date(Date.UTC(year, month - 1, day + amount));
+    return value.toISOString().slice(0, 10);
 }
 
 export interface BookingSummary {

@@ -31,6 +31,10 @@ test('loadAdminBookingCounts returns live counts using operating-date filters', 
                     query.filters.push(['gte', column, value]);
                     return builder;
                 },
+                in(column: string, value: readonly string[]) {
+                    query.filters.push(['in', column, value.join(',')]);
+                    return builder;
+                },
                 then(resolve: (value: { count: number; error: null }) => void) {
                     resolve({ count: expectedCounts[queries.indexOf(query)], error: null });
                 },
@@ -58,11 +62,11 @@ test('loadAdminBookingCounts returns live counts using operating-date filters', 
         [],
         [
             ['eq', 'booking_date', '2026-08-08'],
-            ['eq', 'status', 'confirmed'],
+            ['in', 'status', 'confirmed,in_progress'],
         ],
         [
             ['gte', 'booking_date', '2026-08-08'],
-            ['eq', 'status', 'confirmed'],
+            ['in', 'status', 'confirmed,in_progress'],
         ],
         [['eq', 'status', 'completed']],
     ]);

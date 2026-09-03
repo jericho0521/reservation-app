@@ -1,23 +1,9 @@
 import { NextResponse } from 'next/server';
 import { jsonError, requireAuthenticatedSupabase, supabaseErrorStatus } from '@/app/api/api-utils';
 import { z } from 'zod';
+import { bookingUpdateSchema } from '../update-schema';
 
 const bookingIdSchema = z.string().uuid();
-
-const bookingUpdateSchema = z.object({
-    service_id: z.string().uuid().optional(),
-    user_name: z.string().min(1).optional(),
-    user_email: z.string().email().optional(),
-    booking_date: z.string().min(1).optional(),
-    start_time: z.string().min(1).optional(),
-    end_time: z.string().min(1).optional(),
-    seats_booked: z.number().positive().optional(),
-    seat_labels: z.array(z.string()).optional(),
-    interface_type: z.enum(['form', 'chat']).optional(),
-    status: z.enum(['confirmed', 'completed', 'cancelled']).optional()
-}).strict().refine(value => Object.keys(value).length > 0, {
-    message: 'At least one booking field is required'
-});
 
 export async function GET(
     request: Request,

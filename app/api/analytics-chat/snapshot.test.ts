@@ -18,6 +18,13 @@ const bookings: AnalyticsBookingRecord[] = [
         services: { name: 'Playstation 5' },
     },
     {
+        booking_date: '2026-01-07',
+        start_time: '15:00',
+        seats_booked: 1,
+        status: 'in_progress',
+        services: { name: 'Racing Simulator' },
+    },
+    {
         booking_date: '2026-01-06',
         start_time: '18:00',
         seats_booked: 3,
@@ -45,11 +52,12 @@ test('buildAnalyticsSnapshot creates revenue datasets for interactive dashboards
     assert.deepEqual(snapshot.revenueByDay, [
         { date: '2026-01-05', revenue: 30, source: 'booking_estimate' },
         { date: '2026-01-06', revenue: 75, source: 'booking_estimate' },
+        { date: '2026-01-07', revenue: 15, source: 'booking_estimate' },
         { date: '2026-01-08', revenue: 0, source: 'booking_estimate' },
     ]);
 
     assert.deepEqual(snapshot.revenueByService, [
-        { label: 'Racing Simulator', revenue: 75, bookings: 2 },
+        { label: 'Racing Simulator', revenue: 90, bookings: 3 },
         { label: 'Playstation 5', revenue: 30, bookings: 1 },
     ]);
 
@@ -60,6 +68,8 @@ test('buildAnalyticsSnapshot creates revenue datasets for interactive dashboards
     assert.equal(snapshot.topLevelCharts.weekdayDemand.title, 'Bookings by Day of Week');
     assert.equal(snapshot.topLevelCharts.hourlyDemand.title, 'Bookings by Hour');
     assert.equal(snapshot.topLevelCharts.statusBreakdown.type, 'pie');
+    assert.equal(snapshot.totals.inProgress, 1);
+    assert.equal(snapshot.revenue.pending, 45);
     assert.deepEqual(snapshot.topLevelCharts.weekdayDemand.data, snapshot.bookingsByDay);
     assert.deepEqual(snapshot.topLevelCharts.hourlyDemand.data, snapshot.bookingsByHour);
     assert.deepEqual(snapshot.topLevelCharts.statusBreakdown.data, snapshot.statusCounts);
@@ -86,11 +96,12 @@ test('buildAnalyticsSnapshot uses published daily sales reports as actual revenu
     assert.deepEqual(snapshot.revenueByDay, [
         { date: '2026-01-05', revenue: 30, source: 'booking_estimate' },
         { date: '2026-01-06', revenue: 220, source: 'actual_sales_report' },
+        { date: '2026-01-07', revenue: 15, source: 'booking_estimate' },
         { date: '2026-01-08', revenue: 0, source: 'booking_estimate' },
     ]);
-    assert.equal(snapshot.revenue.total, 250);
+    assert.equal(snapshot.revenue.total, 265);
     assert.equal(snapshot.revenue.actual, 220);
-    assert.equal(snapshot.revenue.estimated, 30);
+    assert.equal(snapshot.revenue.estimated, 45);
     assert.equal(snapshot.revenue.source, 'mixed');
     assert.deepEqual(snapshot.paymentBreakdown, [
         { label: 'card', value: 140 },
@@ -98,6 +109,6 @@ test('buildAnalyticsSnapshot uses published daily sales reports as actual revenu
     ]);
     assert.equal(snapshot.salesMetrics.transactionCount, 8);
     assert.equal(snapshot.salesMetrics.averageTicket, 27.5);
-    assert.deepEqual(snapshot.salesReportCoverage.missingReportDates, ['2026-01-05']);
+    assert.deepEqual(snapshot.salesReportCoverage.missingReportDates, ['2026-01-05', '2026-01-07']);
     assert.deepEqual(snapshot.topLevelCharts.paymentMix.data, snapshot.paymentBreakdown);
 });

@@ -1,6 +1,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { generateTimeSlots, getBookableTimeSlots } from './availability';
+import { CAPACITY_HOLDING_BOOKING_STATUSES } from './booking-availability';
+
+test('capacity queries retain seats for confirmed and in-progress bookings', () => {
+    assert.deepEqual(CAPACITY_HOLDING_BOOKING_STATUSES, ['confirmed', 'in_progress']);
+});
 
 test('generateTimeSlots subtracts booked seats and marks full slots', () => {
     const slots = generateTimeSlots(4, [

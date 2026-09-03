@@ -13,6 +13,15 @@ export const ADMIN_BOOKINGS_SELECT = `
     services (name)
 `;
 
+export const ADMIN_BOOKING_STATUSES = [
+    'confirmed',
+    'in_progress',
+    'completed',
+    'cancelled',
+] as const;
+
+export type AdminBookingStatus = typeof ADMIN_BOOKING_STATUSES[number];
+
 export type AdminFilter = 'all' | 'today' | 'upcoming' | 'completed' | 'cancelled';
 
 export type AdminServiceRelation = { name: string } | { name: string }[] | null;
@@ -27,13 +36,14 @@ export interface AdminBooking {
     end_time: string;
     seats_booked: number;
     seat_labels?: string[];
-    status: string;
+    status: AdminBookingStatus;
     created_at: string;
     services: AdminServiceRelation;
 }
 
 export interface BookingSummary {
     confirmed: number;
+    inProgress: number;
     completed: number;
     cancelled: number;
 }
@@ -55,6 +65,10 @@ export function getBookingSummary(bookings: AdminBooking[]): BookingSummary {
             summary.confirmed += 1;
         }
 
+        if (booking.status === 'in_progress') {
+            summary.inProgress += 1;
+        }
+
         if (booking.status === 'completed') {
             summary.completed += 1;
         }
@@ -66,6 +80,7 @@ export function getBookingSummary(bookings: AdminBooking[]): BookingSummary {
         return summary;
     }, {
         confirmed: 0,
+        inProgress: 0,
         completed: 0,
         cancelled: 0,
     });

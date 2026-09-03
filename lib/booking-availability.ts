@@ -7,6 +7,8 @@ export interface BookingAvailabilityResources {
     maintenanceSeatLabels: string[];
 }
 
+export const CAPACITY_HOLDING_BOOKING_STATUSES = ['confirmed', 'in_progress'] as const;
+
 export async function loadBookingAvailabilityResources(
     serviceId: string,
     bookingDate: string,
@@ -18,7 +20,7 @@ export async function loadBookingAvailabilityResources(
             .select('start_time, end_time, seats_booked, seat_labels')
             .eq('service_id', serviceId)
             .eq('booking_date', bookingDate)
-            .eq('status', 'confirmed'),
+            .in('status', CAPACITY_HOLDING_BOOKING_STATUSES),
         bookingClient
             .from('service_seat_maintenance')
             .select('seat_label')

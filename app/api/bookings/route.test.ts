@@ -3,6 +3,7 @@ import test from "node:test";
 import { POST } from "./route";
 import { getBookingDateBounds } from "@/lib/booking-schedule";
 import { buildBookingSearchFilter, normalizeBookingSearchTerm } from "./search-utils";
+import { bookingUpdateSchema } from "./update-schema";
 
 test("POST /api/bookings returns 400 for invalid booking payloads", async () => {
   const response = await POST(new Request("http://localhost/api/bookings", {
@@ -93,4 +94,15 @@ test("buildBookingSearchFilter escapes SQL LIKE wildcards", () => {
     buildBookingSearchFilter("100%_ready\\now"),
     'user_name.ilike."%100\\\\%\\\\_ready\\\\\\\\now%",user_email.ilike."%100\\\\%\\\\_ready\\\\\\\\now%",user_phone.ilike."%100\\\\%\\\\_ready\\\\\\\\now%"',
   );
+});
+
+test("bookingUpdateSchema accepts the in-progress admin workflow status", () => {
+  assert.deepEqual(
+    bookingUpdateSchema.parse({ status: "in_progress" }),
+    { status: "in_progress" },
+  );
+});
+
+test("bookingUpdateSchema rejects unknown workflow statuses", () => {
+  assert.throws(() => bookingUpdateSchema.parse({ status: "pending" }));
 });

@@ -34,6 +34,7 @@ interface ServiceSnapshot {
     revenue: number;
     completed: number;
     confirmed: number;
+    inProgress: number;
     cancelled: number;
 }
 
@@ -46,6 +47,7 @@ export interface AnalyticsSnapshot {
     totals: {
         bookings: number;
         confirmed: number;
+        inProgress: number;
         completed: number;
         cancelled: number;
         seats: number;
@@ -143,6 +145,7 @@ export function buildAnalyticsSnapshot(
         totals: {
             bookings: bookings.length,
             confirmed: 0,
+            inProgress: 0,
             completed: 0,
             cancelled: 0,
             seats: 0,
@@ -279,6 +282,13 @@ export function buildAnalyticsSnapshot(
             revenueByDate.set(booking.booking_date, (revenueByDate.get(booking.booking_date) ?? 0) + bookingRevenue);
         }
 
+        if (booking.status === 'in_progress') {
+            snapshot.totals.inProgress += 1;
+            snapshot.revenue.pending += bookingRevenue;
+            snapshot.revenue.total += bookingRevenue;
+            revenueByDate.set(booking.booking_date, (revenueByDate.get(booking.booking_date) ?? 0) + bookingRevenue);
+        }
+
         if (booking.status === 'completed') {
             snapshot.totals.completed += 1;
             snapshot.revenue.earned += bookingRevenue;
@@ -299,6 +309,7 @@ export function buildAnalyticsSnapshot(
             revenue: 0,
             completed: 0,
             confirmed: 0,
+            inProgress: 0,
             cancelled: 0,
         };
 
@@ -312,6 +323,12 @@ export function buildAnalyticsSnapshot(
 
         if (booking.status === 'confirmed') {
             serviceStats.confirmed += 1;
+            serviceStats.bookings += 1;
+            serviceStats.revenue += bookingRevenue;
+        }
+
+        if (booking.status === 'in_progress') {
+            serviceStats.inProgress += 1;
             serviceStats.bookings += 1;
             serviceStats.revenue += bookingRevenue;
         }

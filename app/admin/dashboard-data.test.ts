@@ -47,7 +47,7 @@ const bookings: AdminBooking[] = [
         start_time: '20:00',
         end_time: '21:00',
         seats_booked: 3,
-        status: 'pending',
+        status: 'in_progress',
         created_at: '2026-03-11T01:00:00.000Z',
         services: { name: 'Racing Simulator' },
     },
@@ -56,6 +56,7 @@ const bookings: AdminBooking[] = [
 test('getBookingSummary counts status buckets once', () => {
     assert.deepEqual(getBookingSummary(bookings), {
         confirmed: 1,
+        inProgress: 1,
         completed: 1,
         cancelled: 1,
     });

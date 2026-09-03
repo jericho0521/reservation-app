@@ -80,7 +80,7 @@ create table if not exists public.bookings (
   end_time time not null,
   seats_booked integer not null check (seats_booked > 0),
   seat_labels text[] default '{}',
-  status text not null default 'confirmed' check (status in ('confirmed', 'completed', 'cancelled')),
+  status text not null default 'confirmed' check (status in ('confirmed', 'in_progress', 'completed', 'cancelled')),
   interface_type text not null check (interface_type in ('form', 'chat')),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()

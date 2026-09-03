@@ -26,10 +26,10 @@ export async function loadAdminBookingCounts(
         countBookings(),
         countBookings()
             .eq('booking_date', operatingDate)
-            .eq('status', 'confirmed'),
+            .in('status', ['confirmed', 'in_progress']),
         countBookings()
             .gte('booking_date', operatingDate)
-            .eq('status', 'confirmed'),
+            .in('status', ['confirmed', 'in_progress']),
         countBookings().eq('status', 'completed'),
     ]);
 

@@ -6,6 +6,8 @@ export interface Service {
     created_at: string;
 }
 
+export type BookingInterfaceType = 'form' | 'chat' | 'walk_in';
+
 export interface Booking {
     id?: string;
     service_id: string;
@@ -18,7 +20,7 @@ export interface Booking {
     seats_booked: number;
     seat_labels?: string[];
     status?: string;
-    interface_type: 'form' | 'chat';
+    interface_type: BookingInterfaceType;
 }
 
 export interface TimeSlot {

@@ -9,6 +9,7 @@ import {
     ADMIN_STATUS_LABELS as STATUS_LABELS,
     filterBookingsForTable,
     formatRefreshTime,
+    getBookingSourceLabel,
     getServiceName,
     type AdminBooking,
     type AdminBookingStatus,
@@ -223,13 +224,13 @@ export function BookingsTable({ initialBookings, userEmail, loadError }: Booking
                                     <tr key={booking.id}>
                                         <td>
                                             <button type="button" className="admin-customer-link" onClick={() => setSelectedBookingId(booking.id)}>{booking.user_name}</button>
-                                            <span>{booking.user_email}</span>
+                                            <span>{booking.user_email || booking.user_phone || 'No contact details'}</span>
                                         </td>
                                         <td>{getServiceName(booking.services)}</td>
                                         <td>{BOOKING_DATE_FORMATTER.format(new Date(`${booking.booking_date}T00:00:00`))}</td>
                                         <td className="tabular-nums">{booking.start_time.slice(0, 5)}–{booking.end_time.slice(0, 5)}</td>
                                         <td>{booking.seat_labels?.length ? booking.seat_labels.join(', ') : booking.seats_booked}</td>
-                                        <td>{booking.interface_type === 'chat' ? 'Chat' : 'Form'}</td>
+                                        <td>{getBookingSourceLabel(booking.interface_type)}</td>
                                         <td>
                                             <select
                                                 value={booking.status}

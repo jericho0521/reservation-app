@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { ADMIN_BOOKING_STATUSES } from '@/app/admin/dashboard-data';
+import { BOOKING_INTERFACE_TYPES } from '@/lib/booking-schema';
 
 export const bookingUpdateSchema = z.object({
     service_id: z.string().uuid().optional(),
@@ -10,7 +11,7 @@ export const bookingUpdateSchema = z.object({
     end_time: z.string().min(1).optional(),
     seats_booked: z.number().positive().optional(),
     seat_labels: z.array(z.string()).optional(),
-    interface_type: z.enum(['form', 'chat']).optional(),
+    interface_type: z.enum(BOOKING_INTERFACE_TYPES).optional(),
     status: z.enum(ADMIN_BOOKING_STATUSES).optional(),
 }).strict().refine(value => Object.keys(value).length > 0, {
     message: 'At least one booking field is required',

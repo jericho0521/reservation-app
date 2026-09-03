@@ -8,6 +8,13 @@ import {
     type AdminBooking,
     type AdminBookingStatus,
 } from '@/app/admin/dashboard-data';
+import type { BookingInterfaceType } from '@/lib/booking-schema';
+
+const BOOKING_SOURCE_DESCRIPTIONS: Record<BookingInterfaceType, string> = {
+    form: 'Booked on the website',
+    chat: 'Booked through the chat assistant',
+    walk_in: 'Walk-in, recorded by staff',
+};
 
 interface BookingDetailsDrawerProps {
     booking: AdminBooking | null;
@@ -130,7 +137,7 @@ export function BookingDetailsDrawer({
                             </div>
                             <div>
                                 <dt>Source</dt>
-                                <dd>{booking.interface_type === 'chat' ? 'Chat booking' : 'Booking form'}</dd>
+                                <dd>{BOOKING_SOURCE_DESCRIPTIONS[booking.interface_type]}</dd>
                             </div>
                         </dl>
                     </section>
@@ -138,15 +145,21 @@ export function BookingDetailsDrawer({
                     <section className="admin-detail-section">
                         <h3>Customer</h3>
                         <div className="admin-contact-list">
-                            <a href={`mailto:${booking.user_email}`}>
-                                <Mail aria-hidden="true" />
-                                <span>{booking.user_email}</span>
-                            </a>
-                            {booking.user_phone && (
+                            {booking.user_email ? (
+                                <a href={`mailto:${booking.user_email}`}>
+                                    <Mail aria-hidden="true" />
+                                    <span>{booking.user_email}</span>
+                                </a>
+                            ) : (
+                                <p className="admin-contact-empty">No email on file</p>
+                            )}
+                            {booking.user_phone ? (
                                 <a href={`tel:${booking.user_phone}`}>
                                     <Phone aria-hidden="true" />
                                     <span>{booking.user_phone}</span>
                                 </a>
+                            ) : (
+                                <p className="admin-contact-empty">No phone on file</p>
                             )}
                         </div>
                     </section>

@@ -25,9 +25,11 @@ import {
     MoveHorizontal,
     RefreshCw,
     Search,
+    UserPlus,
     Users,
     X,
 } from 'lucide-react';
+import Link from 'next/link';
 import { createClient } from '@/lib/supabase-browser';
 import { AdminShell } from '@/components/admin/AdminShell';
 import { BookingDetailsDrawer } from '@/components/admin/BookingDetailsDrawer';
@@ -37,6 +39,7 @@ import {
     ADMIN_STATUS_LABELS as STATUS_LABELS,
     filterBookingsForBoard,
     formatRefreshTime,
+    getBookingSourceLabel,
     getServiceName,
     getStatusForLane,
     groupBookingsByLane,
@@ -154,7 +157,7 @@ function BookingCard({
 
             <div className="admin-card-meta">
                 <span><Users aria-hidden="true" />{booking.seats_booked} seat{booking.seats_booked === 1 ? '' : 's'}</span>
-                <span>{booking.interface_type === 'chat' ? 'Chat' : 'Form'}</span>
+                <span>{getBookingSourceLabel(booking.interface_type)}</span>
             </div>
 
             {booking.seat_labels?.length ? (
@@ -375,15 +378,21 @@ export default function AdminDashboard({
                         <h1>Daily board</h1>
                         <p>One day at a time. Drag a card between columns, or use its menu, to update the booking status.</p>
                     </div>
-                    <button
-                        type="button"
-                        className="admin-secondary-button"
-                        onClick={() => void refreshBookings()}
-                        disabled={isRefreshing}
-                    >
-                        <RefreshCw className={isRefreshing ? 'is-spinning' : ''} aria-hidden="true" />
-                        {isRefreshing ? 'Refreshing' : 'Refresh'}
-                    </button>
+                    <div className="admin-header-actions">
+                        <button
+                            type="button"
+                            className="admin-secondary-button"
+                            onClick={() => void refreshBookings()}
+                            disabled={isRefreshing}
+                        >
+                            <RefreshCw className={isRefreshing ? 'is-spinning' : ''} aria-hidden="true" />
+                            {isRefreshing ? 'Refreshing' : 'Refresh'}
+                        </button>
+                        <Link href="/admin/walk-in" className="admin-primary-button" title="Record a customer who arrived in person">
+                            <UserPlus aria-hidden="true" />
+                            Add walk-in
+                        </Link>
+                    </div>
                 </header>
 
                 <div className="admin-board-toolbar">

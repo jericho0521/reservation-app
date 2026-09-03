@@ -1,8 +1,9 @@
 import { Resend } from "resend";
+import type { BookingInterfaceType } from "./booking-schema";
 
 export interface BookingConfirmationDetails {
   bookingId: string;
-  interfaceType: "form" | "chat";
+  interfaceType: BookingInterfaceType;
   customerName: string;
   customerEmail: string;
   customerPhone?: string;

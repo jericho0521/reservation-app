@@ -1,3 +1,5 @@
+import type { BookingInterfaceType } from '@/lib/booking-schema';
+
 export const ADMIN_BOOKINGS_SELECT = `
     id,
     user_name,
@@ -22,6 +24,17 @@ export const ADMIN_BOOKING_STATUSES = [
 ] as const;
 
 export type AdminBookingStatus = typeof ADMIN_BOOKING_STATUSES[number];
+
+/** Short label for where a booking came from, shown in cards and tables. */
+export const BOOKING_SOURCE_LABELS: Record<BookingInterfaceType, string> = {
+    form: 'Website',
+    chat: 'Chat',
+    walk_in: 'Walk-in',
+};
+
+export function getBookingSourceLabel(interfaceType: BookingInterfaceType): string {
+    return BOOKING_SOURCE_LABELS[interfaceType] ?? interfaceType;
+}
 
 /** Labels shown to staff for each stored booking status. */
 export const ADMIN_STATUS_LABELS: Record<AdminBookingStatus, string> = {
@@ -55,7 +68,7 @@ export interface AdminBooking {
     seats_booked: number;
     seat_labels?: string[];
     status: AdminBookingStatus;
-    interface_type: 'form' | 'chat';
+    interface_type: BookingInterfaceType;
     created_at: string;
     services: AdminServiceRelation;
 }

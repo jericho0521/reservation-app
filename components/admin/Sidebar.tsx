@@ -11,6 +11,7 @@ import {
     KanbanSquare,
     LogOut,
     Menu,
+    UserPlus,
     X,
     type LucideIcon,
 } from 'lucide-react';
@@ -40,6 +41,7 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
         label: 'Operations',
         items: [
             { icon: KanbanSquare, label: 'Daily board', description: 'Move one day’s sessions through their workflow', path: '/admin' },
+            { icon: UserPlus, label: 'Walk-in booking', description: 'Record a customer who arrived in person so their seats are blocked', path: '/admin/walk-in' },
             { icon: CalendarDays, label: 'All bookings', description: 'Search and update every booking, past and future', path: '/admin/bookings' },
             { icon: Armchair, label: 'Seat maintenance', description: 'Block seats that are under repair', path: '/admin/seat-maintenance' },
         ],

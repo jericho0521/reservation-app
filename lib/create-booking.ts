@@ -32,10 +32,22 @@ export class BookingCreationError extends Error {
     }
 }
 
+export interface ValidateBookingScheduleOptions {
+    /**
+     * Staff recording a walk-in may book the hour that is already underway,
+     * so the "slot has started" rule is skipped for them.
+     */
+    allowStartedSlot?: boolean;
+    now?: Date;
+}
+
 export function validateBookingSchedule(
     input: CreateBookingInput,
+    options: ValidateBookingScheduleOptions = {},
 ): ValidatedCreateBookingInput {
-    if (!isBookingDateWithinWindow(input.booking_date)) {
+    const now = options.now ?? new Date();
+
+    if (!isBookingDateWithinWindow(input.booking_date, now)) {
         throw new BookingCreationError(
             'Booking date must be between today and 30 days from today',
             400,
@@ -47,7 +59,7 @@ export function validateBookingSchedule(
             400,
         );
     }
-    if (isBookingSlotElapsed(input.booking_date, input.start_time)) {
+    if (!options.allowStartedSlot && isBookingSlotElapsed(input.booking_date, input.start_time, now)) {
         throw new BookingCreationError('This booking time has already started or ended', 409);
     }
 
@@ -60,8 +72,10 @@ export function validateSeatSelection(
 ): void {
     const requestedSeatLabels = input.seat_labels ?? [];
 
+    const requiresExplicitSeats = input.interface_type === 'form' || input.interface_type === 'walk_in';
+
     if (
-        input.interface_type === 'form' &&
+        requiresExplicitSeats &&
         service.total_seats === 16 &&
         requestedSeatLabels.length !== input.seats_booked
     ) {
@@ -131,6 +145,10 @@ export async function createConfirmedBooking(
 
     if (error) {
         throw error;
+    }
+
+    if (!booking.user_email) {
+        return { ...booking, email_sent: false };
     }
 
     const emailResult = await sendBookingConfirmationEmail({

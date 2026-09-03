@@ -1761,3 +1761,320 @@
         padding: 0 10px;
     }
 }
+
+/* ------------------------------------------------------------------ */
+/* Walk-in booking                                                     */
+/* ------------------------------------------------------------------ */
+
+.admin-walkin-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1.4fr) minmax(280px, 0.6fr);
+    gap: 24px;
+    align-items: start;
+    padding-top: 24px;
+}
+
+.admin-fieldset:disabled {
+    opacity: 0.55;
+}
+
+.admin-field-note {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    color: var(--admin-muted);
+    font-size: 12px;
+    line-height: 1.5;
+}
+
+.admin-field-note svg,
+.admin-field em svg {
+    width: 13px;
+    height: 13px;
+    flex-shrink: 0;
+    color: var(--admin-accent);
+}
+
+.admin-field em {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.admin-field-narrow {
+    max-width: 220px;
+}
+
+.admin-slot-grid {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: 8px;
+    transition: opacity 140ms ease;
+}
+
+.admin-slot-grid.is-loading {
+    opacity: 0.5;
+}
+
+.admin-slot {
+    position: relative;
+    display: grid;
+    min-height: 58px;
+    justify-items: center;
+    align-content: center;
+    gap: 3px;
+    border: 1px solid var(--admin-line);
+    border-radius: 6px;
+    background: var(--admin-canvas);
+    color: var(--admin-text);
+    transition: border-color 140ms ease, background-color 140ms ease;
+}
+
+.admin-slot strong {
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+}
+
+.admin-slot small {
+    color: var(--admin-muted);
+    font-size: 10px;
+}
+
+.admin-slot i {
+    position: absolute;
+    top: -7px;
+    right: 8px;
+    padding: 1px 6px;
+    border-radius: 999px;
+    background: var(--admin-accent);
+    color: #111827;
+    font-size: 8px;
+    font-style: normal;
+    font-weight: 750;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+}
+
+.admin-slot:hover:not(:disabled) {
+    border-color: var(--admin-line-strong);
+    background: var(--admin-surface-raised);
+}
+
+.admin-slot.is-selected {
+    border-color: var(--admin-accent);
+    background: rgba(185, 217, 207, 0.14);
+    outline: 1px solid var(--admin-accent);
+}
+
+.admin-slot.is-full,
+.admin-slot:disabled {
+    cursor: not-allowed;
+    color: var(--admin-muted);
+    opacity: 0.55;
+}
+
+.admin-duration-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.admin-chip {
+    min-height: 32px;
+    padding: 0 12px;
+    border: 1px solid var(--admin-line);
+    border-radius: 999px;
+    background: var(--admin-canvas);
+    color: var(--admin-text);
+    font-size: 11px;
+    font-weight: 650;
+}
+
+.admin-chip:hover:not(:disabled) {
+    border-color: var(--admin-line-strong);
+}
+
+.admin-chip.is-selected {
+    border-color: var(--admin-accent);
+    background: rgba(185, 217, 207, 0.14);
+    color: var(--admin-accent);
+}
+
+.admin-chip:disabled {
+    cursor: not-allowed;
+    color: var(--admin-muted);
+    opacity: 0.5;
+    text-decoration: line-through;
+}
+
+.admin-seat-picker {
+    display: grid;
+    gap: 14px;
+}
+
+.admin-seat-picker .admin-seat-islands {
+    margin: 0 auto;
+}
+
+.admin-seat-picker .admin-seat-legend {
+    min-height: 0;
+    padding-top: 12px;
+}
+
+.admin-seat-row button.is-taken {
+    border-color: var(--admin-line);
+    background: repeating-linear-gradient(135deg, rgba(143, 154, 171, 0.12) 0 6px, transparent 6px 12px);
+    color: var(--admin-muted);
+    cursor: not-allowed;
+}
+
+.admin-seat-row button.is-selected {
+    border-color: var(--admin-accent);
+    background: rgba(185, 217, 207, 0.16);
+    color: var(--admin-accent);
+    outline: 1px solid var(--admin-accent);
+}
+
+.admin-seat-row button:disabled:hover {
+    background: inherit;
+}
+
+.admin-seat-legend i.is-selected {
+    background: var(--admin-accent);
+    outline: 1px solid var(--admin-accent);
+    outline-offset: 1px;
+}
+
+.admin-seat-legend i.is-taken {
+    background: repeating-linear-gradient(135deg, rgba(143, 154, 171, 0.5) 0 2px, transparent 2px 4px);
+    border: 1px solid var(--admin-line-strong);
+}
+
+.admin-walkin-summary {
+    position: sticky;
+    top: 24px;
+    display: grid;
+    gap: 16px;
+    padding: 18px;
+    border: 1px solid var(--admin-line);
+    border-radius: 6px;
+    background: var(--admin-surface);
+}
+
+.admin-summary-list {
+    display: grid;
+    gap: 10px;
+}
+
+.admin-summary-list > div {
+    display: grid;
+    grid-template-columns: 80px minmax(0, 1fr);
+    gap: 10px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--admin-line);
+    font-size: 12px;
+}
+
+.admin-summary-list > div:last-child {
+    padding-bottom: 0;
+    border-bottom: 0;
+}
+
+.admin-summary-list dt {
+    color: var(--admin-muted);
+    font-size: 10px;
+    font-weight: 750;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    line-height: 1.6;
+}
+
+.admin-summary-list dd {
+    color: var(--admin-text);
+    overflow-wrap: anywhere;
+}
+
+.admin-walkin-submit {
+    width: 100%;
+    justify-content: center;
+    min-height: 44px;
+    font-size: 13px;
+}
+
+.admin-walkin-submit:disabled {
+    cursor: not-allowed;
+}
+
+.admin-success-panel {
+    display: grid;
+    justify-items: start;
+    gap: 10px;
+    max-width: 640px;
+    margin-top: 24px;
+    padding: 24px;
+    border: 1px solid rgba(145, 199, 164, 0.4);
+    border-radius: 8px;
+    background: rgba(145, 199, 164, 0.08);
+}
+
+.admin-success-panel svg {
+    width: 28px;
+    height: 28px;
+    color: #91c7a4;
+}
+
+.admin-success-panel h2 {
+    font-size: 20px;
+    font-weight: 650;
+    letter-spacing: -0.02em;
+}
+
+.admin-success-panel p {
+    color: var(--admin-text);
+    font-size: 13px;
+    line-height: 1.6;
+}
+
+.admin-success-note {
+    color: var(--admin-muted) !important;
+    font-size: 12px !important;
+}
+
+.admin-success-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 8px;
+}
+
+.admin-contact-empty {
+    color: var(--admin-muted);
+    font-size: 12px;
+}
+
+@media (max-width: 1023px) {
+    .admin-walkin-layout {
+        grid-template-columns: 1fr;
+    }
+
+    .admin-walkin-summary {
+        position: static;
+    }
+
+    .admin-slot-grid {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 767px) {
+    .admin-slot-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .admin-walkin-page .admin-page-header {
+        min-height: 0;
+        padding-top: 16px;
+        padding-bottom: 16px;
+    }
+}

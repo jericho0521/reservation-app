@@ -240,13 +240,24 @@ export function WalkInBookingForm({ userEmail, today, maxDate }: WalkInBookingFo
                     interface_type: 'walk_in',
                 }),
             });
-            const payload = await response.json().catch(() => null) as (CreatedBooking & { error?: string; seat_labels?: string[] }) | null;
+            const payload = await response.json().catch(() => null) as (CreatedBooking & {
+                error?: string;
+                seat_labels?: string[];
+                details?: Array<{ path?: Array<string | number>; message?: string }>;
+            }) | null;
 
             if (!response.ok || !payload) {
                 const conflictSeats = response.status === 409 && Array.isArray(payload?.seat_labels) && payload.seat_labels.length > 0
                     ? ` (${payload.seat_labels.join(', ')})`
                     : '';
-                throw new Error(`${payload?.error || 'The booking could not be saved.'}${conflictSeats}`);
+                const issues = Array.isArray(payload?.details)
+                    ? payload.details
+                        .map(issue => [issue.path?.join('.'), issue.message].filter(Boolean).join(': '))
+                        .filter(Boolean)
+                        .join('; ')
+                    : '';
+                const base = payload?.error || `The booking could not be saved (HTTP ${response.status}).`;
+                throw new Error([`${base}${conflictSeats}`, issues].filter(Boolean).join(' — '));
             }
 
             setCreated(payload);
@@ -257,6 +268,29 @@ export function WalkInBookingForm({ userEmail, today, maxDate }: WalkInBookingFo
             setIsSubmitting(false);
         }
     };
+
+    const isReady = services.length > 0;
+
+    if (!isReady) {
+        return (
+            <AdminShell userEmail={userEmail}>
+                <div className="admin-dashboard admin-walkin-page">
+                    <header className="admin-page-header">
+                        <div>
+                            <span className="admin-eyebrow">Operations</span>
+                            <h1>Walk-in booking</h1>
+                            <p>Record a customer who arrived in person. Saving blocks their seats and hours so online bookings cannot clash.</p>
+                        </div>
+                    </header>
+                    {availabilityError ? (
+                        <div className="admin-notice is-error" role="alert"><span>{availabilityError}</span></div>
+                    ) : (
+                        <p className="admin-loading-line" role="status">Loading services…</p>
+                    )}
+                </div>
+            </AdminShell>
+        );
+    }
 
     if (created) {
         return (
@@ -312,8 +346,7 @@ export function WalkInBookingForm({ userEmail, today, maxDate }: WalkInBookingFo
                             <div className="admin-field-grid">
                                 <label className="admin-field">
                                     <span>Service</span>
-                                    <select value={serviceId} onChange={event => setServiceId(event.target.value)} disabled={services.length === 0}>
-                                        {services.length === 0 && <option value="">Loading services…</option>}
+                                    <select value={serviceId} onChange={event => setServiceId(event.target.value)}>
                                         {services.map(service => (
                                             <option key={service.id} value={service.id}>{service.name}</option>
                                         ))}

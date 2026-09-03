@@ -2048,6 +2048,12 @@
     margin-top: 8px;
 }
 
+.admin-loading-line {
+    padding: 28px 0;
+    color: var(--admin-muted);
+    font-size: 12px;
+}
+
 .admin-contact-empty {
     color: var(--admin-muted);
     font-size: 12px;

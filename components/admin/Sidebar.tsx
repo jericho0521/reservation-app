@@ -7,7 +7,8 @@ import { useRef, useState } from 'react';
 import {
     Armchair,
     CalendarDays,
-    LayoutGrid,
+    ExternalLink,
+    KanbanSquare,
     LogOut,
     Menu,
     X,
@@ -19,14 +20,33 @@ import './Sidebar.css';
 interface AdminNavItem {
     icon: LucideIcon;
     label: string;
+    description: string;
     path: string;
 }
 
-export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
-    { icon: LayoutGrid, label: 'Dashboard', path: '/admin' },
-    { icon: CalendarDays, label: 'Bookings', path: '/admin/bookings' },
-    { icon: Armchair, label: 'Seat Maintenance', path: '/admin/seat-maintenance' },
+interface AdminNavGroup {
+    label: string;
+    items: AdminNavItem[];
+}
+
+/**
+ * Navigation labels intentionally match each page's heading so the place a
+ * user clicks and the place they land always share the same name.
+ * Analytics and content pages stay reachable by URL but are deliberately
+ * left out of the menu.
+ */
+export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
+    {
+        label: 'Operations',
+        items: [
+            { icon: KanbanSquare, label: 'Daily board', description: 'Move one day’s sessions through their workflow', path: '/admin' },
+            { icon: CalendarDays, label: 'All bookings', description: 'Search and update every booking, past and future', path: '/admin/bookings' },
+            { icon: Armchair, label: 'Seat maintenance', description: 'Block seats that are under repair', path: '/admin/seat-maintenance' },
+        ],
+    },
 ];
+
+export const ADMIN_NAV_ITEMS: AdminNavItem[] = ADMIN_NAV_GROUPS.flatMap(group => group.items);
 
 interface SidebarProps {
     subtitle?: string;
@@ -76,7 +96,7 @@ export function Sidebar({
 
             <aside className={`admin-sidebar ${mobileOpen ? 'is-open' : ''}`} aria-label="Admin navigation">
                 <div className="admin-sidebar-brand">
-                    <Link href="/" className="admin-sidebar-logo" aria-label="Project Play By CW home">
+                    <Link href="/admin" className="admin-sidebar-logo" aria-label="Admin home" title="Admin home">
                         <Image
                             src="/images/brand/project-play-logo.png"
                             alt="Project Play By CW"
@@ -96,42 +116,59 @@ export function Sidebar({
                 </div>
 
                 <nav className="admin-sidebar-nav">
-                    <p className="admin-sidebar-kicker">Workspace</p>
-                    {ADMIN_NAV_ITEMS.map(item => {
-                        const Icon = item.icon;
-                        const active = isActive(item.path);
+                    {ADMIN_NAV_GROUPS.map(group => (
+                        <div key={group.label} className="admin-sidebar-group">
+                            <p className="admin-sidebar-kicker">{group.label}</p>
+                            {group.items.map(item => {
+                                const Icon = item.icon;
+                                const active = isActive(item.path);
 
-                        return (
-                            <Link
-                                key={item.path}
-                                href={item.path}
-                                className={`admin-sidebar-link ${active ? 'is-active' : ''}`}
-                                aria-current={active ? 'page' : undefined}
-                                onClick={() => setMobileOpen(false)}
-                                title={item.label}
-                            >
-                                <Icon aria-hidden="true" />
-                                <span>{item.label}</span>
-                            </Link>
-                        );
-                    })}
+                                return (
+                                    <Link
+                                        key={item.path}
+                                        href={item.path}
+                                        className={`admin-sidebar-link ${active ? 'is-active' : ''}`}
+                                        aria-current={active ? 'page' : undefined}
+                                        onClick={() => setMobileOpen(false)}
+                                        title={item.description}
+                                    >
+                                        <Icon aria-hidden="true" />
+                                        <span>{item.label}</span>
+                                    </Link>
+                                );
+                            })}
+                        </div>
+                    ))}
                 </nav>
 
-                <div className="admin-sidebar-account">
-                    <div className="admin-sidebar-account-copy">
-                        <span>Signed in</span>
-                        <strong title={subtitle}>{subtitle}</strong>
-                    </div>
-                    <button
-                        type="button"
-                        className="admin-sidebar-signout"
-                        onClick={handleSignOut}
-                        disabled={isSigningOut}
-                        aria-label="Sign out"
-                        title="Sign out"
+                <div className="admin-sidebar-footer">
+                    <a
+                        href="/"
+                        target="_blank"
+                        rel="noreferrer"
+                        className="admin-sidebar-link admin-sidebar-external"
+                        title="Opens the customer-facing website in a new tab"
                     >
-                        <LogOut aria-hidden="true" />
-                    </button>
+                        <ExternalLink aria-hidden="true" />
+                        <span>View public site</span>
+                    </a>
+
+                    <div className="admin-sidebar-account">
+                        <div className="admin-sidebar-account-copy">
+                            <span>Signed in as</span>
+                            <strong title={subtitle}>{subtitle}</strong>
+                        </div>
+                        <button
+                            type="button"
+                            className="admin-sidebar-signout"
+                            onClick={handleSignOut}
+                            disabled={isSigningOut}
+                            title="Sign out"
+                        >
+                            <LogOut aria-hidden="true" />
+                            <span>{isSigningOut ? 'Signing out' : 'Sign out'}</span>
+                        </button>
+                    </div>
                 </div>
             </aside>
         </>

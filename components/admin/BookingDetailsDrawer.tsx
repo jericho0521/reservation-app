@@ -3,17 +3,11 @@
 import { useEffect, useRef } from 'react';
 import { CalendarDays, Mail, Phone, Users, X } from 'lucide-react';
 import {
+    ADMIN_STATUS_LABELS as STATUS_LABELS,
     getServiceName,
     type AdminBooking,
     type AdminBookingStatus,
 } from '@/app/admin/dashboard-data';
-
-const STATUS_LABELS: Record<AdminBookingStatus, string> = {
-    confirmed: 'Upcoming',
-    in_progress: 'In progress',
-    completed: 'Done',
-    cancelled: 'Cancelled',
-};
 
 interface BookingDetailsDrawerProps {
     booking: AdminBooking | null;

@@ -23,6 +23,14 @@ export const ADMIN_BOOKING_STATUSES = [
 
 export type AdminBookingStatus = typeof ADMIN_BOOKING_STATUSES[number];
 
+/** Labels shown to staff for each stored booking status. */
+export const ADMIN_STATUS_LABELS: Record<AdminBookingStatus, string> = {
+    confirmed: 'Upcoming',
+    in_progress: 'In progress',
+    completed: 'Done',
+    cancelled: 'Cancelled',
+};
+
 export type AdminFilter = 'all' | 'today' | 'upcoming' | 'completed' | 'cancelled';
 
 export const ADMIN_BOARD_LANES = [

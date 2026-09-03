@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase-browser';
 import { loadAllAdminBookings } from '@/app/admin/admin-bookings';
 import {
     ADMIN_BOOKING_STATUSES,
+    ADMIN_STATUS_LABELS as STATUS_LABELS,
     filterBookingsForTable,
     formatRefreshTime,
     getServiceName,
@@ -22,13 +23,6 @@ const BOOKING_DATE_FORMATTER = new Intl.DateTimeFormat('en-MY', {
     month: 'short',
     year: 'numeric',
 });
-
-const STATUS_LABELS: Record<AdminBookingStatus, string> = {
-    confirmed: 'Upcoming',
-    in_progress: 'In progress',
-    completed: 'Done',
-    cancelled: 'Cancelled',
-};
 
 interface BookingsTableProps {
     initialBookings: AdminBooking[];
@@ -147,6 +141,7 @@ export function BookingsTable({ initialBookings, userEmail, loadError }: Booking
         void commitStatusChange(booking, 'cancelled');
     }, [commitStatusChange]);
 
+    const hasFilters = Boolean(search || status !== 'all' || service !== 'all' || dateFrom || dateTo);
     const clearFilters = () => {
         setSearch('');
         setStatus('all');
@@ -160,9 +155,9 @@ export function BookingsTable({ initialBookings, userEmail, loadError }: Booking
             <div className="admin-dashboard admin-bookings-page">
                 <header className="admin-page-header">
                     <div>
-                        <span className="admin-eyebrow">Reservation archive</span>
-                        <h1>Bookings</h1>
-                        <p>Search, review, and update every customer booking.</p>
+                        <span className="admin-eyebrow">Operations</span>
+                        <h1>All bookings</h1>
+                        <p>Every booking, past and future. Change a status directly in the table, or click a name for full details.</p>
                     </div>
                     <button type="button" className="admin-secondary-button" onClick={() => void refreshBookings()} disabled={isRefreshing}>
                         <RefreshCw className={isRefreshing ? 'is-spinning' : ''} aria-hidden="true" />
@@ -184,9 +179,9 @@ export function BookingsTable({ initialBookings, userEmail, loadError }: Booking
                         <option value="all">All services</option>
                         {services.map(item => <option key={item} value={item}>{item}</option>)}
                     </select>
-                    <label className="admin-date-filter"><span>From</span><input type="date" value={dateFrom} onChange={event => setDateFrom(event.target.value)} /></label>
-                    <label className="admin-date-filter"><span>To</span><input type="date" value={dateTo} onChange={event => setDateTo(event.target.value)} /></label>
-                    {(search || status !== 'all' || service !== 'all' || dateFrom || dateTo) && (
+                    <label className="admin-date-filter"><span>From</span><input type="date" value={dateFrom} onChange={event => setDateFrom(event.target.value)} aria-label="Booking date from" /></label>
+                    <label className="admin-date-filter"><span>To</span><input type="date" value={dateTo} onChange={event => setDateTo(event.target.value)} aria-label="Booking date to" /></label>
+                    {hasFilters && (
                         <button type="button" className="admin-clear-filters" onClick={clearFilters}>Clear filters</button>
                     )}
                 </div>
@@ -199,7 +194,10 @@ export function BookingsTable({ initialBookings, userEmail, loadError }: Booking
                 )}
 
                 <div className="admin-table-meta">
-                    <span>{filteredBookings.length} booking{filteredBookings.length === 1 ? '' : 's'}</span>
+                    <span>
+                        {filteredBookings.length} booking{filteredBookings.length === 1 ? '' : 's'}
+                        {hasFilters ? ' match your filters' : ' in total'}
+                    </span>
                     <span>{formatRefreshTime(lastRefresh)}</span>
                 </div>
 
@@ -220,7 +218,7 @@ export function BookingsTable({ initialBookings, userEmail, loadError }: Booking
                             </thead>
                             <tbody>
                                 {pageBookings.length === 0 ? (
-                                    <tr><td colSpan={8} className="admin-table-empty">No bookings match these filters.</td></tr>
+                                    <tr><td colSpan={8} className="admin-table-empty">{hasFilters ? 'No bookings match these filters.' : 'No bookings yet.'}</td></tr>
                                 ) : pageBookings.map(booking => (
                                     <tr key={booking.id}>
                                         <td>

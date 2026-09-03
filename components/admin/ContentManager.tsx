@@ -1,8 +1,9 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Edit, ExternalLink, Plus, Trash2 } from "lucide-react";
+import { Archive, ExternalLink, Pencil, Plus, X } from "lucide-react";
 import { getSectionLabels, type BlogPostRecord, type ContentSectionType } from "@/lib/blogs";
 import { AdminShell } from "@/components/admin/AdminShell";
 
@@ -12,8 +13,20 @@ interface ContentManagerProps {
   userEmail: string;
 }
 
+const STATUS_LABELS: Record<string, string> = {
+  draft: "Draft",
+  published: "Published",
+  archived: "Archived",
+};
+
+const STATUS_HINTS: Record<string, string> = {
+  draft: "Not visible to customers yet",
+  published: "Live on the public site",
+  archived: "Hidden from the public site",
+};
+
 function formatDate(value: string | null) {
-  if (!value) return "Not published";
+  if (!value) return "—";
   return new Intl.DateTimeFormat("en-MY", {
     month: "short",
     day: "numeric",
@@ -21,87 +34,121 @@ function formatDate(value: string | null) {
   }).format(new Date(value));
 }
 
-function statusClass(status: string) {
-  if (status === "published") return "border-green-500/30 bg-green-500/20 text-green-300";
-  if (status === "archived") return "border-gray-500/30 bg-gray-500/20 text-gray-300";
-  return "border-yellow-500/30 bg-yellow-500/20 text-yellow-300";
-}
-
 export function ContentManager({ section, posts, userEmail }: ContentManagerProps) {
   const labels = getSectionLabels(section);
   const router = useRouter();
+  const [notice, setNotice] = useState<{ tone: "error" | "success"; message: string } | null>(null);
+  const [archivingId, setArchivingId] = useState<string | null>(null);
+  const singular = labels.singular.toLowerCase();
+  const plural = labels.plural.toLowerCase();
+  const publishedCount = posts.filter(post => post.status === "published").length;
 
   const archivePost = async (post: BlogPostRecord) => {
-    if (!window.confirm(`Archive "${post.title}"?`)) return;
+    const confirmed = window.confirm(
+      `Archive "${post.title}"?\n\nIt will be hidden from the public site. You can bring it back later by editing it and setting its status to Published.`,
+    );
+    if (!confirmed) return;
+
+    setArchivingId(post.id);
+    setNotice(null);
 
     const response = await fetch(`/api/${section === "blog" ? "blogs" : "updates"}/${post.id}`, {
       method: "DELETE",
     });
 
+    setArchivingId(null);
+
     if (!response.ok) {
-      alert("Failed to archive content");
+      setNotice({ tone: "error", message: `"${post.title}" could not be archived. Try again.` });
       return;
     }
 
+    setNotice({ tone: "success", message: `"${post.title}" is archived and no longer public.` });
     router.refresh();
   };
 
   return (
     <AdminShell userEmail={userEmail}>
-      <div className="min-h-screen bg-racing-dark text-white">
-        <header className="sticky top-0 z-10 border-b border-white/10 bg-white/5 backdrop-blur-md">
-          <div className="container mx-auto flex items-center justify-between px-6 py-4">
-            <div>
-              <h1 className="text-2xl font-bold font-heading">{labels.plural}</h1>
-              <p className="text-sm text-gray-400">Create, publish, and archive {labels.plural.toLowerCase()}.</p>
-            </div>
-            <Link href={`${labels.adminPath}/new`} className="inline-flex items-center gap-2 rounded-lg bg-neon px-4 py-2 text-sm font-bold text-racing-dark hover:bg-white">
-              <Plus className="h-4 w-4" /> New {labels.singular}
-            </Link>
+      <div className="admin-dashboard admin-content-page">
+        <header className="admin-page-header">
+          <div>
+            <span className="admin-eyebrow">Content</span>
+            <h1>{labels.plural}</h1>
+            <p>Write, publish, and archive {plural}. Only published items appear on the public site.</p>
           </div>
+          <Link href={`${labels.adminPath}/new`} className="admin-primary-button">
+            <Plus aria-hidden="true" /> New {singular}
+          </Link>
         </header>
 
-        <main className="container mx-auto px-6 py-8">
-          <div className="overflow-hidden rounded-xl border border-white/10 bg-white/[0.04]">
-            <table className="w-full">
-              <thead className="bg-white/5 text-left text-sm text-gray-400">
+        {notice && (
+          <div className={`admin-notice ${notice.tone === "error" ? "is-error" : "is-success"}`} role="status">
+            <span>{notice.message}</span>
+            <button type="button" onClick={() => setNotice(null)} aria-label="Dismiss message"><X aria-hidden="true" /></button>
+          </div>
+        )}
+
+        <div className="admin-table-meta">
+          <span>{posts.length} {posts.length === 1 ? singular : plural}</span>
+          <span>{publishedCount} published</span>
+        </div>
+
+        <div className="admin-table-frame">
+          <div className="admin-table-scroll">
+            <table className="admin-bookings-table admin-content-table">
+              <thead>
                 <tr>
-                  <th className="px-4 py-3 font-medium">Title</th>
-                  <th className="px-4 py-3 font-medium">Status</th>
-                  <th className="px-4 py-3 font-medium">Published</th>
-                  <th className="px-4 py-3 font-medium">Updated</th>
-                  <th className="px-4 py-3 font-medium">Actions</th>
+                  <th>Title</th>
+                  <th>Status</th>
+                  <th>Published</th>
+                  <th>Last edited</th>
+                  <th><span className="sr-only">Actions</span></th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-white/10">
+              <tbody>
                 {posts.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="px-4 py-10 text-center text-gray-400">No content yet.</td>
+                    <td colSpan={5} className="admin-table-empty">
+                      No {plural} yet. Use “New {singular}” to write the first one.
+                    </td>
                   </tr>
                 ) : posts.map((post) => (
-                  <tr key={post.id} className="hover:bg-white/5">
-                    <td className="px-4 py-4">
-                      <div className="font-medium">{post.title}</div>
-                      <div className="text-xs text-gray-500">/{post.slug}</div>
+                  <tr key={post.id}>
+                    <td>
+                      <Link href={`${labels.adminPath}/${post.id}`} className="admin-customer-link">{post.title}</Link>
+                      <span>{labels.publicPath}/{post.slug}</span>
                     </td>
-                    <td className="px-4 py-4">
-                      <span className={`rounded-full border px-2 py-1 text-xs ${statusClass(post.status)}`}>{post.status}</span>
+                    <td>
+                      <span className={`admin-status-badge status-${post.status}`} title={STATUS_HINTS[post.status]}>
+                        {STATUS_LABELS[post.status] ?? post.status}
+                      </span>
                     </td>
-                    <td className="px-4 py-4 text-sm text-gray-300">{formatDate(post.published_at)}</td>
-                    <td className="px-4 py-4 text-sm text-gray-300">{formatDate(post.updated_at)}</td>
-                    <td className="px-4 py-4">
-                      <div className="flex flex-wrap gap-2">
-                        <Link href={`${labels.adminPath}/${post.id}`} className="inline-flex items-center gap-1 rounded border border-white/20 px-2 py-1 text-xs hover:bg-white/10">
-                          <Edit className="h-3 w-3" /> Edit
+                    <td>{formatDate(post.published_at)}</td>
+                    <td>{formatDate(post.updated_at)}</td>
+                    <td>
+                      <div className="admin-row-actions">
+                        <Link href={`${labels.adminPath}/${post.id}`} className="admin-view-button">
+                          <Pencil aria-hidden="true" /> Edit
                         </Link>
                         {post.status === "published" && (
-                          <Link href={`${labels.publicPath}/${post.slug}`} target="_blank" className="inline-flex items-center gap-1 rounded border border-white/20 px-2 py-1 text-xs hover:bg-white/10">
-                            <ExternalLink className="h-3 w-3" /> View
-                          </Link>
+                          <a
+                            href={`${labels.publicPath}/${post.slug}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="admin-view-button"
+                            title="Opens the public page in a new tab"
+                          >
+                            <ExternalLink aria-hidden="true" /> View live
+                          </a>
                         )}
                         {post.status !== "archived" && (
-                          <button onClick={() => archivePost(post)} className="inline-flex items-center gap-1 rounded border border-red-500/30 px-2 py-1 text-xs text-red-300 hover:bg-red-500/10">
-                            <Trash2 className="h-3 w-3" /> Archive
+                          <button
+                            type="button"
+                            onClick={() => void archivePost(post)}
+                            disabled={archivingId === post.id}
+                            className="admin-view-button is-danger"
+                          >
+                            <Archive aria-hidden="true" /> {archivingId === post.id ? "Archiving" : "Archive"}
                           </button>
                         )}
                       </div>
@@ -111,7 +158,7 @@ export function ContentManager({ section, posts, userEmail }: ContentManagerProp
               </tbody>
             </table>
           </div>
-        </main>
+        </div>
       </div>
     </AdminShell>
   );

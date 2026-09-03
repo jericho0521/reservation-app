@@ -28,6 +28,12 @@ const emptyForm: FormData = {
   seoDescription: "",
 };
 
+const STATUS_HELP: Record<string, string> = {
+  draft: "Saved privately. Customers cannot see it.",
+  published: "Live on the public site as soon as you save.",
+  archived: "Hidden from the public site but kept here.",
+};
+
 export function ContentEditor({ section, post, userEmail }: ContentEditorProps) {
   const labels = getSectionLabels(section);
   const router = useRouter();
@@ -35,6 +41,7 @@ export function ContentEditor({ section, post, userEmail }: ContentEditorProps) 
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const apiBase = section === "blog" ? "/api/blogs" : "/api/updates";
+  const singular = labels.singular.toLowerCase();
 
   const setField = (field: keyof FormData, value: string) => {
     setForm(prev => ({ ...prev, [field]: value }));
@@ -53,7 +60,7 @@ export function ContentEditor({ section, post, userEmail }: ContentEditorProps) 
 
     if (!response.ok) {
       const body = await response.json().catch(() => ({}));
-      setError(typeof body.error === "string" ? body.error : "Failed to save content");
+      setError(typeof body.error === "string" ? body.error : `The ${singular} could not be saved. Try again.`);
       setIsSaving(false);
       return;
     }
@@ -64,89 +71,120 @@ export function ContentEditor({ section, post, userEmail }: ContentEditorProps) 
 
   return (
     <AdminShell userEmail={userEmail}>
-      <div className="min-h-screen bg-racing-dark text-white">
-        <header className="sticky top-0 z-10 border-b border-white/10 bg-white/5 backdrop-blur-md">
-          <div className="container mx-auto flex items-center justify-between px-6 py-4">
-            <div>
-              <Link href={labels.adminPath} className="mb-2 inline-flex items-center gap-2 text-sm text-gray-400 hover:text-neon">
-                <ArrowLeft className="h-4 w-4" /> Back to {labels.plural}
-              </Link>
-              <h1 className="text-2xl font-bold font-heading">{post ? "Edit" : "New"} {labels.singular}</h1>
-            </div>
+      <div className="admin-dashboard admin-content-page">
+        <header className="admin-page-header">
+          <div>
+            <Link href={labels.adminPath} className="admin-back-link">
+              <ArrowLeft aria-hidden="true" /> Back to {labels.plural.toLowerCase()}
+            </Link>
+            <h1>{post ? `Edit ${singular}` : `New ${singular}`}</h1>
+            <p>
+              {form.status === "published"
+                ? "This item is live. Saving publishes your edits immediately."
+                : `Saved as a ${form.status}. Set the status to Published when it is ready for customers.`}
+            </p>
           </div>
+          <button type="submit" form="content-editor-form" disabled={isSaving} className="admin-primary-button">
+            <Save aria-hidden="true" /> {isSaving ? "Saving" : form.status === "published" ? "Save and publish" : "Save"}
+          </button>
         </header>
 
-        <main className="container mx-auto grid gap-6 px-6 py-8 lg:grid-cols-[minmax(0,1fr)_minmax(360px,0.8fr)]">
-          <form onSubmit={save} className="space-y-5 rounded-xl border border-white/10 bg-white/[0.04] p-6">
-            {error && <div className="rounded-lg border border-red-500/40 bg-red-500/15 px-4 py-3 text-sm text-red-200">{error}</div>}
+        <div className="admin-editor-layout">
+          <form id="content-editor-form" onSubmit={save} className="admin-form">
+            {error && <div className="admin-notice is-error" role="alert"><span>{error}</span></div>}
 
-            <label className="block">
-              <span className="mb-2 block text-sm font-medium text-gray-300">Title</span>
-              <input value={form.title} onChange={(event) => setField("title", event.target.value)} required className="w-full rounded-lg border border-white/20 bg-white/5 px-4 py-3 outline-none focus:border-neon" />
-            </label>
+            <fieldset className="admin-fieldset">
+              <legend className="admin-eyebrow">Basics</legend>
 
-            <label className="block">
-              <span className="mb-2 block text-sm font-medium text-gray-300">Slug</span>
-              <input value={form.slug} onChange={(event) => setField("slug", event.target.value)} placeholder="Auto-generated from title if empty" className="w-full rounded-lg border border-white/20 bg-white/5 px-4 py-3 outline-none focus:border-neon" />
-            </label>
-
-            <label className="block">
-              <span className="mb-2 block text-sm font-medium text-gray-300">Excerpt</span>
-              <textarea value={form.excerpt} onChange={(event) => setField("excerpt", event.target.value)} rows={3} placeholder="Auto-generated from content if empty" className="w-full rounded-lg border border-white/20 bg-white/5 px-4 py-3 outline-none focus:border-neon" />
-            </label>
-
-            <label className="block">
-              <span className="mb-2 block text-sm font-medium text-gray-300">Markdown Content</span>
-              <textarea value={form.content} onChange={(event) => setField("content", event.target.value)} required rows={16} className="w-full rounded-lg border border-white/20 bg-white/5 px-4 py-3 font-mono text-sm outline-none focus:border-neon" />
-            </label>
-
-            <label className="block">
-              <span className="mb-2 block text-sm font-medium text-gray-300">Cover Image URL</span>
-              <input value={form.coverImageUrl} onChange={(event) => setField("coverImageUrl", event.target.value)} className="w-full rounded-lg border border-white/20 bg-white/5 px-4 py-3 outline-none focus:border-neon" />
-            </label>
-
-            <div className="grid gap-4 md:grid-cols-2">
-              <label className="block">
-                <span className="mb-2 block text-sm font-medium text-gray-300">Status</span>
-                <select value={form.status} onChange={(event) => setField("status", event.target.value)} className="w-full rounded-lg border border-white/20 bg-racing-dark px-4 py-3 outline-none focus:border-neon">
-                  <option value="draft">Draft</option>
-                  <option value="published">Published</option>
-                  <option value="archived">Archived</option>
-                </select>
+              <label className="admin-field">
+                <span>Title</span>
+                <input value={form.title} onChange={(event) => setField("title", event.target.value)} required />
               </label>
-              <label className="block">
-                <span className="mb-2 block text-sm font-medium text-gray-300">Published At</span>
-                <input value={form.publishedAt ?? ""} onChange={(event) => setField("publishedAt", event.target.value)} placeholder="Auto-filled when published" className="w-full rounded-lg border border-white/20 bg-white/5 px-4 py-3 outline-none focus:border-neon" />
-              </label>
-            </div>
 
-            {section === "blog" && (
-              <div className="grid gap-4 md:grid-cols-2">
-                <label className="block">
-                  <span className="mb-2 block text-sm font-medium text-gray-300">SEO Title</span>
-                  <input value={form.seoTitle} onChange={(event) => setField("seoTitle", event.target.value)} className="w-full rounded-lg border border-white/20 bg-white/5 px-4 py-3 outline-none focus:border-neon" />
+              <label className="admin-field">
+                <span>Web address (slug) <small>optional</small></span>
+                <input value={form.slug} onChange={(event) => setField("slug", event.target.value)} placeholder="Created from the title if left empty" />
+                <em>Appears as {labels.publicPath}/{form.slug || "your-title"}</em>
+              </label>
+
+              <label className="admin-field">
+                <span>Summary <small>optional</small></span>
+                <textarea value={form.excerpt} onChange={(event) => setField("excerpt", event.target.value)} rows={3} placeholder="Short teaser shown in lists. Created from the content if left empty." />
+              </label>
+            </fieldset>
+
+            <fieldset className="admin-fieldset">
+              <legend className="admin-eyebrow">Content</legend>
+
+              <label className="admin-field">
+                <span>Body <small>Markdown</small></span>
+                <textarea value={form.content} onChange={(event) => setField("content", event.target.value)} required rows={16} className="is-mono" />
+                <em>Use # for headings, **bold**, and blank lines between paragraphs. The preview on the right updates as you type.</em>
+              </label>
+
+              <label className="admin-field">
+                <span>Cover image URL <small>optional</small></span>
+                <input value={form.coverImageUrl} onChange={(event) => setField("coverImageUrl", event.target.value)} placeholder="https://" />
+              </label>
+            </fieldset>
+
+            <fieldset className="admin-fieldset">
+              <legend className="admin-eyebrow">Visibility</legend>
+
+              <div className="admin-field-grid">
+                <label className="admin-field">
+                  <span>Status</span>
+                  <select value={form.status} onChange={(event) => setField("status", event.target.value)}>
+                    <option value="draft">Draft</option>
+                    <option value="published">Published</option>
+                    <option value="archived">Archived</option>
+                  </select>
+                  <em>{STATUS_HELP[form.status]}</em>
                 </label>
-                <label className="block">
-                  <span className="mb-2 block text-sm font-medium text-gray-300">SEO Description</span>
-                  <input value={form.seoDescription} onChange={(event) => setField("seoDescription", event.target.value)} className="w-full rounded-lg border border-white/20 bg-white/5 px-4 py-3 outline-none focus:border-neon" />
+                <label className="admin-field">
+                  <span>Publish date <small>optional</small></span>
+                  <input value={form.publishedAt ?? ""} onChange={(event) => setField("publishedAt", event.target.value)} placeholder="Filled in automatically when published" />
                 </label>
               </div>
+            </fieldset>
+
+            {section === "blog" && (
+              <fieldset className="admin-fieldset">
+                <legend className="admin-eyebrow">Search engines <small>optional</small></legend>
+
+                <div className="admin-field-grid">
+                  <label className="admin-field">
+                    <span>SEO title</span>
+                    <input value={form.seoTitle} onChange={(event) => setField("seoTitle", event.target.value)} placeholder="Defaults to the title" />
+                  </label>
+                  <label className="admin-field">
+                    <span>SEO description</span>
+                    <input value={form.seoDescription} onChange={(event) => setField("seoDescription", event.target.value)} placeholder="Defaults to the summary" />
+                  </label>
+                </div>
+              </fieldset>
             )}
 
-            <button type="submit" disabled={isSaving} className="inline-flex items-center gap-2 rounded-lg bg-neon px-5 py-3 font-bold text-racing-dark hover:bg-white disabled:opacity-50">
-              <Save className="h-4 w-4" /> {isSaving ? "Saving..." : "Save"}
-            </button>
+            <div className="admin-form-footer">
+              <Link href={labels.adminPath} className="admin-secondary-button">Cancel</Link>
+              <button type="submit" disabled={isSaving} className="admin-primary-button">
+                <Save aria-hidden="true" /> {isSaving ? "Saving" : form.status === "published" ? "Save and publish" : "Save"}
+              </button>
+            </div>
           </form>
 
-          <aside className="rounded-xl border border-white/10 bg-white/[0.04] p-6">
-            <h2 className="mb-4 text-lg font-bold font-heading">Preview</h2>
-            <div className="rounded-lg border border-white/10 bg-racing-dark/80 p-5">
-              <h3 className="mb-3 text-2xl font-bold font-heading">{form.title || "Untitled"}</h3>
-              {form.excerpt && <p className="mb-6 text-sm text-gray-400">{form.excerpt}</p>}
-              <MarkdownContent content={form.content || "Start writing to preview Markdown."} />
+          <aside className="admin-preview" aria-label="Live preview">
+            <div className="admin-section-heading">
+              <span className="admin-eyebrow">Preview</span>
+              <h2>How customers will see it</h2>
+            </div>
+            <div className="admin-preview-body">
+              <h3>{form.title || "Untitled"}</h3>
+              {form.excerpt && <p className="admin-preview-excerpt">{form.excerpt}</p>}
+              <MarkdownContent content={form.content || "Start writing to see the preview."} />
             </div>
           </aside>
-        </main>
+        </div>
       </div>
     </AdminShell>
   );

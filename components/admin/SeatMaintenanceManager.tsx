@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { Armchair, Save, Wrench, X } from 'lucide-react';
+import { Armchair, CircleDot, Save, Wrench, X } from 'lucide-react';
 import type { Service } from '@/types';
 import { AdminShell } from './AdminShell';
 
@@ -24,6 +24,7 @@ export function SeatMaintenanceManager({ userEmail }: SeatMaintenanceManagerProp
     const [selectedServiceId, setSelectedServiceId] = useState('');
     const [maintenanceSeats, setMaintenanceSeats] = useState<string[]>([]);
     const [reason, setReason] = useState('');
+    const [savedState, setSavedState] = useState({ seats: [] as string[], reason: '' });
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
     const [notice, setNotice] = useState<{ tone: 'error' | 'success'; message: string } | null>(null);
@@ -31,6 +32,19 @@ export function SeatMaintenanceManager({ userEmail }: SeatMaintenanceManagerProp
         () => services.find(service => service.id === selectedServiceId) ?? null,
         [selectedServiceId, services],
     );
+    const isDirty = reason.trim() !== savedState.reason
+        || maintenanceSeats.length !== savedState.seats.length
+        || maintenanceSeats.some(seat => !savedState.seats.includes(seat));
+
+    useEffect(() => {
+        if (!isDirty) return;
+
+        const warnBeforeLeaving = (event: BeforeUnloadEvent) => {
+            event.preventDefault();
+        };
+        window.addEventListener('beforeunload', warnBeforeLeaving);
+        return () => window.removeEventListener('beforeunload', warnBeforeLeaving);
+    }, [isDirty]);
 
     useEffect(() => {
         let mounted = true;
@@ -78,8 +92,11 @@ export function SeatMaintenanceManager({ userEmail }: SeatMaintenanceManagerProp
                 const data = (await response.json()) as { seats?: MaintenanceSeatRow[] };
                 if (!mounted) return;
 
-                setMaintenanceSeats((data.seats ?? []).map(seat => seat.seat_label));
-                setReason(data.seats?.find(seat => seat.reason)?.reason ?? '');
+                const seats = (data.seats ?? []).map(seat => seat.seat_label);
+                const savedReason = data.seats?.find(seat => seat.reason)?.reason ?? '';
+                setMaintenanceSeats(seats);
+                setReason(savedReason);
+                setSavedState({ seats, reason: savedReason.trim() });
             } catch {
                 if (mounted) setNotice({ tone: 'error', message: 'Seat maintenance could not be loaded.' });
             }
@@ -117,8 +134,10 @@ export function SeatMaintenanceManager({ userEmail }: SeatMaintenanceManagerProp
             if (!response.ok) throw new Error('Failed to save maintenance seats');
 
             const data = (await response.json()) as { seat_labels?: string[] };
-            setMaintenanceSeats(data.seat_labels ?? []);
-            setNotice({ tone: 'success', message: 'Seat availability has been updated.' });
+            const seats = data.seat_labels ?? [];
+            setMaintenanceSeats(seats);
+            setSavedState({ seats, reason: reason.trim() });
+            setNotice({ tone: 'success', message: 'Saved. Customers can no longer book the blocked seats.' });
         } catch {
             setNotice({ tone: 'error', message: 'Changes could not be saved. Try again.' });
         } finally {
@@ -131,19 +150,27 @@ export function SeatMaintenanceManager({ userEmail }: SeatMaintenanceManagerProp
             <div className="admin-dashboard admin-maintenance-page">
                 <header className="admin-page-header">
                     <div>
-                        <span className="admin-eyebrow">Equipment operations</span>
+                        <span className="admin-eyebrow">Operations</span>
                         <h1>Seat maintenance</h1>
-                        <p>Remove simulator seats from availability while repairs are underway.</p>
+                        <p>Click a seat to block or unblock it, then press Save. Nothing changes for customers until you save.</p>
                     </div>
-                    <button
-                        type="button"
-                        className="admin-primary-button"
-                        onClick={() => void saveMaintenanceSeats()}
-                        disabled={isSaving || !selectedServiceId}
-                    >
-                        <Save aria-hidden="true" />
-                        {isSaving ? 'Saving' : 'Save changes'}
-                    </button>
+                    <div className="admin-header-actions">
+                        {isDirty && (
+                            <span className="admin-unsaved-chip" role="status">
+                                <CircleDot aria-hidden="true" />Unsaved changes
+                            </span>
+                        )}
+                        <button
+                            type="button"
+                            className="admin-primary-button"
+                            onClick={() => void saveMaintenanceSeats()}
+                            disabled={isSaving || !selectedServiceId || !isDirty}
+                            title={isDirty ? 'Save your changes' : 'No changes to save'}
+                        >
+                            <Save aria-hidden="true" />
+                            {isSaving ? 'Saving' : isDirty ? 'Save changes' : 'Saved'}
+                        </button>
+                    </div>
                 </header>
 
                 {notice && (
@@ -161,7 +188,7 @@ export function SeatMaintenanceManager({ userEmail }: SeatMaintenanceManagerProp
                         </select>
                     </label>
                     <label className="admin-reason-field">
-                        <span>Maintenance note</span>
+                        <span>Maintenance note <small>(optional, internal only)</small></span>
                         <input value={reason} onChange={event => setReason(event.target.value)} placeholder="Wheel, pedals, PC, or other repair details" />
                     </label>
                 </div>
@@ -172,7 +199,7 @@ export function SeatMaintenanceManager({ userEmail }: SeatMaintenanceManagerProp
                             <span className="admin-eyebrow">Floor layout</span>
                             <h2>{selectedService?.name ?? 'Simulator seats'}</h2>
                         </div>
-                        <p><Wrench aria-hidden="true" />{maintenanceSeats.length} under maintenance</p>
+                        <p><Wrench aria-hidden="true" />{maintenanceSeats.length} of 16 seats blocked</p>
                     </header>
 
                     <div className="admin-pc-wall"><span>PC wall</span></div>
@@ -209,8 +236,8 @@ export function SeatMaintenanceManager({ userEmail }: SeatMaintenanceManagerProp
                     </div>
 
                     <footer className="admin-seat-legend">
-                        <span><i className="is-ready" />Available</span>
-                        <span><i className="is-maintenance" />Maintenance</span>
+                        <span><i className="is-ready" />Ready: customers can book</span>
+                        <span><i className="is-maintenance" />Blocked: hidden from customers</span>
                     </footer>
                 </section>
             </div>

@@ -1,3 +1,4 @@
+import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase-server';
 import { getAdminBookingsLoadError, type AdminBooking } from './dashboard-data';
@@ -6,6 +7,7 @@ import AdminDashboard from './AdminDashboard';
 import { getBookingDateBounds } from '@/lib/booking-schedule';
 
 export const dynamic = 'force-dynamic';
+export const metadata: Metadata = { title: 'Daily board · Admin' };
 
 export default async function AdminPage() {
     const supabase = await createClient();

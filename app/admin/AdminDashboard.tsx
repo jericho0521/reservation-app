@@ -20,9 +20,9 @@ import {
     ChevronLeft,
     ChevronRight,
     Circle,
-    Clock3,
     GripVertical,
     MoreHorizontal,
+    MoveHorizontal,
     RefreshCw,
     Search,
     Users,
@@ -34,6 +34,7 @@ import { BookingDetailsDrawer } from '@/components/admin/BookingDetailsDrawer';
 import { BookingCancellationDialog } from '@/components/admin/BookingCancellationDialog';
 import {
     ADMIN_BOARD_LANES,
+    ADMIN_STATUS_LABELS as STATUS_LABELS,
     filterBookingsForBoard,
     formatRefreshTime,
     getServiceName,
@@ -54,17 +55,10 @@ interface AdminDashboardProps {
 }
 
 const LANE_META: Record<AdminBoardLane, { label: string; description: string }> = {
-    upcoming: { label: 'Upcoming', description: 'Confirmed arrivals' },
-    in_progress: { label: 'In progress', description: 'Sessions underway' },
-    done: { label: 'Done', description: 'Completed sessions' },
-    cancelled: { label: 'Cancelled', description: 'Cancelled bookings' },
-};
-
-const STATUS_LABELS: Record<AdminBookingStatus, string> = {
-    confirmed: 'Upcoming',
-    in_progress: 'In progress',
-    completed: 'Done',
-    cancelled: 'Cancelled',
+    upcoming: { label: 'Upcoming', description: 'Confirmed, customer not here yet' },
+    in_progress: { label: 'In progress', description: 'Customer is playing now' },
+    done: { label: 'Done', description: 'Session finished' },
+    cancelled: { label: 'Cancelled', description: 'Will not happen' },
 };
 
 function BookingCard({
@@ -82,7 +76,29 @@ function BookingCard({
         id: booking.id,
         disabled: isUpdating,
     });
+    const menuRef = useRef<HTMLDetailsElement>(null);
     const style = transform ? { transform: CSS.Translate.toString(transform) } : undefined;
+
+    const handleMenuToggle = () => {
+        const menu = menuRef.current;
+        if (!menu?.open) return;
+
+        const closeOnOutsideClick = (event: PointerEvent) => {
+            if (!menu.contains(event.target as Node)) menu.open = false;
+        };
+        const closeOnEscape = (event: KeyboardEvent) => {
+            if (event.key === 'Escape') menu.open = false;
+        };
+        const cleanup = () => {
+            document.removeEventListener('pointerdown', closeOnOutsideClick);
+            document.removeEventListener('keydown', closeOnEscape);
+            menu.removeEventListener('toggle', cleanup);
+        };
+
+        document.addEventListener('pointerdown', closeOnOutsideClick);
+        document.addEventListener('keydown', closeOnEscape);
+        menu.addEventListener('toggle', cleanup, { once: true });
+    };
 
     return (
         <article
@@ -105,13 +121,14 @@ function BookingCard({
                         type="button"
                         className="admin-card-drag"
                         aria-label={`Drag booking for ${booking.user_name}`}
+                        title="Drag to another column"
                         {...listeners}
                         {...attributes}
                     >
                         <GripVertical aria-hidden="true" />
                     </button>
-                    <details className="admin-card-menu">
-                        <summary aria-label={`Move booking for ${booking.user_name}`}>
+                    <details ref={menuRef} className="admin-card-menu" onToggle={handleMenuToggle}>
+                        <summary aria-label={`Change status for ${booking.user_name}`} title="Change status">
                             <MoreHorizontal aria-hidden="true" />
                         </summary>
                         <div className="admin-card-menu-popover">
@@ -177,7 +194,7 @@ function BoardColumn({
             </header>
             <div className="admin-column-cards">
                 {bookings.length === 0 ? (
-                    <div className="admin-column-empty">No {meta.label.toLowerCase()} bookings</div>
+                    <div className="admin-column-empty">Nothing {lane === 'in_progress' ? 'in progress' : meta.label.toLowerCase()}</div>
                 ) : bookings.map(booking => (
                     <BookingCard
                         key={booking.id}
@@ -342,15 +359,21 @@ export default function AdminDashboard({
         month: 'long',
         year: 'numeric',
     }).format(new Date(`${selectedDate}T00:00:00`));
+    const isToday = selectedDate === today;
+    const hasFilters = search.trim() !== '' || service !== 'all';
+    const clearFilters = () => {
+        setSearch('');
+        setService('all');
+    };
 
     return (
         <AdminShell userEmail={userEmail}>
             <div className="admin-dashboard">
                 <header className="admin-page-header">
                     <div>
-                        <span className="admin-eyebrow">Daily operations</span>
-                        <h1>Bookings board</h1>
-                        <p>Move each booking through today&apos;s service workflow.</p>
+                        <span className="admin-eyebrow">Operations</span>
+                        <h1>Daily board</h1>
+                        <p>One day at a time. Drag a card between columns, or use its menu, to update the booking status.</p>
                     </div>
                     <button
                         type="button"
@@ -368,9 +391,10 @@ export default function AdminDashboard({
                         <button type="button" onClick={() => setSelectedDate(date => shiftDate(date, -1))} aria-label="Previous day">
                             <ChevronLeft aria-hidden="true" />
                         </button>
-                        <label>
+                        <label title="Pick a date">
                             <CalendarDays aria-hidden="true" />
                             <span>{selectedDateLabel}</span>
+                            {isToday && <em className="admin-today-tag">Today</em>}
                             <input
                                 type="date"
                                 value={selectedDate}
@@ -381,8 +405,8 @@ export default function AdminDashboard({
                         <button type="button" onClick={() => setSelectedDate(date => shiftDate(date, 1))} aria-label="Next day">
                             <ChevronRight aria-hidden="true" />
                         </button>
-                        {selectedDate !== today && (
-                            <button type="button" className="admin-today-button" onClick={() => setSelectedDate(today)}>Today</button>
+                        {!isToday && (
+                            <button type="button" className="admin-today-button" onClick={() => setSelectedDate(today)}>Back to today</button>
                         )}
                     </div>
 
@@ -392,7 +416,7 @@ export default function AdminDashboard({
                             <input
                                 value={search}
                                 onChange={event => setSearch(event.target.value)}
-                                placeholder="Search customer"
+                                placeholder="Search name, email, or phone"
                                 aria-label="Search bookings"
                             />
                             {search && (
@@ -418,9 +442,16 @@ export default function AdminDashboard({
                 )}
 
                 <div className="admin-board-context">
-                    <span><Clock3 aria-hidden="true" />{selectedDateLabel}</span>
-                    <span>{visibleBookings.length} booking{visibleBookings.length === 1 ? '' : 's'}</span>
-                    <span>{formatRefreshTime(lastRefresh)}</span>
+                    <span className="admin-board-count">
+                        {visibleBookings.length === 0
+                            ? (hasFilters ? 'No bookings match your filters' : `No bookings ${isToday ? 'today' : 'on this day'}`)
+                            : `${visibleBookings.length} booking${visibleBookings.length === 1 ? '' : 's'} ${isToday ? 'today' : 'on this day'}`}
+                    </span>
+                    {hasFilters && (
+                        <button type="button" className="admin-inline-link" onClick={clearFilters}>Clear filters</button>
+                    )}
+                    <span className="admin-board-hint"><MoveHorizontal aria-hidden="true" />Drag cards between columns to change status</span>
+                    <span className="admin-board-refresh">{formatRefreshTime(lastRefresh)}</span>
                 </div>
 
                 <DndContext

@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { ContentEditor } from "@/components/admin/ContentEditor";
 import { loadAdminContentPost } from "@/app/admin/content-pages";
 
@@ -6,6 +7,7 @@ interface EditBlogPageProps {
 }
 
 export const dynamic = "force-dynamic";
+export const metadata: Metadata = { title: "Edit blog post · Admin" };
 
 export default async function EditBlogPage({ params }: EditBlogPageProps) {
   const { id } = await params;

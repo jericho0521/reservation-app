@@ -43,6 +43,7 @@
 }
 
 .admin-sidebar-brand {
+    position: relative;
     display: flex;
     min-height: 88px;
     align-items: center;
@@ -65,6 +66,7 @@
     display: flex;
     flex: 1;
     align-items: center;
+    justify-content: center;
 }
 
 .admin-sidebar-logo img {
@@ -249,10 +251,11 @@
     }
 
     .admin-sidebar-close {
+        position: absolute;
+        right: 16px;
         display: grid;
         width: 34px;
         height: 34px;
-        margin-left: auto;
     }
 
     .admin-sidebar-scrim {

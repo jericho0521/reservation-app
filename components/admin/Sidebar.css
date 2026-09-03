@@ -10,6 +10,20 @@
     min-height: 100vh;
     background: var(--admin-canvas);
     color: var(--admin-text);
+    font-family: Arial, Helvetica, sans-serif;
+}
+
+.admin-shell h1,
+.admin-shell h2,
+.admin-shell h3 {
+    font-family: var(--font-electrolize), Arial, Helvetica, sans-serif;
+}
+
+.admin-shell button,
+.admin-shell input,
+.admin-shell select,
+.admin-shell textarea {
+    font-family: Arial, Helvetica, sans-serif;
 }
 
 .admin-main {
@@ -37,38 +51,27 @@
     padding: 20px;
 }
 
-.admin-sidebar-mark {
-    display: grid;
-    width: 34px;
-    height: 34px;
-    flex: 0 0 34px;
-    place-items: center;
-    border: 1px solid var(--admin-line-strong);
-    border-radius: 6px;
-    color: var(--admin-accent);
-    font-size: 11px;
-    font-weight: 750;
-    letter-spacing: 0.08em;
-}
-
-.admin-sidebar-brand-copy,
+.admin-sidebar-logo,
 .admin-sidebar-account-copy {
     min-width: 0;
 }
 
-.admin-sidebar-brand-copy strong,
-.admin-sidebar-brand-copy span,
 .admin-sidebar-account-copy strong,
 .admin-sidebar-account-copy span {
     display: block;
 }
 
-.admin-sidebar-brand-copy strong {
-    font-size: 14px;
-    letter-spacing: -0.01em;
+.admin-sidebar-logo {
+    display: flex;
+    flex: 1;
+    align-items: center;
 }
 
-.admin-sidebar-brand-copy span,
+.admin-sidebar-logo img {
+    width: 142px;
+    height: auto;
+}
+
 .admin-sidebar-account-copy span {
     margin-top: 2px;
     color: var(--admin-muted);
@@ -190,14 +193,17 @@
 
     .admin-sidebar-brand {
         justify-content: center;
-        padding: 17px;
+        padding: 12px 8px;
     }
 
-    .admin-sidebar-brand-copy,
     .admin-sidebar-kicker,
     .admin-sidebar-link span,
     .admin-sidebar-account-copy {
         display: none;
+    }
+
+    .admin-sidebar-logo img {
+        width: 48px;
     }
 
     .admin-sidebar-nav {

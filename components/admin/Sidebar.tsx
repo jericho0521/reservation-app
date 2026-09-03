@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useRef, useState } from 'react';
@@ -28,12 +29,10 @@ export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
 ];
 
 interface SidebarProps {
-    title?: string;
     subtitle?: string;
 }
 
 export function Sidebar({
-    title = 'Project Play',
     subtitle = 'Reservation admin',
 }: SidebarProps) {
     const pathname = usePathname();
@@ -77,11 +76,15 @@ export function Sidebar({
 
             <aside className={`admin-sidebar ${mobileOpen ? 'is-open' : ''}`} aria-label="Admin navigation">
                 <div className="admin-sidebar-brand">
-                    <div className="admin-sidebar-mark" aria-hidden="true">PP</div>
-                    <div className="admin-sidebar-brand-copy">
-                        <strong>{title}</strong>
-                        <span>Operations</span>
-                    </div>
+                    <Link href="/" className="admin-sidebar-logo" aria-label="Project Play By CW home">
+                        <Image
+                            src="/images/brand/project-play-logo.png"
+                            alt="Project Play By CW"
+                            width={169}
+                            height={50}
+                            priority
+                        />
+                    </Link>
                     <button
                         type="button"
                         className="admin-sidebar-close"

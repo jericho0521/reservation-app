@@ -137,7 +137,7 @@ export default function AnalyticsPage() {
     return (
         <div className="admin-shell min-h-screen bg-racing-dark">
             {/* Sidebar */}
-            <Sidebar title="Admin Panel" subtitle="Analytics" />
+            <Sidebar subtitle="Analytics" />
 
             {/* Main Layout with margin for sidebar */}
             <div className="admin-main">

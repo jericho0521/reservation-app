@@ -2,6 +2,7 @@
 
 import { useRef, useState } from 'react';
 import { ArrowRight, LockKeyhole } from 'lucide-react';
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase-browser';
 import './login.css';
@@ -45,8 +46,14 @@ export default function AdminLoginPage() {
         <main className="admin-login-page">
             <section className="admin-login-intro" aria-labelledby="admin-login-title">
                 <div className="admin-login-brand">
-                    <span aria-hidden="true">PP</span>
-                    <div><strong>Project Play</strong><small>Operations</small></div>
+                    <Image
+                        src="/images/brand/project-play-logo.png"
+                        alt="Project Play By CW"
+                        width={169}
+                        height={50}
+                        priority
+                    />
+                    <small>Operations</small>
                 </div>
 
                 <div className="admin-login-copy">

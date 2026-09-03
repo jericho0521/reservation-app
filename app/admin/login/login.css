@@ -10,6 +10,17 @@
     grid-template-columns: minmax(0, 1.08fr) minmax(440px, 0.92fr);
     background: var(--login-canvas);
     color: var(--login-text);
+    font-family: Arial, Helvetica, sans-serif;
+}
+
+.admin-login-page h1,
+.admin-login-page h2 {
+    font-family: var(--font-electrolize), Arial, Helvetica, sans-serif;
+}
+
+.admin-login-page button,
+.admin-login-page input {
+    font-family: Arial, Helvetica, sans-serif;
 }
 
 .admin-login-intro {
@@ -23,21 +34,8 @@
     background-size: 64px 64px;
 }
 
-.admin-login-brand { display: flex; align-items: center; gap: 12px; }
-.admin-login-brand > span {
-    display: grid;
-    width: 38px;
-    height: 38px;
-    place-items: center;
-    border: 1px solid var(--login-accent);
-    border-radius: 4px;
-    color: var(--login-accent);
-    font-size: 11px;
-    font-weight: 800;
-    letter-spacing: 0.08em;
-}
-.admin-login-brand div { display: flex; flex-direction: column; }
-.admin-login-brand strong { font-size: 13px; letter-spacing: -0.01em; }
+.admin-login-brand { display: flex; align-items: center; gap: 16px; }
+.admin-login-brand img { width: 150px; height: auto; }
 .admin-login-brand small,
 .admin-login-footnote {
     color: var(--login-muted);

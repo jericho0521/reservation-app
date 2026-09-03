@@ -58,6 +58,14 @@ export interface AdminBoardFilters {
     service: string;
 }
 
+export interface AdminTableFilters {
+    search: string;
+    service: string;
+    status: AdminBookingStatus | 'all';
+    dateFrom: string;
+    dateTo: string;
+}
+
 const STATUS_TO_LANE: Record<AdminBookingStatus, AdminBoardLane> = {
     confirmed: 'upcoming',
     in_progress: 'in_progress',
@@ -118,6 +126,31 @@ export function shiftDate(date: string, amount: number): string {
     const [year, month, day] = date.split('-').map(Number);
     const value = new Date(Date.UTC(year, month - 1, day + amount));
     return value.toISOString().slice(0, 10);
+}
+
+export function filterBookingsForTable(
+    bookings: AdminBooking[],
+    filters: AdminTableFilters,
+): AdminBooking[] {
+    const search = filters.search.trim().toLowerCase();
+
+    return bookings
+        .filter(booking => filters.status === 'all' || booking.status === filters.status)
+        .filter(booking => filters.service === 'all' || getServiceName(booking.services) === filters.service)
+        .filter(booking => !filters.dateFrom || booking.booking_date >= filters.dateFrom)
+        .filter(booking => !filters.dateTo || booking.booking_date <= filters.dateTo)
+        .filter(booking => {
+            if (!search) return true;
+
+            return booking.user_name.toLowerCase().includes(search)
+                || booking.user_email.toLowerCase().includes(search)
+                || booking.user_phone?.toLowerCase().includes(search);
+        })
+        .sort((left, right) => (
+            right.booking_date.localeCompare(left.booking_date)
+            || left.start_time.localeCompare(right.start_time)
+            || left.id.localeCompare(right.id)
+        ));
 }
 
 export interface BookingSummary {

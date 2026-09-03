@@ -316,6 +316,15 @@ export default function AdminDashboard({
         void commitStatusChange(booking, status);
     }, [commitStatusChange]);
 
+    const openBooking = useCallback((booking: AdminBooking) => {
+        setSelectedBookingId(booking.id);
+    }, []);
+    const closeDetails = useCallback(() => setSelectedBookingId(null), []);
+    const cancelCancellation = useCallback(() => setPendingCancellation(null), []);
+    const confirmCancellation = useCallback((booking: AdminBooking) => {
+        void commitStatusChange(booking, 'cancelled');
+    }, [commitStatusChange]);
+
     const handleDragStart = ({ active }: DragStartEvent) => {
         setActiveBookingId(String(active.id));
     };
@@ -432,7 +441,7 @@ export default function AdminDashboard({
                                 lane={lane}
                                 bookings={lanes[lane]}
                                 updatingId={updatingId}
-                                onOpen={booking => setSelectedBookingId(booking.id)}
+                                onOpen={openBooking}
                                 onMove={requestStatusChange}
                             />
                         ))}
@@ -452,14 +461,14 @@ export default function AdminDashboard({
             <BookingDetailsDrawer
                 booking={selectedBooking}
                 isUpdating={updatingId === selectedBooking?.id}
-                onClose={() => setSelectedBookingId(null)}
+                onClose={closeDetails}
                 onMove={requestStatusChange}
             />
 
             <BookingCancellationDialog
                 booking={pendingCancellation}
-                onCancel={() => setPendingCancellation(null)}
-                onConfirm={booking => void commitStatusChange(booking, 'cancelled')}
+                onCancel={cancelCancellation}
+                onConfirm={confirmCancellation}
             />
         </AdminShell>
     );

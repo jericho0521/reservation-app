@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { ArrowLeft, Save } from "lucide-react";
 import { blogPostToFormData, getSectionLabels, type BlogPostRecord, type ContentSectionType } from "@/lib/blogs";
 import { MarkdownContent } from "@/components/content/MarkdownContent";
-import { Sidebar } from "@/components/admin/Sidebar";
+import { AdminShell } from "@/components/admin/AdminShell";
 
 type FormData = ReturnType<typeof blogPostToFormData>;
 
@@ -63,9 +63,8 @@ export function ContentEditor({ section, post, userEmail }: ContentEditorProps) 
   };
 
   return (
-    <div className="min-h-screen bg-racing-dark text-white">
-      <Sidebar title="Admin Panel" subtitle={userEmail} />
-      <div className="ml-[76px] transition-all duration-300">
+    <AdminShell userEmail={userEmail}>
+      <div className="min-h-screen bg-racing-dark text-white">
         <header className="sticky top-0 z-10 border-b border-white/10 bg-white/5 backdrop-blur-md">
           <div className="container mx-auto flex items-center justify-between px-6 py-4">
             <div>
@@ -149,6 +148,6 @@ export function ContentEditor({ section, post, userEmail }: ContentEditorProps) 
           </aside>
         </main>
       </div>
-    </div>
+    </AdminShell>
   );
 }

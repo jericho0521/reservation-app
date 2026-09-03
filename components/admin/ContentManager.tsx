@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Edit, ExternalLink, Plus, Trash2 } from "lucide-react";
 import { getSectionLabels, type BlogPostRecord, type ContentSectionType } from "@/lib/blogs";
-import { Sidebar } from "@/components/admin/Sidebar";
+import { AdminShell } from "@/components/admin/AdminShell";
 
 interface ContentManagerProps {
   section: ContentSectionType;
@@ -47,9 +47,8 @@ export function ContentManager({ section, posts, userEmail }: ContentManagerProp
   };
 
   return (
-    <div className="min-h-screen bg-racing-dark text-white">
-      <Sidebar title="Admin Panel" subtitle={userEmail} />
-      <div className="ml-[76px] transition-all duration-300">
+    <AdminShell userEmail={userEmail}>
+      <div className="min-h-screen bg-racing-dark text-white">
         <header className="sticky top-0 z-10 border-b border-white/10 bg-white/5 backdrop-blur-md">
           <div className="container mx-auto flex items-center justify-between px-6 py-4">
             <div>
@@ -114,6 +113,6 @@ export function ContentManager({ section, posts, userEmail }: ContentManagerProp
           </div>
         </main>
       </div>
-    </div>
+    </AdminShell>
   );
 }

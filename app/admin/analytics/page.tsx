@@ -16,6 +16,7 @@ import {
 } from '@/components/analytics/renderer/AnalyticsRenderer';
 import type { AnalyticsAction, AnalyticsSpec } from '@/components/analytics/renderer/spec-types';
 import { Sidebar } from '@/components/admin/Sidebar';
+import '@/app/admin/AdminDashboard.css';
 
 interface AnalyticsApiResponse {
     spec?: AnalyticsSpec | null;
@@ -134,12 +135,12 @@ export default function AnalyticsPage() {
     };
 
     return (
-        <div className="min-h-screen bg-racing-dark">
+        <div className="admin-shell min-h-screen bg-racing-dark">
             {/* Sidebar */}
             <Sidebar title="Admin Panel" subtitle="Analytics" />
 
             {/* Main Layout with margin for sidebar */}
-            <div className="ml-[76px] transition-all duration-300">
+            <div className="admin-main">
                 {/* Header */}
                 <header className="border-b border-white/10 bg-white/5 sticky top-0 z-10 backdrop-blur-md">
                     <div className="container mx-auto px-6 py-4 flex items-center justify-between">

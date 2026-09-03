@@ -3,6 +3,7 @@ import test from 'node:test';
 import {
     filterBookings,
     filterBookingsForBoard,
+    filterBookingsForTable,
     formatRefreshTime,
     getAdminBookingsLoadError,
     getBookingSummary,
@@ -131,6 +132,19 @@ test('groupBookingsByLane maps database statuses to the four workflow lanes', ()
 test('shiftDate performs timezone-independent date navigation', () => {
     assert.equal(shiftDate('2026-03-31', 1), '2026-04-01');
     assert.equal(shiftDate('2026-03-01', -1), '2026-02-28');
+});
+
+test('filterBookingsForTable combines status and date-range filters', () => {
+    assert.deepEqual(
+        filterBookingsForTable(bookings, {
+            search: '',
+            service: 'all',
+            status: 'completed',
+            dateFrom: '2026-03-11',
+            dateTo: '2026-03-13',
+        }).map(booking => booking.id),
+        ['2'],
+    );
 });
 
 test('formatRefreshTime formats the client refresh timestamp after hydration', () => {

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { POST } from "./route";
 import { getBookingDateBounds } from "@/lib/booking-schedule";
-import { buildBookingSearchFilter, normalizeBookingSearchTerm } from "./search-utils";
+import { bookingListFiltersSchema, buildBookingSearchFilter, normalizeBookingSearchTerm } from "./search-utils";
 import { bookingUpdateSchema } from "./update-schema";
 
 test("POST /api/bookings returns 400 for invalid booking payloads", async () => {
@@ -105,4 +105,19 @@ test("bookingUpdateSchema accepts the in-progress admin workflow status", () => 
 
 test("bookingUpdateSchema rejects unknown workflow statuses", () => {
   assert.throws(() => bookingUpdateSchema.parse({ status: "pending" }));
+});
+
+test("bookingListFiltersSchema accepts exact-date and service filters", () => {
+  assert.deepEqual(bookingListFiltersSchema.parse({
+    date: "2026-09-03",
+    service_id: "11111111-1111-4111-8111-111111111111",
+  }), {
+    date: "2026-09-03",
+    service_id: "11111111-1111-4111-8111-111111111111",
+  });
+});
+
+test("bookingListFiltersSchema rejects malformed dates", () => {
+  assert.throws(() => bookingListFiltersSchema.parse({ date: "03/09/2026" }));
+  assert.throws(() => bookingListFiltersSchema.parse({ date: "2026-02-31" }));
 });

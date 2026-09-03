@@ -7,7 +7,7 @@ import {
 } from '@/lib/create-booking';
 import { jsonError, requireAuthenticatedSupabase, supabaseErrorStatus } from '@/app/api/api-utils';
 import { formBookingRequestSchema } from '@/lib/booking-schema';
-import { buildBookingSearchFilter, normalizeBookingSearchTerm } from './search-utils';
+import { bookingListFiltersSchema, buildBookingSearchFilter, normalizeBookingSearchTerm } from './search-utils';
 import { z } from 'zod';
 
 export async function GET(request: NextRequest) {
@@ -18,7 +18,17 @@ export async function GET(request: NextRequest) {
             return auth.response;
         }
 
-        const search = normalizeBookingSearchTerm(request.nextUrl.searchParams.get('search'));
+        const filtersResult = bookingListFiltersSchema.safeParse({
+            date: request.nextUrl.searchParams.get('date') ?? undefined,
+            service_id: request.nextUrl.searchParams.get('service_id') ?? undefined,
+            search: request.nextUrl.searchParams.get('search') ?? undefined,
+        });
+
+        if (!filtersResult.success) {
+            return jsonError('Invalid booking filters', 400, { details: filtersResult.error.issues });
+        }
+
+        const search = normalizeBookingSearchTerm(filtersResult.data.search ?? null);
 
         let query = auth.supabase
             .from('bookings')
@@ -30,6 +40,14 @@ export async function GET(request: NextRequest) {
             query = query
                 .or(buildBookingSearchFilter(search))
                 .limit(100);
+        }
+
+        if (filtersResult.data.date) {
+            query = query.eq('booking_date', filtersResult.data.date);
+        }
+
+        if (filtersResult.data.service_id) {
+            query = query.eq('service_id', filtersResult.data.service_id);
         }
 
         const { data, error } = await query;

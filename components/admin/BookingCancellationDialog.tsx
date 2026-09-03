@@ -19,12 +19,16 @@ export function BookingCancellationDialog({
     useEffect(() => {
         if (!booking) return;
 
+        const previousFocus = document.activeElement as HTMLElement | null;
         keepButtonRef.current?.focus();
         const handleKeyDown = (event: KeyboardEvent) => {
             if (event.key === 'Escape') onCancel();
         };
         window.addEventListener('keydown', handleKeyDown);
-        return () => window.removeEventListener('keydown', handleKeyDown);
+        return () => {
+            window.removeEventListener('keydown', handleKeyDown);
+            previousFocus?.focus();
+        };
     }, [booking, onCancel]);
 
     if (!booking) return null;

@@ -1,8 +1,10 @@
 'use client';
 
 import { useRef, useState } from 'react';
+import { ArrowRight, LockKeyhole } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase-browser';
+import './login.css';
 
 export default function AdminLoginPage() {
     const [email, setEmail] = useState('');
@@ -11,85 +13,92 @@ export default function AdminLoginPage() {
     const [isLoading, setIsLoading] = useState(false);
     const router = useRouter();
     const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null);
+
     const getSupabase = () => {
-        if (!supabaseRef.current) supabaseRef.current = createClient();
+        supabaseRef.current ??= createClient();
         return supabaseRef.current;
     };
 
-    const handleLogin = async (e: React.FormEvent) => {
-        e.preventDefault();
+    const handleLogin = async (event: React.FormEvent) => {
+        event.preventDefault();
         setError('');
         setIsLoading(true);
 
         try {
-            const { error } = await getSupabase().auth.signInWithPassword({
-                email,
-                password,
-            });
+            const { error: signInError } = await getSupabase().auth.signInWithPassword({ email, password });
 
-            if (error) {
-                setError(error.message);
-            } else {
-                router.push('/admin');
-                router.refresh();
+            if (signInError) {
+                setError(signInError.message);
+                return;
             }
+
+            router.push('/admin');
+            router.refresh();
         } catch {
-            setError('An unexpected error occurred');
+            setError('An unexpected error occurred. Try again.');
         } finally {
             setIsLoading(false);
         }
     };
 
     return (
-        <div className="min-h-screen bg-racing-dark flex items-center justify-center px-4">
-            <div className="w-full max-w-md">
-                <div className="glass-panel p-8 rounded-xl border border-white/10">
-                    <h1 className="text-2xl font-bold font-heading mb-2 text-center">Admin Login</h1>
-                    <p className="text-gray-400 text-sm text-center mb-6">
-                        Access the booking dashboard
-                    </p>
-
-                    {error && (
-                        <div className="bg-red-500/20 border border-red-500/50 text-red-300 px-4 py-3 rounded-lg mb-4">
-                            {error}
-                        </div>
-                    )}
-
-                    <form onSubmit={handleLogin} className="space-y-4">
-                        <div>
-                            <label className="block text-sm font-medium mb-2">Email</label>
-                            <input
-                                type="email"
-                                value={email}
-                                onChange={(e) => setEmail(e.target.value)}
-                                className="w-full px-4 py-3 bg-white/5 border border-white/20 rounded-lg text-white placeholder-gray-500 focus:border-neon focus:outline-none focus:ring-1 focus:ring-neon"
-                                placeholder="admin@example.com"
-                                required
-                            />
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium mb-2">Password</label>
-                            <input
-                                type="password"
-                                value={password}
-                                onChange={(e) => setPassword(e.target.value)}
-                                className="w-full px-4 py-3 bg-white/5 border border-white/20 rounded-lg text-white placeholder-gray-500 focus:border-neon focus:outline-none focus:ring-1 focus:ring-neon"
-                                placeholder="••••••••"
-                                required
-                            />
-                        </div>
-
-                        <button
-                            type="submit"
-                            disabled={isLoading}
-                            className="w-full py-3 bg-neon text-racing-dark font-bold rounded-lg hover:bg-white transition-colors disabled:opacity-50"
-                        >
-                            {isLoading ? 'Signing in...' : 'Sign In'}
-                        </button>
-                    </form>
+        <main className="admin-login-page">
+            <section className="admin-login-intro" aria-labelledby="admin-login-title">
+                <div className="admin-login-brand">
+                    <span aria-hidden="true">PP</span>
+                    <div><strong>Project Play</strong><small>Operations</small></div>
                 </div>
-            </div>
-        </div>
+
+                <div className="admin-login-copy">
+                    <span className="admin-login-kicker">Reservation control</span>
+                    <h1 id="admin-login-title">Keep every session moving.</h1>
+                    <p>A focused workspace for bookings, customer arrivals, and seat availability.</p>
+                </div>
+
+                <p className="admin-login-footnote">Authorized team access only</p>
+            </section>
+
+            <section className="admin-login-form-panel" aria-label="Admin sign in">
+                <form onSubmit={handleLogin} className="admin-login-form">
+                    <div className="admin-login-form-heading">
+                        <LockKeyhole aria-hidden="true" />
+                        <span className="admin-login-kicker">Secure workspace</span>
+                        <h2>Sign in</h2>
+                        <p>Use your administrator account to continue.</p>
+                    </div>
+
+                    {error && <div className="admin-login-error" role="alert">{error}</div>}
+
+                    <label>
+                        <span>Email address</span>
+                        <input
+                            type="email"
+                            value={email}
+                            onChange={event => setEmail(event.target.value)}
+                            autoComplete="email"
+                            placeholder="admin@example.com"
+                            required
+                        />
+                    </label>
+
+                    <label>
+                        <span>Password</span>
+                        <input
+                            type="password"
+                            value={password}
+                            onChange={event => setPassword(event.target.value)}
+                            autoComplete="current-password"
+                            placeholder="Enter your password"
+                            required
+                        />
+                    </label>
+
+                    <button type="submit" disabled={isLoading}>
+                        <span>{isLoading ? 'Signing in' : 'Continue'}</span>
+                        <ArrowRight aria-hidden="true" />
+                    </button>
+                </form>
+            </section>
+        </main>
     );
 }

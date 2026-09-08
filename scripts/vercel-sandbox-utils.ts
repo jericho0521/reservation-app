@@ -17,31 +17,25 @@ export async function runChecked(
   args: string[],
   options: RunOptions = {},
 ) {
-  const result = await sandbox.runCommand({
-    cmd,
-    args,
-    cwd: options.cwd,
-    env: options.env,
-    sudo: options.sudo,
-  });
-
-  const stdout = (await result.stdout()).trim();
-  const stderr = (await result.stderr()).trim();
-
-  if (result.exitCode !== 0) {
-    throw new Error(
-      [
-        `Command failed: ${cmd} ${args.join(" ")}`,
-        `Exit code: ${result.exitCode}`,
-        stdout && `stdout:\n${stdout}`,
-        stderr && `stderr:\n${stderr}`,
-      ]
-        .filter(Boolean)
-        .join("\n\n"),
-    );
+  try {
+    const result = await sandbox.runCommand({
+      cmd,
+      args,
+      cwd: options.cwd,
+      env: options.env,
+      sudo: options.sudo,
+    });
+  
+    const stdout = (await result.stdout()).trim();
+  
+    if (result.exitCode !== 0) {
+      throw new Error("Sandbox command failed");
+    }
+  
+    return stdout;
+  } catch {
+    throw new Error("Sandbox command failed; arguments and output omitted to protect credentials");
   }
-
-  return stdout;
 }
 
 export async function runShell(
@@ -68,8 +62,9 @@ export async function stopSandbox(sandbox: Sandbox | undefined) {
   }
 
   try {
-    await sandbox.stop();
+    await sandbox.delete();
   } catch (error) {
-    console.warn("Could not stop sandbox cleanly:", error);
+    console.warn("Could not delete sandbox cleanly:", error);
+    process.exitCode = 1;
   }
 }

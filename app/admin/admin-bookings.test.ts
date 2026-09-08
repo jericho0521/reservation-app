@@ -56,3 +56,24 @@ test('loadAllAdminBookings returns every booking with newest-created first', asy
         [1_000, 1_999],
     ]);
 });
+
+test('table pages apply filters before a bounded database range', async () => {
+  const { loadAdminBookingsPage } = await import('./admin-bookings');
+  const filters: unknown[] = [];
+  let range: number[] = [];
+  const query = {
+    select: (...args: unknown[]) => { filters.push(args); return query; },
+    eq: (...args: unknown[]) => { filters.push(args); return query; },
+    gte: (...args: unknown[]) => { filters.push(args); return query; },
+    lte: (...args: unknown[]) => { filters.push(args); return query; },
+    order: () => query,
+    range: async (from: number, to: number) => { range = [from, to]; return { data: [], count: 51, error: null }; },
+  };
+  const result = await loadAdminBookingsPage({ from: () => query } as unknown as SupabaseClient, {
+    page: 2, status: 'confirmed', service: 'Racing Simulator', dateFrom: '2026-09-01',
+  });
+  assert.deepEqual(range, [25, 49]);
+  assert.equal(result.count, 51);
+  assert.ok(JSON.stringify(filters).includes('services!inner('));
+  assert.ok(JSON.stringify(filters).includes('confirmed'));
+});

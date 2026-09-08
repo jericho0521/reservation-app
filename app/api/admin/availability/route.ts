@@ -3,11 +3,11 @@ import { z } from 'zod';
 import { jsonError, requireAdminSupabase, supabaseErrorStatus } from '@/app/api/api-utils';
 import { generateTimeSlots } from '@/lib/availability';
 import { loadBookingAvailabilityResources } from '@/lib/booking-availability';
-import { isBookingDateWithinWindow, isBookingSlotElapsed } from '@/lib/booking-schedule';
+import { isBookingDateWithinWindow, isBookingSlotElapsed, isCurrentBookingSlot } from '@/lib/booking-schedule';
 
 /**
  * Availability for staff recording walk-ins. Unlike the public endpoint this
- * keeps hours that have already started, because a walk-in customer is
+ * keeps only the current started hour, because a walk-in customer is
  * usually booked into the current hour.
  */
 export async function GET(request: Request) {
@@ -53,7 +53,7 @@ export async function GET(request: Request) {
             service.total_seats,
             resources.bookings,
             resources.maintenanceSeatLabels,
-        ).map(slot => ({
+        ).filter(slot => !isBookingSlotElapsed(date, slot.start_time, now) || isCurrentBookingSlot(date, slot.start_time, now)).map(slot => ({
             ...slot,
             has_started: isBookingSlotElapsed(date, slot.start_time, now),
         }));

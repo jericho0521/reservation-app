@@ -117,6 +117,12 @@ function getMalaysiaTimestamp(now: Date): number {
     return Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute);
 }
 
+export function isCurrentBookingSlot(bookingDate: string, startTime: string, now: Date = new Date()): boolean {
+    const start = getSlotTimestamp(bookingDate, startTime);
+    const current = getMalaysiaTimestamp(now);
+    return start !== null && start <= current && current < start + 60 * 60 * 1000;
+}
+
 export function isBookingSlotElapsed(
     bookingDate: string,
     startTime: string,

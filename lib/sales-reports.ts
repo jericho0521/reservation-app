@@ -262,7 +262,7 @@ export function parseTransactionCount(value: unknown): number | null {
   }
 
   if (typeof value === "number") {
-    return Number.isFinite(value) ? Math.max(0, Math.round(value)) : null;
+    return Number.isFinite(value) ? Math.round(value) : null;
   }
 
   if (typeof value !== "string") {
@@ -270,45 +270,24 @@ export function parseTransactionCount(value: unknown): number | null {
   }
 
   const parsed = Number(value.replace(/[^\d.-]/g, ""));
-  return Number.isFinite(parsed) ? Math.max(0, Math.round(parsed)) : null;
+  return Number.isFinite(parsed) ? Math.round(parsed) : null;
 }
 
 export function normalizeReportDate(value: string | null | undefined): string | null {
-  if (!value) {
-    return null;
-  }
-
+  if (!value) return null;
   const trimmed = value.trim();
-
-  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
-    return trimmed;
-  }
-
-  const parsed = new Date(trimmed);
-
-  if (Number.isNaN(parsed.getTime())) {
-    return null;
-  }
-
-  return parsed.toISOString().slice(0, 10);
+  return z.string().date().safeParse(trimmed).success ? trimmed : null;
 }
 
 export function normalizeDateTime(value: string | null | undefined): string | null {
-  if (!value) {
-    return null;
+  if (!value) return null;
+  let timestamp = value.trim().replace(' ', 'T');
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?$/.test(timestamp)) {
+    if (timestamp.length === 16) timestamp += ':00';
+    timestamp += '+08:00';
   }
-
-  const trimmed = value.trim();
-  const normalized = trimmed
-    .replace(/\s+AM$/i, " AM")
-    .replace(/\s+PM$/i, " PM");
-  const parsed = new Date(normalized);
-
-  if (Number.isNaN(parsed.getTime())) {
-    return null;
-  }
-
-  return parsed.toISOString();
+  if (!z.string().datetime({ offset: true }).safeParse(timestamp).success) return null;
+  return new Date(timestamp).toISOString();
 }
 
 export function normalizePaymentBreakdown(

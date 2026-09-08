@@ -100,3 +100,17 @@ test("validateSalesReportFile rejects unsupported files", () => {
   );
   assert.equal(validateSalesReportFile({ name: "report.pdf", type: "application/pdf", size: 100 }), null);
 });
+
+test('impossible report dates require review', () => {
+  const report = normalizeExtractedSalesReport({ reportDate: '2026-02-30', netSales: 10 });
+  assert.equal(report.reportDate, null);
+});
+test('negative counts remain invalid instead of becoming zero', () => {
+  const report = normalizeExtractedSalesReport({ reportDate: '2026-09-08', netSales: 10, transactionCount: -2 });
+  assert.equal(report.transactionCount, -2);
+  assert.ok(report.validationWarnings.includes('Invalid negative transaction count.'));
+});
+test('timezone-less shifts use the Malaysia business timezone', () => {
+  const report = normalizeExtractedSalesReport({ reportDate: '2026-09-08', shiftStartAt: '2026-09-08 01:30:00' });
+  assert.equal(report.shiftStartAt, '2026-09-07T17:30:00.000Z');
+});

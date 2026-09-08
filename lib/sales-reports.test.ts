@@ -53,7 +53,7 @@ test("normalizeExtractedSalesReport parses dates, RM amounts, payments, and conf
   assert.deepEqual(report.validationWarnings, []);
 });
 
-test("evaluateSalesReportForPublishing auto-publishes high-confidence valid reports", () => {
+test("evaluateSalesReportForPublishing requires human review even for high-confidence valid reports", () => {
   const report = normalizeExtractedSalesReport({
     reportDate: "2026-04-24",
     topupRegisterAmount: 75,
@@ -67,8 +67,8 @@ test("evaluateSalesReportForPublishing auto-publishes high-confidence valid repo
   });
 
   assert.deepEqual(evaluateSalesReportForPublishing(report), {
-    status: "auto_published",
-    isPublished: true,
+    status: "needs_review",
+    isPublished: false,
     warnings: [],
   });
 });

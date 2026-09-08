@@ -409,12 +409,8 @@ export function evaluateSalesReportForPublishing(
     warnings.push("A published sales report already exists for this date.");
   }
 
-  const hasBlockingWarning = warnings.some(warning =>
-    warning.startsWith("Missing") ||
-    warning.startsWith("Invalid") ||
-    warning.includes("already exists")
-  );
-  const isPublished = report.confidenceScore >= SALES_REPORT_AUTO_PUBLISH_CONFIDENCE && !hasBlockingWarning;
+  // Extraction confidence is model output, not authorization to publish financial data.
+  const isPublished = false;
 
   return {
     status: isPublished ? "auto_published" : "needs_review",

@@ -27,6 +27,7 @@ interface FormData extends Partial<Booking> {
 }
 
 interface BookingConfirmation {
+    submitted: FormData;
     bookingId?: string;
     emailSent: boolean;
 }
@@ -116,6 +117,7 @@ export default function MultiStepForm() {
     };
 
     const handleSubmit = async () => {
+        if (isSubmitting) return;
         const errors = getBookingDetailErrors(formData);
         if (Object.keys(errors).length > 0 || !isStepValid(2, formData)) {
             setDetailErrors(errors);
@@ -146,6 +148,7 @@ export default function MultiStepForm() {
             if (response.ok) {
                 const booking = await response.json();
                 setConfirmation({
+                    submitted: structuredClone(formData),
                     bookingId: typeof booking.id === 'string' ? booking.id : undefined,
                     emailSent: booking.email_sent === true,
                 });
@@ -169,15 +172,15 @@ export default function MultiStepForm() {
 
                 {/* Animated Booking Ticket */}
                 <BookingTicket
-                    service={formData.service_name || 'Racing Simulator'}
-                    date={formData.booking_date || ''}
-                    time={formData.start_time && formData.end_time
-                        ? `${formData.start_time} - ${formData.end_time}`
-                        : formData.start_time || ''}
-                    seats={formData.seats_booked || 1}
-                    name={formData.user_name || ''}
-                    email={formData.user_email || ''}
-                    phone={formData.user_phone || ''}
+                    service={confirmation.submitted.service_name || 'Racing Simulator'}
+                    date={confirmation.submitted.booking_date || ''}
+                    time={confirmation.submitted.start_time && confirmation.submitted.end_time
+                        ? `${confirmation.submitted.start_time} - ${confirmation.submitted.end_time}`
+                        : confirmation.submitted.start_time || ''}
+                    seats={confirmation.submitted.seats_booked || 1}
+                    name={confirmation.submitted.user_name || ''}
+                    email={confirmation.submitted.user_email || ''}
+                    phone={confirmation.submitted.user_phone || ''}
                     bookingId={confirmation.bookingId}
                     emailSent={confirmation.emailSent}
                 />
@@ -289,7 +292,7 @@ export default function MultiStepForm() {
                     />
                 )}
 
-                {currentStep === 4 && <BookingSummary booking={formData} />}
+                {currentStep === 4 && <BookingSummary booking={{ ...formData, seat_labels: formData.selected_seat_labels }} />}
             </div>
 
             {submissionError && (
@@ -302,6 +305,7 @@ export default function MultiStepForm() {
             <div className="flex justify-between mt-10 pt-6 border-t border-white/10">
                 {currentStep > 1 ? (
                     <button
+                        disabled={isSubmitting}
                         onClick={prevStep}
                         className="px-6 py-3 border border-white/20 rounded-lg hover:border-neon hover:text-neon transition-colors"
                     >

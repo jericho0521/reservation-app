@@ -3,6 +3,7 @@ import type { CreateBookingInput } from './booking-schema';
 import { loadBookingAvailabilityResources } from './booking-availability';
 import {
     isBookingDateWithinWindow,
+    isCurrentBookingSlot,
     isBookingSlotElapsed,
     isValidBookingTimeRange,
 } from './booking-schedule';
@@ -59,7 +60,7 @@ export function validateBookingSchedule(
             400,
         );
     }
-    if (!options.allowStartedSlot && isBookingSlotElapsed(input.booking_date, input.start_time, now)) {
+    if (isBookingSlotElapsed(input.booking_date, input.start_time, now) && !(options.allowStartedSlot && isCurrentBookingSlot(input.booking_date, input.start_time, now))) {
         throw new BookingCreationError('This booking time has already started or ended', 409);
     }
 
@@ -72,10 +73,16 @@ export function validateSeatSelection(
 ): void {
     const requestedSeatLabels = input.seat_labels ?? [];
 
+    if (service.total_seats !== 16 && requestedSeatLabels.length > 0) {
+        throw new BookingCreationError('This service does not use numbered seats', 400);
+    }
+    if (new Set(requestedSeatLabels).size !== requestedSeatLabels.length || requestedSeatLabels.some(label => !/^RS(?:[1-9]|1[0-6])$/.test(label))) {
+        throw new BookingCreationError('Invalid or duplicate seat labels', 400);
+    }
     const requiresExplicitSeats = input.interface_type === 'form' || input.interface_type === 'walk_in';
 
     if (
-        requiresExplicitSeats &&
+        (requiresExplicitSeats || requestedSeatLabels.length > 0) &&
         service.total_seats === 16 &&
         requestedSeatLabels.length !== input.seats_booked
     ) {
@@ -148,7 +155,7 @@ export async function createConfirmedBooking(
     }
 
     if (!booking.user_email) {
-        return { ...booking, email_sent: false };
+        return { ...booking, email_requested: false, email_sent: false };
     }
 
     const emailResult = await sendBookingConfirmationEmail({
@@ -167,6 +174,7 @@ export async function createConfirmedBooking(
 
     return {
         ...booking,
+        email_requested: true,
         email_sent: emailResult.sent,
     };
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { Armchair, CheckCircle2, Clock3, Users, X } from 'lucide-react';
 import type { Service, TimeSlot } from '@/types';
@@ -30,6 +30,7 @@ interface CreatedBooking {
     end_time: string;
     seats_booked: number;
     seat_labels?: string[] | null;
+    email_requested?: boolean;
     email_sent?: boolean;
 }
 
@@ -79,7 +80,10 @@ export function WalkInBookingForm({ userEmail, today, maxDate }: WalkInBookingFo
     const slots = useMemo(() => availability?.timeSlots ?? [], [availability]);
     const endTime = startTime ? getEndTime(startTime, durationHours) : '';
 
+    const availabilityGeneration = useRef(0);
     const loadAvailability = useCallback(async () => {
+        const generation = ++availabilityGeneration.current;
+        setAvailability(null);
         if (!serviceId || !date) {
             setAvailability(null);
             return;
@@ -96,12 +100,14 @@ export function WalkInBookingForm({ userEmail, today, maxDate }: WalkInBookingFo
                 throw new Error(payload?.error || 'Availability could not be loaded.');
             }
 
+            if (generation !== availabilityGeneration.current) return;
             setAvailability(payload);
         } catch (error) {
+            if (generation !== availabilityGeneration.current) return;
             setAvailability(null);
             setAvailabilityError(error instanceof Error ? error.message : 'Availability could not be loaded.');
         } finally {
-            setIsLoadingAvailability(false);
+            if (generation === availabilityGeneration.current) setIsLoadingAvailability(false);
         }
     }, [date, serviceId]);
 
@@ -132,6 +138,7 @@ export function WalkInBookingForm({ userEmail, today, maxDate }: WalkInBookingFo
 
     useEffect(() => {
         void loadAvailability();
+        return () => { availabilityGeneration.current += 1; };
     }, [loadAvailability]);
 
     // Changing the service or date invalidates the time and seat choices.
@@ -315,7 +322,9 @@ export function WalkInBookingForm({ userEmail, today, maxDate }: WalkInBookingFo
                         <p className="admin-success-note">
                             {created.email_sent
                                 ? 'A confirmation email was sent to the customer.'
-                                : 'No confirmation email was sent because no email address was given.'}
+                                : created.email_requested
+                                    ? 'The booking is confirmed, but email delivery failed. Please share the booking details with the customer.'
+                                    : 'No confirmation email was sent because no email address was given.'}
                             {' '}Online customers can no longer book these seats for this time.
                         </p>
                         <div className="admin-success-actions">

@@ -93,3 +93,17 @@ test('walk-in requests only require a customer name', () => {
         seats_booked: 1,
     }));
 });
+
+test('walk-in exception cannot book an earlier elapsed hour', () => {
+  assert.throws(() => validateBookingSchedule({ ...booking, start_time: '12:00', end_time: '15:00' }, {
+    now: new Date('2026-08-03T06:30:00Z'), allowStartedSlot: true,
+  }), BookingCreationError);
+});
+test('unnumbered services reject explicit racing seat labels', () => {
+  assert.throws(() => validateSeatSelection({ ...racingService, total_seats: 2 }, {
+    ...booking, seats_booked: 1, seat_labels: ['RS1', 'RS2'],
+  }), BookingCreationError);
+});
+test('chat explicit seat labels must match the reserved count', () => {
+  assert.throws(() => validateSeatSelection(racingService, { ...booking, seats_booked: 1, seat_labels: ['RS1', 'RS2'] }), BookingCreationError);
+});

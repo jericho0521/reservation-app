@@ -1,13 +1,12 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ChevronLeft, ChevronRight, RefreshCw, Search, X } from 'lucide-react';
 import { createClient } from '@/lib/supabase-browser';
-import { loadAllAdminBookings } from '@/app/admin/admin-bookings';
+import { loadAdminBookingsPage } from '@/app/admin/admin-bookings';
 import {
     ADMIN_BOOKING_STATUSES,
     ADMIN_STATUS_LABELS as STATUS_LABELS,
-    filterBookingsForTable,
     formatRefreshTime,
     getBookingSourceLabel,
     getServiceName,
@@ -27,11 +26,12 @@ const BOOKING_DATE_FORMATTER = new Intl.DateTimeFormat('en-MY', {
 
 interface BookingsTableProps {
     initialBookings: AdminBooking[];
+    initialCount: number;
     userEmail: string;
     loadError: string | null;
 }
 
-export function BookingsTable({ initialBookings, userEmail, loadError }: BookingsTableProps) {
+export function BookingsTable({ initialBookings, initialCount, userEmail, loadError }: BookingsTableProps) {
     const [bookings, setBookings] = useState(initialBookings);
     const [search, setSearch] = useState('');
     const [status, setStatus] = useState<AdminBookingStatus | 'all'>('all');
@@ -47,18 +47,14 @@ export function BookingsTable({ initialBookings, userEmail, loadError }: Booking
     const [notice, setNotice] = useState<{ tone: 'error' | 'success'; message: string } | null>(null);
     const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null);
 
-    const services = useMemo(() => (
-        [...new Set(bookings.map(booking => getServiceName(booking.services)))].sort()
-    ), [bookings]);
-    const filteredBookings = useMemo(() => filterBookingsForTable(bookings, {
-        search,
-        status,
-        service,
-        dateFrom,
-        dateTo,
-    }), [bookings, dateFrom, dateTo, search, service, status]);
-    const totalPages = Math.max(1, Math.ceil(filteredBookings.length / PAGE_SIZE));
-    const pageBookings = filteredBookings.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+    const [services, setServices] = useState<string[]>([]);
+    const [totalCount, setTotalCount] = useState(initialCount);
+    const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
+    const pageBookings = bookings;
+    const requestRef = useRef<AbortController | null>(null);
+    useEffect(() => {
+        void fetch('/api/services').then(response => response.json()).then((data: { name: string }[]) => setServices(data.map(service => service.name))).catch(() => undefined);
+    }, []);
     const selectedBooking = bookings.find(booking => booking.id === selectedBookingId) ?? null;
 
     useEffect(() => {
@@ -70,31 +66,44 @@ export function BookingsTable({ initialBookings, userEmail, loadError }: Booking
     }, [page, totalPages]);
 
     const refreshBookings = useCallback(async () => {
+        requestRef.current?.abort();
+        const controller = new AbortController();
+        requestRef.current = controller;
         setIsRefreshing(true);
         supabaseRef.current ??= createClient();
-        const result = await loadAllAdminBookings(supabaseRef.current);
+        const result = await loadAdminBookingsPage(supabaseRef.current, { page, search, status, service, dateFrom, dateTo }, controller.signal);
+        if (controller.signal.aborted) return;
 
         if (result.error) {
             setNotice({ tone: 'error', message: 'Bookings could not be refreshed. Try again.' });
         } else {
             setBookings(result.data);
+            setTotalCount(result.count);
             setLastRefresh(new Date());
         }
         setIsRefreshing(false);
-    }, []);
+    }, [page, search, status, service, dateFrom, dateTo]);
+
+    useEffect(() => {
+        const timer = window.setTimeout(() => void refreshBookings(), 200);
+        return () => { window.clearTimeout(timer); requestRef.current?.abort(); };
+    }, [refreshBookings]);
 
     useEffect(() => {
         setLastRefresh(new Date());
         supabaseRef.current ??= createClient();
         const supabase = supabaseRef.current;
+        let refreshTimer: ReturnType<typeof setTimeout>;
         const channel = supabase
             .channel('admin-bookings-table')
             .on('postgres_changes', { event: '*', schema: 'public', table: 'bookings' }, () => {
-                void refreshBookings();
+                clearTimeout(refreshTimer);
+                refreshTimer = setTimeout(() => void refreshBookings(), 200);
             })
             .subscribe();
 
         return () => {
+            clearTimeout(refreshTimer);
             void supabase.removeChannel(channel);
         };
     }, [refreshBookings]);
@@ -196,7 +205,7 @@ export function BookingsTable({ initialBookings, userEmail, loadError }: Booking
 
                 <div className="admin-table-meta">
                     <span>
-                        {filteredBookings.length} booking{filteredBookings.length === 1 ? '' : 's'}
+                        {totalCount} booking{totalCount === 1 ? '' : 's'}
                         {hasFilters ? ' match your filters' : ' in total'}
                     </span>
                     <span>{formatRefreshTime(lastRefresh)}</span>

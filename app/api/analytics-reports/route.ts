@@ -1,10 +1,10 @@
+import { readLimitedFormData, RequestBodyError } from "@/lib/request-body";
+import { storeReportUpload } from "@/lib/report-upload";
 import { NextResponse } from "next/server";
 import {
-  buildStoragePath,
   isSalesReportSetupError,
   loadSalesReports,
   requireAdminSupabase,
-  SALES_REPORT_BUCKET,
   salesReportSetupResponse,
   validateUploadFile,
 } from "./report-utils";
@@ -23,6 +23,7 @@ export async function GET() {
     const reports = await loadSalesReports(supabase);
     return NextResponse.json({ reports });
   } catch (error) {
+    if (error instanceof RequestBodyError) return NextResponse.json({ error: error.message }, { status: error.status });
     if (isSalesReportSetupError(error)) {
       return salesReportSetupResponse();
     }
@@ -40,7 +41,7 @@ export async function POST(request: Request) {
       return response ?? NextResponse.json({ error: "Admin authentication required" }, { status: 401 });
     }
 
-    const formData = await request.formData();
+    const formData = await readLimitedFormData(request);
     const file = formData.get("file");
 
     if (!(file instanceof File)) {
@@ -53,46 +54,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: validationError }, { status: 400 });
     }
 
-    const storagePath = buildStoragePath(user.id, file.name);
-    const { error: uploadError } = await supabase.storage
-      .from(SALES_REPORT_BUCKET)
-      .upload(storagePath, file, {
-        contentType: file.type,
-        upsert: false,
-      });
-
-    if (uploadError) {
-      if (isSalesReportSetupError(uploadError)) {
-        return salesReportSetupResponse();
-      }
-
-      throw uploadError;
-    }
-
-    const { data: document, error: insertError } = await supabase
-      .from("sales_report_documents")
-      .insert({
-        uploaded_by: user.id,
-        file_name: file.name,
-        file_type: file.type,
-        file_size: file.size,
-        storage_bucket: SALES_REPORT_BUCKET,
-        storage_path: storagePath,
-        status: "pending",
-      })
-      .select()
-      .single();
-
-    if (insertError) {
-      if (isSalesReportSetupError(insertError)) {
-        return salesReportSetupResponse();
-      }
-
-      throw insertError;
-    }
+    const document = await storeReportUpload(supabase, user.id, file);
 
     return NextResponse.json({ document }, { status: 201 });
   } catch (error) {
+    if (error instanceof RequestBodyError) return NextResponse.json({ error: error.message }, { status: error.status });
     if (isSalesReportSetupError(error)) {
       return salesReportSetupResponse();
     }

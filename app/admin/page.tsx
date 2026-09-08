@@ -21,7 +21,7 @@ export default async function AdminPage() {
     }
 
     const today = getBookingDateBounds().minDate;
-    const bookingsResult = await loadAllAdminBookings(supabase);
+    const bookingsResult = await loadAllAdminBookings(supabase, today);
 
     return (
         <AdminDashboard

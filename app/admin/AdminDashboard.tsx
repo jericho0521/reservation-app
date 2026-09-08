@@ -253,10 +253,15 @@ export default function AdminDashboard({
         [activeBookingId, bookings],
     );
 
+    const requestRef = useRef<AbortController | null>(null);
     const refreshBookings = useCallback(async () => {
+        requestRef.current?.abort();
+        const controller = new AbortController();
+        requestRef.current = controller;
         setIsRefreshing(true);
         supabaseRef.current ??= createClient();
-        const result = await loadAllAdminBookings(supabaseRef.current);
+        const result = await loadAllAdminBookings(supabaseRef.current, selectedDate, controller.signal);
+        if (controller.signal.aborted) return;
 
         if (result.error) {
             setNotice({ tone: 'error', message: 'Bookings could not be refreshed. Try again.' });
@@ -265,7 +270,12 @@ export default function AdminDashboard({
             setLastRefresh(new Date());
         }
         setIsRefreshing(false);
-    }, []);
+    }, [selectedDate]);
+
+    useEffect(() => {
+        void refreshBookings();
+        return () => requestRef.current?.abort();
+    }, [refreshBookings]);
 
     useEffect(() => {
         setLastRefresh(new Date());
@@ -276,14 +286,17 @@ export default function AdminDashboard({
     useEffect(() => {
         supabaseRef.current ??= createClient();
         const supabase = supabaseRef.current;
+        let refreshTimer: ReturnType<typeof setTimeout>;
         const channel = supabase
             .channel('admin-bookings-board')
             .on('postgres_changes', { event: '*', schema: 'public', table: 'bookings' }, () => {
-                void refreshBookings();
+                clearTimeout(refreshTimer);
+                refreshTimer = setTimeout(() => void refreshBookings(), 200);
             })
             .subscribe();
 
         return () => {
+            clearTimeout(refreshTimer);
             void supabase.removeChannel(channel);
         };
     }, [refreshBookings]);

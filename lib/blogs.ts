@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isSupportedCoverImage } from "./content-images";
 
 export const contentSectionTypes = ["blog", "update"] as const;
 export type ContentSectionType = (typeof contentSectionTypes)[number];
@@ -28,9 +29,9 @@ export const blogPostInputSchema = z.object({
   slug: z.string().optional().nullable(),
   excerpt: z.string().optional().nullable(),
   content: z.string().trim().min(1, "Content is required"),
-  coverImageUrl: z.string().optional().nullable(),
+  coverImageUrl: z.string().trim().refine(value => !value || isSupportedCoverImage(value), "Use a local /images path or a public blog-assets image from the configured storage host").optional().nullable(),
   status: z.enum(blogPostStatuses).optional().default("draft"),
-  publishedAt: z.string().optional().nullable(),
+  publishedAt: z.union([z.string().datetime({ offset: true }), z.literal("")]).optional().nullable(),
   seoTitle: z.string().optional().nullable(),
   seoDescription: z.string().optional().nullable(),
 });

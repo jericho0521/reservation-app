@@ -19,6 +19,8 @@ begin
     raise exception 'Admin privileges required' using errcode = '42501';
   end if;
 
+  perform pg_advisory_xact_lock(hashtextextended(p_service_id::text, 0));
+
   update public.service_seat_maintenance
   set is_active = false
   where service_id = p_service_id

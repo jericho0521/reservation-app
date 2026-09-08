@@ -71,14 +71,7 @@ begin
 end $$;
 
 drop policy if exists "Public can create bookings" on public.bookings;
-create policy "Public can create bookings"
-on public.bookings
-for insert
-to anon, authenticated
-with check (
-  status = 'confirmed'
-  and interface_type in ('form', 'chat')
-);
+revoke insert on public.bookings from anon, authenticated;
 
 drop policy if exists "Authenticated admins can manage bookings" on public.bookings;
 create policy "Authenticated admins can manage bookings"

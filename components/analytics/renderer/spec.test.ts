@@ -119,3 +119,11 @@ test('parseAnalyticsSpec accepts rich chart props for interactive analytics dash
 
     assert.equal(result.success, true);
 });
+
+test('rejects shared children before they can expand rendering exponentially', () => {
+  assert.equal(parseAnalyticsSpec({ root: 'root', elements: {
+    root: { type: 'Stack', children: ['child', 'child'] },
+    child: { type: 'Text', props: { content: 'hello' } },
+  } }).success, false);
+  assert.equal(parseAnalyticsSpec({ root: 'root', elements: { root: { type: 'Stack', children: ['root'] } } }).success, false);
+});

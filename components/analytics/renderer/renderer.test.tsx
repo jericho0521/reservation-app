@@ -91,7 +91,7 @@ test('renderer gracefully renders fallback for unknown element type', () => {
         />,
     );
 
-    assert.match(html, /Unknown analytics element type/);
+    assert.match(html, /Invalid analytics dashboard/);
 });
 
 test('renderer passes rich chart props through to analytics charts', () => {

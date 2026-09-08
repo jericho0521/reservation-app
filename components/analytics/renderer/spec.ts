@@ -206,6 +206,16 @@ export function parseAnalyticsSpec(input: unknown): {
         };
     }
 
+    const seen = new Set<string>();
+    function validTree(key: string, depth: number): boolean {
+        if (depth > 20 || seen.has(key) || seen.size >= 100 || !result.success || !result.data.elements[key]) return false;
+        seen.add(key);
+        return (result.data.elements[key].children ?? []).every(child => validTree(child, depth + 1));
+    }
+    if (Object.keys(result.data.elements).length > 100 || !validTree(result.data.root, 0)) {
+        return { success: false, error: 'Dashboard must be a tree with at most 100 elements and 20 levels' };
+    }
+
     return {
         success: true,
         data: result.data,

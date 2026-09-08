@@ -1,9 +1,9 @@
+import { readLimitedFormData, RequestBodyError } from "@/lib/request-body";
+import { storeReportUpload } from "@/lib/report-upload";
 import { NextResponse } from "next/server";
 import {
-  buildStoragePath,
   isSalesReportSetupError,
   requireAdminSupabase,
-  SALES_REPORT_BUCKET,
   salesReportSetupResponse,
   validateUploadFile,
 } from "../report-utils";
@@ -14,6 +14,7 @@ export const dynamic = "force-dynamic";
 interface BatchUploadResult {
   id: string;
   fileName: string;
+  index: number;
   status: "created" | "error";
   error?: string;
 }
@@ -26,8 +27,9 @@ export async function POST(request: Request) {
       return response ?? NextResponse.json({ error: "Admin authentication required" }, { status: 401 });
     }
 
-    const formData = await request.formData();
+    const formData = await readLimitedFormData(request);
     const files = formData.getAll("files");
+    if (files.length > 10) return NextResponse.json({ error: "Upload at most 10 files per batch" }, { status: 400 });
 
     if (files.length === 0) {
       return NextResponse.json({ error: "At least one sales report file is required" }, { status: 400 });
@@ -35,63 +37,24 @@ export async function POST(request: Request) {
 
     const results: BatchUploadResult[] = [];
 
-    for (const entry of files) {
+    for (const [index, entry] of files.entries()) {
       if (!(entry instanceof File)) {
-        results.push({ id: "", fileName: "unknown", status: "error", error: "Invalid file entry" });
+        results.push({ index, id: "", fileName: "unknown", status: "error", error: "Invalid file entry" });
         continue;
       }
 
       const validationError = validateUploadFile(entry);
 
       if (validationError) {
-        results.push({ id: "", fileName: entry.name, status: "error", error: validationError });
+        results.push({ index, id: "", fileName: entry.name, status: "error", error: validationError });
         continue;
       }
 
       try {
-        const storagePath = buildStoragePath(user.id, entry.name);
-        const { error: uploadError } = await supabase.storage
-          .from(SALES_REPORT_BUCKET)
-          .upload(storagePath, entry, {
-            contentType: entry.type,
-            upsert: false,
-          });
-
-        if (uploadError) {
-          if (isSalesReportSetupError(uploadError)) {
-            return salesReportSetupResponse();
-          }
-
-          results.push({ id: "", fileName: entry.name, status: "error", error: uploadError.message });
-          continue;
-        }
-
-        const { data: document, error: insertError } = await supabase
-          .from("sales_report_documents")
-          .insert({
-            uploaded_by: user.id,
-            file_name: entry.name,
-            file_type: entry.type,
-            file_size: entry.size,
-            storage_bucket: SALES_REPORT_BUCKET,
-            storage_path: storagePath,
-            status: "pending",
-          })
-          .select()
-          .single();
-
-        if (insertError) {
-          if (isSalesReportSetupError(insertError)) {
-            return salesReportSetupResponse();
-          }
-
-          results.push({ id: "", fileName: entry.name, status: "error", error: insertError.message });
-          continue;
-        }
-
-        results.push({ id: document.id, fileName: entry.name, status: "created" });
+        const document = await storeReportUpload(supabase, user.id, entry);
+        results.push({ index, id: document.id, fileName: entry.name, status: "created" });
       } catch (err) {
-        results.push({
+        results.push({ index,
           id: "",
           fileName: entry.name,
           status: "error",
@@ -105,6 +68,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ results, summary: { total: results.length, succeeded, failed } }, { status: 201 });
   } catch (error) {
+    if (error instanceof RequestBodyError) return NextResponse.json({ error: error.message }, { status: error.status });
     if (isSalesReportSetupError(error)) {
       return salesReportSetupResponse();
     }

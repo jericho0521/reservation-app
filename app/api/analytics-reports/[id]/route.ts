@@ -59,6 +59,8 @@ export async function PATCH(
       return NextResponse.json({ error: "Sales report not found" }, { status: 404 });
     }
 
+    if (existing.status === "processing") return NextResponse.json({ error: "Report is processing" }, { status: 409 });
+
     const saved = await saveNormalizedSalesReport({
       supabase,
       sourceDocumentId: id,
@@ -67,6 +69,7 @@ export async function PATCH(
         confidence: body.publish ? 1 : body.report.confidence,
       },
       forcePublish: body.publish,
+      expectedUpdatedAt: body.expectedUpdatedAt,
     });
 
     if ("error" in saved) {
@@ -82,6 +85,7 @@ export async function PATCH(
       return salesReportSetupResponse();
     }
 
+    if (error instanceof Error && error.name === "ZodError") return NextResponse.json({ error: "Invalid report update; reload before saving" }, { status: 400 });
     console.error("Failed to update sales report:", error);
     return NextResponse.json({ error: "Failed to update sales report" }, { status: 500 });
   }

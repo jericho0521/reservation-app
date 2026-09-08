@@ -12,7 +12,10 @@ function Write-Step($Message) {
 
 Write-Step "Stopping Cloudflare Tunnel"
 $tunnelProcesses = Get-CimInstance Win32_Process -Filter "name = 'cloudflared.exe'" -ErrorAction SilentlyContinue |
-  Where-Object { $_.CommandLine -like "*$TunnelName*" }
+  Where-Object {
+    $tokens = [regex]::Matches($_.CommandLine, '(?:[^\s"]+|"[^"]*")+') | ForEach-Object { $_.Value.Trim('"') }
+    $tokens.Count -ge 4 -and $tokens[1] -ceq 'tunnel' -and $tokens[2] -ceq 'run' -and $tokens[-1] -ceq $TunnelName
+  }
 
 if ($tunnelProcesses) {
   foreach ($process in $tunnelProcesses) {

@@ -52,3 +52,22 @@ create policy "Public can read knowledge chunks"
   on public.knowledge_chunks
   for select
   using (true);
+
+-- Replace the complete dataset only after every embedding has been generated.
+create or replace function public.replace_knowledge_chunks(chunks jsonb)
+returns void language plpgsql
+set search_path = public, extensions
+as $$
+begin
+  if jsonb_typeof(chunks) <> 'array' or jsonb_array_length(chunks) = 0 then
+    raise exception 'Knowledge replacement must not be empty';
+  end if;
+  perform pg_advisory_xact_lock(hashtextextended('knowledge_chunks replacement', 0));
+  delete from public.knowledge_chunks;
+  insert into public.knowledge_chunks (content, embedding, metadata)
+    select item->>'content', (item->>'embedding')::vector(768), coalesce(item->'metadata', '{}'::jsonb)
+    from jsonb_array_elements(chunks) item;
+end;
+$$;
+revoke all on function public.replace_knowledge_chunks(jsonb) from public, anon, authenticated;
+grant execute on function public.replace_knowledge_chunks(jsonb) to service_role;

@@ -9,7 +9,7 @@ import { generateGeminiEmbedding, getGeminiEmbeddingDimension, getGeminiEmbeddin
 dotenv.config({ path: path.join(process.cwd(), '.env') });
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 const googleApiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY!;
 
 if (!supabaseUrl || !supabaseKey || !googleApiKey) {
@@ -64,37 +64,17 @@ async function seedKnowledge() {
     const chunks = splitIntoChunks(knowledgeContent);
     console.log(`Found ${chunks.length} chunks to embed\n`);
 
-    console.log('Clearing existing knowledge chunks...');
-    await supabase.from('knowledge_chunks').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-
+    const replacement = [];
     for (let i = 0; i < chunks.length; i++) {
-        const chunk = chunks[i];
-        console.log(`\nProcessing chunk ${i + 1}/${chunks.length}...`);
-        console.log(`   Preview: ${chunk.substring(0, 50).replace(/\n/g, ' ')}...`);
-
-        try {
-            const embedding = await generateGeminiEmbedding(chunk, googleApiKey);
-            console.log(`   Generated embedding (${embedding.length} dimensions)`);
-
-            const { error } = await supabase.from('knowledge_chunks').insert({
-                content: chunk,
-                embedding: embedding,
-                metadata: { source: 'knowledge.md', index: i },
-            });
-
-            if (error) {
-                console.error(`   Insert failed:`, error.message);
-            } else {
-                console.log(`   Inserted into database`);
-            }
-
-            await new Promise(resolve => setTimeout(resolve, 1000));
-        } catch (error) {
-            console.error(`   Failed:`, error);
-        }
+        console.log(`Embedding chunk ${i + 1}/${chunks.length}...`);
+        const embedding = await generateGeminiEmbedding(chunks[i], googleApiKey);
+        replacement.push({ content: chunks[i], embedding, metadata: { source: 'knowledge.md', index: i } });
     }
+    if (replacement.length === 0) throw new Error('Refusing to replace knowledge with an empty dataset');
+    const { error } = await supabase.rpc('replace_knowledge_chunks', { chunks: replacement });
+    if (error) throw error;
 
     console.log('\nKnowledge base seeding complete!');
 }
 
-seedKnowledge().catch(console.error);
+seedKnowledge().catch(error => { console.error("Knowledge replacement failed:", error); process.exitCode = 1; });

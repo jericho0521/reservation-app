@@ -31,6 +31,7 @@ export async function generateGeminiEmbedding(
         `https://generativelanguage.googleapis.com/v1beta/models/${model}:embedContent`,
         {
             method: 'POST',
+            signal: AbortSignal.timeout(10_000),
             headers: {
                 'Content-Type': 'application/json',
                 'x-goog-api-key': apiKey,

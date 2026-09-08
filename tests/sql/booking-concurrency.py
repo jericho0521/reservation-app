@@ -18,3 +18,10 @@ p.stdin.write(prefix+f"begin; select replace_service_seat_maintenance('{service}
 r=sql(prefix+f"select replace_service_seat_maintenance('{service}',array['RS2']);");p.wait();assert p.returncode==0,p.stderr.read();assert r.returncode==0,r.stderr
 r=sql(f"select string_agg(seat_label,',') from service_seat_maintenance where service_id='{service}' and is_active;");assert r.stdout.strip()=='RS2',r.stdout
 print('PASS: concurrent maintenance replacement contains exactly the second seat set')
+key='concurrent:'+str(uuid.uuid4())
+query=f"select consume_request_budget(array['{key}'],array[1],60);"
+p=subprocess.Popen(PSQL + ['-v','ON_ERROR_STOP=1','-At'],stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True)
+p.stdin.write('begin;'+query+'select pg_sleep(1);commit;');p.stdin.close();time.sleep(.2)
+r=sql(query);p.wait();assert p.returncode==0,p.stderr.read();assert r.returncode==0,r.stderr
+assert r.stdout.strip()=='f',r.stdout
+print('PASS: concurrent requests cannot spend the same quota allowance')

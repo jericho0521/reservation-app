@@ -1,5 +1,7 @@
 'use client';
 
+import { resolveAnalyticsDateQuery } from '@/lib/analytics-date-range';
+
 import { useEffect, useMemo, useState } from 'react';
 import { GripVertical, Sparkles, X } from 'lucide-react';
 import { AnalyticsChatInput } from '@/components/analytics/AnalyticsChatInput';
@@ -124,8 +126,7 @@ export function AnalyticsWorkspace({ userEmail }: AnalyticsWorkspaceProps) {
             setDashboard(fallbackDashboard);
             setUiState(prev => ({
                 ...prev,
-                filters: {},
-                lastQuery: prompt,
+                lastQuery: resolveAnalyticsDateQuery(prompt, lastQuery),
             }));
         } catch (err) {
             console.error('Analytics chat error:', err);

@@ -1,3 +1,5 @@
+import { parseDateRange, resolveAnalyticsDateQuery } from "@/lib/analytics-date-range";
+import { readAllRows } from "@/lib/read-all-rows";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   buildAnalyticsSnapshot,
@@ -76,68 +78,6 @@ export interface AnalyticsAgentResult {
   response?: string;
 }
 
-function parseDateRange(query: string): { startDate?: string; endDate?: string } {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = now.getMonth();
-
-  const lowerQuery = query.toLowerCase();
-
-  const months = [
-    "january", "february", "march", "april", "may", "june",
-    "july", "august", "september", "october", "november", "december",
-  ];
-
-  for (let i = 0; i < months.length; i++) {
-    if (lowerQuery.includes(months[i])) {
-      const targetYear = i > month ? year - 1 : year;
-      const startDate = `${targetYear}-${String(i + 1).padStart(2, "0")}-01`;
-      const lastDay = new Date(targetYear, i + 1, 0).getDate();
-      const endDate = `${targetYear}-${String(i + 1).padStart(2, "0")}-${lastDay}`;
-      return { startDate, endDate };
-    }
-  }
-
-  if (lowerQuery.includes("this month")) {
-    const startDate = `${year}-${String(month + 1).padStart(2, "0")}-01`;
-    const lastDay = new Date(year, month + 1, 0).getDate();
-    const endDate = `${year}-${String(month + 1).padStart(2, "0")}-${lastDay}`;
-    return { startDate, endDate };
-  }
-
-  if (lowerQuery.includes("last month")) {
-    const lastMonth = month === 0 ? 11 : month - 1;
-    const targetYear = month === 0 ? year - 1 : year;
-    const startDate = `${targetYear}-${String(lastMonth + 1).padStart(2, "0")}-01`;
-    const lastDay = new Date(targetYear, lastMonth + 1, 0).getDate();
-    const endDate = `${targetYear}-${String(lastMonth + 1).padStart(2, "0")}-${lastDay}`;
-    return { startDate, endDate };
-  }
-
-  if (lowerQuery.includes("this week")) {
-    const dayOfWeek = now.getDay();
-    const startOfWeek = new Date(now);
-    startOfWeek.setDate(now.getDate() - dayOfWeek);
-    const endOfWeek = new Date(startOfWeek);
-    endOfWeek.setDate(startOfWeek.getDate() + 6);
-    return {
-      startDate: startOfWeek.toISOString().split("T")[0],
-      endDate: endOfWeek.toISOString().split("T")[0],
-    };
-  }
-
-  if (lowerQuery.includes("today")) {
-    const today = now.toISOString().split("T")[0];
-    return { startDate: today, endDate: today };
-  }
-
-  const thirtyDaysAgo = new Date(now);
-  thirtyDaysAgo.setDate(now.getDate() - 30);
-  return {
-    startDate: thirtyDaysAgo.toISOString().split("T")[0],
-    endDate: now.toISOString().split("T")[0],
-  };
-}
 
 function isMissingSalesReportsTable(error: unknown) {
   if (!error || typeof error !== "object") {
@@ -154,7 +94,8 @@ function isMissingSalesReportsTable(error: unknown) {
 async function getAnalyticsSnapshot(
   supabase: SupabaseClient,
   startDate?: string,
-  endDate?: string
+  endDate?: string,
+  filters?: Record<string, unknown>,
 ): Promise<AnalyticsSnapshot | null> {
   let query = supabase
     .from("bookings")
@@ -176,32 +117,29 @@ async function getAnalyticsSnapshot(
     salesReportsQuery = salesReportsQuery.lte("report_date", endDate);
   }
 
-  const [
-    { data: bookings, error },
-    salesReportsResult,
-  ] = await Promise.all([
-    query,
-    salesReportsQuery.order("report_date", { ascending: true }),
-  ]);
-
-  if (error) {
-    console.error("Error fetching bookings:", error);
-    return null;
-  }
-
-  if (
-    salesReportsResult.error &&
-    !isMissingSalesReportsTable(salesReportsResult.error)
-  ) {
-    console.error("Error fetching sales reports:", salesReportsResult.error);
-    return null;
+  const bookings = await readAllRows((from, to) => query.order("id").range(from, to));
+  const service = typeof filters?.service === 'string' ? filters.service : undefined;
+  const status = typeof filters?.status === 'string' ? filters.status : undefined;
+  const filteredBookings = bookings.filter(booking => {
+    const names = Array.isArray(booking.services) ? booking.services.map(service => service.name) : [(booking.services as { name: string } | null)?.name];
+    return (!service || service === 'all' || names.includes(service)) && (!status || status === 'all' || booking.status === status);
+  });
+  // Daily financial reports cannot be attributed to one service or booking status.
+  const scoped = (service && service !== 'all') || (status && status !== 'all');
+  let salesReports: AnalyticsSalesReportRecord[] = [];
+  if (!scoped) {
+    try {
+      salesReports = await readAllRows((from, to) => salesReportsQuery.order("report_date").order("id").range(from, to));
+    } catch (error) {
+      if (!isMissingSalesReportsTable(error)) throw error;
+    }
   }
 
   return buildAnalyticsSnapshot(
-    bookings ?? [],
+    filteredBookings,
     startDate,
     endDate,
-    (salesReportsResult.data ?? []) as AnalyticsSalesReportRecord[]
+    salesReports
   );
 }
 
@@ -316,14 +254,14 @@ export async function runAnalyticsAgent(
   filters?: Record<string, unknown>,
   supabase?: SupabaseClient
 ): Promise<AnalyticsAgentResult> {
-  const { startDate, endDate } = parseDateRange(prompt);
+  const { startDate, endDate } = parseDateRange(resolveAnalyticsDateQuery(prompt, previousQuery));
 
   try {
     if (!supabase) {
       throw new Error("Authenticated Supabase client is required");
     }
 
-    const snapshot = await getAnalyticsSnapshot(supabase, startDate, endDate);
+    const snapshot = await getAnalyticsSnapshot(supabase, startDate, endDate, filters);
 
     if (!snapshot) {
       throw new Error("Failed to fetch booking data");

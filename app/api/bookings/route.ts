@@ -5,14 +5,14 @@ import {
     createConfirmedBooking,
     validateBookingSchedule,
 } from '@/lib/create-booking';
-import { jsonError, requireAuthenticatedSupabase, supabaseErrorStatus } from '@/app/api/api-utils';
+import { jsonError, requireAdminSupabase, supabaseErrorStatus } from '@/app/api/api-utils';
 import { formBookingRequestSchema } from '@/lib/booking-schema';
 import { bookingListFiltersSchema, buildBookingSearchFilter, normalizeBookingSearchTerm } from './search-utils';
 import { z } from 'zod';
 
 export async function GET(request: NextRequest) {
     try {
-        const auth = await requireAuthenticatedSupabase();
+        const auth = await requireAdminSupabase();
 
         if (auth.response) {
             return auth.response;

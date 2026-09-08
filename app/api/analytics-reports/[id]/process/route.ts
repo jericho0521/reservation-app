@@ -3,7 +3,7 @@ import { runSalesReportPipeline } from "@/lib/langchain/sales-report-pipeline";
 import {
   isSalesReportSetupError,
   loadSalesReport,
-  requireAuthenticatedSupabase,
+  requireAdminSupabase,
   salesReportSetupResponse,
 } from "../../report-utils";
 
@@ -15,7 +15,7 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
-  const { response, supabase } = await requireAuthenticatedSupabase();
+  const { response, supabase } = await requireAdminSupabase();
 
   if (response) {
     return response;

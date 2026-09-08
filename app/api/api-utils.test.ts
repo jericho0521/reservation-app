@@ -3,7 +3,7 @@ import test from "node:test";
 import {
   isSupabaseNotFoundError,
   jsonError,
-  requireAuthenticatedSupabase,
+  requireAdminSupabase,
   supabaseErrorStatus,
 } from "./api-utils";
 
@@ -33,8 +33,9 @@ test("jsonError returns the standard API error shape", async () => {
   });
 });
 
-test("requireAuthenticatedSupabase returns 401 response without a user", async () => {
-  const result = await requireAuthenticatedSupabase(async () => ({
+test("requireAdminSupabase returns 401 response without a user", async () => {
+  const result = await requireAdminSupabase(async () => ({
+    rpc: async () => { throw new Error("Role lookup must not run without authentication"); },
     auth: {
       getUser: async () => ({
         data: { user: null },
@@ -48,3 +49,21 @@ test("requireAuthenticatedSupabase returns 401 response without a user", async (
     error: "Admin authentication required",
   });
 });
+
+test("authenticated non-admins cannot pass the privileged endpoint guard", async () => {
+  const result = await requireAdminSupabase(async () => ({
+    auth: { getUser: async () => ({ data: { user: { id: 'ordinary-user' } }, error: null }) },
+    rpc: async () => ({ data: false, error: null }),
+  }));
+  assert.equal(result.response?.status, 403);
+});
+
+for (const [data, error, status] of [[true, null, undefined], [null, new Error('unavailable'), 403], [null, null, 403]] as const) {
+  test(`admin guard fails closed: ${String(data)} / ${status}`, async () => {
+    const result = await requireAdminSupabase(async () => ({
+      auth: { getUser: async () => ({ data: { user: { id: 'staff' } }, error: null }) },
+      rpc: async () => ({ data, error }),
+    }));
+    assert.equal(result.response?.status, status);
+  });
+}

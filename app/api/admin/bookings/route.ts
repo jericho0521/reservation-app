@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { jsonError, requireAuthenticatedSupabase, supabaseErrorStatus } from '@/app/api/api-utils';
+import { jsonError, requireAdminSupabase, supabaseErrorStatus } from '@/app/api/api-utils';
 import { walkInBookingRequestSchema } from '@/lib/booking-schema';
 import {
     BookingCreationError,
@@ -15,7 +15,7 @@ import {
  */
 export async function POST(request: Request) {
     try {
-        const auth = await requireAuthenticatedSupabase();
+        const auth = await requireAdminSupabase();
 
         if (auth.response) {
             return auth.response;

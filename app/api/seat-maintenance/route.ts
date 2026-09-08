@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { jsonError, requireAuthenticatedSupabase, supabaseErrorStatus } from "@/app/api/api-utils";
+import { jsonError, requireAdminSupabase, supabaseErrorStatus } from "@/app/api/api-utils";
 import { normalizeSeatLabel, normalizeSeatLabels } from "@/lib/seat-maintenance";
 import { isSeatMaintenanceSupportedService } from "./service-support";
 
@@ -26,7 +26,7 @@ export async function GET(request: Request) {
     return jsonError("service_id is required", 400);
   }
 
-  const auth = await requireAuthenticatedSupabase();
+  const auth = await requireAdminSupabase();
 
   if (auth.response) {
     return auth.response;
@@ -49,7 +49,7 @@ export async function GET(request: Request) {
 
 export async function PUT(request: Request) {
   try {
-    const auth = await requireAuthenticatedSupabase();
+    const auth = await requireAdminSupabase();
 
     if (auth.response) {
       return auth.response;

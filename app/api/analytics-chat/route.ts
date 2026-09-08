@@ -1,15 +1,11 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase-server";
+import { requireAdminSupabase } from "@/app/api/api-utils";
 import { runAnalyticsAgent } from "@/lib/langchain/analytics-agent";
 
 export async function POST(req: Request) {
   try {
-    const supabase = await createClient();
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-    if (authError || !user) {
-      return NextResponse.json({ error: "Admin authentication required" }, { status: 401 });
-    }
+    const { response, supabase } = await requireAdminSupabase();
+    if (response) return response;
 
     const { prompt, previousQuery, filters, threadId } = await req.json();
 

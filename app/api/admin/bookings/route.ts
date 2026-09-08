@@ -1,3 +1,5 @@
+import { bookingRequestContext, RequestControlError } from '@/lib/request-controls';
+import { readLimitedJson, RequestBodyError } from '@/lib/request-body';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { jsonError, requireAdminSupabase, supabaseErrorStatus } from '@/app/api/api-utils';
@@ -21,7 +23,7 @@ export async function POST(request: Request) {
             return auth.response;
         }
 
-        const body = await request.json();
+        const body = await readLimitedJson(request);
         const { service_id: serviceId, ...bookingInput } = walkInBookingRequestSchema.parse(body);
         const validatedData = validateBookingSchedule(bookingInput, { allowStartedSlot: true });
 
@@ -38,10 +40,11 @@ export async function POST(request: Request) {
             );
         }
 
-        const booking = await createConfirmedBooking({ id: serviceId, ...service }, validatedData);
+        const booking = await createConfirmedBooking({ id: serviceId, ...service }, validatedData, bookingRequestContext(request, auth.user.id));
 
         return NextResponse.json(booking, { status: 201 });
     } catch (error) {
+        if (error instanceof RequestControlError || error instanceof RequestBodyError) return jsonError(error.message, error.status);
         if (error instanceof BookingCreationError) {
             return jsonError(error.message, error.status, error.details);
         }

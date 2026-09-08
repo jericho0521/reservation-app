@@ -1,3 +1,4 @@
+import { consumeBookingBudget, hashRequestValue, type BookingRequestContext } from './request-controls';
 import { sendBookingConfirmationEmail } from './booking-confirmation-email';
 import type { CreateBookingInput } from './booking-schema';
 import { loadBookingAvailabilityResources } from './booking-availability';
@@ -93,7 +94,19 @@ export function validateSeatSelection(
 export async function createConfirmedBooking(
     service: BookableService,
     input: ValidatedCreateBookingInput,
+    requestContext: BookingRequestContext,
 ) {
+    const client = supabaseAdmin();
+    const requestHash = hashRequestValue({ serviceId: service.id, ...input, user_email: input.user_email.trim().toLowerCase(), seat_labels: [...(input.seat_labels ?? [])].sort() });
+    const loadDuplicate = async () => {
+        const { data, error } = await client.from('bookings').select('*').eq('request_actor', requestContext.actor).eq('request_key', requestContext.key).maybeSingle();
+        if (error) throw error;
+        if (data && data.request_hash !== requestHash) throw new BookingCreationError('Idempotency key was already used for different booking details', 409);
+        return data ? { ...data, email_requested: Boolean(data.user_email), email_sent: data.confirmation_email_sent === true } : null;
+    };
+    const duplicate = await loadDuplicate();
+    if (duplicate) return duplicate;
+    await consumeBookingBudget(requestContext, service.id, input.booking_date, input.user_email);
     const { bookings, maintenanceSeatLabels } = await loadBookingAvailabilityResources(
         service.id,
         input.booking_date,
@@ -146,11 +159,13 @@ export async function createConfirmedBooking(
             service_id: service.id,
             ...input,
             status: 'confirmed',
+            request_actor: requestContext.actor, request_key: requestContext.key, request_hash: requestHash,
         })
         .select()
         .single();
 
     if (error) {
+        if (error.code === '23505') { const duplicate = await loadDuplicate(); if (duplicate) return duplicate; }
         throw error;
     }
 
@@ -172,6 +187,7 @@ export async function createConfirmedBooking(
         seatLabels: booking.seat_labels,
     });
 
+    await client.from('bookings').update({ confirmation_email_sent: emailResult.sent }).eq('id', booking.id);
     return {
         ...booking,
         email_requested: true,

@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
 import ServiceSelector from './ServiceSelector';
 import DatePicker from './DatePicker';
@@ -45,6 +45,8 @@ const EMPTY_AVAILABILITY: AvailabilitySelection = {
 };
 
 export default function MultiStepForm() {
+    const submissionKey = useRef(crypto.randomUUID());
+    const previousPayload = useRef<string | null>(null);
     const [currentStep, setCurrentStep] = useState(1);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [submissionError, setSubmissionError] = useState('');
@@ -56,6 +58,7 @@ export default function MultiStepForm() {
     }));
 
     const updateFormData = (data: Partial<FormData>) => {
+        submissionKey.current = crypto.randomUUID();
         setFormData(prev => ({ ...prev, ...data }));
         setSubmissionError('');
     };
@@ -125,24 +128,27 @@ export default function MultiStepForm() {
             return;
         }
 
+        const requestBody = JSON.stringify({
+            service_id: formData.service_id,
+            user_name: formData.user_name,
+            user_email: formData.user_email,
+            user_phone: formData.user_phone,
+            booking_date: formData.booking_date,
+            start_time: formData.start_time,
+            end_time: formData.end_time,
+            seats_booked: formData.seats_booked,
+            seat_labels: formData.selected_seat_labels || [],
+            interface_type: 'form',
+        });
+        if (previousPayload.current !== requestBody) submissionKey.current = crypto.randomUUID();
+        previousPayload.current = requestBody;
         setSubmissionError('');
         setIsSubmitting(true);
         try {
             const response = await fetch('/api/bookings', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    service_id: formData.service_id,
-                    user_name: formData.user_name,
-                    user_email: formData.user_email,
-                    user_phone: formData.user_phone,
-                    booking_date: formData.booking_date,
-                    start_time: formData.start_time,
-                    end_time: formData.end_time,
-                    seats_booked: formData.seats_booked,
-                    seat_labels: formData.selected_seat_labels || [],
-                    interface_type: 'form',
-                }),
+                headers: { 'Content-Type': 'application/json', 'Idempotency-Key': submissionKey.current },
+                body: requestBody,
             });
 
             if (response.ok) {
@@ -188,6 +194,7 @@ export default function MultiStepForm() {
                 {/* Make Another Booking Button */}
                 <button
                     onClick={() => {
+                        submissionKey.current = crypto.randomUUID();
                         setConfirmation(null);
                         setSubmissionError('');
                         setDetailErrors({});

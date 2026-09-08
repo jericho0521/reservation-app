@@ -6,7 +6,9 @@ export async function loadAdminContentList(section: ContentSectionType) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
-  if (!user) {
+  const { data: isAdmin, error: roleError } = await supabase.rpc("is_admin");
+
+    if (!user || roleError || isAdmin !== true) {
     redirect("/admin/login");
   }
 
@@ -30,7 +32,9 @@ export async function loadAdminContentPost(section: ContentSectionType, id: stri
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
-  if (!user) {
+  const { data: isAdmin, error: roleError } = await supabase.rpc("is_admin");
+
+    if (!user || roleError || isAdmin !== true) {
     redirect("/admin/login");
   }
 
@@ -55,7 +59,9 @@ export async function requireAdminEmail() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
-  if (!user) {
+  const { data: isAdmin, error: roleError } = await supabase.rpc("is_admin");
+
+    if (!user || roleError || isAdmin !== true) {
     redirect("/admin/login");
   }
 

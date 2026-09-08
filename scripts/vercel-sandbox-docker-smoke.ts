@@ -6,6 +6,7 @@ async function main() {
 
   try {
     sandbox = await Sandbox.create({
+      persistent: false,
       runtime: "node24",
       resources: { vcpus: 2 },
       timeout: 15 * 60_000,

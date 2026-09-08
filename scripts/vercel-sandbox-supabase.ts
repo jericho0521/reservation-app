@@ -1,6 +1,8 @@
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { Sandbox } from "@vercel/sandbox";
 import { createHmac, randomBytes } from "node:crypto";
-import { readFile } from "node:fs/promises";
+import { readFile, mkdtemp, writeFile, rm } from "node:fs/promises";
 import { runShell, stopSandbox, waitForEnter } from "./vercel-sandbox-utils";
 
 const SUPABASE_REPO = process.env.SANDBOX_SUPABASE_REPO || "https://github.com/supabase/supabase";
@@ -38,9 +40,11 @@ const DEFAULT_SECRET_VALUES = new Set([
 
 async function main() {
   let sandbox: Sandbox | undefined;
+  let credentialsDirectory: string | undefined;
 
   try {
     sandbox = await Sandbox.create({
+      persistent: false,
       runtime: "node24",
       resources: { vcpus: Number(process.env.SANDBOX_VCPUS || 4) },
       ports: [API_PORT, STUDIO_PORT, POSTGRES_PORT],
@@ -226,15 +230,19 @@ async function main() {
     console.log(`Postgres host: ${postgresHost}`);
     console.log("\nUse these local app values while the script is running:");
     console.log(`NEXT_PUBLIC_SUPABASE_URL=${apiUrl}`);
-    console.log(envOutput
+    credentialsDirectory = await mkdtemp(join(tmpdir(), 'reservation-sandbox-'));
+    const credentialsPath = join(credentialsDirectory, 'credentials.env');
+    await writeFile(credentialsPath, `NEXT_PUBLIC_SUPABASE_URL=${apiUrl}\n${envOutput
       .replace(/^ANON_KEY=/m, "NEXT_PUBLIC_SUPABASE_ANON_KEY=")
-      .replace(/^SERVICE_ROLE_KEY=/m, "SUPABASE_SERVICE_ROLE_KEY="));
+      .replace(/^SERVICE_ROLE_KEY=/m, "SUPABASE_SERVICE_ROLE_KEY=")}\n`, { mode: 0o600 });
+    console.log(`Local credentials file: ${credentialsPath}`);
     console.log("\nUse DASHBOARD_USERNAME and DASHBOARD_PASSWORD to sign in to Supabase Studio.");
     console.log("\nThe sandbox and containers will stop when you press Enter.");
 
     await waitForEnter();
   } finally {
     await stopSandbox(sandbox);
+    if (credentialsDirectory) await rm(credentialsDirectory, { recursive: true, force: true });
   }
 }
 
@@ -263,7 +271,7 @@ function createSupabaseJwt(role: "anon" | "service_role", jwtSecret: string) {
     role,
     iss: "supabase-demo",
     iat: now,
-    exp: now + 10 * 365 * 24 * 60 * 60,
+    exp: now + 60 * 60,
   });
   const unsignedToken = `${header}.${payload}`;
   const signature = createHmac("sha256", jwtSecret)

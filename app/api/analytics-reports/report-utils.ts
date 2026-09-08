@@ -52,6 +52,7 @@ export const manualSalesReportSchema = z.object({
 
 export const patchSalesReportSchema = z.object({
   report: manualSalesReportSchema,
+  expectedUpdatedAt: z.string().datetime({ offset: true }),
   publish: z.boolean().optional().default(false),
 });
 
@@ -184,11 +185,15 @@ export async function saveNormalizedSalesReport({
   sourceDocumentId,
   input,
   forcePublish = false,
+  expectedUpdatedAt,
+  rawExtraction,
 }: {
   supabase: Awaited<ReturnType<typeof createClient>>;
   sourceDocumentId: string;
   input: unknown;
   forcePublish?: boolean;
+  expectedUpdatedAt: string;
+  rawExtraction?: unknown;
 }) {
   const normalized = normalizeExtractedSalesReport(input);
   const hasDuplicatePublishedDate = await hasPublishedReportForDate(
@@ -230,32 +235,19 @@ export async function saveNormalizedSalesReport({
   }
 
   const payload = toDailySalesReportInsert(sourceDocumentId, normalized, finalEvaluation);
-  const { data: report, error } = await supabase
-    .from("daily_sales_reports")
-    .upsert(payload, { onConflict: "source_document_id" })
-    .select()
-    .single();
-
+  const { data, error } = await supabase.rpc('save_sales_report', {
+    p_document_id: sourceDocumentId, p_expected_updated_at: expectedUpdatedAt,
+    p_report: payload, p_document: {
+      status: finalEvaluation.status, confidence_score: normalized.confidenceScore,
+      extraction_errors: finalEvaluation.warnings,
+      ...(rawExtraction !== undefined ? { raw_extraction: rawExtraction } : {}),
+    },
+  });
   if (error) {
+    if (error.code === '40001' || error.code === '23505') return { error: NextResponse.json({ error: 'Report changed or conflicts with a published date. Reload before saving.' }, { status: 409 }) };
     throw error;
   }
-
-  const { data: document, error: updateError } = await supabase
-    .from("sales_report_documents")
-    .update({
-      status: finalEvaluation.status,
-      confidence_score: normalized.confidenceScore,
-      extraction_errors: finalEvaluation.warnings,
-      processed_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", sourceDocumentId)
-    .select()
-    .single();
-
-  if (updateError) {
-    throw updateError;
-  }
+  const { document, report } = data;
 
   return {
     document: document as SalesReportDocument,

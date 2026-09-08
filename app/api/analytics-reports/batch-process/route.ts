@@ -4,7 +4,7 @@ import { extractSalesReportFromFile } from "@/lib/sales-report-extraction";
 import {
   isSalesReportSetupError,
   loadSalesReport,
-  requireAuthenticatedSupabase,
+  requireAdminSupabase,
   salesReportSetupResponse,
   saveNormalizedSalesReport,
 } from "../report-utils";
@@ -23,7 +23,7 @@ interface BatchProcessResult {
 }
 
 export async function POST(request: Request) {
-  const { response, supabase } = await requireAuthenticatedSupabase();
+  const { response, supabase } = await requireAdminSupabase();
 
   if (response) {
     return response;

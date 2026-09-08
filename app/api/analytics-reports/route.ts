@@ -3,7 +3,7 @@ import {
   buildStoragePath,
   isSalesReportSetupError,
   loadSalesReports,
-  requireAuthenticatedSupabase,
+  requireAdminSupabase,
   SALES_REPORT_BUCKET,
   salesReportSetupResponse,
   validateUploadFile,
@@ -14,7 +14,7 @@ export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
-    const { response, supabase } = await requireAuthenticatedSupabase();
+    const { response, supabase } = await requireAdminSupabase();
 
     if (response) {
       return response;
@@ -34,7 +34,7 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const { response, supabase, user } = await requireAuthenticatedSupabase();
+    const { response, supabase, user } = await requireAdminSupabase();
 
     if (response || !user) {
       return response ?? NextResponse.json({ error: "Admin authentication required" }, { status: 401 });

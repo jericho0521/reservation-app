@@ -11,7 +11,8 @@ export default async function AdminBookingsPage() {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
 
-    if (!user) redirect('/admin/login');
+    const { data: isAdmin, error: roleError } = await supabase.rpc('is_admin');
+    if (!user || roleError || isAdmin !== true) redirect('/admin/login');
 
     const result = await loadAllAdminBookings(supabase);
 

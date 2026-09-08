@@ -81,24 +81,7 @@ export function salesReportSetupResponse() {
   );
 }
 
-export async function requireAuthenticatedSupabase() {
-  const supabase = await createClient();
-  const { data: { user }, error } = await supabase.auth.getUser();
-
-  if (error || !user) {
-    return {
-      response: NextResponse.json({ error: "Admin authentication required" }, { status: 401 }),
-      supabase,
-      user: null,
-    };
-  }
-
-  return {
-    response: null,
-    supabase,
-    user,
-  };
-}
+export { requireAdminSupabase } from "@/app/api/api-utils";
 
 export async function loadSalesReports(supabase: Awaited<ReturnType<typeof createClient>>) {
   const { data: documents, error } = await supabase

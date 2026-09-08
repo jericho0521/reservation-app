@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import {
   buildStoragePath,
   isSalesReportSetupError,
-  requireAuthenticatedSupabase,
+  requireAdminSupabase,
   SALES_REPORT_BUCKET,
   salesReportSetupResponse,
   validateUploadFile,
@@ -20,7 +20,7 @@ interface BatchUploadResult {
 
 export async function POST(request: Request) {
   try {
-    const { response, supabase, user } = await requireAuthenticatedSupabase();
+    const { response, supabase, user } = await requireAdminSupabase();
 
     if (response || !user) {
       return response ?? NextResponse.json({ error: "Admin authentication required" }, { status: 401 });

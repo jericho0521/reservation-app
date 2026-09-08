@@ -3,7 +3,7 @@ import {
   isSalesReportSetupError,
   loadSalesReport,
   patchSalesReportSchema,
-  requireAuthenticatedSupabase,
+  requireAdminSupabase,
   salesReportSetupResponse,
   saveNormalizedSalesReport,
 } from "../report-utils";
@@ -17,7 +17,7 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const { response, supabase } = await requireAuthenticatedSupabase();
+    const { response, supabase } = await requireAdminSupabase();
 
     if (response) {
       return response;
@@ -46,7 +46,7 @@ export async function PATCH(
 ) {
   try {
     const { id } = await params;
-    const { response, supabase } = await requireAuthenticatedSupabase();
+    const { response, supabase } = await requireAdminSupabase();
 
     if (response) {
       return response;

@@ -14,7 +14,9 @@ export default async function AdminPage() {
 
     const { data: { user } } = await supabase.auth.getUser();
 
-    if (!user) {
+    const { data: isAdmin, error: roleError } = await supabase.rpc("is_admin");
+
+    if (!user || roleError || isAdmin !== true) {
         redirect('/admin/login');
     }
 

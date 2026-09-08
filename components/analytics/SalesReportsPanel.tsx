@@ -60,6 +60,7 @@ interface SalesReportItem {
     confidence_score: number | null;
     extraction_errors: string[] | null;
     created_at: string;
+    updated_at: string;
     processed_at: string | null;
     report: DailySalesReport | null;
 }
@@ -157,7 +158,7 @@ const statusStyles: Record<ReportStatus, string> = {
 
 interface QueuedFile {
     file: File;
-    status: 'queued' | 'uploading' | 'uploaded' | 'error';
+    status: 'queued' | 'uploading' | 'uploaded' | 'processed' | 'error';
     error?: string;
     documentId?: string;
 }
@@ -298,7 +299,7 @@ export function SalesReportsPanel() {
     };
 
     const batchUploadAndProcess = async () => {
-        if (fileQueue.length === 0 || batchUploading || batchProcessing) {
+        if (!fileQueue.some(file => file.status !== "processed") || batchUploading || batchProcessing) {
             return;
         }
 
@@ -309,27 +310,24 @@ export function SalesReportsPanel() {
         try {
             const formData = new FormData();
 
-            for (const qf of fileQueue) {
+            const pendingUploads = fileQueue.filter(qf => !qf.documentId && qf.status !== "processed");
+            for (const qf of pendingUploads) {
                 formData.append('files', qf.file);
             }
 
-            const uploadResponse = await fetch('/api/analytics-reports/batch', {
-                method: 'POST',
-                body: formData,
-            });
-
-            if (!uploadResponse.ok) {
-                const payload = await uploadResponse.json().catch(() => ({})) as SalesReportsApiError;
-                throw new Error(payload.error || 'Batch upload failed');
+            let uploadPayload: { results: Array<{ index: number; id: string; fileName: string; status: string; error?: string }> } = { results: [] };
+            if (pendingUploads.length > 0) {
+                const uploadResponse = await fetch('/api/analytics-reports/batch', { method: 'POST', body: formData });
+                if (!uploadResponse.ok) {
+                    const payload = await uploadResponse.json().catch(() => ({})) as SalesReportsApiError;
+                    throw new Error(payload.error || 'Batch upload failed');
+                }
+                uploadPayload = await uploadResponse.json();
             }
 
-            const uploadPayload = await uploadResponse.json() as {
-                results: Array<{ id: string; fileName: string; status: string; error?: string }>;
-                summary: { total: number; succeeded: number; failed: number };
-            };
-
             const updatedQueue = fileQueue.map((qf) => {
-                const result = uploadPayload.results.find(r => r.fileName === qf.file.name);
+                if (qf.documentId || qf.status === "processed") return qf;
+                const result = uploadPayload.results.find(r => r.index === pendingUploads.indexOf(qf));
 
                 if (!result) {
                     return { ...qf, status: 'error' as const, error: 'Unknown result' };
@@ -345,7 +343,7 @@ export function SalesReportsPanel() {
             setFileQueue(updatedQueue);
 
             const uploadedIds = updatedQueue
-                .filter(qf => qf.status === 'uploaded' && qf.documentId)
+                .filter(qf => qf.status !== 'processed' && qf.documentId)
                 .map(qf => qf.documentId!);
 
             if (uploadedIds.length === 0) {
@@ -375,6 +373,12 @@ export function SalesReportsPanel() {
                     results: Array<{ id: string; status: string; error?: string }>;
                     summary: { total: number; succeeded: number; needsReview: number; failed: number };
                 };
+
+                setFileQueue(previous => previous.map(qf => {
+                    const result = processPayload.results.find(result => result.id === qf.documentId);
+                    if (!result) return qf;
+                    return { ...qf, status: result.status === 'failed' ? 'error' : 'processed', error: result.error };
+                }));
 
                 const processed = i + chunk.length;
 
@@ -487,6 +491,7 @@ export function SalesReportsPanel() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     publish,
+                    expectedUpdatedAt: selectedReport.updated_at,
                     report: {
                         reportDate: editState.reportDate,
                         cashierName: editState.cashierName,

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { jsonError, requireAuthenticatedSupabase, supabaseErrorStatus } from '@/app/api/api-utils';
+import { jsonError, requireAdminSupabase, supabaseErrorStatus } from '@/app/api/api-utils';
 import { generateTimeSlots } from '@/lib/availability';
 import { loadBookingAvailabilityResources } from '@/lib/booking-availability';
 import { isBookingDateWithinWindow, isBookingSlotElapsed } from '@/lib/booking-schedule';
@@ -11,7 +11,7 @@ import { isBookingDateWithinWindow, isBookingSlotElapsed } from '@/lib/booking-s
  * usually booked into the current hour.
  */
 export async function GET(request: Request) {
-    const auth = await requireAuthenticatedSupabase();
+    const auth = await requireAdminSupabase();
 
     if (auth.response) {
         return auth.response;

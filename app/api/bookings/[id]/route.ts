@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { jsonError, requireAuthenticatedSupabase, supabaseErrorStatus } from '@/app/api/api-utils';
+import { jsonError, requireAdminSupabase, supabaseErrorStatus } from '@/app/api/api-utils';
 import { z } from 'zod';
 import { bookingUpdateSchema } from '../update-schema';
 
@@ -10,7 +10,7 @@ export async function GET(
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
-        const auth = await requireAuthenticatedSupabase();
+        const auth = await requireAdminSupabase();
 
         if (auth.response) {
             return auth.response;
@@ -48,7 +48,7 @@ export async function PUT(
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
-        const auth = await requireAuthenticatedSupabase();
+        const auth = await requireAdminSupabase();
 
         if (auth.response) {
             return auth.response;
@@ -96,7 +96,7 @@ export async function DELETE(
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
-        const auth = await requireAuthenticatedSupabase();
+        const auth = await requireAdminSupabase();
 
         if (auth.response) {
             return auth.response;

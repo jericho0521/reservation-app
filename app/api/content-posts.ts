@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase-server";
 import { supabase as createPublicSupabase } from "@/lib/supabase";
-import { jsonError, requireAuthenticatedSupabase, supabaseErrorStatus } from "@/app/api/api-utils";
+import { jsonError, requireAdminSupabase, supabaseErrorStatus } from "@/app/api/api-utils";
 import {
   normalizeBlogPostInput,
   type BlogPostRecord,
@@ -69,7 +69,7 @@ export async function listContentPosts(request: Request, section: ContentSection
 }
 
 export async function createContentPost(request: Request, section: ContentSectionType) {
-  const { response, supabase, user } = await requireAuthenticatedSupabase();
+  const { response, supabase, user } = await requireAdminSupabase();
   if (response) return response;
 
   try {
@@ -97,7 +97,7 @@ export async function createContentPost(request: Request, section: ContentSectio
 }
 
 export async function getContentPost(id: string, section: ContentSectionType) {
-  const { response, supabase } = await requireAuthenticatedSupabase();
+  const { response, supabase } = await requireAdminSupabase();
   if (response) return response;
 
   try {
@@ -120,7 +120,7 @@ export async function getContentPost(id: string, section: ContentSectionType) {
 }
 
 export async function updateContentPost(request: Request, id: string, section: ContentSectionType) {
-  const { response, supabase } = await requireAuthenticatedSupabase();
+  const { response, supabase } = await requireAdminSupabase();
   if (response) return response;
 
   try {
@@ -150,7 +150,7 @@ export async function updateContentPost(request: Request, id: string, section: C
 }
 
 export async function archiveContentPost(id: string, section: ContentSectionType) {
-  const { response, supabase } = await requireAuthenticatedSupabase();
+  const { response, supabase } = await requireAdminSupabase();
   if (response) return response;
 
   try {

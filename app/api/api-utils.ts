@@ -4,10 +4,11 @@ import { createClient } from "@/lib/supabase-server";
 export type AuthenticatedSupabase = Awaited<ReturnType<typeof createClient>>;
 
 interface AuthCapableClient {
+  rpc: (name: "is_admin") => PromiseLike<{ data: unknown; error: unknown }>;
   auth: {
     getUser: () => Promise<{
       data: {
-        user: unknown | null;
+        user: { id: string } | null;
       };
       error: unknown;
     }>;
@@ -46,16 +47,16 @@ type AuthResult<Client> = {
 } | {
   response: null;
   supabase: Client;
-  user: unknown;
+  user: { id: string };
 };
 
-export async function requireAuthenticatedSupabase(): Promise<AuthResult<AuthenticatedSupabase>>;
-export async function requireAuthenticatedSupabase<
+export async function requireAdminSupabase(): Promise<AuthResult<AuthenticatedSupabase>>;
+export async function requireAdminSupabase<
   Client extends AuthCapableClient,
 >(
   createSupabaseClient: () => Promise<Client>,
 ): Promise<AuthResult<Client>>;
-export async function requireAuthenticatedSupabase<Client extends AuthCapableClient>(
+export async function requireAdminSupabase<Client extends AuthCapableClient>(
   createSupabaseClient?: () => Promise<Client>,
 ) {
   const supabase = createSupabaseClient
@@ -69,6 +70,11 @@ export async function requireAuthenticatedSupabase<Client extends AuthCapableCli
       supabase,
       user: null,
     };
+  }
+
+  const { data: isAdmin, error: roleError } = await supabase.rpc("is_admin");
+  if (roleError || isAdmin !== true) {
+    return { response: jsonError("Administrator access required", 403), supabase, user: null };
   }
 
   return {

@@ -74,3 +74,33 @@ describe("blogPostInputSchema", () => {
     );
   });
 });
+
+describe('public content validation', () => {
+  it('rejects invalid publication dates', () => {
+    for (const publishedAt of ['nonsense', '2026-02-30T12:00:00Z']) {
+      assert.equal(blogPostInputSchema.safeParse({ title: 'Post', content: 'Text', publishedAt }).success, false);
+    }
+  });
+  it('rejects unsupported remote cover URLs', () => {
+    assert.equal(blogPostInputSchema.safeParse({ title: 'Post', content: 'Text', coverImageUrl: 'https://untrusted.test/image.jpg' }).success, false);
+  });
+});
+
+describe('cover image allowlist', () => {
+  it('accepts local images and only the configured public storage bucket', async () => {
+    const { isSupportedCoverImage, contentImagePatterns } = await import('./content-images');
+    const previous = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://storage.example.test';
+    try {
+      assert.equal(isSupportedCoverImage('/images/cover.jpg'), true);
+      assert.equal(isSupportedCoverImage('https://storage.example.test/storage/v1/object/public/blog-assets/cover.jpg'), true);
+      for (const value of ['//evil.test/image.jpg', '/images/../private.jpg', 'https://storage.example.test/storage/v1/object/public/private/cover.jpg', 'https://storage.example.test.evil.test/storage/v1/object/public/blog-assets/a.jpg']) {
+        assert.equal(isSupportedCoverImage(value), false);
+      }
+      assert.equal(contentImagePatterns()[0].hostname, 'storage.example.test');
+    } finally {
+      if (previous === undefined) delete process.env.NEXT_PUBLIC_SUPABASE_URL;
+      else process.env.NEXT_PUBLIC_SUPABASE_URL = previous;
+    }
+  });
+});

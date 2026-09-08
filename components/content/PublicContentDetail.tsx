@@ -1,4 +1,5 @@
 import Image from "next/image";
+import { isSupportedCoverImage } from "@/lib/content-images";
 import Link from "next/link";
 import { ArrowLeft, CalendarDays } from "lucide-react";
 import { getSectionLabels, type BlogPostRecord, type ContentSectionType } from "@/lib/blogs";
@@ -10,7 +11,7 @@ interface PublicContentDetailProps {
 }
 
 function formatDate(value: string | null) {
-  if (!value) return "Unpublished";
+  if (!value || !Number.isFinite(Date.parse(value))) return "Unpublished";
   return new Intl.DateTimeFormat("en-MY", {
     month: "long",
     day: "numeric",
@@ -37,10 +38,10 @@ export function PublicContentDetail({ section, post }: PublicContentDetailProps)
           </div>
         </header>
 
-        {post.cover_image_url && (
+        {isSupportedCoverImage(post.cover_image_url) && (
           <div className="container mx-auto max-w-5xl px-6 pt-10">
             <div className="relative h-[360px] overflow-hidden rounded-2xl border border-white/10 bg-white/5">
-              <Image src={post.cover_image_url} alt="" fill className="object-cover" priority sizes="(min-width: 1024px) 960px, 100vw" />
+              <Image src={post.cover_image_url!} alt="" fill className="object-cover" priority sizes="(min-width: 1024px) 960px, 100vw" />
             </div>
           </div>
         )}

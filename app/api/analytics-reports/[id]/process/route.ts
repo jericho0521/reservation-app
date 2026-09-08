@@ -28,10 +28,10 @@ export async function POST(
       return NextResponse.json({ error: "Sales report not found" }, { status: 404 });
     }
 
-    const result = await runSalesReportPipeline(id);
+    const result = await runSalesReportPipeline(id, supabase);
 
     if (result.error) {
-      return NextResponse.json({ error: result.error }, { status: 500 });
+      return NextResponse.json({ error: result.error }, { status: result.status === "conflict" ? 409 : 500 });
     }
 
     return NextResponse.json({
@@ -45,18 +45,8 @@ export async function POST(
       return salesReportSetupResponse();
     }
 
-    const message = error instanceof Error ? error.message : "Unknown extraction error";
     console.error("Failed to process sales report:", error);
 
-    await supabase
-      .from("sales_report_documents")
-      .update({
-        status: "failed",
-        extraction_errors: [message],
-        processed_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", id);
 
     return NextResponse.json({ error: "Failed to process sales report" }, { status: 500 });
   }

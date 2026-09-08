@@ -27,6 +27,8 @@ export function SeatMaintenanceManager({ userEmail }: SeatMaintenanceManagerProp
     const [savedState, setSavedState] = useState({ seats: [] as string[], reason: '' });
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
+    const [loadedServiceId, setLoadedServiceId] = useState('');
+    const canEdit = loadedServiceId === selectedServiceId && Boolean(selectedServiceId) && !isSaving;
     const [notice, setNotice] = useState<{ tone: 'error' | 'success'; message: string } | null>(null);
     const selectedService = useMemo(
         () => services.find(service => service.id === selectedServiceId) ?? null,
@@ -81,6 +83,10 @@ export function SeatMaintenanceManager({ userEmail }: SeatMaintenanceManagerProp
         }
 
         let mounted = true;
+        setLoadedServiceId('');
+        setMaintenanceSeats([]);
+        setReason('');
+        setSavedState({ seats: [], reason: '' });
 
         async function loadMaintenanceSeats() {
             setNotice(null);
@@ -97,6 +103,7 @@ export function SeatMaintenanceManager({ userEmail }: SeatMaintenanceManagerProp
                 setMaintenanceSeats(seats);
                 setReason(savedReason);
                 setSavedState({ seats, reason: savedReason.trim() });
+                setLoadedServiceId(selectedServiceId);
             } catch {
                 if (mounted) setNotice({ tone: 'error', message: 'Seat maintenance could not be loaded.' });
             }
@@ -116,7 +123,7 @@ export function SeatMaintenanceManager({ userEmail }: SeatMaintenanceManagerProp
     };
 
     const saveMaintenanceSeats = async () => {
-        if (!selectedServiceId) return;
+        if (!canEdit) return;
 
         setIsSaving(true);
         setNotice(null);
@@ -164,7 +171,7 @@ export function SeatMaintenanceManager({ userEmail }: SeatMaintenanceManagerProp
                             type="button"
                             className="admin-primary-button"
                             onClick={() => void saveMaintenanceSeats()}
-                            disabled={isSaving || !selectedServiceId || !isDirty}
+                            disabled={!canEdit || !isDirty}
                             title={isDirty ? 'Save your changes' : 'No changes to save'}
                         >
                             <Save aria-hidden="true" />
@@ -183,13 +190,13 @@ export function SeatMaintenanceManager({ userEmail }: SeatMaintenanceManagerProp
                 <div className="admin-maintenance-toolbar">
                     <label>
                         <span>Service</span>
-                        <select value={selectedServiceId} onChange={event => setSelectedServiceId(event.target.value)} disabled={isLoading}>
+                        <select value={selectedServiceId} onChange={event => setSelectedServiceId(event.target.value)} disabled={isLoading || isSaving}>
                             {services.map(service => <option key={service.id} value={service.id}>{service.name}</option>)}
                         </select>
                     </label>
                     <label className="admin-reason-field">
                         <span>Maintenance note <small>(optional, internal only)</small></span>
-                        <input value={reason} onChange={event => setReason(event.target.value)} placeholder="Wheel, pedals, PC, or other repair details" />
+                        <input disabled={!canEdit} value={reason} onChange={event => setReason(event.target.value)} placeholder="Wheel, pedals, PC, or other repair details" />
                     </label>
                 </div>
 
@@ -219,6 +226,7 @@ export function SeatMaintenanceManager({ userEmail }: SeatMaintenanceManagerProp
                                                     key={seatLabel}
                                                     type="button"
                                                     className={blocked ? 'is-blocked' : ''}
+                                                    disabled={!canEdit}
                                                     onClick={() => toggleSeat(seatLabel)}
                                                     aria-pressed={blocked}
                                                     aria-label={`${seatLabel}, ${blocked ? 'under maintenance' : 'available'}`}

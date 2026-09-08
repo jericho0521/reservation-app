@@ -1,5 +1,6 @@
 param(
   [string]$SupabaseDockerPath = "~/self-hosted/supabase/docker",
+  [ValidatePattern("^[a-zA-Z0-9][a-zA-Z0-9_-]*$")]
   [string]$TunnelName = "local-supabase",
   [string]$LocalSupabaseUrl = "http://localhost:8000",
   [string]$PublicSupabaseUrl = "https://supabase.jerichofoong.com"
@@ -17,7 +18,9 @@ function Test-HttpEndpoint($Url) {
     return "HTTP $($response.StatusCode)"
   } catch {
     if ($_.Exception.Response) {
-      return "HTTP $([int]$_.Exception.Response.StatusCode)"
+      $status = [int]$_.Exception.Response.StatusCode
+      if ($status -in @(401, 403, 404)) { return "HTTP $status" }
+      throw
     }
 
     throw
@@ -64,7 +67,10 @@ Write-Host "$LocalSupabaseUrl responded with $localStatus."
 
 Write-Step "Starting Cloudflare Tunnel"
 $existingTunnel = Get-CimInstance Win32_Process -Filter "name = 'cloudflared.exe'" -ErrorAction SilentlyContinue |
-  Where-Object { $_.CommandLine -like "*$TunnelName*" }
+  Where-Object {
+    $tokens = [regex]::Matches($_.CommandLine, '(?:[^\s"]+|"[^"]*")+') | ForEach-Object { $_.Value.Trim('"') }
+    $tokens.Count -ge 4 -and $tokens[1] -ceq 'tunnel' -and $tokens[2] -ceq 'run' -and $tokens[-1] -ceq $TunnelName
+  }
 
 if ($existingTunnel) {
   Write-Host "Cloudflare Tunnel '$TunnelName' already appears to be running."
@@ -80,7 +86,7 @@ try {
   $publicStatus = Test-HttpEndpoint $PublicSupabaseUrl
   Write-Host "$PublicSupabaseUrl responded with $publicStatus."
 } catch {
-  Write-Warning "Could not reach $PublicSupabaseUrl yet. Check that Cloudflare is active and the tunnel window is connected."
+  throw "Public Supabase endpoint is unavailable. Verify the tunnel and retry."
 }
 
 Write-Step "Ready"

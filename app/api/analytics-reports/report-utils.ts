@@ -199,6 +199,9 @@ export async function saveNormalizedSalesReport({
   const evaluation = evaluateSalesReportForPublishing(normalized, {
     hasPublishedReportForDate: hasDuplicatePublishedDate,
   });
+  if (forcePublish && normalized.validationWarnings.some(warning => /^(Missing|Invalid)/.test(warning))) {
+    return { error: NextResponse.json({ error: "Correct invalid or missing report values before publishing." }, { status: 400 }) };
+  }
   const finalEvaluation = forcePublish
     ? {
       ...evaluation,

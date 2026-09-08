@@ -37,6 +37,9 @@ export function isSupabaseNotFoundError(error: unknown) {
 }
 
 export function supabaseErrorStatus(error: unknown) {
+  const code = error && typeof error === 'object' ? (error as { code?: string }).code : undefined;
+  if (code === '23P01' || code === '40001' || code === '23505') return 409;
+  if (code === '23514' || code === '22007' || code === '22008') return 400;
   return isSupabaseNotFoundError(error) ? 404 : 500;
 }
 

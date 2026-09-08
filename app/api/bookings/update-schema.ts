@@ -9,8 +9,8 @@ export const bookingUpdateSchema = z.object({
     booking_date: z.string().min(1).optional(),
     start_time: z.string().min(1).optional(),
     end_time: z.string().min(1).optional(),
-    seats_booked: z.number().positive().optional(),
-    seat_labels: z.array(z.string()).optional(),
+    seats_booked: z.number().int().positive().optional(),
+    seat_labels: z.array(z.string().regex(/^RS(?:[1-9]|1[0-6])$/)).max(16).refine(labels => new Set(labels).size === labels.length, 'Seat labels must be unique').optional(),
     interface_type: z.enum(BOOKING_INTERFACE_TYPES).optional(),
     status: z.enum(ADMIN_BOOKING_STATUSES).optional(),
 }).strict().refine(value => Object.keys(value).length > 0, {

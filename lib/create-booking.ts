@@ -151,6 +151,8 @@ export async function createConfirmedBooking(
         .single();
 
     if (error) {
+        if (error.code === '23P01') throw new BookingCreationError('The selected capacity or seats are no longer available', 409);
+        if (error.code === '23514') throw new BookingCreationError('Invalid booking schedule or seat selection', 400);
         throw error;
     }
 

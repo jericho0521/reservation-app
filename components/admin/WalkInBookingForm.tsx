@@ -55,6 +55,8 @@ function formatLongDate(date: string) {
 }
 
 export function WalkInBookingForm({ userEmail, today, maxDate }: WalkInBookingFormProps) {
+    const submissionKey = useRef(crypto.randomUUID());
+    const previousPayload = useRef<string | null>(null);
     const [services, setServices] = useState<Service[]>([]);
     const [serviceId, setServiceId] = useState('');
     const [date, setDate] = useState(today);
@@ -211,6 +213,7 @@ export function WalkInBookingForm({ userEmail, today, maxDate }: WalkInBookingFo
     );
 
     const resetForm = () => {
+        submissionKey.current = crypto.randomUUID();
         setCreated(null);
         setSubmitError(null);
         setStartTime('');
@@ -227,25 +230,28 @@ export function WalkInBookingForm({ userEmail, today, maxDate }: WalkInBookingFo
         event.preventDefault();
         if (!canSubmit) return;
 
+        const requestBody = JSON.stringify({
+            service_id: serviceId,
+            user_name: customerName.trim(),
+            user_email: customerEmail.trim(),
+            user_phone: customerPhone.trim(),
+            booking_date: date,
+            start_time: startTime,
+            end_time: endTime,
+            seats_booked: seatsBooked,
+            seat_labels: usesSeatMap ? seatLabels : undefined,
+            interface_type: 'walk_in',
+        });
+        if (previousPayload.current !== requestBody) submissionKey.current = crypto.randomUUID();
+        previousPayload.current = requestBody;
         setIsSubmitting(true);
         setSubmitError(null);
 
         try {
             const response = await fetch('/api/admin/bookings', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    service_id: serviceId,
-                    user_name: customerName.trim(),
-                    user_email: customerEmail.trim(),
-                    user_phone: customerPhone.trim(),
-                    booking_date: date,
-                    start_time: startTime,
-                    end_time: endTime,
-                    seats_booked: seatsBooked,
-                    seat_labels: usesSeatMap ? seatLabels : undefined,
-                    interface_type: 'walk_in',
-                }),
+                headers: { 'Content-Type': 'application/json', 'Idempotency-Key': submissionKey.current },
+                body: requestBody,
             });
             const payload = await response.json().catch(() => null) as (CreatedBooking & {
                 error?: string;

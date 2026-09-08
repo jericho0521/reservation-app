@@ -12,4 +12,6 @@ psql -v ON_ERROR_STOP=1 -f supabase/base-schema.sql
 psql -v ON_ERROR_STOP=1 -f supabase/walk-in-bookings.sql
 psql -v ON_ERROR_STOP=1 -f supabase/booking-integrity.sql
 psql -v ON_ERROR_STOP=1 -f tests/sql/booking-integrity.sql
+psql -v ON_ERROR_STOP=1 -f supabase/request-controls.sql
+psql -v ON_ERROR_STOP=1 -f tests/sql/request-controls.sql
 python3 tests/sql/booking-concurrency.py

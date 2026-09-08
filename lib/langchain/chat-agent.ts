@@ -1,7 +1,7 @@
+import { RequestControlError, type BookingRequestContext } from "@/lib/request-controls";
 import { z } from "zod";
 import { tool } from "@langchain/core/tools";
 import { createReactAgent } from "@langchain/langgraph/prebuilt";
-import { MemorySaver } from "@langchain/langgraph";
 import {
   HumanMessage,
   AIMessage,
@@ -379,7 +379,8 @@ export async function createBooking(
   seats: number,
   userName: string,
   userEmail: string,
-  userPhone: string
+  userPhone: string,
+  requestContext: BookingRequestContext,
 ) {
   const service = await getServiceByName(serviceName);
   if (!service) return { success: false, error: "Service not found" };
@@ -394,7 +395,7 @@ export async function createBooking(
       end_time: endTime,
       seats_booked: seats,
       interface_type: "chat",
-    }));
+    }), requestContext);
 
     return {
       success: true,
@@ -403,6 +404,7 @@ export async function createBooking(
       message: `Booking confirmed! ${seats} seat(s) on ${date} from ${startTime} to ${endTime}.`,
     };
   } catch (error) {
+    if (error instanceof RequestControlError) throw error;
     if (error instanceof BookingCreationError) {
       return { success: false, error: error.message };
     }
@@ -418,7 +420,6 @@ function createChatAgent() {
   return createReactAgent({
     llm,
     tools: [getServicesTool, checkAvailabilityTool, prepareBookingTool],
-    checkpointSaver: new MemorySaver(),
   });
 }
 
@@ -452,7 +453,7 @@ export async function runChatAgent(
   try {
     const result = await agent.invoke(
       { messages: langChainMessages },
-      { configurable: { thread_id: threadId } }
+      { configurable: { thread_id: threadId }, recursionLimit: 8, signal: AbortSignal.timeout(30_000) }
     );
 
     const resultMessages = result.messages as BaseMessage[];

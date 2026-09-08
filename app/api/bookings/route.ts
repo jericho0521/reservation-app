@@ -1,3 +1,5 @@
+import { bookingRequestContext, RequestControlError } from '@/lib/request-controls';
+import { readLimitedJson, RequestBodyError } from '@/lib/request-body';
 import { NextResponse, NextRequest } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import {
@@ -63,9 +65,10 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: Request) {
     try {
-        const body = await request.json();
+        const body = await readLimitedJson(request);
         const { service_id: serviceId, ...bookingInput } = formBookingRequestSchema.parse(body);
         const validatedData = validateBookingSchedule(bookingInput);
+        const requestContext = bookingRequestContext(request);
 
         const { data: service, error: serviceError } = await supabase()
             .from('services')
@@ -83,10 +86,11 @@ export async function POST(request: Request) {
         const booking = await createConfirmedBooking({
             id: serviceId,
             ...service,
-        }, validatedData);
+        }, validatedData, requestContext);
 
         return NextResponse.json(booking, { status: 201 });
     } catch (error) {
+        if (error instanceof RequestControlError || error instanceof RequestBodyError) return jsonError(error.message, error.status);
         if (error instanceof BookingCreationError) {
             return jsonError(error.message, error.status, error.details);
         }

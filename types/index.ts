@@ -41,6 +41,7 @@ export interface TimeRangeSelection {
 }
 
 export interface BookingConfirmationData {
+    confirmationToken?: string;
     service: string;
     date: string;
     time: string;

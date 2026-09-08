@@ -52,21 +52,26 @@ export function ContentEditor({ section, post, userEmail }: ContentEditorProps) 
     setIsSaving(true);
     setError(null);
 
-    const response = await fetch(post ? `${apiBase}/${post.id}` : apiBase, {
-      method: post ? "PATCH" : "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(form),
-    });
+    try {
+      const response = await fetch(post ? `${apiBase}/${post.id}` : apiBase, {
+        method: post ? "PATCH" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form),
+      });
 
-    if (!response.ok) {
-      const body = await response.json().catch(() => ({}));
-      setError(typeof body.error === "string" ? body.error : `The ${singular} could not be saved. Try again.`);
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({}));
+        setError(typeof body.error === "string" ? body.error : `The ${singular} could not be saved. Try again.`);
+        return;
+      }
+
+      router.push(labels.adminPath);
+      router.refresh();
+    } catch {
+      setError(`The ${singular} could not be saved. Check your connection and try again.`);
+    } finally {
       setIsSaving(false);
-      return;
     }
-
-    router.push(labels.adminPath);
-    router.refresh();
   };
 
   return (
@@ -124,7 +129,7 @@ export function ContentEditor({ section, post, userEmail }: ContentEditorProps) 
 
               <label className="admin-field">
                 <span>Cover image URL <small>optional</small></span>
-                <input value={form.coverImageUrl} onChange={(event) => setField("coverImageUrl", event.target.value)} placeholder="https://" />
+                <input value={form.coverImageUrl} onChange={(event) => setField("coverImageUrl", event.target.value)} placeholder="/images/cover.jpg or your public blog-assets URL" />
               </label>
             </fieldset>
 
@@ -143,7 +148,7 @@ export function ContentEditor({ section, post, userEmail }: ContentEditorProps) 
                 </label>
                 <label className="admin-field">
                   <span>Publish date <small>optional</small></span>
-                  <input value={form.publishedAt ?? ""} onChange={(event) => setField("publishedAt", event.target.value)} placeholder="Filled in automatically when published" />
+                  <input value={form.publishedAt ?? ""} onChange={(event) => setField("publishedAt", event.target.value)} placeholder="2026-09-08T12:00:00+08:00 (optional)" />
                 </label>
               </div>
             </fieldset>

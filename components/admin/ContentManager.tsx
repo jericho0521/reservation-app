@@ -52,19 +52,24 @@ export function ContentManager({ section, posts, userEmail }: ContentManagerProp
     setArchivingId(post.id);
     setNotice(null);
 
-    const response = await fetch(`/api/${section === "blog" ? "blogs" : "updates"}/${post.id}`, {
-      method: "DELETE",
-    });
+    try {
+      const response = await fetch(`/api/${section === "blog" ? "blogs" : "updates"}/${post.id}`, {
+        method: "DELETE",
+      });
 
-    setArchivingId(null);
 
-    if (!response.ok) {
-      setNotice({ tone: "error", message: `"${post.title}" could not be archived. Try again.` });
-      return;
+      if (!response.ok) {
+        setNotice({ tone: "error", message: `"${post.title}" could not be archived. Try again.` });
+        return;
+      }
+
+      setNotice({ tone: "success", message: `"${post.title}" is archived and no longer public.` });
+      router.refresh();
+    } catch {
+      setNotice({ tone: "error", message: `"${post.title}" could not be archived. Check your connection and try again.` });
+    } finally {
+      setArchivingId(null);
     }
-
-    setNotice({ tone: "success", message: `"${post.title}" is archived and no longer public.` });
-    router.refresh();
   };
 
   return (

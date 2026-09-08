@@ -407,7 +407,7 @@ export default function AdminDashboard({
                             <input
                                 type="date"
                                 value={selectedDate}
-                                onChange={event => setSelectedDate(event.target.value)}
+                                onChange={event => { if (/^\d{4}-\d{2}-\d{2}$/.test(event.target.value)) setSelectedDate(event.target.value); }}
                                 aria-label="Selected booking date"
                             />
                         </label>

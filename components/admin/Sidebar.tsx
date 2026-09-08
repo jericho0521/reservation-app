@@ -61,6 +61,7 @@ export function Sidebar({
     const router = useRouter();
     const [mobileOpen, setMobileOpen] = useState(false);
     const [isSigningOut, setIsSigningOut] = useState(false);
+    const [signOutError, setSignOutError] = useState<string | null>(null);
     const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null);
 
     const isActive = (path: string) => (
@@ -69,10 +70,18 @@ export function Sidebar({
 
     const handleSignOut = async () => {
         setIsSigningOut(true);
-        supabaseRef.current ??= createClient();
-        await supabaseRef.current.auth.signOut();
-        router.push('/admin/login');
-        router.refresh();
+        setSignOutError(null);
+        try {
+            supabaseRef.current ??= createClient();
+            const { error } = await supabaseRef.current.auth.signOut();
+            if (error) throw error;
+            router.push('/admin/login');
+            router.refresh();
+        } catch {
+            setSignOutError('Sign out failed. Your session is still active. Please try again.');
+        } finally {
+            setIsSigningOut(false);
+        }
     };
 
     return (
@@ -144,6 +153,7 @@ export function Sidebar({
                 </nav>
 
                 <div className="admin-sidebar-footer">
+                    {signOutError && <p role="alert">{signOutError}</p>}
                     <a
                         href="/"
                         target="_blank"

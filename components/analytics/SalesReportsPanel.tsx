@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
     AlertTriangle,
     CheckCircle2,
@@ -197,11 +197,34 @@ export function SalesReportsPanel() {
     const [selectedMonth, setSelectedMonth] = useState(currentMonthKey);
     const [summary, setSummary] = useState<SalesReportSummary | null>(null);
     const [summaryLoading, setSummaryLoading] = useState(false);
+    const summaryGeneration = useRef(0);
 
     const selectedReport = useMemo(
         () => reports.find(report => report.id === selectedId) ?? null,
         [reports, selectedId],
     );
+
+    const loadSummary = useCallback(async () => {
+        const generation = ++summaryGeneration.current;
+        setSummary(null);
+        setSummaryLoading(true);
+
+        try {
+            const [y, m] = selectedMonth.split('-');
+            const response = await fetch(`/api/analytics-reports/summary?year=${y}&month=${m}`);
+
+            if (response.ok) {
+                const data = await response.json() as SalesReportSummary;
+                if (generation === summaryGeneration.current) setSummary(data);
+            } else {
+                if (generation === summaryGeneration.current) setSummary(null);
+            }
+        } catch {
+            if (generation === summaryGeneration.current) setSummary(null);
+        } finally {
+            if (generation === summaryGeneration.current) setSummaryLoading(false);
+        }
+    }, [selectedMonth]);
 
     useEffect(() => {
         void refreshReports();
@@ -209,7 +232,8 @@ export function SalesReportsPanel() {
 
     useEffect(() => {
         void loadSummary();
-    }, [selectedMonth]);
+        return () => { summaryGeneration.current += 1; };
+    }, [loadSummary]);
 
     useEffect(() => {
         if (!selectedId && reports[0]) {
@@ -257,25 +281,6 @@ export function SalesReportsPanel() {
         }
     };
 
-    const loadSummary = async () => {
-        setSummaryLoading(true);
-
-        try {
-            const [y, m] = selectedMonth.split('-');
-            const response = await fetch(`/api/analytics-reports/summary?year=${y}&month=${m}`);
-
-            if (response.ok) {
-                const data = await response.json() as SalesReportSummary;
-                setSummary(data);
-            } else {
-                setSummary(null);
-            }
-        } catch {
-            setSummary(null);
-        } finally {
-            setSummaryLoading(false);
-        }
-    };
 
     const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
         const selected = event.target.files;

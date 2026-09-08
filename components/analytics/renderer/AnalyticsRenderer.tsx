@@ -1,5 +1,7 @@
 'use client';
 
+import { parseAnalyticsSpec } from './spec';
+
 import { Fragment, useMemo, useState, type Dispatch, type ReactNode, type SetStateAction } from 'react';
 import {
     DndContext,
@@ -224,7 +226,7 @@ function getDragPreviewMeta(element: AnalyticsElement | undefined): { title: str
 }
 
 export function AnalyticsRenderer({
-    spec,
+    spec: inputSpec,
     uiState,
     setUiState,
     onAction,
@@ -233,6 +235,10 @@ export function AnalyticsRenderer({
     layoutState,
     onLayoutStateChange,
 }: AnalyticsRendererProps) {
+    const spec = useMemo(() => {
+        const parsed = parseAnalyticsSpec(inputSpec);
+        return parsed.success ? parsed.data : null;
+    }, [inputSpec]);
     const [activeItemId, setActiveItemId] = useState<string | null>(null);
 
     const sensors = useSensors(
@@ -252,7 +258,7 @@ export function AnalyticsRenderer({
     const activePreview = activeItemId && spec ? getDragPreviewMeta(spec.elements[activeItemId]) : null;
 
     if (!spec) {
-        return null;
+        return inputSpec ? <p role="alert">Invalid analytics dashboard. Please regenerate it.</p> : null;
     }
 
     const runAction = (action: AnalyticsAction) => {

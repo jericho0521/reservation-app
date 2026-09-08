@@ -53,7 +53,7 @@ test("normalizeExtractedSalesReport parses dates, RM amounts, payments, and conf
   assert.deepEqual(report.validationWarnings, []);
 });
 
-test("evaluateSalesReportForPublishing auto-publishes high-confidence valid reports", () => {
+test("evaluateSalesReportForPublishing requires human review even for high-confidence valid reports", () => {
   const report = normalizeExtractedSalesReport({
     reportDate: "2026-04-24",
     topupRegisterAmount: 75,
@@ -67,8 +67,8 @@ test("evaluateSalesReportForPublishing auto-publishes high-confidence valid repo
   });
 
   assert.deepEqual(evaluateSalesReportForPublishing(report), {
-    status: "auto_published",
-    isPublished: true,
+    status: "needs_review",
+    isPublished: false,
     warnings: [],
   });
 });
@@ -99,4 +99,18 @@ test("validateSalesReportFile rejects unsupported files", () => {
     "Upload a PDF, JPG, PNG, or WebP sales report.",
   );
   assert.equal(validateSalesReportFile({ name: "report.pdf", type: "application/pdf", size: 100 }), null);
+});
+
+test('impossible report dates require review', () => {
+  const report = normalizeExtractedSalesReport({ reportDate: '2026-02-30', netSales: 10 });
+  assert.equal(report.reportDate, null);
+});
+test('negative counts remain invalid instead of becoming zero', () => {
+  const report = normalizeExtractedSalesReport({ reportDate: '2026-09-08', netSales: 10, transactionCount: -2 });
+  assert.equal(report.transactionCount, -2);
+  assert.ok(report.validationWarnings.includes('Invalid negative transaction count.'));
+});
+test('timezone-less shifts use the Malaysia business timezone', () => {
+  const report = normalizeExtractedSalesReport({ reportDate: '2026-09-08', shiftStartAt: '2026-09-08 01:30:00' });
+  assert.equal(report.shiftStartAt, '2026-09-07T17:30:00.000Z');
 });
